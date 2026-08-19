@@ -1,0 +1,61 @@
+{
+  "schema_version": "mssr.target_graph.v1",
+  "stamp": 0.0,
+  "global_attributes": {
+    "graph_kind": "target_morphology",
+    "robot_family": "smores_ep",
+    "task_type": "parallel_self_assembly",
+    "morphology_name": "mobile_manipulator8",
+    "module_count": 8,
+    "requires_helping_module": false,
+    "assembly_strategy": "progressive_planar_waves_then_fold",
+    "post_assembly_tilt_tolerance_rad": 0.2,
+    "post_assembly_tilt_groups_by_vertex": [
+      ["v0", "v1", "v2", "v3", "v4"],
+      ["v6"],
+      ["v5"]
+    ],
+    "pre_reconfiguration_tilt_rad_by_vertex": {
+      "v1": 0.0,
+      "v2": 0.0,
+      "v3": 0.0,
+      "v4": 0.0,
+      "v5": 0.0,
+      "v6": 0.0
+    },
+    "post_assembly_tilt_rad_by_vertex": {
+      "v0": 0.0,
+      "v1": -0.20,
+      "v2": 0.0,
+      "v3": -0.20,
+      "v4": 0.0,
+      "v5": 0.75,
+      "v6": 0.65
+    },
+    "post_assembly_pan_rad_by_vertex": {
+      "v7": 0.0
+    },
+    "capabilities": ["flat_locomotion", "high_reach", "manipulation"],
+    "source_reference": "SMORES-EP Parallel Self-Assembly conference demonstration",
+    "description": "Eight-module mobile manipulator. Four serial modules form the longitudinal arm: the first remains grounded as a locomotor attached to the central root, while the following three are carried in the raised section. Non-actuated joints remain structurally held during and after folding."
+  },
+  "nodes": [
+    {"node_id": "v0", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v0", "target_role": "chassis_center", "is_target_root": true}},
+    {"node_id": "v1", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v1", "target_role": "right_drive", "kinematic_axis": "transverse", "top_function": "ground_support"}},
+    {"node_id": "v2", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v2", "target_role": "front_support", "physical_role": "longitudinal_drive", "kinematic_axis": "arm_longitudinal", "top_function": "ground_translation_drive"}},
+    {"node_id": "v3", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v3", "target_role": "left_drive", "kinematic_axis": "transverse", "top_function": "ground_support"}},
+    {"node_id": "v4", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v4", "target_role": "arm_ground_drive", "physical_role": "longitudinal_drive", "kinematic_axis": "arm_longitudinal", "top_function": "ground_translation_drive"}},
+    {"node_id": "v5", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v5", "target_role": "arm_lift"}},
+    {"node_id": "v6", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v6", "target_role": "arm_link"}},
+    {"node_id": "v7", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v7", "target_role": "end_effector"}}
+  ],
+  "edges": [
+    {"module_a_id": "v3", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "LEFT", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v1", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "RIGHT", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v2", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "TOP", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v4", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v5", "module_b_id": "v4", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v6", "module_b_id": "v5", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v7", "module_b_id": "v6", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}}
+  ]
+}

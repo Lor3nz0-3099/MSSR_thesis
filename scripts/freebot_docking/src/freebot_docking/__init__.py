@@ -1,0 +1,1 @@
+"""Physically grounded FreeBOT docking simulation."""

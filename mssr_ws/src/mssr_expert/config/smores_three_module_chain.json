@@ -1,0 +1,76 @@
+{
+  "schema_version": "mssr.target_graph.v1",
+  "stamp": 0.0,
+  "global_attributes": {
+    "graph_kind": "target_morphology",
+    "robot_family": "smores_ep",
+    "task_type": "parallel_self_assembly",
+    "description": "Three SMORES-EP modules connected as a TOP-BOTTOM chain"
+  },
+  "nodes": [
+    {
+      "node_id": "v0",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v0",
+        "target_role": "left_link",
+        "functional_role": {
+          "name": "structural_link",
+          "effective_dof_count": 0
+        }
+      }
+    },
+    {
+      "node_id": "v1",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v1",
+        "target_role": "support",
+        "is_target_root": true,
+        "functional_role": {
+          "name": "support",
+          "effective_dof_count": 0
+        }
+      }
+    },
+    {
+      "node_id": "v2",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v2",
+        "target_role": "right_link",
+        "functional_role": {
+          "name": "structural_link",
+          "effective_dof_count": 0
+        }
+      }
+    }
+  ],
+  "edges": [
+    {
+      "module_a_id": "v0",
+      "module_b_id": "v1",
+      "attributes": {
+        "relation_type": "target_connection",
+        "is_target_edge": true,
+        "face_a": "TOP",
+        "face_b": "BOTTOM",
+        "clocking_quarter_turns": 0
+      }
+    },
+    {
+      "module_a_id": "v1",
+      "module_b_id": "v2",
+      "attributes": {
+        "relation_type": "target_connection",
+        "is_target_edge": true,
+        "face_a": "TOP",
+        "face_b": "BOTTOM",
+        "clocking_quarter_turns": 0
+      }
+    }
+  ]
+}

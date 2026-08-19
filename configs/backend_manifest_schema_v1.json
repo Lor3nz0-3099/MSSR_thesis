@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "mssr.backend_manifest.v1",
+  "title": "MSSR robot backend manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "robot_family",
+    "module_type",
+    "maturity",
+    "resources",
+    "primitives",
+    "connectors",
+    "observations",
+    "validation"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "mssr.backend_manifest.v1"
+    },
+    "robot_family": {
+      "type": "string",
+      "minLength": 1
+    },
+    "module_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "maturity": {
+      "enum": [
+        "experimental",
+        "implementation_complete_pending_validation",
+        "validated",
+        "in_development"
+      ]
+    },
+    "resources": {
+      "type": "object"
+    },
+    "primitives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "resources", "status"]
+      }
+    },
+    "connectors": {
+      "type": "object"
+    },
+    "observations": {
+      "type": "object"
+    },
+    "validation": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": true
+}

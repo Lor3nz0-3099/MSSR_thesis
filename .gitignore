@@ -1,0 +1,75 @@
+# Python
+
+__pycache__/
+
+*.py[cod]
+
+*.egg-info/
+
+.pytest_cache/
+
+# ROS2 / colcon generated
+
+build/
+
+install/
+
+log/
+
+mssr_ws/build/
+
+mssr_ws/install/
+
+mssr_ws/log/
+
+# Runtime logs and datasets
+
+logs/
+
+mssr_ws/logs/
+
+# IDE
+
+.vscode/
+
+.idea/
+
+# Temporary files
+
+*~
+
+*.swp
+
+.DS_Store
+
+# Archives
+
+*.zip
+
+*.tar.gz
+
+# Old invalid git metadata
+
+.git_invalid_pre_refactor_2026-08-19/
+
+# Literature PDFs - kept locally, not versioned
+
+references/
+
+# Heavy CAD source files - runtime uses USD assets
+
+assets/**/cad_source/
+
+assets/smores-ep/SMORES-EP CAD inventor/
+
+Salva con Ctrl+O, Invio, Ctrl+X.
+
+Non ignoriamo invece:
+
+assets/freebot/usd_physics/
+
+assets/freebot/usd_visual/
+
+assets/smores-ep/usd_physics/
+
+assets/smores-ep/usd_visual/

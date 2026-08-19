@@ -1,0 +1,153 @@
+{
+  "schema_version": "mssr.backend_manifest.v1",
+  "robot_family": "smores_ep",
+  "module_type": "smores_ep_enhanced",
+  "maturity": "validated",
+  "description": "CAD-derived dynamic SMORES-EP backend with an enhanced payload requirement.",
+  "kinematics": {
+    "locomotion": "differential_drive",
+    "wheel_radius_m": 0.03106,
+    "wheel_diameter_m": 0.06212,
+    "max_land_speed_m_s": 0.088,
+    "pure_spin": "equal and opposite wheel angular velocities",
+    "pan": "continuous",
+    "tilt_limits_rad": [-1.5707963267948966, 1.5707963267948966],
+    "pan_tilt_coupling": "same two internal motors; mutually exclusive"
+  },
+  "resources": {
+    "locomotion": {
+      "scope": "per_module",
+      "actuators": ["left_wheel", "right_wheel"],
+      "exclusive": true
+    },
+    "internal_motion": {
+      "scope": "per_module",
+      "actuators": ["internal_motor_a", "internal_motor_b"],
+      "modes": ["pan", "tilt"],
+      "exclusive": true
+    },
+    "connector": {
+      "scope": "per_module_face",
+      "exclusive": true
+    },
+    "allowed_concurrency": [
+      ["locomotion", "internal_motion"],
+      ["locomotion", "connector"],
+      ["internal_motion", "connector"],
+      ["resources_on_disjoint_modules"]
+    ],
+    "forbidden_concurrency": [
+      ["pan", "tilt"],
+      ["two_locomotion_goals_on_same_module"]
+    ]
+  },
+  "primitives": [
+    {
+      "name": "drive_to_pose",
+      "resources": ["locomotion"],
+      "status": "implemented"
+    },
+    {
+      "name": "align_faces",
+      "resources": ["locomotion:mobile", "locomotion:target"],
+      "status": "implemented"
+    },
+    {
+      "name": "dock",
+      "resources": ["connector:module_a:face_a", "connector:module_b:face_b"],
+      "status": "implemented"
+    },
+    {
+      "name": "undock",
+      "resources": ["connector:module_a:face_a", "connector:module_b:face_b"],
+      "status": "implemented"
+    },
+    {
+      "name": "set_pan",
+      "resources": ["internal_motion"],
+      "status": "implemented"
+    },
+    {
+      "name": "rotate_pan_by",
+      "resources": ["internal_motion"],
+      "status": "implemented"
+    },
+    {
+      "name": "set_tilt",
+      "resources": ["internal_motion"],
+      "status": "implemented"
+    },
+    {
+      "name": "rotate_tilt_by",
+      "resources": ["internal_motion"],
+      "status": "implemented"
+    }
+  ],
+  "connectors": {
+    "type": "four_face_electropermanent_magnet",
+    "face_ids": ["LEFT", "RIGHT", "TOP", "BOTTOM"],
+    "constraint": "Isaac fixed joint",
+    "attachment_requires": [
+      "explicit endpoint faces",
+      "overlapping face area within tolerance",
+      "opposed normals within tolerance",
+      "quarter-turn-compatible clocking"
+    ],
+    "runtime_topology": "dynamic"
+  },
+  "observations": {
+    "current_mode": "centralized_simulator_ground_truth",
+    "module_fields": [
+      "pose",
+      "twist",
+      "joint_positions",
+      "joint_velocities",
+      "actuator_limits",
+      "connector_states",
+      "role",
+      "functional_role",
+      "health"
+    ],
+    "edge_fields": [
+      "module_endpoints",
+      "connector_endpoints",
+      "connection_state",
+      "relative_transform",
+      "clocking",
+      "joint_type",
+      "allowed_relative_dofs",
+      "edge_role"
+    ],
+    "hardware_equivalent_sensing": [
+      "joint_position",
+      "external_localization"
+    ],
+    "not_claimed_onboard": ["camera", "lidar", "autonomous_scene_perception"]
+  },
+  "functional_requirements": {
+    "tow_attached_payload": true,
+    "cooperative_connected_component_drive": true,
+    "lift_chain_module_count_min": 5,
+    "lift_chain_module_count_target": 7,
+    "profile_interpretation": "requirements for an enhanced SMORES-compatible physical design"
+  },
+  "transport": {
+    "ros_bridge": "external rclpy process plus atomic JSON files",
+    "goal_topic": "/mssr/primitives/goal",
+    "cancel_topic": "/mssr/primitives/cancel",
+    "status_topic": "/mssr/primitives/status",
+    "semantics": "action-like lifecycle with concurrent resource arbitration"
+  },
+  "validation": {
+    "unit_tests": "41_of_41_passed",
+    "shared_graph_builder_tests": "1_of_1_passed",
+    "two_module_isaac_smoke": "passed_120_steps_cpu_physx",
+    "five_module_isaac_smoke": "passed_120_steps_cpu_physx",
+    "physical_hardware": "not_run",
+    "simulation_fixtures_recorded": [
+      "payload overdrive actuator profile",
+      "optional anti-tip ground support",
+      "unbreakable fixed docking joint"
+    ]
+  }
+}

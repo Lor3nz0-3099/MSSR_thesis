@@ -1,0 +1,35 @@
+{
+  "schema_version": "mssr.scenario.v2",
+  "name": "stage0_gap_crossing",
+  "reset_every_steps": 0,
+  "episode_timeout_steps": 5400,
+  "curriculum": {
+    "task_type": "gap_crossing_temporary_bridge",
+    "stage": 0,
+    "difficulty": 0.1
+  },
+  "goal": {
+    "name": "far_side_of_gap",
+    "position": [5.0, 0.0, 0.6],
+    "tolerance": 0.75
+  },
+  "random_spawn": {
+    "module_count": 6,
+    "x_range": [-3.0, -0.5],
+    "y_range": [-1.8, 1.8],
+    "z": 0.6,
+    "min_distance": 1.35,
+    "radius": 0.6,
+    "mass": 5.0,
+    "seed": 100
+  },
+  "gap_regions": [
+    {
+      "name": "central_gap",
+      "center": [2.5, 0.0, 0.0],
+      "size": [1.2, 3.4, 0.2],
+      "required_attachment_modes": ["anchor_link", "bridge_link", "support_contact"]
+    }
+  ],
+  "box_obstacles": []
+}

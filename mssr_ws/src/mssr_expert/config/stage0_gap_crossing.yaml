@@ -1,0 +1,19 @@
+stage:
+  stage_id: 0
+  stage_name: "gap_crossing"
+  task_type: "gap_crossing_temporary_bridge"
+  expert_name: "stage0_gap_crossing"
+  scenario_name: "stage0_gap_crossing"
+  difficulty: 0.10
+  module_count: 6
+  roles:
+    - "anchor"
+    - "bridge_part"
+    - "mobile"
+    - "recovery"
+  attachment_modes:
+    - "rolling_contact"
+    - "anchor_link"
+    - "bridge_link"
+    - "support_contact"
+    - "transfer_link"

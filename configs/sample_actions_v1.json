@@ -1,0 +1,27 @@
+{
+  "schema_version": "mssr.actions.v1",
+  "timestamp": 0.0,
+  "reset": false,
+  "locomotion": {
+    "sphere_0": {
+      "vx": 0.15,
+      "vy": 0.0,
+      "yaw_rate": 0.0
+    },
+    "sphere_1": {
+      "vx": 0.0,
+      "vy": 0.0,
+      "yaw_rate": 0.0
+    }
+  },
+  "magnetic": [
+    {
+      "module_a_id": "sphere_0",
+      "module_b_id": "sphere_1",
+      "command": "attach",
+      "joint_type": "hinge",
+      "joint_axis": "z",
+      "edge_role": "snake_body"
+    }
+  ]
+}

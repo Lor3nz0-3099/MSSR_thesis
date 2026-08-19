@@ -1,0 +1,35 @@
+{
+  "schema_version": "mssr.scenario.v1",
+  "name": "curriculum_01_low_step",
+  "attachment_mode": "continuous",
+  "reset_every_steps": 0,
+  "episode_timeout_steps": 4800,
+  "curriculum": {
+    "task_type": "assemble_reconfigure_step_climb",
+    "stage": 1,
+    "difficulty": 0.4
+  },
+  "goal": {
+    "name": "top_of_low_step",
+    "position": [5.2, 0.0, 1.35],
+    "tolerance": 0.8
+  },
+  "random_spawn": {
+    "module_count": 6,
+    "x_range": [-2.5, 1.0],
+    "y_range": [-2.0, 2.0],
+    "z": 1.0,
+    "min_distance": 1.45,
+    "radius": 0.6,
+    "mass": 0.5,
+    "seed": 200
+  },
+  "box_obstacles": [
+    {
+      "name": "low_step",
+      "position": [4.0, 0.0, 0.175],
+      "size": [1.2, 3.0, 0.35],
+      "color": [0.45, 0.45, 0.5]
+    }
+  ]
+}

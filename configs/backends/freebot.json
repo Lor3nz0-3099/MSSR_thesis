@@ -1,0 +1,71 @@
+{
+  "schema_version": "mssr.backend_manifest.v1",
+  "robot_family": "freebot",
+  "module_type": "freebot_spherical_prototype",
+  "maturity": "in_development",
+  "description": "Spherical FreeBOT prototype backend retained as the second robot family.",
+  "resources": {
+    "locomotion": {
+      "scope": "per_module",
+      "status": "implemented_in_legacy_adapter"
+    },
+    "magnetic_attachment": {
+      "scope": "continuous_surface_region",
+      "status": "prototype"
+    }
+  },
+  "primitives": [
+    {
+      "name": "roll_to",
+      "resources": ["locomotion"],
+      "status": "prototype_implemented"
+    },
+    {
+      "name": "dock_to_surface",
+      "resources": ["locomotion", "magnetic_attachment"],
+      "status": "requires_two_module_validation"
+    },
+    {
+      "name": "attach_as_pivot",
+      "resources": ["magnetic_attachment"],
+      "status": "requires_two_module_validation"
+    },
+    {
+      "name": "rotate_around_attached",
+      "resources": ["locomotion", "magnetic_attachment"],
+      "status": "requires_crawling_validation"
+    },
+    {
+      "name": "climb_on",
+      "resources": ["locomotion", "magnetic_attachment"],
+      "status": "requires_crawling_validation"
+    }
+  ],
+  "connectors": {
+    "type": "continuous_spherical_surface_attachment",
+    "constraint": "prototype magnetic/pivot model",
+    "runtime_topology": "dynamic",
+    "known_gap": "robust physical docking and two-module crawling are not yet validated"
+  },
+  "observations": {
+    "current_mode": "centralized_simulator_ground_truth",
+    "canonical_adapter_status": "partially_migrated",
+    "legacy_fields_to_isolate": [
+      "sphere_radius",
+      "arbitrary_surface_contact",
+      "pivot_attachment"
+    ]
+  },
+  "validation": {
+    "basic_module_control": "prototype_available",
+    "two_module_docking": "not_accepted",
+    "two_module_crawling": "not_accepted",
+    "canonical_state_graph_compatibility": "pending",
+    "canonical_action_compatibility": "pending",
+    "ready_for_deterministic_experts": false
+  },
+  "migration_policy": {
+    "delete_legacy_sphere_code_now": false,
+    "reason": "it is the active FreeBOT backend and must be migrated only after equivalent tests pass"
+  }
+}

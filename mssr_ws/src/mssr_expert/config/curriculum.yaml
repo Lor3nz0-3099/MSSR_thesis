@@ -1,0 +1,76 @@
+curriculum:
+  initial_stage_id: 0
+  difficulty_scheduler:
+    initial_difficulty: 0.10
+    min_difficulty: 0.0
+    max_difficulty: 1.0
+    success_step: 0.05
+    failure_step: 0.025
+  stages:
+    - stage_id: 0
+      stage_name: "gap_crossing"
+      task_type: "gap_crossing_temporary_bridge"
+      expert_name: "stage0_gap_crossing"
+      scenario_name: "stage0_gap_crossing"
+      difficulty: 0.10
+      module_count: 6
+      required_primitives:
+        - "roll_to"
+        - "hold_position"
+        - "dock_to_surface"
+        - "form_temporary_bridge"
+        - "handover_support"
+        - "detach_after_support"
+      success_metrics:
+        - "all_mobile_modules_crossed_gap"
+        - "no_module_fell_into_gap"
+        - "bridge_recovered_or_stable"
+      parameters:
+        gap_width: 1.2
+        bridge_safety_margin: 0.25
+        max_bridge_modules: 4
+    - stage_id: 1
+      stage_name: "obstacle_traversal"
+      task_type: "low_obstacle_climb_over"
+      expert_name: "stage1_obstacle_traversal"
+      scenario_name: "stage1_obstacle_traversal"
+      difficulty: 0.25
+      module_count: 6
+      required_primitives:
+        - "roll_to"
+        - "hold_position"
+        - "dock_to_surface"
+        - "attach_as_pivot"
+        - "rotate_around_attached"
+        - "climb_on"
+      success_metrics:
+        - "climber_height_gain"
+        - "obstacle_crossed"
+        - "support_contacts_stable"
+      parameters:
+        obstacle_height: 0.35
+        support_base_size: 2
+        climb_height_margin: 0.10
+    - stage_id: 2
+      stage_name: "stair_climb"
+      task_type: "multi_step_dynamic_support"
+      expert_name: "stage2_stair_climb"
+      scenario_name: "stage2_stair_climb"
+      difficulty: 0.45
+      module_count: 8
+      required_primitives:
+        - "roll_to"
+        - "hold_position"
+        - "attach_as_pivot"
+        - "climb_on"
+        - "handover_support"
+        - "detach_after_support"
+      success_metrics:
+        - "highest_step_reached"
+        - "frontier_support_advanced"
+        - "group_reached_top"
+      parameters:
+        step_count: 3
+        step_height: 0.30
+        step_depth: 1.0
+        support_frontier_size: 3

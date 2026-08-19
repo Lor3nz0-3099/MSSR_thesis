@@ -1,0 +1,33 @@
+{
+  "schema_version": "mssr.scenario.v2",
+  "name": "stage1_obstacle_traversal_ordered",
+  "reset_every_steps": 0,
+  "episode_timeout_steps": 6000,
+  "curriculum": {
+    "task_type": "low_obstacle_climb_over",
+    "stage": 1,
+    "difficulty": 0.25
+  },
+  "goal": {
+    "name": "after_low_obstacle",
+    "position": [5.2, 0.0, 0.9],
+    "tolerance": 0.8
+  },
+  "modules": [
+    {"index": 0, "module_id": "sphere_0", "position": [-1.2, 1.26, 0.6], "radius": 0.6, "mass": 5.0},
+    {"index": 1, "module_id": "sphere_1", "position": [-1.2, -1.26, 0.6], "radius": 0.6, "mass": 5.0},
+    {"index": 2, "module_id": "sphere_2", "position": [-1.2, 0.0, 0.6], "radius": 0.6, "mass": 5.0},
+    {"index": 3, "module_id": "sphere_3", "position": [0.2, 0.0, 0.6], "radius": 0.6, "mass": 5.0},
+    {"index": 4, "module_id": "sphere_4", "position": [0.2, 1.26, 0.6], "radius": 0.6, "mass": 5.0},
+    {"index": 5, "module_id": "sphere_5", "position": [0.2, -1.26, 0.6], "radius": 0.6, "mass": 5.0}
+  ],
+  "box_obstacles": [
+    {
+      "name": "low_obstacle",
+      "position": [3.0, 0.0, 0.175],
+      "size": [1.0, 3.2, 0.35],
+      "color": [0.45, 0.45, 0.5],
+      "required_attachment_modes": ["surface_pivot", "support_contact", "anchor_link"]
+    }
+  ]
+}

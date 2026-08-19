@@ -1,0 +1,50 @@
+{
+  "schema_version": "mssr.target_graph.v1",
+  "stamp": 0.0,
+  "global_attributes": {
+    "graph_kind": "target_morphology",
+    "robot_family": "smores_ep",
+    "task_type": "parallel_self_assembly",
+    "morphology_name": "rc_car7",
+    "module_count": 7,
+    "capabilities": ["flat_locomotion", "differential_drive", "heavy_push"],
+    "requires_helping_module": false,
+    "assembly_strategy": "progressive_planar_waves_then_fold",
+    "coordinate_post_assembly_tilts": true,
+    "post_assembly_tilt_tolerance_rad": 0.08,
+    "pre_reconfiguration_tilt_rad_by_vertex": {
+      "v3": 0.0,
+      "v4": 0.0,
+      "v5": 0.0,
+      "v6": 0.0
+    },
+    "pre_reconfiguration_tilt_groups_by_vertex": [
+      ["v3", "v4", "v5", "v6"]
+    ],
+    "post_assembly_tilt_rad_by_vertex": {
+      "v3": -0.7853981633974483,
+      "v4": -0.7853981633974483,
+      "v5": -0.7853981633974483,
+      "v6": -0.7853981633974483
+    },
+    "source_reference": "User-defined flattened RC Car7 derived from SMORES-EP",
+    "description": "Three-module TOP-BOTTOM centerline with four BOTTOM-to-lateral wheel modules, followed by coordinated tilt"
+  },
+  "nodes": [
+    {"node_id": "v0", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v0", "target_role": "chassis_center", "is_target_root": true}},
+    {"node_id": "v1", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v1", "target_role": "chassis_left"}},
+    {"node_id": "v2", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v2", "target_role": "chassis_right"}},
+    {"node_id": "v3", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v3", "target_role": "wheel_left_front"}},
+    {"node_id": "v4", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v4", "target_role": "wheel_left_rear"}},
+    {"node_id": "v5", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v5", "target_role": "wheel_right_front"}},
+    {"node_id": "v6", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v6", "target_role": "wheel_right_rear"}}
+  ],
+  "edges": [
+    {"module_a_id": "v1", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v0", "module_b_id": "v2", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v3", "module_b_id": "v1", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "LEFT", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v4", "module_b_id": "v1", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "RIGHT", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v5", "module_b_id": "v2", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "LEFT", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v6", "module_b_id": "v2", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "RIGHT", "clocking_quarter_turns": 0}}
+  ]
+}

@@ -1,0 +1,20 @@
+mssr_expert_node:
+  ros__parameters:
+    observation_topic: "/mssr/state_graph"
+    module_states_topic: "/mssr/module_states"
+    graph_topic: "/mssr/robot_graph"
+    locomotion_command_topic: "/mssr/commands/locomotion"
+    magnetic_command_topic: "/mssr/commands/magnetic"
+    combined_action_topic: "/mssr/actions"
+    expert_state_topic: "/mssr/expert/state"
+    curriculum_state_topic: "/mssr/curriculum/state"
+    dataset_path: "logs/datasets/swarm_expert_curriculum.jsonl"
+    dataset_log_period: 5
+    control_rate_hz: 10.0
+    seed: 100
+    stage_id: 0
+    task_type: "gap_crossing_temporary_bridge"
+    difficulty: 0.10
+    use_curriculum_manager: true
+    default_joint_type: "spherical"
+    default_attachment_mode: "rolling_contact"

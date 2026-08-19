@@ -1,0 +1,566 @@
+{
+  "schema_version": "mssr.morphology_library.v1",
+  "morphologies": {
+    "snake7": {
+      "module_count": 7,
+      "ready_posture": "straight",
+      "postures": {
+        "straight": [
+          {"target_role": "snake_head", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "snake_link", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "snake_center", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "snake_tail", "joint": "tilt", "angle_rad": 0.0}
+        ]
+      },
+      "behaviors": {
+        "straighten": ["straight"]
+      },
+      "drive": {
+        "max_linear_m_s": 0.08,
+        "max_yaw_rate_rad_s": 0.0,
+        "turn_radius_m": 0.0,
+        "selectors": [
+          {"target_role": "snake_head", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_link", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_center", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_tail", "linear_scale": 1.0, "turn_scale": 0.0}
+        ]
+      }
+    },
+    "snake8": {
+      "module_count": 8,
+      "ready_posture": "straight",
+      "postures": {
+        "straight": [
+          {"target_vertex_id": "v0", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v7", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"}
+        ],
+        "head_lift": [
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_01"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_01"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_02"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_02"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_03"}
+        ],
+        "step_hook": [
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.20, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_wave_01"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.20, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_wave_01"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.20, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_wave_02"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.20, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_wave_02"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": -0.65, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_tip_down"}
+        ],
+        "step_transfer": [
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": -0.25, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"}
+        ]
+      },
+      "behaviors": {
+        "lift_head": ["head_lift"],
+        "hook_step": ["step_hook"],
+        "train": [
+          {
+            "phase": "TRAIN_DRIVE",
+            "drive": {
+              "default_duration_s": 8.0,
+              "duration_parameter": "duration_s",
+              "default_linear_m_s": 0.025,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_hip",
+                "snake_center_rear", "snake_center_front",
+                "snake_shoulder", "snake_neck", "snake_head"
+              ]
+            }
+          }
+        ],
+        "cross_gap_as_bridge": [
+          {
+            "phase": "SPAN_GAP",
+            "drive": {
+              "default_duration_s": 4.0,
+              "duration_parameter": "span_duration_s",
+              "default_linear_m_s": 0.030,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_hip",
+                "snake_center_rear", "snake_center_front",
+                "snake_shoulder", "snake_neck", "snake_head"
+              ]
+            }
+          },
+          {
+            "phase": "PULL_TAIL_CLEAR",
+            "drive": {
+              "default_duration_s": 6.0,
+              "duration_parameter": "tail_clear_duration_s",
+              "default_linear_m_s": 0.030,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_hip",
+                "snake_center_rear", "snake_center_front",
+                "snake_shoulder", "snake_neck", "snake_head"
+              ]
+            }
+          }
+        ],
+        "pull_over_step": [
+          {"phase": "SET_HOOK", "posture": "step_hook"},
+          {
+            "phase": "PULL_FRONT",
+            "drive": {
+              "default_duration_s": 6.0,
+              "duration_parameter": "front_pull_duration_s",
+              "default_linear_m_s": 0.025,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_hip",
+                "snake_center_rear", "snake_center_front",
+                "snake_shoulder", "snake_neck", "snake_head"
+              ]
+            }
+          },
+          {"phase": "TRANSFER_LOAD", "posture": "step_transfer"},
+          {
+            "phase": "PULL_BODY",
+            "drive": {
+              "default_duration_s": 8.0,
+              "duration_parameter": "body_pull_duration_s",
+              "default_linear_m_s": 0.025,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_hip",
+                "snake_center_rear", "snake_center_front",
+                "snake_shoulder", "snake_neck", "snake_head"
+              ]
+            }
+          },
+          {"phase": "RETURN_FLAT", "posture": "straight"}
+        ]
+      },
+      "drive": {
+        "actuation": "module_wheels",
+        "preserve_current_posture": true,
+        "max_linear_m_s": 0.06,
+        "max_yaw_rate_rad_s": 0.0,
+        "turn_radius_m": 0.0,
+        "selectors": [
+          {"target_role": "snake_tail", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_rear", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_hip", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_center_rear", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_center_front", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_shoulder", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_neck", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "snake_head", "linear_scale": 1.0, "turn_scale": 0.0}
+        ]
+      }
+    },
+    "bridge8": {
+      "module_count": 8,
+      "ready_posture": "flat",
+      "postures": {
+        "flat": [
+          {"target_vertex_id": "v0", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.08, "max_servo_error_rad": 0.16, "coordination_group": "flat_frame"},
+          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.08, "max_servo_error_rad": 0.16, "coordination_group": "flat_frame"},
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.08, "max_servo_error_rad": 0.16, "coordination_group": "flat_frame"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.08, "max_servo_error_rad": 0.16, "coordination_group": "flat_frame"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.08, "max_servo_error_rad": 0.16, "coordination_group": "flat_frame"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.08, "max_servo_error_rad": 0.16, "coordination_group": "flat_frame"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.08, "max_servo_error_rad": 0.16, "coordination_group": "flat_frame"},
+          {"target_vertex_id": "v7", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.08, "max_servo_error_rad": 0.16, "coordination_group": "flat_frame"}
+        ],
+        "front_lever_preload": [
+          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.09, "max_servo_error_rad": 0.16, "coordination_group": "front_lever_preload"},
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.14, "tolerance_rad": 0.09, "max_servo_error_rad": 0.16, "coordination_group": "front_lever_preload"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.08, "tolerance_rad": 0.09, "max_servo_error_rad": 0.16, "coordination_group": "front_lever_preload"}
+        ],
+        "front_lever_lift": [
+          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 0.36, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "front_lever_lift"},
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.30, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "front_lever_lift"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.20, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "front_lever_lift"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "front_lever_lift"}
+        ],
+        "front_lever_land": [
+          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 0.16, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "front_lever_land"},
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "front_lever_land"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.04, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "front_lever_land"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "front_lever_land"}
+        ],
+        "rear_clear_preload": [
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": -0.08, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "rear_clear_preload"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": -0.14, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "rear_clear_preload"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": -0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "rear_clear_preload"}
+        ],
+        "rear_clear_lift": [
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": -0.06, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "rear_clear_lift"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": -0.14, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "rear_clear_lift"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": -0.22, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "rear_clear_lift"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": -0.28, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "rear_clear_lift"}
+        ]
+      },
+      "behaviors": {
+        "deploy_span": ["front_lever_preload", "front_lever_lift"],
+        "stow_span": ["front_lever_land", "flat"],
+        "cross_gap": [
+          {
+            "phase": "APPROACH_EDGE",
+            "drive": {
+              "default_duration_s": 4.0,
+              "duration_parameter": "approach_duration_s",
+              "default_linear_m_s": 0.018,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "bridge_rear_support", "bridge_rear_riser",
+                "bridge_rear_span", "bridge_center_rear",
+                "bridge_center_front", "bridge_front_span",
+                "bridge_front_riser", "bridge_front_support"
+              ]
+            }
+          },
+          {"phase": "LIFT_FRONT_PRELOAD", "posture": "front_lever_preload"},
+          {"phase": "LIFT_FRONT", "posture": "front_lever_lift"},
+          {
+            "phase": "ADVANCE_REAR",
+            "drive": {
+              "default_duration_s": 4.0,
+              "duration_parameter": "rear_push_duration_s",
+              "default_linear_m_s": 0.014,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "bridge_rear_support", "bridge_rear_riser",
+                "bridge_rear_span", "bridge_center_rear"
+              ]
+            }
+          },
+          {"phase": "LOWER_FRONT", "posture": "front_lever_land"},
+          {"phase": "LAND_FRONT", "posture": "flat"},
+          {
+            "phase": "TRANSFER_FRONT",
+            "drive": {
+              "default_duration_s": 6.0,
+              "duration_parameter": "front_transfer_duration_s",
+              "default_linear_m_s": 0.016,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "bridge_center_front", "bridge_front_span",
+                "bridge_front_riser", "bridge_front_support"
+              ]
+            }
+          },
+          {"phase": "LIFT_REAR_PRELOAD", "posture": "rear_clear_preload"},
+          {"phase": "LIFT_REAR", "posture": "rear_clear_lift"},
+          {
+            "phase": "CLEAR_REAR",
+            "drive": {
+              "default_duration_s": 4.0,
+              "duration_parameter": "rear_clear_duration_s",
+              "default_linear_m_s": 0.016,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "bridge_center_front", "bridge_front_span",
+                "bridge_front_riser", "bridge_front_support"
+              ]
+            }
+          },
+          {"phase": "RETURN_FLAT", "posture": "flat"}
+        ]
+      },
+      "drive": {
+        "actuation": "module_wheels",
+        "preserve_current_posture": true,
+        "max_linear_m_s": 0.06,
+        "max_yaw_rate_rad_s": 0.0,
+        "turn_radius_m": 0.0,
+        "selectors": [
+          {"target_role": "bridge_rear_support", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "bridge_rear_riser", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "bridge_rear_span", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "bridge_center_rear", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "bridge_center_front", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "bridge_front_span", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "bridge_front_riser", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "bridge_front_support", "linear_scale": 1.0, "turn_scale": 0.0}
+        ]
+      }
+    },
+    "rc_car7": {
+      "module_count": 7,
+      "ready_posture": "wheels_down",
+      "postures": {
+        "wheels_down": [
+          {"target_role": "wheel_left_front", "joint": "tilt", "angle_rad": -0.785398, "tolerance_rad": 0.08, "coordination_group": "drive_supports"},
+          {"target_role": "wheel_left_rear", "joint": "tilt", "angle_rad": -0.785398, "tolerance_rad": 0.08, "coordination_group": "drive_supports"},
+          {"target_role": "wheel_right_front", "joint": "tilt", "angle_rad": -0.785398, "tolerance_rad": 0.08, "coordination_group": "drive_supports"},
+          {"target_role": "wheel_right_rear", "joint": "tilt", "angle_rad": -0.785398, "tolerance_rad": 0.08, "coordination_group": "drive_supports"}
+        ],
+        "wheels_stowed": [
+          {"target_role": "wheel_left_front", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "wheel_left_rear", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "wheel_right_front", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "wheel_right_rear", "joint": "tilt", "angle_rad": 0.0}
+        ]
+      },
+      "behaviors": {"stow": ["wheels_stowed"]},
+      "drive": {
+        "actuation": "pan",
+        "max_linear_m_s": 0.10,
+        "max_yaw_rate_rad_s": 0.8,
+        "turn_radius_m": 0.12,
+        "effective_radius_m": 0.0314,
+        "max_pan_rate_rad_s": 2.0,
+        "selectors": [
+          {"target_role": "wheel_left_front", "linear_scale": 1.0, "turn_scale": -1.0, "actuator_scale": 1.0},
+          {"target_role": "wheel_left_rear", "linear_scale": 1.0, "turn_scale": 1.0, "actuator_scale": -1.0},
+          {"target_role": "wheel_right_front", "linear_scale": 1.0, "turn_scale": -1.0, "actuator_scale": 1.0},
+          {"target_role": "wheel_right_rear", "linear_scale": 1.0, "turn_scale": 1.0, "actuator_scale": -1.0}
+        ]
+      }
+    },
+    "rc_car8": {
+      "module_count": 8,
+      "ready_posture": "wheels_down",
+      "postures": {
+        "wheels_down": [
+          {"target_role": "wheel_left_front", "joint": "tilt", "angle_rad": -0.785398, "tolerance_rad": 0.12, "coordination_group": "drive_supports"},
+          {"target_role": "wheel_left_rear", "joint": "tilt", "angle_rad": -0.785398, "tolerance_rad": 0.12, "coordination_group": "drive_supports"},
+          {"target_role": "wheel_right_front", "joint": "tilt", "angle_rad": -0.785398, "tolerance_rad": 0.12, "coordination_group": "drive_supports"},
+          {"target_role": "wheel_right_rear", "joint": "tilt", "angle_rad": -0.785398, "tolerance_rad": 0.12, "coordination_group": "drive_supports"}
+        ],
+        "wheels_stowed": [
+          {"target_role": "wheel_left_front", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "drive_supports_stow"},
+          {"target_role": "wheel_left_rear", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "drive_supports_stow"},
+          {"target_role": "wheel_right_front", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "drive_supports_stow"},
+          {"target_role": "wheel_right_rear", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "drive_supports_stow"}
+        ]
+      },
+      "behaviors": {"stow": ["wheels_stowed"]},
+      "drive": {
+        "actuation": "pan",
+        "max_linear_m_s": 0.10,
+        "max_yaw_rate_rad_s": 0.8,
+        "turn_radius_m": 0.12,
+        "effective_radius_m": 0.0314,
+        "max_pan_rate_rad_s": 2.0,
+        "selectors": [
+          {"target_role": "wheel_left_front", "linear_scale": 1.0, "turn_scale": -1.0, "actuator_scale": 1.0},
+          {"target_role": "wheel_left_rear", "linear_scale": 1.0, "turn_scale": 1.0, "actuator_scale": -1.0},
+          {"target_role": "wheel_right_front", "linear_scale": 1.0, "turn_scale": -1.0, "actuator_scale": 1.0},
+          {"target_role": "wheel_right_rear", "linear_scale": 1.0, "turn_scale": 1.0, "actuator_scale": -1.0}
+        ]
+      }
+    },
+    "holonomic9": {
+      "module_count": 9,
+      "ready_posture": "supports_down",
+      "postures": {
+        "supports_down": [
+          {"target_role": "holonomic_inner_west", "joint": "tilt", "angle_rad": -1.35, "tolerance_rad": 0.12, "coordination_group": "inner_lifters", "pusher_target_role": "holonomic_drive_west", "pusher_linear_m_s": 0.025},
+          {"target_role": "holonomic_inner_north", "joint": "tilt", "angle_rad": -1.35, "tolerance_rad": 0.12, "coordination_group": "inner_lifters", "pusher_target_role": "holonomic_drive_north", "pusher_linear_m_s": 0.025},
+          {"target_role": "holonomic_inner_east", "joint": "tilt", "angle_rad": -1.35, "tolerance_rad": 0.12, "coordination_group": "inner_lifters", "pusher_target_role": "holonomic_drive_east", "pusher_linear_m_s": 0.025},
+          {"target_role": "holonomic_inner_south", "joint": "tilt", "angle_rad": -1.35, "tolerance_rad": 0.12, "coordination_group": "inner_lifters", "pusher_target_role": "holonomic_drive_south", "pusher_linear_m_s": 0.025}
+        ],
+        "flat": [
+          {"target_role": "holonomic_inner_west", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "inner_lifters"},
+          {"target_role": "holonomic_inner_north", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "inner_lifters"},
+          {"target_role": "holonomic_inner_east", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "inner_lifters"},
+          {"target_role": "holonomic_inner_south", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "inner_lifters"}
+        ]
+      },
+      "behaviors": {"flatten": ["flat"], "deploy": ["supports_down"]},
+      "drive": {
+        "actuation": "module_wheels",
+        "preserve_current_posture": true,
+        "allow_combined_translation_and_turn": false,
+        "max_linear_m_s": 0.06,
+        "max_lateral_m_s": 0.06,
+        "max_yaw_rate_rad_s": 0.4,
+        "turn_radius_m": 0.15,
+        "selectors": [
+          {"target_role": "holonomic_drive_west", "linear_scale": 0.0, "lateral_scale": -1.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "holonomic_drive_north", "linear_scale": -1.0, "lateral_scale": 0.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "holonomic_drive_east", "linear_scale": 0.0, "lateral_scale": 1.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "holonomic_drive_south", "linear_scale": 1.0, "lateral_scale": 0.0, "yaw_actuator_scale": 1.0}
+        ]
+      }
+    },
+    "rc_car7_reference": {
+      "module_count": 7,
+      "ready_posture": "flat",
+      "postures": {
+        "flat": [
+          {"target_role": "rc_left_spine", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "rc_right_spine", "joint": "tilt", "angle_rad": 0.0}
+        ]
+      },
+      "behaviors": {"flatten": ["flat"]},
+      "drive": {
+        "actuation": "module_wheels",
+        "max_linear_m_s": 0.08,
+        "max_yaw_rate_rad_s": 0.5,
+        "turn_radius_m": 0.12,
+        "selectors": [
+          {"target_role": "rc_wheel_left_front", "linear_scale": 1.0, "turn_scale": -1.0},
+          {"target_role": "rc_wheel_left_rear", "linear_scale": -1.0, "turn_scale": 1.0},
+          {"target_role": "rc_wheel_right_front", "linear_scale": 1.0, "turn_scale": 1.0},
+          {"target_role": "rc_wheel_right_rear", "linear_scale": -1.0, "turn_scale": -1.0}
+        ]
+      }
+    },
+    "mobile_manipulator8": {
+      "module_count": 8,
+      "ready_posture": "drive_ready",
+      "postures": {
+        "drive_ready": [
+          {"target_role": "chassis_center", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.2, "coordination_group": "base_hold"},
+          {"target_role": "left_drive", "joint": "tilt", "angle_rad": -0.20, "tolerance_rad": 0.2, "coordination_group": "base_hold"},
+          {"target_role": "right_drive", "joint": "tilt", "angle_rad": -0.20, "tolerance_rad": 0.2, "coordination_group": "base_hold"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.2, "coordination_group": "base_hold"},
+          {"target_role": "arm_ground_drive", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.2, "coordination_group": "base_hold"},
+          {"target_role": "arm_lift", "joint": "tilt", "angle_rad": 0.75, "tolerance_rad": 0.2},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": 0.65, "tolerance_rad": 0.2},
+          {"target_role": "end_effector", "joint": "pan", "angle_rad": 0.0}
+        ],
+        "arm_raised": [
+          {"target_role": "chassis_center", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "left_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "right_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_ground_drive", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_lift", "joint": "tilt", "angle_rad": 0.75},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": 0.65},
+          {"target_role": "end_effector", "joint": "pan", "angle_rad": 0.0}
+        ],
+        "arm_forward": [
+          {"target_role": "chassis_center", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "left_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "right_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_ground_drive", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_lift", "joint": "tilt", "angle_rad": 0.45},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": -0.35},
+          {"target_role": "end_effector", "joint": "pan", "angle_rad": 0.0}
+        ],
+        "arm_lowered": [
+          {"target_role": "chassis_center", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "left_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "right_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_ground_drive", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_lift", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "end_effector", "joint": "pan", "angle_rad": 0.0}
+        ],
+        "button_press": [
+          {"target_role": "chassis_center", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "left_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "right_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_ground_drive", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_lift", "joint": "tilt", "angle_rad": 0.30, "tolerance_rad": 0.15},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": -0.55, "tolerance_rad": 0.15},
+          {"target_role": "end_effector", "joint": "pan", "angle_rad": 0.0}
+        ]
+      },
+      "behaviors": {
+        "raise_arm": ["arm_raised"],
+        "reach_forward": ["arm_forward"],
+        "press_button": ["arm_raised", "arm_forward", "button_press"],
+        "release_button": ["arm_forward", "arm_raised"],
+        "lower_arm": ["arm_lowered"]
+      },
+      "drive": {
+        "actuation": "module_wheels",
+        "preserve_current_posture": true,
+        "allow_combined_translation_and_turn": false,
+        "max_linear_m_s": 0.08,
+        "max_yaw_rate_rad_s": 0.6,
+        "turn_radius_m": 0.10,
+        "selectors": [
+          {"target_role": "front_support", "active_when": "translation", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "arm_ground_drive", "active_when": "translation", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "front_support", "active_when": "pure_turn", "linear_scale": 0.0, "turn_scale": 1.0},
+          {"target_role": "arm_ground_drive", "active_when": "pure_turn", "linear_scale": 0.0, "turn_scale": -1.0}
+        ]
+      }
+    },
+    "mobile_manipulator7": {
+      "module_count": 7,
+      "ready_posture": "drive_ready",
+      "postures": {
+        "drive_ready": [
+          {"target_role": "chassis_center", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.2, "coordination_group": "base_hold"},
+          {"target_role": "left_drive", "joint": "tilt", "angle_rad": -0.20, "tolerance_rad": 0.2, "coordination_group": "base_hold"},
+          {"target_role": "right_drive", "joint": "tilt", "angle_rad": -0.20, "tolerance_rad": 0.2, "coordination_group": "base_hold"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.2, "coordination_group": "base_hold"},
+          {"target_role": "arm_base", "joint": "tilt", "angle_rad": 0.75, "tolerance_rad": 0.2},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": 0.65, "tolerance_rad": 0.2},
+          {"target_role": "end_effector", "joint": "pan", "angle_rad": 0.0}
+        ],
+        "turn_ready": [
+          {"target_role": "arm_base", "joint": "tilt", "angle_rad": 0.75, "tolerance_rad": 0.2, "coordination_group": "arm_lift"},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": 0.65, "tolerance_rad": 0.2, "coordination_group": "arm_lift"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.45, "tolerance_rad": 0.2}
+        ],
+        "arm_raised": [
+          {"target_role": "chassis_center", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "left_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "right_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_base", "joint": "tilt", "angle_rad": 0.75},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": 0.65},
+          {"target_role": "end_effector", "joint": "pan", "angle_rad": 0.0}
+        ],
+        "arm_forward": [
+          {"target_role": "chassis_center", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "left_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "right_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_base", "joint": "tilt", "angle_rad": 0.45},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": -0.35},
+          {"target_role": "end_effector", "joint": "pan", "angle_rad": 0.0}
+        ],
+        "arm_lowered": [
+          {"target_role": "chassis_center", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "left_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "right_drive", "joint": "tilt", "angle_rad": -0.20, "coordination_group": "base_hold"},
+          {"target_role": "front_support", "joint": "tilt", "angle_rad": 0.0, "coordination_group": "base_hold"},
+          {"target_role": "arm_base", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "arm_link", "joint": "tilt", "angle_rad": 0.0},
+          {"target_role": "end_effector", "joint": "pan", "angle_rad": 0.0}
+        ]
+      },
+      "behaviors": {
+        "raise_arm": ["arm_raised"],
+        "reach_forward": ["arm_forward"],
+        "lower_arm": ["arm_lowered"]
+      },
+      "drive": {
+        "actuation": "module_wheels",
+        "preserve_current_posture": true,
+        "allow_combined_translation_and_turn": false,
+        "max_linear_m_s": 0.08,
+        "max_yaw_rate_rad_s": 0.6,
+        "turn_radius_m": 0.10,
+        "effective_radius_m": 0.0314,
+        "max_pan_rate_rad_s": 2.0,
+        "selectors": [
+          {"target_role": "front_support", "active_when": "translation", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "arm_base", "active_when": "translation", "linear_scale": 1.0, "turn_scale": 0.0},
+          {"target_role": "left_drive", "active_when": "translation", "actuation": "pan", "linear_scale": 1.0, "turn_scale": 0.0, "actuator_scale": 1.0},
+          {"target_role": "right_drive", "active_when": "translation", "actuation": "pan", "linear_scale": 1.0, "turn_scale": 0.0, "actuator_scale": -1.0},
+          {"target_role": "left_drive", "active_when": "pure_turn", "actuation": "pan", "linear_scale": 0.0, "turn_scale": -1.0, "actuator_scale": -1.0},
+          {"target_role": "right_drive", "active_when": "pure_turn", "actuation": "pan", "linear_scale": 0.0, "turn_scale": 1.0, "actuator_scale": 1.0}
+        ]
+      }
+    }
+  }
+}

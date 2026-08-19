@@ -1,0 +1,493 @@
+"""ROS 2 node that operates an assembled SMORES-EP morphology."""
+
+from __future__ import annotations
+
+import time
+from pathlib import Path
+from typing import Any, Mapping
+
+import rclpy
+from ament_index_python.packages import get_package_share_directory
+from rclpy.executors import ExternalShutdownException
+from rclpy.node import Node
+from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from std_msgs.msg import String
+
+from mssr_expert.behaviors.morphology_library import (
+    AssignedModule,
+    MorphologyLibrary,
+)
+from mssr_expert.behaviors.morphology_locomotion import (
+    coherent_planar_train_commands,
+)
+from mssr_expert.behaviors.morphology_dof_model import (
+    MorphologyDofInventory,
+    SmoresMorphologyDofAnalyzer,
+)
+from mssr_expert.execution.morphology_behavior_executor import (
+    MorphologyBehaviorExecutor,
+    MorphologyCommand,
+)
+from mssr_expert.graph.attributed_robot_graph import AttributedRobotGraph
+from mssr_expert.graph.serialization import (
+    attributed_graph_from_dict,
+    load_attributed_graph,
+)
+from mssr_expert.planning.smores_ep.attributed_adapter import (
+    target_roles_from_graph,
+)
+from mssr_expert.planning.smores_ep.self_reconfiguration_planner import (
+    SmoresSelfReconfigurationPlanner,
+)
+from mssr_expert.utils.json_io import dict_to_string_msg, string_msg_to_dict
+
+
+def load_behavior_morphology_catalog(
+    config_directory: Path,
+) -> dict[str, AttributedRobotGraph]:
+    """Load named target graphs without importing another ROS node."""
+
+    catalog: dict[str, AttributedRobotGraph] = {}
+    for path in sorted(config_directory.glob("smores_*.json")):
+        try:
+            graph = load_attributed_graph(path)
+        except ValueError:
+            continue
+        name = graph.global_attributes.get("morphology_name")
+        if (
+            not isinstance(name, str)
+            or not name.strip()
+            or graph.global_attributes.get("graph_kind")
+            != "target_morphology"
+        ):
+            continue
+        if name in catalog:
+            raise ValueError(f"Duplicated morphology_name {name!r}.")
+        catalog[name] = graph
+    return catalog
+
+
+def assembly_readiness(
+    global_attributes: Mapping[str, Any],
+) -> tuple[bool, str]:
+    """Return whether the latest self-assembly task graph is operational."""
+
+    execution_state = global_attributes.get("execution_state", {})
+    if not isinstance(execution_state, Mapping):
+        return False, "UNKNOWN"
+    state = str(execution_state.get("state", "UNKNOWN"))
+    ready = bool(
+        execution_state.get("done", False)
+        and execution_state.get("success", False)
+    )
+    return ready, state
+
+
+class SmoresMorphologyBehaviorNode(Node):
+    """Map high-level morphology commands to posture and cluster motion."""
+
+    def __init__(self) -> None:
+        super().__init__("smores_morphology_behavior_node")
+        package_share = Path(get_package_share_directory("mssr_expert"))
+        default_library = (
+            package_share / "config" / "smores_morphology_behaviors.json"
+        )
+        self.declare_parameter("library_path", str(default_library))
+        self.declare_parameter("control_rate_hz", 10.0)
+        self.declare_parameter("joint_timeout_s", 20.0)
+        self.declare_parameter(
+            "command_topic", "/mssr/morphology/command"
+        )
+        self.declare_parameter(
+            "status_topic", "/mssr/morphology/status"
+        )
+        self.declare_parameter("actions_topic", "/mssr/actions")
+        self.declare_parameter(
+            "primitive_goal_topic", "/mssr/primitives/goal"
+        )
+        self.declare_parameter(
+            "primitive_status_topic", "/mssr/primitives/status"
+        )
+        self.declare_parameter(
+            "task_graph_topic", "/mssr/expert/task_graph"
+        )
+        self.declare_parameter("robot_graph_topic", "/mssr/robot_graph")
+
+        library = MorphologyLibrary.load(
+            Path(str(self.get_parameter("library_path").value))
+        )
+        self._executor = MorphologyBehaviorExecutor(
+            library,
+            joint_timeout_s=float(
+                self.get_parameter("joint_timeout_s").value
+            ),
+        )
+        self._morphology_catalog = load_behavior_morphology_catalog(
+            package_share / "config"
+        )
+        self._topology_matcher = SmoresSelfReconfigurationPlanner()
+        self._morphology_name = ""
+        self._assignments: tuple[AssignedModule, ...] = ()
+        self._assembly_ready = False
+        self._assembly_state = "UNASSIGNED"
+        self._assignment_source = ""
+        self._latest_primitive_status: dict[str, Any] = {}
+        self._latest_robot_graph = AttributedRobotGraph()
+        self._dof_analyzer = SmoresMorphologyDofAnalyzer()
+        self._dof_inventory = MorphologyDofInventory(())
+        self._dof_signature: tuple[tuple[str, str, str], ...] = ()
+        self._last_terminal_command_id = ""
+
+        self._actions_publisher = self.create_publisher(
+            String,
+            str(self.get_parameter("actions_topic").value),
+            10,
+        )
+        self._goal_publisher = self.create_publisher(
+            String,
+            str(self.get_parameter("primitive_goal_topic").value),
+            10,
+        )
+        self._status_publisher = self.create_publisher(
+            String,
+            str(self.get_parameter("status_topic").value),
+            10,
+        )
+        task_graph_qos = QoSProfile(
+            depth=1,
+            reliability=ReliabilityPolicy.RELIABLE,
+            durability=DurabilityPolicy.TRANSIENT_LOCAL,
+        )
+        self.create_subscription(
+            String,
+            str(self.get_parameter("task_graph_topic").value),
+            self._on_task_graph,
+            task_graph_qos,
+        )
+        self.create_subscription(
+            String,
+            str(self.get_parameter("robot_graph_topic").value),
+            self._on_robot_graph,
+            10,
+        )
+        self.create_subscription(
+            String,
+            str(self.get_parameter("primitive_status_topic").value),
+            self._on_primitive_status,
+            10,
+        )
+        self.create_subscription(
+            String,
+            str(self.get_parameter("command_topic").value),
+            self._on_command,
+            10,
+        )
+        rate_hz = max(
+            1.0, float(self.get_parameter("control_rate_hz").value)
+        )
+        self._timer = self.create_timer(1.0 / rate_hz, self._step)
+        self.get_logger().info(
+            "SMORES morphology behavior node ready; waiting for assignment."
+        )
+
+    def _on_task_graph(self, message: String) -> None:
+        payload = string_msg_to_dict(message)
+        global_attributes = payload.get("global_attributes", {})
+        if isinstance(global_attributes, Mapping):
+            candidate_morphology = str(
+                global_attributes.get("target_morphology_name", "")
+            )
+            if (
+                self._assignment_source == "robot_graph"
+                and candidate_morphology
+                and candidate_morphology != self._morphology_name
+            ):
+                # A retained task graph for another morphology is not proof
+                # that the live rigid topology has changed.  The robot-graph
+                # callback will adopt the new assignment as soon as that
+                # topology uniquely exists.
+                return
+            self._morphology_name = candidate_morphology
+            (
+                self._assembly_ready,
+                self._assembly_state,
+            ) = assembly_readiness(global_attributes)
+        assignments: list[AssignedModule] = []
+        raw_nodes = payload.get("nodes", ())
+        if isinstance(raw_nodes, list | tuple):
+            for raw_node in raw_nodes:
+                if not isinstance(raw_node, Mapping):
+                    continue
+                attributes = raw_node.get("attributes", {})
+                if not isinstance(attributes, Mapping):
+                    continue
+                if str(attributes.get("node_type", "")) != "physical_module":
+                    continue
+                vertex = attributes.get("target_vertex_id")
+                role = attributes.get("target_role")
+                module_id = raw_node.get("module_id") or raw_node.get("node_id")
+                if module_id is None or vertex is None or role is None:
+                    continue
+                assignments.append(
+                    AssignedModule(
+                        module_id=str(module_id),
+                        target_vertex_id=str(vertex),
+                        target_role=str(role),
+                    )
+                )
+        self._assignments = tuple(
+            sorted(assignments, key=lambda item: item.target_vertex_id)
+        )
+        if self._morphology_name and self._assignments:
+            self._assignment_source = "task_graph"
+
+    def _on_robot_graph(self, message: String) -> None:
+        """Recover an assignment after the producing expert was restarted."""
+
+        payload = string_msg_to_dict(message)
+        try:
+            current_graph = attributed_graph_from_dict(payload)
+        except (KeyError, RuntimeError, TypeError, ValueError):
+            return
+        self._latest_robot_graph = current_graph
+        self._update_dof_inventory(current_graph)
+
+        # Re-evaluate the physical topology even when a task graph supplied
+        # the last assignment.  Several expert publishers can have retained
+        # task-graph samples on the same transient-local topic; an older
+        # self-assembly sample must not overwrite a completed
+        # self-reconfiguration.  The live rigid topology is the final
+        # authority once it uniquely matches one catalog morphology.
+        try:
+            matches = []
+            for morphology_name, target_graph in sorted(
+                self._morphology_catalog.items()
+            ):
+                assignment = self._topology_matcher.configuration_assignment(
+                    current_graph, target_graph
+                )
+                if assignment is not None:
+                    matches.append(
+                        (morphology_name, target_graph, assignment)
+                    )
+        except (KeyError, RuntimeError, TypeError, ValueError):
+            return
+        if len(matches) != 1:
+            if self._assignment_source == "robot_graph":
+                self._assembly_ready = False
+                self._assembly_state = "TOPOLOGY_TRANSITION"
+            return
+        morphology_name, target_graph, assignment = matches[0]
+        roles = target_roles_from_graph(target_graph)
+        recovered_assignments = tuple(
+            sorted(
+                (
+                    AssignedModule(
+                        module_id=module_id,
+                        target_vertex_id=target_vertex_id,
+                        target_role=str(
+                            roles[target_vertex_id]["target_role"]
+                        ),
+                    )
+                    for target_vertex_id, module_id in (
+                        assignment.target_to_module.items()
+                    )
+                ),
+                key=lambda item: item.target_vertex_id,
+            )
+        )
+        unchanged = (
+            self._morphology_name == morphology_name
+            and self._assignments == recovered_assignments
+            and self._assembly_ready
+        )
+        self._morphology_name = morphology_name
+        self._assignments = recovered_assignments
+        self._assembly_ready = True
+        self._assembly_state = "TOPOLOGY_MATCHED"
+        self._assignment_source = "robot_graph"
+        if not unchanged:
+            self.get_logger().info(
+                "Recovered unique live topology assignment for "
+                f"{morphology_name!r}."
+            )
+
+    def _update_dof_inventory(
+        self,
+        current_graph: AttributedRobotGraph,
+    ) -> None:
+        inventory = self._dof_analyzer.analyze(current_graph)
+        self._dof_inventory = inventory
+        if inventory.signature == self._dof_signature:
+            return
+        self._dof_signature = inventory.signature
+        self.get_logger().info(
+            "Operational DoFs: "
+            f"load_bearing={len(inventory.by_mode('load_bearing'))}, "
+            "locomotion_candidates="
+            f"{len(inventory.by_mode('locomotion_candidate'))}, "
+            f"shape_candidates={len(inventory.by_mode('shape_candidate'))}."
+        )
+
+    def _on_primitive_status(self, message: String) -> None:
+        payload = string_msg_to_dict(message)
+        if payload:
+            self._latest_primitive_status = payload
+
+    def _on_command(self, message: String) -> None:
+        payload = string_msg_to_dict(message)
+        try:
+            command = MorphologyCommand.from_mapping(payload)
+            if not self._morphology_name or not self._assignments:
+                raise ValueError("No self-assembly assignment is available")
+            if not self._assembly_ready:
+                raise ValueError(
+                    "Self-assembly is not complete; current state is "
+                    f"{self._assembly_state}"
+                )
+            if command.morphology != self._morphology_name:
+                raise ValueError(
+                    f"Command requests {command.morphology}, but the assembled "
+                    f"target is {self._morphology_name}"
+                )
+            if self._executor.active and command.behavior != "stop":
+                raise ValueError("Another morphology behavior is active")
+            self._executor.start(command, self._assignments)
+            self._last_terminal_command_id = ""
+            self._publish_status(
+                command.command_id,
+                command.morphology,
+                command.behavior,
+                "ACCEPTED",
+                "QUEUED",
+                0.0,
+                False,
+                False,
+                "Morphology command accepted.",
+            )
+        except (KeyError, TypeError, ValueError) as error:
+            self.get_logger().error(f"Rejected morphology command: {error}")
+            self._publish_status(
+                str(payload.get("command_id", "")),
+                str(payload.get("morphology", "")),
+                str(payload.get("behavior", "")),
+                "REJECTED",
+                "TERMINAL",
+                0.0,
+                True,
+                False,
+                str(error),
+            )
+
+    def _step(self) -> None:
+        decision = self._executor.step(
+            time.monotonic(), self._latest_primitive_status
+        )
+        if not decision.command_id:
+            return
+        if decision.primitive_goal is not None:
+            self._goal_publisher.publish(
+                dict_to_string_msg(decision.primitive_goal.to_dict())
+            )
+        locomotion = coherent_planar_train_commands(
+            self._latest_robot_graph,
+            decision.locomotion,
+        )
+        self._actions_publisher.publish(
+            dict_to_string_msg(
+                {
+                    "schema_version": "mssr.actions.v2",
+                    "stamp": time.time(),
+                    "stage_id": 0,
+                    "task_type": "morphology_behavior",
+                    "reset": False,
+                    "locomotion": {
+                        module_id: dict(command)
+                        for module_id, command in locomotion.items()
+                    },
+                    "magnetic": [],
+                    "expert": {
+                        "fsm_state": decision.state,
+                        "active_primitive": (
+                            decision.primitive_goal.primitive
+                            if decision.primitive_goal is not None
+                            else decision.behavior
+                        ),
+                        "primitive_params": {},
+                        "module_roles": {
+                            item.module_id: item.target_role
+                            for item in self._assignments
+                        },
+                        "task_metrics": {"progress": decision.progress},
+                        "success": decision.success,
+                        "done": decision.done,
+                        "debug": {"message": decision.message},
+                    },
+                }
+            )
+        )
+        if (
+            decision.done
+            and decision.command_id == self._last_terminal_command_id
+        ):
+            return
+        self._publish_status(
+            decision.command_id,
+            decision.morphology,
+            decision.behavior,
+            decision.state,
+            decision.phase,
+            decision.progress,
+            decision.done,
+            decision.success,
+            decision.message,
+        )
+        if decision.done:
+            self._last_terminal_command_id = decision.command_id
+
+    def _publish_status(
+        self,
+        command_id: str,
+        morphology: str,
+        behavior: str,
+        state: str,
+        phase: str,
+        progress: float,
+        done: bool,
+        success: bool,
+        message: str,
+    ) -> None:
+        self._status_publisher.publish(
+            dict_to_string_msg(
+                {
+                    "schema_version": "mssr.morphology_status.v1",
+                    "stamp": time.time(),
+                    "command_id": command_id,
+                    "morphology": morphology,
+                    "behavior": behavior,
+                    "state": state,
+                    "phase": phase,
+                    "progress": float(progress),
+                    "done": bool(done),
+                    "success": bool(success),
+                    "message": message,
+                }
+            )
+        )
+
+
+def main(args: list[str] | None = None) -> None:
+    rclpy.init(args=args)
+    node = SmoresMorphologyBehaviorNode()
+    try:
+        rclpy.spin(node)
+    except (KeyboardInterrupt, ExternalShutdownException):
+        pass
+    finally:
+        node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()

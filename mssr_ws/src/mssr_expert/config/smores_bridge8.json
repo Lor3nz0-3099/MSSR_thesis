@@ -1,0 +1,42 @@
+{
+  "schema_version": "mssr.target_graph.v1",
+  "stamp": 0.0,
+  "global_attributes": {
+    "graph_kind": "target_morphology",
+    "robot_family": "smores_ep",
+    "task_type": "parallel_self_assembly",
+    "morphology_name": "bridge8",
+    "module_count": 8,
+    "requires_helping_module": false,
+    "assembly_strategy": "progressive_planar_waves",
+    "pre_reconfiguration_tilt_rad_by_vertex": {
+      "v0": 0.0,
+      "v7": 0.0
+    },
+    "pre_reconfiguration_tilt_groups_by_vertex": [
+      ["v0", "v7"]
+    ],
+    "capabilities": ["gap_crossing", "hyper_redundant_chain", "distributed_train_locomotion"],
+    "source_reference": "User-defined eight-module bridge morphology adapted from SMORES-EP gap-crossing behavior patterns",
+    "description": "Eight-module chain used as a distributed bridge/lever. The front-end TOP-TOP reversal distinguishes it from Snake8, while the operational behavior keeps the chain rigid and drives groups of ground-contact modules instead of relying on terminal supports only."
+  },
+  "nodes": [
+    {"node_id": "v0", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v0", "target_role": "bridge_rear_support"}},
+    {"node_id": "v1", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v1", "target_role": "bridge_rear_riser"}},
+    {"node_id": "v2", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v2", "target_role": "bridge_rear_span"}},
+    {"node_id": "v3", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v3", "target_role": "bridge_center_rear", "is_target_root": true}},
+    {"node_id": "v4", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v4", "target_role": "bridge_center_front"}},
+    {"node_id": "v5", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v5", "target_role": "bridge_front_span"}},
+    {"node_id": "v6", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v6", "target_role": "bridge_front_riser"}},
+    {"node_id": "v7", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v7", "target_role": "bridge_front_support"}}
+  ],
+  "edges": [
+    {"module_a_id": "v0", "module_b_id": "v1", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v1", "module_b_id": "v2", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v2", "module_b_id": "v3", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v3", "module_b_id": "v4", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v4", "module_b_id": "v5", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v5", "module_b_id": "v6", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v6", "module_b_id": "v7", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "TOP", "clocking_quarter_turns": 0}}
+  ]
+}

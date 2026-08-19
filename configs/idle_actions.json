@@ -1,0 +1,9 @@
+{
+  "schema_version": "mssr.actions.v2",
+  "stamp": 0.0,
+  "stage_id": 0,
+  "task_type": "idle",
+  "reset": false,
+  "locomotion": {},
+  "magnetic": []
+}

@@ -1,0 +1,176 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MSSR simulation scenario v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "name", "modules"],
+  "properties": {
+    "schema_version": {
+      "const": "mssr.scenario.v1"
+    },
+    "name": {
+      "type": "string"
+    },
+    "attachment_mode": {
+      "enum": ["continuous", "six_axis"]
+    },
+    "reset_every_steps": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "episode_timeout_steps": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "curriculum": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "task_type": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "difficulty": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "goal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "position"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "$ref": "#/$defs/vector3"
+        },
+        "tolerance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "box_obstacles": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "position", "size"],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "prim_path": {
+            "type": "string"
+          },
+          "position": {
+            "$ref": "#/$defs/vector3"
+          },
+          "size": {
+            "$ref": "#/$defs/vector3"
+          },
+          "color": {
+            "$ref": "#/$defs/vector3"
+          }
+        }
+      }
+    },
+    "random_spawn": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["module_count", "x_range", "y_range"],
+      "properties": {
+        "module_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "x_range": {
+          "$ref": "#/$defs/range2"
+        },
+        "y_range": {
+          "$ref": "#/$defs/range2"
+        },
+        "z": {
+          "type": "number"
+        },
+        "min_distance": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "radius": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "mass": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "seed": {
+          "type": "integer"
+        },
+        "world_frame_id": {
+          "type": "string"
+        }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["index", "position"],
+        "properties": {
+          "index": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "module_id": {
+            "type": "string"
+          },
+          "position": {
+            "$ref": "#/$defs/vector3"
+          },
+          "radius": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "mass": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "color": {
+            "$ref": "#/$defs/vector3"
+          },
+          "world_frame_id": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "vector3": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "type": "number"
+      }
+    },
+    "range2": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "number"
+      }
+    }
+  }
+}

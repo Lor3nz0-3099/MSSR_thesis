@@ -1,0 +1,20 @@
+stage:
+  stage_id: 1
+  stage_name: "obstacle_traversal"
+  task_type: "low_obstacle_climb_over"
+  expert_name: "stage1_obstacle_traversal"
+  scenario_name: "stage1_obstacle_traversal"
+  difficulty: 0.25
+  module_count: 6
+  roles:
+    - "base"
+    - "anchor"
+    - "climber"
+    - "stabilizer"
+    - "mobile"
+  attachment_modes:
+    - "rolling_contact"
+    - "surface_pivot"
+    - "support_contact"
+    - "anchor_link"
+    - "transfer_link"

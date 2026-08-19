@@ -1,0 +1,34 @@
+{
+  "schema_version": "mssr.target_graph.v1",
+  "stamp": 0.0,
+  "global_attributes": {
+    "graph_kind": "target_morphology",
+    "robot_family": "smores_ep",
+    "task_type": "parallel_self_assembly",
+    "morphology_name": "rc_car7_reference",
+    "module_count": 7,
+    "requires_helping_module": true,
+    "dedicated_helper_module_count": 1,
+    "assembly_strategy": "paper_parallel_waves_with_helper",
+    "capabilities": ["flat_locomotion", "differential_drive", "heavy_push"],
+    "source_reference": "Liu et al., Parallel Self-Assembly with SMORES-EP, Fig. 12",
+    "description": "Reference seven-module RC car. It uses seven assigned modules plus one temporary helper; the helper is released and remains in the reserve pool."
+  },
+  "nodes": [
+    {"node_id": "v0", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v0", "target_role": "rc_center", "is_target_root": true}},
+    {"node_id": "v1", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v1", "target_role": "rc_left_spine"}},
+    {"node_id": "v2", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v2", "target_role": "rc_right_spine"}},
+    {"node_id": "v3", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v3", "target_role": "rc_wheel_left_front"}},
+    {"node_id": "v4", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v4", "target_role": "rc_wheel_left_rear"}},
+    {"node_id": "v5", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v5", "target_role": "rc_wheel_right_front"}},
+    {"node_id": "v6", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v6", "target_role": "rc_wheel_right_rear"}}
+  ],
+  "edges": [
+    {"module_a_id": "v1", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "RIGHT", "face_b": "LEFT", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v2", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "LEFT", "face_b": "RIGHT", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v3", "module_b_id": "v1", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "TOP", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v4", "module_b_id": "v1", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v5", "module_b_id": "v2", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "TOP", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v6", "module_b_id": "v2", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}}
+  ]
+}

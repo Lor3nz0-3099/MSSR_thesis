@@ -1,0 +1,7 @@
+{
+  "schema_version": "mssr.actions.v1",
+  "timestamp": 0.0,
+  "reset": true,
+  "locomotion": {},
+  "magnetic": []
+}

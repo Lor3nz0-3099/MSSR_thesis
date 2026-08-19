@@ -1,0 +1,42 @@
+{
+  "schema_version": "mssr.target_graph.v1",
+  "stamp": 0.0,
+  "global_attributes": {
+    "graph_kind": "target_morphology",
+    "robot_family": "smores_ep",
+    "task_type": "parallel_self_assembly",
+    "morphology_name": "snake7",
+    "module_count": 7,
+    "requires_helping_module": false,
+    "assembly_strategy": "progressive_planar_waves",
+    "pre_reconfiguration_tilt_rad_by_vertex": {
+      "v0": 0.0,
+      "v1": 0.0,
+      "v2": 0.0,
+      "v3": 0.0,
+      "v4": 0.0,
+      "v5": 0.0,
+      "v6": 0.0
+    },
+    "capabilities": ["flat_train_locomotion", "adaptive_stair_climb", "gap_crossing"],
+    "source_reference": "Accomplishing High-Level Tasks with Modular Robots, Table 2 and Fig. 11",
+    "description": "Seven-module TOP-BOTTOM stair-climber chain: train locomotion on flat terrain and obstacle-conditioned tilt articulation on steps"
+  },
+  "nodes": [
+    {"node_id": "v0", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v0", "target_role": "snake_head"}},
+    {"node_id": "v1", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v1", "target_role": "snake_link"}},
+    {"node_id": "v2", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v2", "target_role": "snake_link"}},
+    {"node_id": "v3", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v3", "target_role": "snake_center", "is_target_root": true}},
+    {"node_id": "v4", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v4", "target_role": "snake_link"}},
+    {"node_id": "v5", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v5", "target_role": "snake_link"}},
+    {"node_id": "v6", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v6", "target_role": "snake_tail"}}
+  ],
+  "edges": [
+    {"module_a_id": "v0", "module_b_id": "v1", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v1", "module_b_id": "v2", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v2", "module_b_id": "v3", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v3", "module_b_id": "v4", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v4", "module_b_id": "v5", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v5", "module_b_id": "v6", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}}
+  ]
+}

@@ -1,0 +1,60 @@
+{
+  "schema_version": "mssr.target_graph.v1",
+  "stamp": 0.0,
+  "global_attributes": {
+    "graph_kind": "target_morphology",
+    "robot_family": "smores_ep",
+    "task_type": "parallel_self_assembly",
+    "morphology_name": "holonomic9",
+    "module_count": 9,
+    "requires_helping_module": false,
+    "assembly_strategy": "paper_depth_waves_then_external_fold",
+    "coordinate_post_assembly_tilts": true,
+    "post_assembly_tilt_tolerance_rad": 0.12,
+    "post_assembly_tilt_groups_by_vertex": [["v1", "v2", "v3", "v4"]],
+    "post_assembly_push_pairs_by_vertex": [
+      {"pusher_vertex": "v5", "lifter_vertex": "v1", "linear_m_s": 0.025},
+      {"pusher_vertex": "v6", "lifter_vertex": "v2", "linear_m_s": 0.025},
+      {"pusher_vertex": "v7", "lifter_vertex": "v3", "linear_m_s": 0.025},
+      {"pusher_vertex": "v8", "lifter_vertex": "v4", "linear_m_s": 0.025}
+    ],
+    "post_assembly_tilt_rad_by_vertex": {
+      "v1": -1.35,
+      "v2": -1.35,
+      "v3": -1.35,
+      "v4": -1.35
+    },
+  "pre_reconfiguration_tilt_rad_by_vertex": {
+    "v1": 0.0,
+    "v2": 0.0,
+    "v3": 0.0,
+    "v4": 0.0
+  },
+  "pre_reconfiguration_tilt_groups_by_vertex": [["v1", "v2", "v3", "v4"]],
+  "pre_reconfiguration_stabilize_vertices": ["v0"],
+    "capabilities": ["holonomic_translation", "transport", "omnidirectional_support"],
+    "source_reference": "Liu et al., Parallel Self-Assembly with SMORES-EP, Task 2 / Fig. 13",
+    "description": "Reference nine-module cross. Root-face actions are split LEFT/RIGHT then TOP/BOTTOM, the four depth-two leaves dock in parallel, and each external leaf drives LEFT/RIGHT inward while retaining PAN/TILT as its paired inner spoke tilts to lift the center."
+  },
+  "nodes": [
+    {"node_id": "v0", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v0", "target_role": "holonomic_center", "is_target_root": true}},
+    {"node_id": "v1", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v1", "target_role": "holonomic_inner_west"}},
+    {"node_id": "v2", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v2", "target_role": "holonomic_inner_north"}},
+    {"node_id": "v3", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v3", "target_role": "holonomic_inner_east"}},
+    {"node_id": "v4", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v4", "target_role": "holonomic_inner_south"}},
+    {"node_id": "v5", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v5", "target_role": "holonomic_drive_west"}},
+    {"node_id": "v6", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v6", "target_role": "holonomic_drive_north"}},
+    {"node_id": "v7", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v7", "target_role": "holonomic_drive_east"}},
+    {"node_id": "v8", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v8", "target_role": "holonomic_drive_south"}}
+  ],
+  "edges": [
+    {"module_a_id": "v1", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "LEFT", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v2", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "TOP", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v3", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "RIGHT", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v4", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v5", "module_b_id": "v1", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v6", "module_b_id": "v2", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v7", "module_b_id": "v3", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
+    {"module_a_id": "v8", "module_b_id": "v4", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}}
+  ]
+}

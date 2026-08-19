@@ -1,0 +1,22 @@
+{
+  "locomotion": {
+    "sphere_0": {
+      "vx": 0.15,
+      "vy": 0.0,
+      "yaw_rate": 0.0
+    },
+    "sphere_1": {
+      "vx": 0.0,
+      "vy": 0.0,
+      "yaw_rate": 0.0
+    }
+  },
+  "magnetic": [
+    {
+      "module_a_id": "sphere_0",
+      "module_b_id": "sphere_1",
+      "command": "attach",
+      "joint_type": "spherical"
+    }
+  ]
+}

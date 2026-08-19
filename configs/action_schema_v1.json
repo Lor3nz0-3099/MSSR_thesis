@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "MSSR simulation actions v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "mssr.actions.v1"
+    },
+    "timestamp": {
+      "type": "number"
+    },
+    "reset": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "requested": {
+              "type": "boolean"
+            },
+            "command": {
+              "enum": ["reset", "none"]
+            }
+          }
+        }
+      ]
+    },
+    "locomotion": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "vx": {
+            "type": "number"
+          },
+          "vy": {
+            "type": "number"
+          },
+          "yaw_rate": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "magnetic": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["module_a_id", "module_b_id", "command"],
+        "properties": {
+          "module_a_id": {
+            "type": "string"
+          },
+          "module_b_id": {
+            "type": "string"
+          },
+          "command": {
+            "enum": ["hold", "attach", "detach"]
+          },
+          "joint_type": {
+            "enum": ["rigid", "spherical", "hinge"]
+          },
+          "joint_axis": {
+            "enum": ["x", "y", "z"]
+          },
+          "edge_role": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

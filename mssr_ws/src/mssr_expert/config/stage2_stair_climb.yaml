@@ -1,0 +1,20 @@
+stage:
+  stage_id: 2
+  stage_name: "stair_climb"
+  task_type: "multi_step_dynamic_support"
+  expert_name: "stage2_stair_climb"
+  scenario_name: "stage2_stair_climb"
+  difficulty: 0.45
+  module_count: 8
+  roles:
+    - "frontier_anchor"
+    - "base"
+    - "climber"
+    - "support_transfer"
+    - "mobile"
+  attachment_modes:
+    - "rolling_contact"
+    - "surface_pivot"
+    - "support_contact"
+    - "anchor_link"
+    - "transfer_link"
