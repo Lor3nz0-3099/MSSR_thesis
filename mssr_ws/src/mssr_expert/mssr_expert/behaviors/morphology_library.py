@@ -423,7 +423,6 @@ class MorphologyLibrary:
                         * velocity
                         / effective_radius
                     )
-                    pan_rate = max(-max_pan_rate, min(max_pan_rate, pan_rate))
                     commands[assignment.module_id] = {
                         "vx": 0.0,
                         "vy": 0.0,
@@ -441,6 +440,29 @@ class MorphologyLibrary:
                     }
         if not commands:
             raise MorphologyLibraryError("Drive profile selected no locomotor")
+
+        # Preserve the requested morphology twist when one or more PAN
+        # locomotors hit their speed limit.  Clipping each actuator
+        # independently changes the relative wheel speeds and therefore the
+        # path curvature.  A single scale factor keeps their ratios intact.
+        pan_commands = [
+            command
+            for command in commands.values()
+            if "pan_rate_rad_s" in command
+        ]
+        if pan_commands:
+            if not math.isfinite(max_pan_rate) or max_pan_rate <= 0.0:
+                raise MorphologyLibraryError(
+                    "PAN drive needs a positive rate limit"
+                )
+            peak_rate = max(
+                abs(float(command["pan_rate_rad_s"]))
+                for command in pan_commands
+            )
+            if peak_rate > max_pan_rate:
+                scale = max_pan_rate / peak_rate
+                for command in pan_commands:
+                    command["pan_rate_rad_s"] *= scale
         return commands
 
     def _resolve_posture(
