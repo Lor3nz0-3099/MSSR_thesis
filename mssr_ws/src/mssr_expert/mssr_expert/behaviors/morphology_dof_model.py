@@ -23,6 +23,8 @@ class OperationalDof:
     upper_limit_rad: float | None = None
     max_effort_nm: float | None = None
     motor_mix: tuple[tuple[str, float], ...] = ()
+    locomotion_capable: bool = False
+    shape_capable: bool = False
 
     @property
     def load_bearing(self) -> bool:
@@ -35,6 +37,24 @@ class OperationalDof:
     @property
     def shape_candidate(self) -> bool:
         return self.mode == "shape_candidate"
+
+    @property
+    def can_locomote(self) -> bool:
+        """Whether this free coordinate may be used as a locomotor.
+
+        PAN is intentionally included: in wheel-support morphologies such as
+        RC Car8 the free TOP/PAN disk is the ground-contact wheel.  ``mode``
+        describes the coordinate's current structural use; it is not an
+        exhaustive list of all functions that the coordinate can perform.
+        """
+
+        return self.locomotion_capable
+
+    @property
+    def can_shape(self) -> bool:
+        """Whether this coordinate is a morphology-shaping actuator."""
+
+        return self.shape_capable
 
 
 @dataclass(frozen=True)
@@ -57,6 +77,12 @@ class MorphologyDofInventory:
 
     def by_mode(self, mode: str) -> tuple[OperationalDof, ...]:
         return tuple(dof for dof in self.dofs if dof.mode == mode)
+
+    def locomotion_dofs(self) -> tuple[OperationalDof, ...]:
+        return tuple(dof for dof in self.dofs if dof.can_locomote)
+
+    def shape_dofs(self) -> tuple[OperationalDof, ...]:
+        return tuple(dof for dof in self.dofs if dof.can_shape)
 
     @property
     def signature(self) -> tuple[tuple[str, str, str], ...]:
@@ -179,6 +205,11 @@ class SmoresMorphologyDofAnalyzer:
                 actuator.get("max_effort_nm")
             ),
             motor_mix=self._MOTOR_MIX.get(name, ()),
+            locomotion_capable=(
+                not connected
+                and name in {"left_wheel", "right_wheel", "pan"}
+            ),
+            shape_capable=name in {"tilt", "pan"},
         )
 
     @staticmethod

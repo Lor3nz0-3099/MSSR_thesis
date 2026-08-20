@@ -62,3 +62,25 @@ def test_pan_and_tilt_expose_the_physical_motor_mixing() -> None:
         ("motorA", 1.0),
         ("motorB", -1.0),
     )
+
+
+def test_rc_car_free_pan_is_a_locomotion_capable_shape_dof() -> None:
+    inventory = _analyze("smores_rc_car8.json")
+    by_module = {module.module_id: module for module in inventory.modules}
+
+    for module_id in ("v3", "v4", "v5", "v6"):
+        by_name = {dof.name: dof for dof in by_module[module_id].dofs}
+        assert by_name["pan"].shape_candidate
+        assert by_name["pan"].can_shape
+        assert by_name["pan"].can_locomote
+        assert not by_name["tilt"].can_locomote
+
+
+def test_connected_pan_cannot_be_used_as_a_locomotor() -> None:
+    inventory = _analyze("smores_bridge8.json")
+
+    assert all(
+        not dof.can_locomote
+        for dof in inventory.dofs
+        if dof.name == "pan" and dof.connected
+    )
