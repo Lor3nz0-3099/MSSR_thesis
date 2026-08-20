@@ -5,6 +5,8 @@ from __future__ import annotations
 import math
 from typing import Any, Mapping
 
+from mssr_expert.behaviors.morphology_dof_model import MorphologyDofInventory
+from mssr_expert.behaviors.morphology_library import MorphologyLibraryError
 from mssr_expert.graph.attributed_robot_graph import AttributedRobotGraph
 
 
@@ -94,3 +96,49 @@ def _planar_body_forward(
     if planar_norm <= 1.0e-6:
         return None
     return forward_x / planar_norm, forward_y / planar_norm
+
+
+def validate_locomotion_dofs(
+    commands: Mapping[str, Mapping[str, float]],
+    inventory: MorphologyDofInventory,
+) -> None:
+    """Reject locomotion commands that use structurally occupied DoFs.
+
+    Module-wheel commands require both LEFT and RIGHT wheel coordinates to be
+    available.  PAN-rate commands require a free PAN coordinate.  This keeps
+    morphology-level drive profiles from silently commanding a connector joint
+    that is currently carrying a rigid attachment.
+    """
+
+    by_module = {
+        module.module_id: {dof.name: dof for dof in module.dofs}
+        for module in inventory.modules
+    }
+    for module_id, command in commands.items():
+        if module_id not in by_module:
+            raise MorphologyLibraryError(
+                f"Locomotion command targets unknown module {module_id!r}"
+            )
+        dofs = by_module[module_id]
+        pan_rate = float(command.get("pan_rate_rad_s", 0.0))
+        body_motion = any(
+            abs(float(command.get(key, 0.0))) > 1.0e-9
+            for key in ("vx", "vy", "yaw_rate")
+        )
+        if abs(pan_rate) > 1.0e-9:
+            pan = dofs.get("pan")
+            if pan is None or not pan.can_locomote:
+                raise MorphologyLibraryError(
+                    f"Module {module_id!r} PAN is not available for locomotion"
+                )
+        if body_motion:
+            unavailable = [
+                name
+                for name in ("left_wheel", "right_wheel")
+                if name not in dofs or not dofs[name].can_locomote
+            ]
+            if unavailable:
+                raise MorphologyLibraryError(
+                    f"Module {module_id!r} cannot use module-wheel locomotion; "
+                    f"unavailable DoFs: {', '.join(unavailable)}"
+                )

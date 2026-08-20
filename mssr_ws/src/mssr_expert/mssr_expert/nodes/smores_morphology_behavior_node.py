@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import time
 from pathlib import Path
 from typing import Any, Mapping
@@ -11,6 +12,7 @@ from ament_index_python.packages import get_package_share_directory
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
+from geometry_msgs.msg import Twist
 from std_msgs.msg import String
 
 from mssr_expert.behaviors.morphology_library import (
@@ -19,6 +21,7 @@ from mssr_expert.behaviors.morphology_library import (
 )
 from mssr_expert.behaviors.morphology_locomotion import (
     coherent_planar_train_commands,
+    validate_locomotion_dofs,
 )
 from mssr_expert.behaviors.morphology_dof_model import (
     MorphologyDofInventory,
@@ -112,10 +115,13 @@ class SmoresMorphologyBehaviorNode(Node):
             "task_graph_topic", "/mssr/expert/task_graph"
         )
         self.declare_parameter("robot_graph_topic", "/mssr/robot_graph")
+        self.declare_parameter("cmd_vel_topic", "/cmd_vel")
+        self.declare_parameter("cmd_vel_timeout_s", 0.5)
 
         library = MorphologyLibrary.load(
             Path(str(self.get_parameter("library_path").value))
         )
+        self._library = library
         self._executor = MorphologyBehaviorExecutor(
             library,
             joint_timeout_s=float(
@@ -137,6 +143,9 @@ class SmoresMorphologyBehaviorNode(Node):
         self._dof_inventory = MorphologyDofInventory(())
         self._dof_signature: tuple[tuple[str, str, str], ...] = ()
         self._last_terminal_command_id = ""
+        self._latest_cmd_vel = (0.0, 0.0, 0.0)
+        self._last_cmd_vel_s: float | None = None
+        self._cmd_vel_output_active = False
 
         self._actions_publisher = self.create_publisher(
             String,
@@ -180,6 +189,12 @@ class SmoresMorphologyBehaviorNode(Node):
             String,
             str(self.get_parameter("command_topic").value),
             self._on_command,
+            10,
+        )
+        self.create_subscription(
+            Twist,
+            str(self.get_parameter("cmd_vel_topic").value),
+            self._on_cmd_vel,
             10,
         )
         rate_hz = max(
@@ -329,6 +344,18 @@ class SmoresMorphologyBehaviorNode(Node):
             f"shape_candidates={len(inventory.by_mode('shape_candidate'))}."
         )
 
+    def _on_cmd_vel(self, message: Twist) -> None:
+        values = (
+            float(message.linear.x),
+            float(message.linear.y),
+            float(message.angular.z),
+        )
+        if not all(math.isfinite(value) for value in values):
+            self.get_logger().error("Ignoring non-finite /cmd_vel command.")
+            return
+        self._latest_cmd_vel = values
+        self._last_cmd_vel_s = time.monotonic()
+
     def _on_primitive_status(self, message: String) -> None:
         payload = string_msg_to_dict(message)
         if payload:
@@ -380,6 +407,9 @@ class SmoresMorphologyBehaviorNode(Node):
             )
 
     def _step(self) -> None:
+        if not self._executor.active and self._step_cmd_vel():
+            return
+
         decision = self._executor.step(
             time.monotonic(), self._latest_primitive_status
         )
@@ -393,38 +423,19 @@ class SmoresMorphologyBehaviorNode(Node):
             self._latest_robot_graph,
             decision.locomotion,
         )
-        self._actions_publisher.publish(
-            dict_to_string_msg(
-                {
-                    "schema_version": "mssr.actions.v2",
-                    "stamp": time.time(),
-                    "stage_id": 0,
-                    "task_type": "morphology_behavior",
-                    "reset": False,
-                    "locomotion": {
-                        module_id: dict(command)
-                        for module_id, command in locomotion.items()
-                    },
-                    "magnetic": [],
-                    "expert": {
-                        "fsm_state": decision.state,
-                        "active_primitive": (
-                            decision.primitive_goal.primitive
-                            if decision.primitive_goal is not None
-                            else decision.behavior
-                        ),
-                        "primitive_params": {},
-                        "module_roles": {
-                            item.module_id: item.target_role
-                            for item in self._assignments
-                        },
-                        "task_metrics": {"progress": decision.progress},
-                        "success": decision.success,
-                        "done": decision.done,
-                        "debug": {"message": decision.message},
-                    },
-                }
-            )
+        self._publish_actions(
+            locomotion,
+            fsm_state=decision.state,
+            active_primitive=(
+                decision.primitive_goal.primitive
+                if decision.primitive_goal is not None
+                else decision.behavior
+            ),
+            progress=decision.progress,
+            success=decision.success,
+            done=decision.done,
+            message=decision.message,
+            task_type="morphology_behavior",
         )
         if (
             decision.done
@@ -444,6 +455,109 @@ class SmoresMorphologyBehaviorNode(Node):
         )
         if decision.done:
             self._last_terminal_command_id = decision.command_id
+
+    def _step_cmd_vel(self) -> bool:
+        """Forward a fresh Nav2-style body twist through the morphology map."""
+
+        now_s = time.monotonic()
+        timeout_s = float(self.get_parameter("cmd_vel_timeout_s").value)
+        if not math.isfinite(timeout_s) or timeout_s <= 0.0:
+            timeout_s = 0.5
+        fresh = (
+            self._last_cmd_vel_s is not None
+            and now_s - self._last_cmd_vel_s <= timeout_s
+        )
+        if not fresh and not self._cmd_vel_output_active:
+            return False
+        if (
+            not self._morphology_name
+            or not self._assignments
+            or not self._assembly_ready
+        ):
+            return False
+
+        linear, lateral, yaw_rate = (
+            self._latest_cmd_vel if fresh else (0.0, 0.0, 0.0)
+        )
+        try:
+            locomotion = self._library.drive_commands(
+                self._morphology_name,
+                self._assignments,
+                linear,
+                yaw_rate,
+                lateral,
+            )
+            locomotion = coherent_planar_train_commands(
+                self._latest_robot_graph, locomotion
+            )
+            validate_locomotion_dofs(locomotion, self._dof_inventory)
+        except ValueError as error:
+            self.get_logger().error(
+                f"Rejected /cmd_vel for current morphology: {error}"
+            )
+            if not self._cmd_vel_output_active:
+                return False
+            locomotion = {}
+            fresh = False
+
+        self._publish_actions(
+            locomotion,
+            fsm_state="NAV2_DRIVE" if fresh else "NAV2_WATCHDOG_STOP",
+            active_primitive="cmd_vel",
+            progress=0.0,
+            success=False,
+            done=False,
+            message=(
+                "Following /cmd_vel through morphology controller."
+                if fresh
+                else "/cmd_vel watchdog expired; locomotion stopped."
+            ),
+            task_type="morphology_velocity",
+        )
+        self._cmd_vel_output_active = fresh
+        return True
+
+    def _publish_actions(
+        self,
+        locomotion: Mapping[str, Mapping[str, float]],
+        *,
+        fsm_state: str,
+        active_primitive: str,
+        progress: float,
+        success: bool,
+        done: bool,
+        message: str,
+        task_type: str,
+    ) -> None:
+        self._actions_publisher.publish(
+            dict_to_string_msg(
+                {
+                    "schema_version": "mssr.actions.v2",
+                    "stamp": time.time(),
+                    "stage_id": 0,
+                    "task_type": task_type,
+                    "reset": False,
+                    "locomotion": {
+                        module_id: dict(command)
+                        for module_id, command in locomotion.items()
+                    },
+                    "magnetic": [],
+                    "expert": {
+                        "fsm_state": fsm_state,
+                        "active_primitive": active_primitive,
+                        "primitive_params": {},
+                        "module_roles": {
+                            item.module_id: item.target_role
+                            for item in self._assignments
+                        },
+                        "task_metrics": {"progress": float(progress)},
+                        "success": bool(success),
+                        "done": bool(done),
+                        "debug": {"message": message},
+                    },
+                }
+            )
+        )
 
     def _publish_status(
         self,
