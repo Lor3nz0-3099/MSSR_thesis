@@ -12,12 +12,17 @@ from ament_index_python.packages import get_package_share_directory
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
-from geometry_msgs.msg import Twist
+from geometry_msgs.msg import TransformStamped, Twist
+from nav_msgs.msg import Odometry
+from tf2_ros import TransformBroadcaster
 from std_msgs.msg import String
 
 from mssr_expert.behaviors.morphology_library import (
     AssignedModule,
     MorphologyLibrary,
+)
+from mssr_expert.behaviors.morphology_navigation import (
+    estimate_planar_morphology_state,
 )
 from mssr_expert.behaviors.morphology_locomotion import (
     coherent_planar_train_commands,
@@ -117,6 +122,9 @@ class SmoresMorphologyBehaviorNode(Node):
         self.declare_parameter("robot_graph_topic", "/mssr/robot_graph")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel")
         self.declare_parameter("cmd_vel_timeout_s", 0.5)
+        self.declare_parameter("odom_topic", "/odom")
+        self.declare_parameter("odom_frame", "odom")
+        self.declare_parameter("base_frame", "base_link")
 
         library = MorphologyLibrary.load(
             Path(str(self.get_parameter("library_path").value))
@@ -146,6 +154,13 @@ class SmoresMorphologyBehaviorNode(Node):
         self._latest_cmd_vel = (0.0, 0.0, 0.0)
         self._last_cmd_vel_s: float | None = None
         self._cmd_vel_output_active = False
+
+        self._odom_publisher = self.create_publisher(
+            Odometry,
+            str(self.get_parameter("odom_topic").value),
+            10,
+        )
+        self._tf_broadcaster = TransformBroadcaster(self)
 
         self._actions_publisher = self.create_publisher(
             String,
@@ -326,6 +341,62 @@ class SmoresMorphologyBehaviorNode(Node):
                 "Recovered unique live topology assignment for "
                 f"{morphology_name!r}."
             )
+        self._publish_navigation_state(current_graph)
+
+    def _publish_navigation_state(
+        self,
+        current_graph: AttributedRobotGraph,
+    ) -> None:
+        """Expose the assembled morphology as one planar Nav2 base."""
+
+        try:
+            navigation_spec = self._library.navigation_frame_spec(
+                self._morphology_name
+            )
+            if navigation_spec is None:
+                return
+            state = estimate_planar_morphology_state(
+                current_graph,
+                self._assignments,
+                navigation_spec,
+            )
+        except ValueError as error:
+            self.get_logger().warning(
+                f"Cannot publish morphology odometry: {error}"
+            )
+            return
+
+        stamp = self.get_clock().now().to_msg()
+        odom_frame = str(self.get_parameter("odom_frame").value)
+        base_frame = str(self.get_parameter("base_frame").value)
+        half_yaw = 0.5 * state.yaw_rad
+        qz = math.sin(half_yaw)
+        qw = math.cos(half_yaw)
+
+        odometry = Odometry()
+        odometry.header.stamp = stamp
+        odometry.header.frame_id = odom_frame
+        odometry.child_frame_id = base_frame
+        odometry.pose.pose.position.x = state.x_m
+        odometry.pose.pose.position.y = state.y_m
+        odometry.pose.pose.position.z = 0.0
+        odometry.pose.pose.orientation.z = qz
+        odometry.pose.pose.orientation.w = qw
+        odometry.twist.twist.linear.x = state.vx_m_s
+        odometry.twist.twist.linear.y = state.vy_m_s
+        odometry.twist.twist.angular.z = state.yaw_rate_rad_s
+        self._odom_publisher.publish(odometry)
+
+        transform = TransformStamped()
+        transform.header.stamp = stamp
+        transform.header.frame_id = odom_frame
+        transform.child_frame_id = base_frame
+        transform.transform.translation.x = state.x_m
+        transform.transform.translation.y = state.y_m
+        transform.transform.translation.z = 0.0
+        transform.transform.rotation.z = qz
+        transform.transform.rotation.w = qw
+        self._tf_broadcaster.sendTransform(transform)
 
     def _update_dof_inventory(
         self,

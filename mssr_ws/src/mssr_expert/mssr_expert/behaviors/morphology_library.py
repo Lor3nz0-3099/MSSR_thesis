@@ -97,6 +97,40 @@ class MorphologyLibrary:
         if len(set(module_ids)) != expected or len(set(vertices)) != expected:
             raise MorphologyLibraryError("Morphology assignment must be one-to-one")
 
+
+    def navigation_frame_spec(
+        self,
+        morphology_name: str,
+    ) -> dict[str, tuple[str, ...]] | None:
+        """Return the optional role-anchored planar navigation frame."""
+
+        profile = self._profile(morphology_name)
+        raw = profile.get("navigation")
+        if raw is None:
+            return None
+        if not isinstance(raw, Mapping):
+            raise MorphologyLibraryError(
+                f"{morphology_name} navigation profile must be an object"
+            )
+        result: dict[str, tuple[str, ...]] = {}
+        for key in (
+            "center_roles",
+            "forward_from_roles",
+            "forward_to_roles",
+        ):
+            values = raw.get(key)
+            if not isinstance(values, list | tuple) or not values:
+                raise MorphologyLibraryError(
+                    f"{morphology_name} navigation {key} must be a non-empty array"
+                )
+            roles = tuple(str(value).strip() for value in values)
+            if any(not role for role in roles) or len(set(roles)) != len(roles):
+                raise MorphologyLibraryError(
+                    f"{morphology_name} navigation {key} contains invalid roles"
+                )
+            result[key] = roles
+        return result
+
     def behavior_joint_targets(
         self,
         morphology_name: str,
