@@ -69,6 +69,7 @@
         ]
       },
       "behaviors": {
+        "straighten": ["straight"],
         "lift_head": ["head_lift"],
         "hook_step": ["step_hook"],
         "train": [

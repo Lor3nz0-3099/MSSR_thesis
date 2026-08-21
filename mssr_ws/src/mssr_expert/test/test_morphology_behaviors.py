@@ -711,10 +711,13 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
     assert [target.target_vertex_id for target in hook if target.angle_rad] == [
         "v2", "v3", "v4", "v5", "v6"
     ]
-    with pytest.raises(MorphologyLibraryError, match="not defined"):
-        _library().behavior_joint_targets(
-            "snake8", "straighten", assignments
-        )
+    straight = _library().behavior_joint_targets(
+        "snake8", "straighten", assignments
+    )
+    assert [target.target_vertex_id for target in straight] == [
+        "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7"
+    ]
+    assert all(target.angle_rad == pytest.approx(0.0) for target in straight)
     assert _library().drive_joint_targets(
         "snake8", assignments, 0.03, 0.0
     ) == ()

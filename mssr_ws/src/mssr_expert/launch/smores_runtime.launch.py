@@ -96,6 +96,8 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         simulation_command.append("--performance")
     if _as_bool(LaunchConfiguration("simple_visuals").perform(context)):
         simulation_command.append("--simple-visuals")
+    if _as_bool(LaunchConfiguration("obstacle_course").perform(context)):
+        simulation_command.append("--obstacle-course")
     if _as_bool(LaunchConfiguration("headless").perform(context)):
         simulation_command.append("--headless")
 
@@ -174,6 +176,11 @@ def generate_launch_description() -> LaunchDescription:
                 "simple_visuals",
                 default_value="false",
                 description="Use collision proxies instead of full CAD.",
+            ),
+            DeclareLaunchArgument(
+                "obstacle_course",
+                default_value="false",
+                description="Spawn the physical gap and stair course in Isaac.",
             ),
             DeclareLaunchArgument(
                 "headless",

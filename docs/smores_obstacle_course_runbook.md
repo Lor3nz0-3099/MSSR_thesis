@@ -31,7 +31,8 @@ uses live module poses with those landmarks: RC Car8 climbs the ramp and
 stops before the gap, then reconfigures safely to Snake8. The Snake8 train
 spans and clears the gap, verifies each stair-height progression, aligns the
 manipulator at a button stand-off pose, and crosses the exit plane with RC
-Car8. No `straighten` command is available for Snake8.
+Car8. Snake8 also exposes the direct `straighten` behavior used by the
+manual posture smoke test below.
 
 Closed-loop approach phases run at `0.05 m/s` and the bridge crossing uses
 `0.03 m/s`; these are below the configured morphology speed limits while
