@@ -94,13 +94,69 @@
           {
             "phase": "APPROACH_RISER",
             "drive": {
-              "default_duration_s": 8.0,
+              "default_duration_s": 4.0,
               "duration_parameter": "riser_approach_duration_s",
-              "default_linear_m_s": 0.018,
-              "linear_parameter": "linear_m_s",
+              "default_linear_m_s": 0.060,
+              "linear_parameter": "riser_approach_linear_m_s",
               "active_target_roles": [
                 "snake_tail", "snake_rear", "snake_hip",
                 "snake_center_rear", "snake_center_front"
+              ]
+            }
+          }
+        ],
+        "advance_hooked_front": [
+          {
+            "phase": "ADVANCE_HOOK",
+            "drive": {
+              "default_duration_s": 3.0,
+              "duration_parameter": "duration_s",
+              "default_linear_m_s": 0.018,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": ["snake_neck", "snake_head"]
+            }
+          }
+        ],
+        "advance_after_transfer_1": [
+          {
+            "phase": "ADVANCE_TRANSFER_1",
+            "drive": {
+              "default_duration_s": 3.0,
+              "duration_parameter": "duration_s",
+              "default_linear_m_s": 0.018,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_shoulder", "snake_neck", "snake_head"
+              ]
+            }
+          }
+        ],
+        "advance_after_transfer_2": [
+          {
+            "phase": "ADVANCE_TRANSFER_2",
+            "drive": {
+              "default_duration_s": 3.0,
+              "duration_parameter": "duration_s",
+              "default_linear_m_s": 0.018,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_center_front", "snake_shoulder",
+                "snake_neck", "snake_head"
+              ]
+            }
+          }
+        ],
+        "advance_after_transfer_3": [
+          {
+            "phase": "ADVANCE_TRANSFER_3",
+            "drive": {
+              "default_duration_s": 3.0,
+              "duration_parameter": "duration_s",
+              "default_linear_m_s": 0.018,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_center_rear", "snake_center_front",
+                "snake_shoulder", "snake_neck", "snake_head"
               ]
             }
           }
@@ -156,10 +212,10 @@
           {
             "phase": "APPROACH_RISER",
             "drive": {
-              "default_duration_s": 8.0,
+              "default_duration_s": 4.0,
               "duration_parameter": "riser_approach_duration_s",
-              "default_linear_m_s": 0.018,
-              "linear_parameter": "linear_m_s",
+              "default_linear_m_s": 0.060,
+              "linear_parameter": "riser_approach_linear_m_s",
               "active_target_roles": [
                 "snake_tail", "snake_rear", "snake_hip",
                 "snake_center_rear", "snake_center_front"
@@ -168,44 +224,37 @@
           },
           {"phase": "SET_HOOK", "posture": "step_hook"},
           {
-            "phase": "PULL_FRONT",
+            "phase": "ADVANCE_HOOK",
             "drive": {
               "default_duration_s": 4.0,
               "duration_parameter": "front_pull_duration_s",
               "default_linear_m_s": 0.025,
               "linear_parameter": "linear_m_s",
-              "active_target_roles": [
-                "snake_tail", "snake_rear", "snake_hip",
-                "snake_center_rear", "snake_center_front",
-                "snake_neck", "snake_head"
-              ]
+              "active_target_roles": ["snake_neck", "snake_head"]
             }
           },
           {"phase": "SHIFT_RISER_1", "posture": "step_transfer_1"},
           {
-            "phase": "PULL_SHIFT_1",
+            "phase": "ADVANCE_TRANSFER_1",
             "drive": {
               "default_duration_s": 4.0,
               "duration_parameter": "transfer_pull_duration_s",
               "default_linear_m_s": 0.025,
               "linear_parameter": "linear_m_s",
               "active_target_roles": [
-                "snake_tail", "snake_rear", "snake_hip",
-                "snake_center_rear", "snake_shoulder",
-                "snake_neck", "snake_head"
+                "snake_shoulder", "snake_neck", "snake_head"
               ]
             }
           },
           {"phase": "SHIFT_RISER_2", "posture": "step_transfer_2"},
           {
-            "phase": "PULL_SHIFT_2",
+            "phase": "ADVANCE_TRANSFER_2",
             "drive": {
               "default_duration_s": 4.0,
               "duration_parameter": "transfer_pull_duration_s",
               "default_linear_m_s": 0.025,
               "linear_parameter": "linear_m_s",
               "active_target_roles": [
-                "snake_tail", "snake_rear", "snake_hip",
                 "snake_center_front", "snake_shoulder",
                 "snake_neck", "snake_head"
               ]
@@ -213,15 +262,14 @@
           },
           {"phase": "SHIFT_RISER_3", "posture": "step_transfer_3"},
           {
-            "phase": "PULL_SHIFT_3",
+            "phase": "ADVANCE_TRANSFER_3",
             "drive": {
               "default_duration_s": 4.0,
               "duration_parameter": "transfer_pull_duration_s",
               "default_linear_m_s": 0.025,
               "linear_parameter": "linear_m_s",
               "active_target_roles": [
-                "snake_tail", "snake_rear", "snake_center_rear",
-                "snake_center_front", "snake_shoulder",
+                "snake_center_rear", "snake_center_front", "snake_shoulder",
                 "snake_neck", "snake_head"
               ]
             }

@@ -49,6 +49,22 @@ def test_policy_selects_one_capable_morphology_per_course_task() -> None:
         "button_retreat",
         "cross_exit",
     }
+    stair_pulls = [
+        step for step in steps if step.task.startswith("stairs_pull_")
+    ]
+    assert len(stair_pulls) == 3
+    assert all(
+        step.parameters
+        == {
+            "linear_m_s": 0.030,
+            "riser_approach_linear_m_s": 0.060,
+            "riser_approach_duration_s": 4.0,
+            "front_pull_duration_s": 3.0,
+            "transfer_pull_duration_s": 3.0,
+            "tread_advance_duration_s": 5.0,
+        }
+        for step in stair_pulls
+    )
 
 
 def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None:

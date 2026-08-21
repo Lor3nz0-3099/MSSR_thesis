@@ -783,17 +783,43 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
         "snake8",
         "approach_step_lifted",
         assignments,
-        {"linear_m_s": 0.015, "riser_approach_duration_s": 3.0},
+        {
+            "riser_approach_linear_m_s": 0.060,
+            "riser_approach_duration_s": 3.0,
+        },
     )
     assert [step.phase for step in lifted_approach] == [
         "SET_RISER",
         "APPROACH_RISER",
     ]
     assert lifted_approach[1].duration_s == pytest.approx(3.0)
-    assert lifted_approach[1].linear_m_s == pytest.approx(0.015)
+    assert lifted_approach[1].linear_m_s == pytest.approx(0.060)
     assert set(lifted_approach[1].active_target_roles) == set(
         SNAKE8_ROLES[:5]
     )
+    platform_advances = [
+        _library().composite_behavior_steps(
+            "snake8", behavior, assignments
+        )[0]
+        for behavior in (
+            "advance_hooked_front",
+            "advance_after_transfer_1",
+            "advance_after_transfer_2",
+            "advance_after_transfer_3",
+        )
+    ]
+    assert [step.phase for step in platform_advances] == [
+        "ADVANCE_HOOK",
+        "ADVANCE_TRANSFER_1",
+        "ADVANCE_TRANSFER_2",
+        "ADVANCE_TRANSFER_3",
+    ]
+    assert [step.active_target_roles for step in platform_advances] == [
+        SNAKE8_ROLES[6:],
+        SNAKE8_ROLES[5:],
+        SNAKE8_ROLES[4:],
+        SNAKE8_ROLES[3:],
+    ]
 
     pull = _library().composite_behavior_steps(
         "snake8", "pull_over_step", assignments
@@ -802,23 +828,24 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
         "SET_RISER",
         "APPROACH_RISER",
         "SET_HOOK",
-        "PULL_FRONT",
+        "ADVANCE_HOOK",
         "SHIFT_RISER_1",
-        "PULL_SHIFT_1",
+        "ADVANCE_TRANSFER_1",
         "SHIFT_RISER_2",
-        "PULL_SHIFT_2",
+        "ADVANCE_TRANSFER_2",
         "SHIFT_RISER_3",
-        "PULL_SHIFT_3",
+        "ADVANCE_TRANSFER_3",
         "RETURN_NEUTRAL",
         "ADVANCE_ON_TREAD",
     ]
     assert set(pull[1].active_target_roles) == set(SNAKE8_ROLES[:5])
-    assert "snake_shoulder" not in pull[3].active_target_roles
-    assert "snake_center_front" not in pull[5].active_target_roles
-    assert "snake_center_rear" not in pull[7].active_target_roles
-    assert "snake_hip" not in pull[9].active_target_roles
+    assert pull[3].active_target_roles == SNAKE8_ROLES[6:]
+    assert pull[5].active_target_roles == SNAKE8_ROLES[5:]
+    assert pull[7].active_target_roles == SNAKE8_ROLES[4:]
+    assert pull[9].active_target_roles == SNAKE8_ROLES[3:]
     assert set(pull[11].active_target_roles) == set(SNAKE8_ROLES)
-    assert pull[1].duration_s == pytest.approx(8.0)
+    assert pull[1].duration_s == pytest.approx(4.0)
+    assert pull[1].linear_m_s == pytest.approx(0.060)
     assert pull[3].duration_s == pytest.approx(4.0)
     assert pull[5].duration_s == pytest.approx(4.0)
     assert pull[11].duration_s == pytest.approx(5.0)

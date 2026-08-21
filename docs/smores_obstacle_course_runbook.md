@@ -154,11 +154,19 @@ sourced terminal, using the command in section 1. After assembly, define
 run_behavior snake8 stair-neutral-01 straighten '{}'
 run_behavior snake8 stair-rise-01 lift_head '{}'
 run_behavior snake8 stair-lifted-approach-01 approach_step_lifted \
-  '{"linear_m_s":0.015,"riser_approach_duration_s":3.0}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_duration_s":4.0}'
 run_behavior snake8 stair-hook-01 hook_step '{}'
+run_behavior snake8 stair-hook-advance-01 advance_hooked_front \
+  '{"linear_m_s":0.030,"duration_s":3.0}'
 run_behavior snake8 stair-shift-01 transfer_step_1 '{}'
+run_behavior snake8 stair-shift-advance-01 advance_after_transfer_1 \
+  '{"linear_m_s":0.030,"duration_s":3.0}'
 run_behavior snake8 stair-shift-02 transfer_step_2 '{}'
+run_behavior snake8 stair-shift-advance-02 advance_after_transfer_2 \
+  '{"linear_m_s":0.030,"duration_s":3.0}'
 run_behavior snake8 stair-shift-03 transfer_step_3 '{}'
+run_behavior snake8 stair-shift-advance-03 advance_after_transfer_3 \
+  '{"linear_m_s":0.030,"duration_s":3.0}'
 run_behavior snake8 stair-reset-01 straighten '{}'
 ```
 
@@ -167,13 +175,15 @@ The initial lift shortens the horizontal projection of the robot. Therefore,
 the hook is formed; the three vertical modules remain stopped. The square
 profile then has a horizontal ground section, one nearly vertical 77.77 mm
 link, and a horizontal two-module hook. The three transfer commands move that
-profile toward the tail one link at a time. Only after these phases have been
-visually confirmed should the complete timed program be tested close to the
-first riser:
+profile toward the tail one link at a time. After the hook and after every
+transfer, only the modules already supported by the upper tread advance: first
+`v6..v7`, then `v5..v7`, `v4..v7`, and finally `v3..v7`. Only after these
+phases have been visually confirmed should the complete timed program be
+tested close to the first riser:
 
 ```bash
 run_behavior snake8 stair-pull-01 pull_over_step \
-  '{"linear_m_s":0.018,"riser_approach_duration_s":8.0,"front_pull_duration_s":4.0,"transfer_pull_duration_s":4.0,"tread_advance_duration_s":5.0}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_duration_s":4.0,"linear_m_s":0.030,"front_pull_duration_s":3.0,"transfer_pull_duration_s":3.0,"tread_advance_duration_s":5.0}'
 ```
 
 Optional monitoring terminals:
@@ -309,16 +319,18 @@ terminal docking relation. The stair behavior uses two opposing folds rather
 than a progressive arch: the rear remains horizontal, one serial link becomes
 nearly vertical, and the two front modules form a horizontal hook.
 `pull_over_step` lifts the front, closes the post-lift distance using only the
-five grounded modules, forms the hook, and shifts this square profile toward
-the tail three times. It inserts a stopped traction phase after every shift,
-then restores the captured neutral posture and advances on the tread:
+five grounded modules, forms the hook, and advances only the two modules on
+the upper tread. It then shifts the square profile toward the tail three
+times; after each completed shift, the newly supported upper group advances.
+It never drives wheels below the riser during those four phases. Finally it
+restores the captured neutral posture and advances on the tread:
 
 ```bash
 run_behavior snake8 stair-straight-01 straighten '{}'
 run_behavior snake8 stair-approach-01 train '{"linear_m_s":0.020,"duration_s":5.0}'
 run_behavior snake8 stair-lift-01 lift_head '{}'
 run_behavior snake8 stair-hook-01 hook_step '{}'
-run_behavior snake8 stair-pull-01 pull_over_step '{"linear_m_s":0.022,"riser_approach_duration_s":8.0,"front_pull_duration_s":4.0,"transfer_pull_duration_s":4.0,"tread_advance_duration_s":5.0}'
+run_behavior snake8 stair-pull-01 pull_over_step '{"riser_approach_linear_m_s":0.060,"riser_approach_duration_s":4.0,"linear_m_s":0.030,"front_pull_duration_s":3.0,"transfer_pull_duration_s":3.0,"tread_advance_duration_s":5.0}'
 ```
 
 Repeat `lift_head -> hook_step -> pull_over_step` for another riser. The
