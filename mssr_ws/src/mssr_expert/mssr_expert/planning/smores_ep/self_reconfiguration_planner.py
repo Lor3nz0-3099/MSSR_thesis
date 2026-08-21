@@ -943,6 +943,11 @@ class SmoresSelfReconfigurationPlanner:
             future_blockers_by_pair=future_blockers_by_pair,
             target_ids=target_ids,
             module_ids=physical_module_ids,
+            # In a connected reconfiguration, count each occupied future
+            # staging corridor as one clearance-sized detour.  This retains
+            # congestion awareness without sending symmetric source leaves
+            # across the entire robot merely to reduce the blocker count.
+            blocker_penalty_m=self.assignment_corridor_clearance_m,
         )
         mapping = dict(best_common_mapping)
         moving_targets = sorted(set(target_ids) - set(mapping))
@@ -1374,8 +1379,11 @@ class SmoresSelfReconfigurationPlanner:
 
         if first.requires_helper or second.requires_helper:
             return False
-        if first.depth != second.depth:
-            return False
+        # Target depth is not itself a dependency.  The progressive DAG has
+        # already made both actions ready only after their individual target
+        # parents are available.  Ready actions at different depths may
+        # therefore share a wave when their connectors and motion corridors
+        # are independent.
         first_source_edge = (
             {first_detach.module_a_id, first_detach.module_b_id}
             if first_detach is not None

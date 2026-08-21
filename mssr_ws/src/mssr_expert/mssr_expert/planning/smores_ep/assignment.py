@@ -272,17 +272,36 @@ def congestion_aware_pair_costs(
     future_blockers_by_pair: Mapping[tuple[str, str], int],
     target_ids: Sequence[str],
     module_ids: Sequence[str],
+    blocker_penalty_m: float | None = None,
 ) -> dict[tuple[str, str], float]:
-    """Encode blocker count before motion cost in one Hungarian matrix."""
+    """Combine blocker count and motion cost in one Hungarian matrix.
 
-    maximum_total_motion_cost = sum(
-        max(
-            motion_cost_by_pair[(target_id, module_id)]
-            for module_id in module_ids
+    ``None`` preserves the lexicographic blocker-first policy used by fresh
+    self-assembly.  Reconfiguration may instead provide a finite metric
+    penalty so avoiding one future staging blocker cannot justify an
+    arbitrarily long cross-robot relocation.
+    """
+
+    if blocker_penalty_m is None:
+        blocker_tier = (
+            sum(
+                max(
+                    motion_cost_by_pair[(target_id, module_id)]
+                    for module_id in module_ids
+                )
+                for target_id in target_ids
+            )
+            + 1.0
         )
-        for target_id in target_ids
-    )
-    blocker_tier = maximum_total_motion_cost + 1.0
+    else:
+        if (
+            not math.isfinite(blocker_penalty_m)
+            or blocker_penalty_m < 0.0
+        ):
+            raise AssignmentError(
+                "The future-blocker penalty must be finite and non-negative."
+            )
+        blocker_tier = blocker_penalty_m
     return {
         (target_id, module_id): (
             motion_cost_by_pair[(target_id, module_id)]

@@ -122,6 +122,36 @@ def _captured_snake_graph() -> AttributedRobotGraph:
     )
 
 
+def _captured_rc_car8_graph() -> AttributedRobotGraph:
+    """Return the live RC Car8 layout that produced [1, 2, 1] waves."""
+
+    positions = {
+        "smores_01": (-0.002314, -0.000828, 0.03),
+        "smores_02": (0.160414, 0.000933, 0.03),
+        "smores_03": (0.156778, 0.084881, 0.03),
+        "smores_04": (0.079453, -0.001281, 0.03),
+        "smores_05": (-0.081910, 0.083797, 0.03),
+        "smores_06": (-0.083270, -0.000282, 0.03),
+        "smores_07": (-0.084057, -0.084288, 0.03),
+        "smores_08": (0.162665, -0.082155, 0.03),
+    }
+    return AttributedRobotGraph(
+        nodes=tuple(
+            _node(module_id, position)
+            for module_id, position in positions.items()
+        ),
+        edges=(
+            _connection("smores_06", "TOP", "smores_01", "BOTTOM"),
+            _connection("smores_04", "BOTTOM", "smores_01", "TOP"),
+            _connection("smores_02", "BOTTOM", "smores_04", "TOP"),
+            _connection("smores_03", "BOTTOM", "smores_02", "LEFT"),
+            _connection("smores_08", "BOTTOM", "smores_02", "RIGHT"),
+            _connection("smores_05", "BOTTOM", "smores_06", "LEFT"),
+            _connection("smores_07", "BOTTOM", "smores_06", "RIGHT"),
+        ),
+    )
+
+
 def _snake_target() -> AttributedRobotGraph:
     return load_attributed_graph(
         CONFIG_ROOT / "smores_snake7.json"
@@ -693,6 +723,32 @@ def test_rc_car_to_manipulator_parallelizes_diverging_source_siblings() -> None:
         first_detach,
         "smores_02",
     ) != planner._detach_face(second_detach, "smores_02")
+
+
+def test_captured_rc_car8_to_snake8_uses_two_local_parallel_waves() -> None:
+    planner = SmoresSelfReconfigurationPlanner()
+    source = _target("rc_car8")
+    current = _captured_rc_car8_graph()
+
+    plan = planner.plan(
+        current,
+        _target("snake8"),
+        source_graph=source,
+        source_assignment=planner.configuration_assignment(current, source),
+    )
+
+    assert [len(stage.mobile_module_ids) for stage in plan.stages] == [2, 2]
+    assert plan.assignment.total_cost < 0.60
+    assert plan.assignment.target_to_module["v1"] == "smores_05"
+    assert plan.assignment.target_to_module["v6"] == "smores_08"
+    assert {
+        plan.assignment.target_to_module["v0"],
+        plan.assignment.target_to_module["v1"],
+    } == {"smores_05", "smores_07"}
+    assert {
+        plan.assignment.target_to_module["v6"],
+        plan.assignment.target_to_module["v7"],
+    } == {"smores_03", "smores_08"}
 
 
 def test_parallel_clearance_can_force_the_safe_serial_fallback() -> None:
