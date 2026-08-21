@@ -657,6 +657,16 @@ def run_parallel_self_assembly_scenario(
                 )
                 for module_id in module_roots
             }
+            pan_moving = {
+                module_id: round(
+                    routed_commands.get(
+                        module_id,
+                        SmoresCommand(),
+                    ).pan_velocity_rad_s,
+                    3,
+                )
+                for module_id in module_roots
+            }
             elapsed = (
                 SimulationManager.get_simulation_time()
                 - initial_time
@@ -669,6 +679,7 @@ def run_parallel_self_assembly_scenario(
             print(
                 f"t={elapsed:7.3f}s {position_text} "
                 f"wheel_cmd={moving} "
+                f"pan_cmd={pan_moving} "
                 f"connections={connection_count}"
             )
             next_log_step += config.log_interval

@@ -216,12 +216,13 @@ def test_rc_car_drive_resolves_physical_modules_by_target_role() -> None:
 
     assert set(commands) == {"m3", "m4", "m5", "m6"}
     assert all(command["vx"] == 0.0 for command in commands.values())
+    saturation_scale = 2.0 / (0.084 / 0.0314)
     assert commands["m3"]["pan_rate_rad_s"] == pytest.approx(
-        0.036 / 0.0314
+        0.036 / 0.0314 * saturation_scale
     )
     assert commands["m4"]["pan_rate_rad_s"] == pytest.approx(-2.0)
     assert commands["m5"]["pan_rate_rad_s"] == pytest.approx(
-        0.036 / 0.0314
+        0.036 / 0.0314 * saturation_scale
     )
     assert commands["m6"]["pan_rate_rad_s"] == pytest.approx(-2.0)
 

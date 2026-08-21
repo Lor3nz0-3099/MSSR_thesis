@@ -330,8 +330,8 @@
       "ready_posture": "wheels_down",
       "navigation": {
         "center_roles": ["chassis_center_left", "chassis_left", "chassis_center_right", "chassis_right"],
-        "forward_from_roles": ["wheel_left_rear", "wheel_right_rear"],
-        "forward_to_roles": ["wheel_left_front", "wheel_right_front"]
+        "forward_from_roles": ["wheel_right_front", "wheel_right_rear"],
+        "forward_to_roles": ["wheel_left_front", "wheel_left_rear"]
       },
       "postures": {
         "wheels_down": [

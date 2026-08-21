@@ -62,7 +62,7 @@ def generate_launch_description() -> LaunchDescription:
                     "use_sim_time": "false",
                     "autostart": autostart,
                     "params_file": params_file,
-                    "use_composition": "false",
+                    "use_composition": "False",
                     "use_respawn": "false",
                     "log_level": log_level,
                 }.items(),

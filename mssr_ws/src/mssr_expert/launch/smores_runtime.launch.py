@@ -1,0 +1,203 @@
+"""Start the SMORES simulation, file bridge, and morphology controller.
+
+Self-assembly and Nav2 are deliberately separate lifecycle phases.  Start the
+self-assembly expert after this launch is ready, then start Nav2 only after the
+assembled morphology publishes ``/odom`` and ``odom -> base_link``.
+"""
+
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+from launch import LaunchContext, LaunchDescription
+from launch.actions import (
+    DeclareLaunchArgument,
+    ExecuteProcess,
+    OpaqueFunction,
+    SetEnvironmentVariable,
+)
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+
+_CURRENT_STATE_FILES = (
+    "module_states.json",
+    "robot_graph.json",
+    "state_graph.json",
+    "task_metrics.json",
+    "primitive_status.json",
+)
+
+
+def _as_bool(value: str) -> bool:
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise ValueError(f"Expected a boolean launch value, got {value!r}")
+
+
+def _runtime_path(repository_root: Path, value: str) -> Path:
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = repository_root / path
+    return path.resolve()
+
+
+def _prepare_runtime_files(repository_root: Path, runtime_dir: Path) -> None:
+    if runtime_dir in {Path("/"), repository_root}:
+        raise ValueError(
+            "runtime_dir must be a dedicated directory, not the repository root"
+        )
+    runtime_dir.mkdir(parents=True, exist_ok=True)
+    idle_actions = repository_root / "configs" / "idle_actions.json"
+    (runtime_dir / "actions.json").write_text(
+        idle_actions.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+    for name in ("primitive_goal.json", "primitive_cancel.json"):
+        (runtime_dir / name).write_text("{}\n", encoding="utf-8")
+    for name in _CURRENT_STATE_FILES:
+        (runtime_dir / name).unlink(missing_ok=True)
+
+
+def _launch_runtime(context: LaunchContext) -> list[object]:
+    repository_root = Path(
+        LaunchConfiguration("repository_root").perform(context)
+    ).expanduser().resolve()
+    runtime_dir = _runtime_path(
+        repository_root,
+        LaunchConfiguration("runtime_dir").perform(context),
+    )
+    if _as_bool(LaunchConfiguration("clean_runtime").perform(context)):
+        _prepare_runtime_files(repository_root, runtime_dir)
+
+    action_file = runtime_dir / "actions.json"
+    primitive_goal_file = runtime_dir / "primitive_goal.json"
+    primitive_cancel_file = runtime_dir / "primitive_cancel.json"
+    primitive_status_file = runtime_dir / "primitive_status.json"
+
+    simulation_command = [
+        str(repository_root / "scripts" / "smores_ep" / "run_self_assembly.sh"),
+        "--module-count",
+        LaunchConfiguration("module_count").perform(context),
+        "--action-file",
+        str(action_file),
+        "--primitive-goal-file",
+        str(primitive_goal_file),
+        "--primitive-cancel-file",
+        str(primitive_cancel_file),
+        "--primitive-status-file",
+        str(primitive_status_file),
+    ]
+    if _as_bool(LaunchConfiguration("performance").perform(context)):
+        simulation_command.append("--performance")
+    if _as_bool(LaunchConfiguration("simple_visuals").perform(context)):
+        simulation_command.append("--simple-visuals")
+    if _as_bool(LaunchConfiguration("headless").perform(context)):
+        simulation_command.append("--headless")
+
+    bridge_command = [
+        sys.executable,
+        str(repository_root / "ros2_bridge" / "mssr_file_bridge.py"),
+        "--state-graph-dir",
+        str(runtime_dir),
+        "--action-file",
+        str(action_file),
+        "--primitive-goal-file",
+        str(primitive_goal_file),
+        "--primitive-cancel-file",
+        str(primitive_cancel_file),
+        "--primitive-status-file",
+        str(primitive_status_file),
+    ]
+
+    return [
+        ExecuteProcess(
+            cmd=bridge_command,
+            cwd=str(repository_root),
+            name="mssr_file_bridge",
+            output="screen",
+            emulate_tty=True,
+        ),
+        Node(
+            package="mssr_expert",
+            executable="mssr_smores_morphology_behavior_node",
+            name="smores_morphology_behavior_node",
+            output="screen",
+            emulate_tty=True,
+        ),
+        ExecuteProcess(
+            cmd=simulation_command,
+            cwd=str(repository_root),
+            name="smores_isaac_sim",
+            output="both",
+            emulate_tty=True,
+        ),
+    ]
+
+
+def generate_launch_description() -> LaunchDescription:
+    """Create the pre-assembly SMORES runtime launch description."""
+
+    repository_root = Path(__file__).resolve().parents[4]
+    return LaunchDescription(
+        [
+            DeclareLaunchArgument(
+                "repository_root",
+                default_value=str(repository_root),
+                description="Root of the MSSR_thesis checkout.",
+            ),
+            DeclareLaunchArgument(
+                "runtime_dir",
+                default_value="logs/nav2_smoke",
+                description="Shared Isaac/ROS JSON channel directory.",
+            ),
+            DeclareLaunchArgument(
+                "module_count",
+                default_value="8",
+                description="Number of SMORES-EP modules spawned in Isaac.",
+            ),
+            DeclareLaunchArgument(
+                "clean_runtime",
+                default_value="true",
+                description="Clear stale commands and current-state payloads.",
+            ),
+            DeclareLaunchArgument(
+                "performance",
+                default_value="false",
+                description="Enable Isaac realtime performance settings.",
+            ),
+            DeclareLaunchArgument(
+                "simple_visuals",
+                default_value="false",
+                description="Use collision proxies instead of full CAD.",
+            ),
+            DeclareLaunchArgument(
+                "headless",
+                default_value="false",
+                description="Run Isaac without its GUI.",
+            ),
+            DeclareLaunchArgument(
+                "ros_domain_id",
+                default_value="0",
+                description="ROS domain shared by bridge and behavior node.",
+            ),
+            DeclareLaunchArgument(
+                "rmw_implementation",
+                default_value="rmw_cyclonedds_cpp",
+                description="ROS middleware shared by runtime processes.",
+            ),
+            SetEnvironmentVariable(
+                "ROS_DOMAIN_ID",
+                LaunchConfiguration("ros_domain_id"),
+            ),
+            SetEnvironmentVariable(
+                "RMW_IMPLEMENTATION",
+                LaunchConfiguration("rmw_implementation"),
+            ),
+            OpaqueFunction(function=_launch_runtime),
+        ]
+    )
