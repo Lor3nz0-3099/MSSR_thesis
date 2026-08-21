@@ -3,7 +3,10 @@ from __future__ import annotations
 
 import pytest
 
-from smores_ep.isaac.obstacle_course import manual_obstacle_course
+from smores_ep.isaac.obstacle_course import (
+    manual_obstacle_course,
+    snake8_stair_test_course,
+)
 
 
 def test_manual_obstacle_course_exports_world_landmarks() -> None:
@@ -59,3 +62,39 @@ def test_manual_course_exposes_future_task_landmarks() -> None:
     } <= semantics
     assert course.button_center_xyz_m[2] > course.stair_top_heights_m[-1]
     assert course.exit_center_xyz_m[0] > course.button_center_xyz_m[0]
+
+
+def test_snake8_stair_test_course_has_three_wheel_high_risers() -> None:
+    course = snake8_stair_test_course()
+
+    assert course.first_riser_x_m == pytest.approx(0.65)
+    assert course.riser_depth_m == pytest.approx(0.28)
+    assert course.stair_top_heights_m == pytest.approx(
+        (0.065, 0.13, 0.195)
+    )
+    assert tuple(
+        second - first
+        for first, second in zip(
+            (0.0, *course.stair_top_heights_m[:-1]),
+            course.stair_top_heights_m,
+        )
+    ) == pytest.approx((0.065, 0.065, 0.065))
+
+
+def test_snake8_stair_test_observation_is_isolated_from_full_course() -> None:
+    course = snake8_stair_test_course()
+
+    assert course.to_observation() == {
+        "frame_id": "world",
+        "course_profile": "snake8_stair_test",
+        "stairs": {
+            "top_heights_m": [0.065, 0.13, 0.195],
+            "first_riser_x_m": 0.65,
+            "riser_depth_m": 0.28,
+        },
+    }
+    assert {box.semantic for box in course.boxes} == {
+        "stair_test_start",
+        "stair_test_riser",
+        "stair_test_upper_deck",
+    }

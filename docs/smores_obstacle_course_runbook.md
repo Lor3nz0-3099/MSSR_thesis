@@ -129,6 +129,48 @@ source mssr_ws/install/setup.bash
 ros2 run mssr_expert mssr_smores_morphology_behavior_node
 ```
 
+### Isolated Snake8 stair stage
+
+Before running the complete course, the stair gait can be validated on a
+dedicated stage without Nav2, the gap, the button, or the task-achievement
+node. It contains three 65 mm risers with 280 mm treads. Start simulation,
+file bridge and the single morphology behavior node together:
+
+```bash
+cd ~/MSSR_thesis/mssr_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch mssr_expert smores_runtime.launch.py \
+  stair_test_course:=true \
+  performance:=true
+```
+
+Do not also pass `obstacle_course:=true`; the two physical stages are
+mutually exclusive. Start only the Snake8 self-assembly expert in another
+sourced terminal, using the command in section 1. After assembly, define
+`run_behavior` as below and validate the stopped postures in order:
+
+```bash
+run_behavior snake8 stair-neutral-01 straighten '{}'
+run_behavior snake8 stair-rise-01 lift_head '{}'
+run_behavior snake8 stair-hook-01 hook_step '{}'
+run_behavior snake8 stair-shift-01 transfer_step_1 '{}'
+run_behavior snake8 stair-shift-02 transfer_step_2 '{}'
+run_behavior snake8 stair-shift-03 transfer_step_3 '{}'
+run_behavior snake8 stair-reset-01 straighten '{}'
+```
+
+The square profile has a horizontal ground section, one nearly vertical
+77.77 mm link, and a horizontal two-module hook. The three transfer commands
+move that profile toward the tail one link at a time. Only after those static
+profiles have been visually confirmed should the timed traction program be
+tested close to the first riser:
+
+```bash
+run_behavior snake8 stair-pull-01 pull_over_step \
+  '{"linear_m_s":0.018,"front_pull_duration_s":4.0,"transfer_pull_duration_s":4.0,"tread_advance_duration_s":5.0}'
+```
+
 Optional monitoring terminals:
 
 ```bash
@@ -258,17 +300,19 @@ ros2 run mssr_expert mssr_smores_self_reconfiguration_node --ros-args \
 ```
 
 This transition retains six of seven connections and changes only the front
-terminal docking relation. The head and hook are distributed over five
-neighbouring links; the tail (`v0`, `v1`) is never given a shape target and is
-kept rigid as the ground support. `pull_over_step` now includes both train
-traction phases, load transfer, and the final simultaneous return to zero:
+terminal docking relation. The stair behavior uses two opposing folds rather
+than a progressive arch: the rear remains horizontal, one serial link becomes
+nearly vertical, and the two front modules form a horizontal hook.
+`pull_over_step` shifts this square profile toward the tail three times,
+inserting a stopped traction phase after every shift, then restores the
+captured neutral posture and advances on the tread:
 
 ```bash
 run_behavior snake8 stair-straight-01 straighten '{}'
 run_behavior snake8 stair-approach-01 train '{"linear_m_s":0.020,"duration_s":5.0}'
 run_behavior snake8 stair-lift-01 lift_head '{}'
 run_behavior snake8 stair-hook-01 hook_step '{}'
-run_behavior snake8 stair-pull-01 pull_over_step '{"linear_m_s":0.022,"front_pull_duration_s":6.0,"body_pull_duration_s":8.0}'
+run_behavior snake8 stair-pull-01 pull_over_step '{"linear_m_s":0.022,"front_pull_duration_s":4.0,"transfer_pull_duration_s":4.0,"tread_advance_duration_s":5.0}'
 ```
 
 Repeat `lift_head -> hook_step -> pull_over_step` for another riser. The

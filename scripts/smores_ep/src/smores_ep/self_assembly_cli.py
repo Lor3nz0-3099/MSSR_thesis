@@ -103,12 +103,21 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--center-y", type=float, default=0.14)
     parser.add_argument("--outer-yaw-deg", type=float, default=25.0)
     parser.add_argument("--spawn-radius", type=float, default=0.34)
-    parser.add_argument(
+    course_group = parser.add_mutually_exclusive_group()
+    course_group.add_argument(
         "--obstacle-course",
         action="store_true",
         help=(
             "Replace the infinite floor with a manual gap/stairs/button/exit "
             "task-achievement course"
+        ),
+    )
+    course_group.add_argument(
+        "--stair-test-course",
+        action="store_true",
+        help=(
+            "Replace the infinite floor with an isolated three-step Snake8 "
+            "behavior test course"
         ),
     )
     parser.add_argument(
@@ -217,6 +226,7 @@ def main() -> None:
                 outer_yaw_deg=args.outer_yaw_deg,
                 spawn_radius_m=args.spawn_radius,
                 manual_obstacle_course=args.obstacle_course,
+                stair_test_course=args.stair_test_course,
                 staging_collision_avoidance=(
                     not args.disable_staging_collision_avoidance
                 ),

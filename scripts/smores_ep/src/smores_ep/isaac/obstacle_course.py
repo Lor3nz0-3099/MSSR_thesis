@@ -57,6 +57,28 @@ class ManualObstacleCourse:
         }
 
 
+@dataclass(frozen=True)
+class StairTestCourse:
+    """Isolated three-riser course for validating the Snake8 gait."""
+
+    boxes: tuple[CourseBox, ...]
+    stair_top_heights_m: tuple[float, ...]
+    first_riser_x_m: float
+    riser_depth_m: float
+
+    def to_observation(self) -> dict[str, Any]:
+        """Serialize only the landmarks relevant to stair testing."""
+        return {
+            "frame_id": "world",
+            "course_profile": "snake8_stair_test",
+            "stairs": {
+                "top_heights_m": list(self.stair_top_heights_m),
+                "first_riser_x_m": self.first_riser_x_m,
+                "riser_depth_m": self.riser_depth_m,
+            },
+        }
+
+
 def manual_obstacle_course() -> ManualObstacleCourse:
     """Return a compact +X course sized for an eight-module morphology.
 
@@ -173,19 +195,76 @@ def manual_obstacle_course() -> ManualObstacleCourse:
     )
 
 
-def install_manual_obstacle_course(stage: Any) -> ManualObstacleCourse:
-    """Replace the infinite floor with the manual, segmented course."""
+def snake8_stair_test_course() -> StairTestCourse:
+    """Return three equal 65 mm risers preceded by an assembly platform.
+
+    A SMORES-EP wheel is roughly 62 mm in diameter.  Each riser is therefore
+    deliberately a little taller than one wheel, but still lower than the
+    vertical projection of one 77.77 mm serial-chain link.
+    """
+
+    platform_color = (0.24, 0.27, 0.31)
+    stair_color = (0.34, 0.38, 0.43)
+    return StairTestCourse(
+        boxes=(
+            CourseBox(
+                "StartPlatform",
+                (-0.175, 0.0, -0.01),
+                (1.65, 1.20, 0.02),
+                platform_color,
+                semantic="stair_test_start",
+            ),
+            CourseBox(
+                "Stair01",
+                (0.79, 0.0, 0.0325),
+                (0.28, 1.20, 0.065),
+                stair_color,
+                semantic="stair_test_riser",
+            ),
+            CourseBox(
+                "Stair02",
+                (1.07, 0.0, 0.065),
+                (0.28, 1.20, 0.13),
+                stair_color,
+                semantic="stair_test_riser",
+            ),
+            CourseBox(
+                "Stair03",
+                (1.35, 0.0, 0.0975),
+                (0.28, 1.20, 0.195),
+                stair_color,
+                semantic="stair_test_riser",
+            ),
+            CourseBox(
+                "UpperDeck",
+                (2.15, 0.0, 0.0975),
+                (1.32, 1.20, 0.195),
+                platform_color,
+                semantic="stair_test_upper_deck",
+            ),
+        ),
+        stair_top_heights_m=(0.065, 0.13, 0.195),
+        first_riser_x_m=0.65,
+        riser_depth_m=0.28,
+    )
+
+
+def _install_course_boxes(
+    stage: Any,
+    root_path: str,
+    boxes: tuple[CourseBox, ...],
+) -> None:
+    """Install shared course-box geometry and physics material."""
 
     from pxr import Gf, Sdf, UsdGeom, UsdPhysics, UsdShade
 
-    course = manual_obstacle_course()
     if stage.GetPrimAtPath("/World/Ground"):
         stage.RemovePrim("/World/Ground")
-    root = UsdGeom.Xform.Define(stage, "/World/ManualObstacleCourse")
+    root = UsdGeom.Xform.Define(stage, root_path)
     material = UsdShade.Material(
         stage.GetPrimAtPath("/World/materials/dynamic_ground")
     )
-    for element in course.boxes:
+    for element in boxes:
         cube = UsdGeom.Cube.Define(
             stage,
             f"{root.GetPath()}/{element.name}",
@@ -207,4 +286,19 @@ def install_manual_obstacle_course(stage: Any) -> ManualObstacleCourse:
                 UsdShade.Tokens.weakerThanDescendants,
                 "physics",
             )
+
+
+def install_manual_obstacle_course(stage: Any) -> ManualObstacleCourse:
+    """Replace the infinite floor with the manual, segmented course."""
+
+    course = manual_obstacle_course()
+    _install_course_boxes(stage, "/World/ManualObstacleCourse", course.boxes)
+    return course
+
+
+def install_snake8_stair_test_course(stage: Any) -> StairTestCourse:
+    """Replace the infinite floor with the isolated three-step course."""
+
+    course = snake8_stair_test_course()
+    _install_course_boxes(stage, "/World/Snake8StairTestCourse", course.boxes)
     return course

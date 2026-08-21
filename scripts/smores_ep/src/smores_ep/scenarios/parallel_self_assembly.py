@@ -269,8 +269,14 @@ def run_parallel_self_assembly_scenario(
         )
 
         obstacle_course = install_manual_obstacle_course(stage)
+    elif config.stair_test_course:
+        from smores_ep.isaac.obstacle_course import (
+            install_snake8_stair_test_course,
+        )
+
+        obstacle_course = install_snake8_stair_test_course(stage)
     layout = self_assembly_spawn_layout(config)
-    if obstacle_course is not None:
+    if config.manual_obstacle_course:
         layout = {
             module_id: (
                 x_m - 2.0,
@@ -392,10 +398,15 @@ def run_parallel_self_assembly_scenario(
     )
 
     if not config.headless:
+        course_extent_m = (
+            2.4
+            if config.manual_obstacle_course
+            else 1.8 if config.stair_test_course else 0.0
+        )
         camera_extent_m = max(
             0.52,
             config.spawn_radius_m * 1.8,
-            2.4 if obstacle_course is not None else 0.0,
+            course_extent_m,
         )
         ViewportManager.set_camera_view(
             "/OmniverseKit_Persp",
@@ -406,7 +417,9 @@ def run_parallel_self_assembly_scenario(
             ],
             target=(
                 [1.25, 0.0, 0.08]
-                if obstacle_course is not None
+                if config.manual_obstacle_course
+                else [1.0, 0.0, 0.10]
+                if config.stair_test_course
                 else [0.0, 0.0, 0.03]
             ),
         )
@@ -434,13 +447,21 @@ def run_parallel_self_assembly_scenario(
         "and mssr_smores_self_assembly_node in separate terminals"
     )
     if obstacle_course is not None:
-        print(
-            "manual obstacle course: +X gap="
-            f"{obstacle_course.gap_interval_x_m}, stairs="
-            f"{obstacle_course.stair_top_heights_m}, button="
-            f"{obstacle_course.button_center_xyz_m}, exit="
-            f"{obstacle_course.exit_center_xyz_m}"
-        )
+        if config.manual_obstacle_course:
+            print(
+                "manual obstacle course: +X gap="
+                f"{obstacle_course.gap_interval_x_m}, stairs="
+                f"{obstacle_course.stair_top_heights_m}, button="
+                f"{obstacle_course.button_center_xyz_m}, exit="
+                f"{obstacle_course.exit_center_xyz_m}"
+            )
+        else:
+            print(
+                "Snake8 stair test course: +X first_riser="
+                f"{obstacle_course.first_riser_x_m} m, depth="
+                f"{obstacle_course.riser_depth_m} m, tops="
+                f"{obstacle_course.stair_top_heights_m} m"
+            )
 
     maximum_steps = config.steps if config.steps > 0 else None
     initial_step = SimulationManager.get_num_physics_steps()

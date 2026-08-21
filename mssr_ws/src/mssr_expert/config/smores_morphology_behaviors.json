@@ -47,31 +47,48 @@
           {"target_vertex_id": "v7", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"}
         ],
         "head_lift": [
-          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_01"},
-          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_01"},
-          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_02"},
-          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_02"},
-          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_03"}
+          {"target_vertex_id": "v0", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "riser_frame"},
+          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "riser_frame"},
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "riser_frame"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "riser_frame"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 1.30, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "riser_frame"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "riser_frame"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "riser_frame"},
+          {"target_vertex_id": "v7", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "riser_frame"}
         ],
         "step_hook": [
-          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.20, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_wave_01"},
-          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.20, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_wave_01"},
-          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.20, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_wave_02"},
-          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.20, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_wave_02"},
-          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": -0.65, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "hook_tip_down"}
+          {"target_vertex_id": "v0", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "hook_frame"},
+          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "hook_frame"},
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "hook_frame"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "hook_frame"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 1.30, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "hook_frame"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": -1.30, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "hook_frame"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "hook_frame"},
+          {"target_vertex_id": "v7", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "hook_frame"}
         ],
-        "step_transfer": [
-          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"},
-          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"},
-          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"},
-          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.10, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"},
-          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": -0.25, "tolerance_rad": 0.12, "max_servo_error_rad": 0.18, "coordination_group": "transfer_frame"}
+        "step_transfer_1": [
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 1.30, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "transfer_1_frame"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": -1.30, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "transfer_1_frame"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "transfer_1_frame"}
+        ],
+        "step_transfer_2": [
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 1.30, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "transfer_2_frame"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": -1.30, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "transfer_2_frame"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "transfer_2_frame"}
+        ],
+        "step_transfer_3": [
+          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 1.30, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "transfer_3_frame"},
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": -1.30, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "transfer_3_frame"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.08, "max_servo_error_rad": 0.12, "coordination_group": "transfer_3_frame"}
         ]
       },
       "behaviors": {
         "straighten": ["straight"],
         "lift_head": ["head_lift"],
         "hook_step": ["step_hook"],
+        "transfer_step_1": ["step_transfer_1"],
+        "transfer_step_2": ["step_transfer_2"],
+        "transfer_step_3": ["step_transfer_3"],
         "train": [
           {
             "phase": "TRAIN_DRIVE",
@@ -119,27 +136,73 @@
           }
         ],
         "pull_over_step": [
+          {"phase": "SET_RISER", "posture": "head_lift"},
           {"phase": "SET_HOOK", "posture": "step_hook"},
           {
             "phase": "PULL_FRONT",
             "drive": {
-              "default_duration_s": 6.0,
+              "default_duration_s": 4.0,
               "duration_parameter": "front_pull_duration_s",
               "default_linear_m_s": 0.025,
               "linear_parameter": "linear_m_s",
               "active_target_roles": [
                 "snake_tail", "snake_rear", "snake_hip",
                 "snake_center_rear", "snake_center_front",
-                "snake_shoulder", "snake_neck", "snake_head"
+                "snake_neck", "snake_head"
               ]
             }
           },
-          {"phase": "TRANSFER_LOAD", "posture": "step_transfer"},
+          {"phase": "SHIFT_RISER_1", "posture": "step_transfer_1"},
           {
-            "phase": "PULL_BODY",
+            "phase": "PULL_SHIFT_1",
             "drive": {
-              "default_duration_s": 8.0,
-              "duration_parameter": "body_pull_duration_s",
+              "default_duration_s": 4.0,
+              "duration_parameter": "transfer_pull_duration_s",
+              "default_linear_m_s": 0.025,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_hip",
+                "snake_center_rear", "snake_shoulder",
+                "snake_neck", "snake_head"
+              ]
+            }
+          },
+          {"phase": "SHIFT_RISER_2", "posture": "step_transfer_2"},
+          {
+            "phase": "PULL_SHIFT_2",
+            "drive": {
+              "default_duration_s": 4.0,
+              "duration_parameter": "transfer_pull_duration_s",
+              "default_linear_m_s": 0.025,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_hip",
+                "snake_center_front", "snake_shoulder",
+                "snake_neck", "snake_head"
+              ]
+            }
+          },
+          {"phase": "SHIFT_RISER_3", "posture": "step_transfer_3"},
+          {
+            "phase": "PULL_SHIFT_3",
+            "drive": {
+              "default_duration_s": 4.0,
+              "duration_parameter": "transfer_pull_duration_s",
+              "default_linear_m_s": 0.025,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_center_rear",
+                "snake_center_front", "snake_shoulder",
+                "snake_neck", "snake_head"
+              ]
+            }
+          },
+          {"phase": "RETURN_NEUTRAL", "posture": "straight"},
+          {
+            "phase": "ADVANCE_ON_TREAD",
+            "drive": {
+              "default_duration_s": 5.0,
+              "duration_parameter": "tread_advance_duration_s",
               "default_linear_m_s": 0.025,
               "linear_parameter": "linear_m_s",
               "active_target_roles": [
@@ -148,8 +211,7 @@
                 "snake_shoulder", "snake_neck", "snake_head"
               ]
             }
-          },
-          {"phase": "RETURN_FLAT", "posture": "straight"}
+          }
         ]
       },
       "drive": {

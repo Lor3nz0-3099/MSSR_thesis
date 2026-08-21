@@ -98,6 +98,8 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         simulation_command.append("--simple-visuals")
     if _as_bool(LaunchConfiguration("obstacle_course").perform(context)):
         simulation_command.append("--obstacle-course")
+    if _as_bool(LaunchConfiguration("stair_test_course").perform(context)):
+        simulation_command.append("--stair-test-course")
     if _as_bool(LaunchConfiguration("headless").perform(context)):
         simulation_command.append("--headless")
 
@@ -181,6 +183,11 @@ def generate_launch_description() -> LaunchDescription:
                 "obstacle_course",
                 default_value="false",
                 description="Spawn the physical gap and stair course in Isaac.",
+            ),
+            DeclareLaunchArgument(
+                "stair_test_course",
+                default_value="false",
+                description="Spawn the isolated three-step Snake8 test stage.",
             ),
             DeclareLaunchArgument(
                 "headless",

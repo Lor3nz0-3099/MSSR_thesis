@@ -346,6 +346,7 @@ class SelfAssemblySimulationConfig:
     outer_yaw_deg: float = 25.0
     spawn_radius_m: float = 0.34
     manual_obstacle_course: bool = False
+    stair_test_course: bool = False
     staging_collision_avoidance: bool = True
     staging_center_clearance_m: float = 0.110
     staging_waypoint_margin_m: float = 0.015
@@ -356,6 +357,10 @@ class SelfAssemblySimulationConfig:
     geometry: SmoresGeometry = field(default_factory=SmoresGeometry)
 
     def __post_init__(self) -> None:
+        if self.manual_obstacle_course and self.stair_test_course:
+            raise ValueError(
+                "Manual obstacle course and stair test course are exclusive"
+            )
         if self.steps < 0:
             raise ValueError("Step count cannot be negative")
         if self.headless and self.steps == 0:

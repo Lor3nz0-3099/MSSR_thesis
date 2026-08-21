@@ -697,23 +697,43 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
         "snake8", "lift_head", assignments
     )
 
-    assert len(targets) == 5
+    assert len(targets) == 8
     assert [target.angle_rad for target in targets] == pytest.approx(
-        [0.18, 0.18, 0.18, 0.18, 0.18]
+        [0.0, 0.0, 0.0, 0.0, 1.30, 0.0, 0.0, 0.0]
     )
     assert [target.target_vertex_id for target in targets] == [
-        "v2", "v3", "v4", "v5", "v6"
+        "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7"
     ]
-    assert len({target.coordination_group for target in targets}) == 3
+    assert len({target.coordination_group for target in targets}) == 1
     assert all(
-        target.max_servo_error_rad == pytest.approx(0.18)
+        target.max_servo_error_rad == pytest.approx(0.12)
         for target in targets
+    )
+    assert all(
+        target.angle_reference == "captured_neutral" for target in targets
     )
     hook = _library().behavior_joint_targets(
         "snake8", "hook_step", assignments
     )
-    assert [target.target_vertex_id for target in hook if target.angle_rad] == [
-        "v2", "v3", "v4", "v5", "v6"
+    assert [target.angle_rad for target in hook] == pytest.approx(
+        [0.0, 0.0, 0.0, 0.0, 1.30, -1.30, 0.0, 0.0]
+    )
+    transfers = [
+        _library().behavior_joint_targets(
+            "snake8", f"transfer_step_{index}", assignments
+        )
+        for index in range(1, 4)
+    ]
+    assert [
+        {
+            target.target_vertex_id: target.angle_rad
+            for target in transfer
+        }
+        for transfer in transfers
+    ] == [
+        pytest.approx({"v3": 1.30, "v4": -1.30, "v5": 0.0}),
+        pytest.approx({"v2": 1.30, "v3": -1.30, "v4": 0.0}),
+        pytest.approx({"v1": 1.30, "v2": -1.30, "v3": 0.0}),
     ]
     straight = _library().behavior_joint_targets(
         "snake8", "straighten", assignments
@@ -763,11 +783,38 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
         "snake8", "pull_over_step", assignments
     )
     assert [step.phase for step in pull] == [
-        "SET_HOOK", "PULL_FRONT", "TRANSFER_LOAD", "PULL_BODY",
-        "RETURN_FLAT",
+        "SET_RISER",
+        "SET_HOOK",
+        "PULL_FRONT",
+        "SHIFT_RISER_1",
+        "PULL_SHIFT_1",
+        "SHIFT_RISER_2",
+        "PULL_SHIFT_2",
+        "SHIFT_RISER_3",
+        "PULL_SHIFT_3",
+        "RETURN_NEUTRAL",
+        "ADVANCE_ON_TREAD",
     ]
-    assert set(pull[1].active_target_roles) == set(SNAKE8_ROLES)
-    assert set(pull[3].active_target_roles) == set(SNAKE8_ROLES)
+    assert "snake_shoulder" not in pull[2].active_target_roles
+    assert "snake_center_front" not in pull[4].active_target_roles
+    assert "snake_center_rear" not in pull[6].active_target_roles
+    assert "snake_hip" not in pull[8].active_target_roles
+    assert set(pull[10].active_target_roles) == set(SNAKE8_ROLES)
+    assert pull[2].duration_s == pytest.approx(4.0)
+    assert pull[4].duration_s == pytest.approx(4.0)
+    assert pull[10].duration_s == pytest.approx(5.0)
+    assert {
+        target.target_vertex_id: target.angle_rad
+        for target in pull[3].posture_targets
+    } == pytest.approx({"v3": 1.30, "v4": -1.30, "v5": 0.0})
+    assert {
+        target.target_vertex_id: target.angle_rad
+        for target in pull[5].posture_targets
+    } == pytest.approx({"v2": 1.30, "v3": -1.30, "v4": 0.0})
+    assert {
+        target.target_vertex_id: target.angle_rad
+        for target in pull[7].posture_targets
+    } == pytest.approx({"v1": 1.30, "v2": -1.30, "v3": 0.0})
 
 
 def test_snake8_straighten_restores_captured_neutral_only() -> None:
@@ -803,9 +850,12 @@ def test_snake8_straighten_restores_captured_neutral_only() -> None:
         assignments,
         neutral,
     )
-    first_lift = lift_executor.step(0.0).primitive_goal
-    assert first_lift is not None
-    assert first_lift.parameters["angle_rad"] == pytest.approx(0.18)
+    lifted, lift_goals = _finish_program_posture(lift_executor, 0.0)
+    assert lifted.done
+    assert lifted.success
+    expected_lift = dict(neutral)
+    expected_lift["m4"] += 1.30
+    assert _angles_by_module(lift_goals) == pytest.approx(expected_lift)
 
 
 def test_snake8_neutral_requires_a_captured_tilt_for_every_module() -> None:

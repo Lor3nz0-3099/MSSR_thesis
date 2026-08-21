@@ -141,6 +141,27 @@ def test_self_assembly_cli_defaults_match_target_demonstration() -> None:
     assert args.simple_visuals is False
     assert args.module_count == 3
     assert args.module_prefix == "smores_"
+    assert args.obstacle_course is False
+    assert args.stair_test_course is False
+
+
+def test_course_cli_options_are_mutually_exclusive() -> None:
+    parser = build_argument_parser()
+
+    args = parser.parse_args(["--stair-test-course"])
+    assert args.stair_test_course is True
+    assert args.obstacle_course is False
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--obstacle-course", "--stair-test-course"])
+
+
+def test_self_assembly_config_rejects_two_courses(tmp_path) -> None:
+    with pytest.raises(ValueError, match="exclusive"):
+        SelfAssemblySimulationConfig(
+            physics_usd=tmp_path / "physics.usd",
+            manual_obstacle_course=True,
+            stair_test_course=True,
+        )
 
 
 def test_self_assembly_config_validates_all_runtime_frequencies(
