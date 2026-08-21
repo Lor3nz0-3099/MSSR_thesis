@@ -779,11 +779,28 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
     assert train[0].duration_s == pytest.approx(9.0)
     assert set(train[0].active_target_roles) == set(SNAKE8_ROLES)
 
+    lifted_approach = _library().composite_behavior_steps(
+        "snake8",
+        "approach_step_lifted",
+        assignments,
+        {"linear_m_s": 0.015, "riser_approach_duration_s": 3.0},
+    )
+    assert [step.phase for step in lifted_approach] == [
+        "SET_RISER",
+        "APPROACH_RISER",
+    ]
+    assert lifted_approach[1].duration_s == pytest.approx(3.0)
+    assert lifted_approach[1].linear_m_s == pytest.approx(0.015)
+    assert set(lifted_approach[1].active_target_roles) == set(
+        SNAKE8_ROLES[:5]
+    )
+
     pull = _library().composite_behavior_steps(
         "snake8", "pull_over_step", assignments
     )
     assert [step.phase for step in pull] == [
         "SET_RISER",
+        "APPROACH_RISER",
         "SET_HOOK",
         "PULL_FRONT",
         "SHIFT_RISER_1",
@@ -795,25 +812,27 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
         "RETURN_NEUTRAL",
         "ADVANCE_ON_TREAD",
     ]
-    assert "snake_shoulder" not in pull[2].active_target_roles
-    assert "snake_center_front" not in pull[4].active_target_roles
-    assert "snake_center_rear" not in pull[6].active_target_roles
-    assert "snake_hip" not in pull[8].active_target_roles
-    assert set(pull[10].active_target_roles) == set(SNAKE8_ROLES)
-    assert pull[2].duration_s == pytest.approx(4.0)
-    assert pull[4].duration_s == pytest.approx(4.0)
-    assert pull[10].duration_s == pytest.approx(5.0)
+    assert set(pull[1].active_target_roles) == set(SNAKE8_ROLES[:5])
+    assert "snake_shoulder" not in pull[3].active_target_roles
+    assert "snake_center_front" not in pull[5].active_target_roles
+    assert "snake_center_rear" not in pull[7].active_target_roles
+    assert "snake_hip" not in pull[9].active_target_roles
+    assert set(pull[11].active_target_roles) == set(SNAKE8_ROLES)
+    assert pull[1].duration_s == pytest.approx(8.0)
+    assert pull[3].duration_s == pytest.approx(4.0)
+    assert pull[5].duration_s == pytest.approx(4.0)
+    assert pull[11].duration_s == pytest.approx(5.0)
     assert {
         target.target_vertex_id: target.angle_rad
-        for target in pull[3].posture_targets
+        for target in pull[4].posture_targets
     } == pytest.approx({"v3": 1.30, "v4": -1.30, "v5": 0.0})
     assert {
         target.target_vertex_id: target.angle_rad
-        for target in pull[5].posture_targets
+        for target in pull[6].posture_targets
     } == pytest.approx({"v2": 1.30, "v3": -1.30, "v4": 0.0})
     assert {
         target.target_vertex_id: target.angle_rad
-        for target in pull[7].posture_targets
+        for target in pull[8].posture_targets
     } == pytest.approx({"v1": 1.30, "v2": -1.30, "v3": 0.0})
 
 

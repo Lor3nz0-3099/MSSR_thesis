@@ -82,6 +82,7 @@ class ObstacleCoursePolicy:
                 "pull_over_step",
                 {
                     "linear_m_s": 0.022,
+                    "riser_approach_duration_s": 8.0,
                     "front_pull_duration_s": 4.0,
                     "transfer_pull_duration_s": 4.0,
                     "tread_advance_duration_s": 5.0,
@@ -96,6 +97,7 @@ class ObstacleCoursePolicy:
                 "pull_over_step",
                 {
                     "linear_m_s": 0.022,
+                    "riser_approach_duration_s": 8.0,
                     "front_pull_duration_s": 4.0,
                     "transfer_pull_duration_s": 4.0,
                     "tread_advance_duration_s": 5.0,
@@ -110,6 +112,7 @@ class ObstacleCoursePolicy:
                 "pull_over_step",
                 {
                     "linear_m_s": 0.022,
+                    "riser_approach_duration_s": 8.0,
                     "front_pull_duration_s": 4.0,
                     "transfer_pull_duration_s": 4.0,
                     "tread_advance_duration_s": 5.0,

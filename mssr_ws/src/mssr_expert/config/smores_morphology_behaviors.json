@@ -89,6 +89,22 @@
         "transfer_step_1": ["step_transfer_1"],
         "transfer_step_2": ["step_transfer_2"],
         "transfer_step_3": ["step_transfer_3"],
+        "approach_step_lifted": [
+          {"phase": "SET_RISER", "posture": "head_lift"},
+          {
+            "phase": "APPROACH_RISER",
+            "drive": {
+              "default_duration_s": 8.0,
+              "duration_parameter": "riser_approach_duration_s",
+              "default_linear_m_s": 0.018,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_hip",
+                "snake_center_rear", "snake_center_front"
+              ]
+            }
+          }
+        ],
         "train": [
           {
             "phase": "TRAIN_DRIVE",
@@ -137,6 +153,19 @@
         ],
         "pull_over_step": [
           {"phase": "SET_RISER", "posture": "head_lift"},
+          {
+            "phase": "APPROACH_RISER",
+            "drive": {
+              "default_duration_s": 8.0,
+              "duration_parameter": "riser_approach_duration_s",
+              "default_linear_m_s": 0.018,
+              "linear_parameter": "linear_m_s",
+              "active_target_roles": [
+                "snake_tail", "snake_rear", "snake_hip",
+                "snake_center_rear", "snake_center_front"
+              ]
+            }
+          },
           {"phase": "SET_HOOK", "posture": "step_hook"},
           {
             "phase": "PULL_FRONT",
