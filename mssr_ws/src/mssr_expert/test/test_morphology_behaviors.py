@@ -723,6 +723,23 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
     )
     assert len(commands) == 8
     assert all(command["vx"] == pytest.approx(0.03) for command in commands.values())
+    assert all(
+        command["yaw_rate"] == pytest.approx(0.0)
+        for command in commands.values()
+    )
+
+    curved_commands = _library().drive_commands(
+        "snake8", assignments, 0.03, 0.2
+    )
+    assert len(curved_commands) == 8
+    assert all(
+        command["vx"] == pytest.approx(0.03)
+        for command in curved_commands.values()
+    )
+    assert all(
+        command["yaw_rate"] == pytest.approx(0.2)
+        for command in curved_commands.values()
+    )
 
     train = _library().composite_behavior_steps(
         "snake8", "train", assignments, {"duration_s": 9.0}

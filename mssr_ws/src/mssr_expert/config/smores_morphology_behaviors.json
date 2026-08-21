@@ -30,6 +30,11 @@
     "snake8": {
       "module_count": 8,
       "ready_posture": "straight",
+      "navigation": {
+        "center_roles": ["snake_center_rear", "snake_center_front"],
+        "forward_from_roles": ["snake_tail", "snake_rear"],
+        "forward_to_roles": ["snake_neck", "snake_head"]
+      },
       "postures": {
         "straight": [
           {"target_vertex_id": "v0", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
@@ -150,17 +155,17 @@
         "actuation": "module_wheels",
         "preserve_current_posture": true,
         "max_linear_m_s": 0.06,
-        "max_yaw_rate_rad_s": 0.0,
+        "max_yaw_rate_rad_s": 0.4,
         "turn_radius_m": 0.0,
         "selectors": [
-          {"target_role": "snake_tail", "linear_scale": 1.0, "turn_scale": 0.0},
-          {"target_role": "snake_rear", "linear_scale": 1.0, "turn_scale": 0.0},
-          {"target_role": "snake_hip", "linear_scale": 1.0, "turn_scale": 0.0},
-          {"target_role": "snake_center_rear", "linear_scale": 1.0, "turn_scale": 0.0},
-          {"target_role": "snake_center_front", "linear_scale": 1.0, "turn_scale": 0.0},
-          {"target_role": "snake_shoulder", "linear_scale": 1.0, "turn_scale": 0.0},
-          {"target_role": "snake_neck", "linear_scale": 1.0, "turn_scale": 0.0},
-          {"target_role": "snake_head", "linear_scale": 1.0, "turn_scale": 0.0}
+          {"target_role": "snake_tail", "linear_scale": 1.0, "turn_scale": 0.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "snake_rear", "linear_scale": 1.0, "turn_scale": 0.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "snake_hip", "linear_scale": 1.0, "turn_scale": 0.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "snake_center_rear", "linear_scale": 1.0, "turn_scale": 0.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "snake_center_front", "linear_scale": 1.0, "turn_scale": 0.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "snake_shoulder", "linear_scale": 1.0, "turn_scale": 0.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "snake_neck", "linear_scale": 1.0, "turn_scale": 0.0, "yaw_actuator_scale": 1.0},
+          {"target_role": "snake_head", "linear_scale": 1.0, "turn_scale": 0.0, "yaw_actuator_scale": 1.0}
         ]
       }
     },
