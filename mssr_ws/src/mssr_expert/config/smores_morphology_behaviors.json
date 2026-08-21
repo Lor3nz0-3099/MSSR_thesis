@@ -37,14 +37,14 @@
       },
       "postures": {
         "straight": [
-          {"target_vertex_id": "v0", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
-          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
-          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
-          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
-          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
-          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
-          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
-          {"target_vertex_id": "v7", "joint": "tilt", "angle_rad": 0.0, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"}
+          {"target_vertex_id": "v0", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v1", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v3", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v4", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v5", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v6", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"},
+          {"target_vertex_id": "v7", "joint": "tilt", "angle_rad": 0.0, "angle_reference": "captured_neutral", "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "straight_frame"}
         ],
         "head_lift": [
           {"target_vertex_id": "v2", "joint": "tilt", "angle_rad": 0.18, "tolerance_rad": 0.10, "max_servo_error_rad": 0.18, "coordination_group": "head_wave_01"},

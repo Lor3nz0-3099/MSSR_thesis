@@ -74,6 +74,11 @@ def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None
             for vertex, attributes in sorted(roles.items())
         )
         executor = MorphologyBehaviorExecutor(library)
+        neutral_tilts = (
+            {assignment.module_id: 0.1 for assignment in assignments}
+            if library.uses_captured_neutral(step.morphology)
+            else {}
+        )
 
         executor.start(
             MorphologyCommand(
@@ -83,4 +88,5 @@ def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None
                 parameters=step.parameters or {},
             ),
             assignments,
+            neutral_tilts,
         )

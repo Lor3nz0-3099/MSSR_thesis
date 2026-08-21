@@ -26,6 +26,30 @@ def extract_modules(observation: Mapping[str, Any]) -> dict[str, Mapping[str, An
     return modules
 
 
+def logical_tilt_positions(
+    observation: Mapping[str, Any],
+) -> dict[str, float]:
+    """Extract primitive-protocol TILT coordinates from module states."""
+
+    result: dict[str, float] = {}
+    for module_id, module in extract_modules(observation).items():
+        actuators = module.get("actuators", {})
+        if not isinstance(actuators, Mapping):
+            continue
+        tilt = actuators.get("tilt", {})
+        if not isinstance(tilt, Mapping):
+            continue
+        try:
+            raw_position = float(tilt["position_rad"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        if math.isfinite(raw_position):
+            # Isaac exports the articulation coordinate; the primitive
+            # protocol deliberately uses its opposite sign.
+            result[module_id] = -raw_position
+    return result
+
+
 def module_position(module: Mapping[str, Any]) -> Vector3:
     """Read a module position from flat or pose-based payloads."""
     pose = module.get("pose", {})

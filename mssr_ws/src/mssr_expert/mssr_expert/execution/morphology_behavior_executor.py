@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Mapping, Sequence
 
 from mssr_expert.behaviors.morphology_library import (
@@ -91,6 +91,7 @@ class MorphologyBehaviorExecutor:
         self._program_drive_started_s: float | None = None
         self._state = "IDLE"
         self._failure_message = ""
+        self._neutral_tilt_rad_by_module: dict[str, float] = {}
 
     @property
     def active(self) -> bool:
@@ -103,6 +104,7 @@ class MorphologyBehaviorExecutor:
         self,
         command: MorphologyCommand,
         assignments: Sequence[AssignedModule],
+        neutral_tilt_rad_by_module: Mapping[str, float] | None = None,
     ) -> None:
         assignments = tuple(assignments)
         self._library.validate_assignment(command.morphology, assignments)
@@ -142,6 +144,18 @@ class MorphologyBehaviorExecutor:
             )
         if command.behavior in {"drive", "stop"}:
             program_steps = ()
+        neutral_tilts = dict(neutral_tilt_rad_by_module or {})
+        targets = self._apply_neutral_reference(targets, neutral_tilts)
+        program_steps = tuple(
+            replace(
+                step,
+                posture_targets=self._apply_neutral_reference(
+                    step.posture_targets,
+                    neutral_tilts,
+                ),
+            )
+            for step in program_steps
+        )
         self._command = command
         self._assignments = assignments
         self._joint_targets = targets
@@ -157,6 +171,7 @@ class MorphologyBehaviorExecutor:
         self._program_drive_started_s = None
         self._state = "READY"
         self._failure_message = ""
+        self._neutral_tilt_rad_by_module = neutral_tilts
 
     def step(
         self,
@@ -287,6 +302,10 @@ class MorphologyBehaviorExecutor:
                         command.morphology,
                         self._assignments,
                     )
+                )
+                restore_targets = self._apply_neutral_reference(
+                    restore_targets,
+                    self._neutral_tilt_rad_by_module,
                 )
                 if restore_targets:
                     self._joint_targets = restore_targets
@@ -637,6 +656,34 @@ class MorphologyBehaviorExecutor:
         return len(self._completed_joint_indices) / len(
             self._joint_targets
         )
+
+    @staticmethod
+    def _apply_neutral_reference(
+        targets: Sequence[JointTarget],
+        neutral_tilt_rad_by_module: Mapping[str, float],
+    ) -> tuple[JointTarget, ...]:
+        resolved: list[JointTarget] = []
+        for target in targets:
+            if target.angle_reference == "absolute":
+                resolved.append(target)
+                continue
+            try:
+                neutral = float(
+                    neutral_tilt_rad_by_module[target.module_id]
+                )
+            except KeyError as error:
+                raise MorphologyLibraryError(
+                    "No captured neutral tilt is available for "
+                    f"{target.module_id}"
+                ) from error
+            if not math.isfinite(neutral):
+                raise MorphologyLibraryError(
+                    f"Captured neutral tilt for {target.module_id} is not finite"
+                )
+            resolved.append(
+                replace(target, angle_rad=neutral + target.angle_rad)
+            )
+        return tuple(resolved)
 
     @staticmethod
     def _validate_drive_parameters(command: MorphologyCommand) -> None:

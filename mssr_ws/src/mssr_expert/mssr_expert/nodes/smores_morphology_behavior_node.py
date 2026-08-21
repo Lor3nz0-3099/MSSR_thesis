@@ -47,6 +47,7 @@ from mssr_expert.planning.smores_ep.attributed_adapter import (
 from mssr_expert.planning.smores_ep.self_reconfiguration_planner import (
     SmoresSelfReconfigurationPlanner,
 )
+from mssr_expert.primitives.common import logical_tilt_positions
 from mssr_expert.utils.json_io import dict_to_string_msg, string_msg_to_dict
 
 
@@ -117,6 +118,9 @@ class SmoresMorphologyBehaviorNode(Node):
             "primitive_status_topic", "/mssr/primitives/status"
         )
         self.declare_parameter(
+            "module_states_topic", "/mssr/module_states"
+        )
+        self.declare_parameter(
             "task_graph_topic", "/mssr/expert/task_graph"
         )
         self.declare_parameter("robot_graph_topic", "/mssr/robot_graph")
@@ -154,6 +158,11 @@ class SmoresMorphologyBehaviorNode(Node):
         self._latest_cmd_vel = (0.0, 0.0, 0.0)
         self._last_cmd_vel_s: float | None = None
         self._cmd_vel_output_active = False
+        self._latest_tilt_rad_by_module: dict[str, float] = {}
+        self._neutral_tilt_rad_by_module: dict[str, float] = {}
+        self._neutral_assignment_signature: tuple[
+            str, tuple[tuple[str, str], ...]
+        ] | None = None
 
         self._odom_publisher = self.create_publisher(
             Odometry,
@@ -198,6 +207,12 @@ class SmoresMorphologyBehaviorNode(Node):
             String,
             str(self.get_parameter("primitive_status_topic").value),
             self._on_primitive_status,
+            10,
+        )
+        self.create_subscription(
+            String,
+            str(self.get_parameter("module_states_topic").value),
+            self._on_module_states,
             10,
         )
         self.create_subscription(
@@ -432,6 +447,11 @@ class SmoresMorphologyBehaviorNode(Node):
         if payload:
             self._latest_primitive_status = payload
 
+    def _on_module_states(self, message: String) -> None:
+        positions = logical_tilt_positions(string_msg_to_dict(message))
+        if positions:
+            self._latest_tilt_rad_by_module = positions
+
     def _on_command(self, message: String) -> None:
         payload = string_msg_to_dict(message)
         try:
@@ -450,7 +470,55 @@ class SmoresMorphologyBehaviorNode(Node):
                 )
             if self._executor.active and command.behavior != "stop":
                 raise ValueError("Another morphology behavior is active")
-            self._executor.start(command, self._assignments)
+            neutral_tilts: Mapping[str, float] = {}
+            if (
+                command.behavior != "stop"
+                and self._library.uses_captured_neutral(
+                    self._morphology_name
+                )
+            ):
+                assignment_signature = (
+                    self._morphology_name,
+                    tuple(
+                        (item.target_vertex_id, item.module_id)
+                        for item in self._assignments
+                    ),
+                )
+                if (
+                    self._neutral_assignment_signature
+                    != assignment_signature
+                ):
+                    missing = sorted(
+                        item.module_id
+                        for item in self._assignments
+                        if item.module_id
+                        not in self._latest_tilt_rad_by_module
+                    )
+                    if missing:
+                        raise ValueError(
+                            "Cannot capture the assembled neutral TILT "
+                            "posture; missing module states for "
+                            f"{missing}"
+                        )
+                    self._neutral_tilt_rad_by_module = {
+                        item.module_id: self._latest_tilt_rad_by_module[
+                            item.module_id
+                        ]
+                        for item in self._assignments
+                    }
+                    self._neutral_assignment_signature = (
+                        assignment_signature
+                    )
+                    self.get_logger().info(
+                        "Captured assembled neutral TILT posture for "
+                        f"{self._morphology_name!r}."
+                    )
+                neutral_tilts = self._neutral_tilt_rad_by_module
+            self._executor.start(
+                command,
+                self._assignments,
+                neutral_tilts,
+            )
             self._last_terminal_command_id = ""
             self._publish_status(
                 command.command_id,

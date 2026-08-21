@@ -23,6 +23,7 @@ from mssr_expert.nodes.smores_morphology_behavior_node import (
 from mssr_expert.nodes.smores_self_reconfiguration_node import (
     load_morphology_catalog,
 )
+from mssr_expert.primitives.common import logical_tilt_positions
 
 
 def _library() -> MorphologyLibrary:
@@ -689,6 +690,8 @@ def test_snake_rejects_turning_until_a_turn_gait_is_defined() -> None:
 
 def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> None:
     assignments = _assignments(SNAKE8_ROLES)
+    assert _library().uses_captured_neutral("snake8")
+    assert not _library().uses_captured_neutral("bridge8")
     targets = _library().behavior_joint_targets(
         "snake8", "lift_head", assignments
     )
@@ -718,6 +721,10 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
         "v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7"
     ]
     assert all(target.angle_rad == pytest.approx(0.0) for target in straight)
+    assert all(
+        target.angle_reference == "captured_neutral"
+        for target in straight
+    )
     assert _library().drive_joint_targets(
         "snake8", assignments, 0.03, 0.0
     ) == ()
@@ -760,6 +767,76 @@ def test_snake8_stair_postures_are_coordinated_and_drive_preserves_them() -> Non
     ]
     assert set(pull[1].active_target_roles) == set(SNAKE8_ROLES)
     assert set(pull[3].active_target_roles) == set(SNAKE8_ROLES)
+
+
+def test_snake8_straighten_restores_captured_neutral_only() -> None:
+    assignments = _assignments(SNAKE8_ROLES)
+    neutral = {
+        assignment.module_id: 0.08 + 0.005 * index
+        for index, assignment in enumerate(assignments)
+    }
+    executor = MorphologyBehaviorExecutor(_library())
+    executor.start(
+        MorphologyCommand(
+            command_id="snake-neutral-1",
+            morphology="snake8",
+            behavior="straighten",
+        ),
+        assignments,
+        neutral,
+    )
+
+    finished, goals = _finish_program_posture(executor, 0.0)
+
+    assert finished.done
+    assert finished.success
+    assert _angles_by_module(goals) == pytest.approx(neutral)
+
+    lift_executor = MorphologyBehaviorExecutor(_library())
+    lift_executor.start(
+        MorphologyCommand(
+            command_id="snake-lift-1",
+            morphology="snake8",
+            behavior="lift_head",
+        ),
+        assignments,
+        neutral,
+    )
+    first_lift = lift_executor.step(0.0).primitive_goal
+    assert first_lift is not None
+    assert first_lift.parameters["angle_rad"] == pytest.approx(0.18)
+
+
+def test_snake8_neutral_requires_a_captured_tilt_for_every_module() -> None:
+    with pytest.raises(
+        MorphologyLibraryError,
+        match="No captured neutral tilt is available for m7",
+    ):
+        MorphologyBehaviorExecutor(_library()).start(
+            MorphologyCommand(
+                command_id="snake-neutral-missing",
+                morphology="snake8",
+                behavior="straighten",
+            ),
+            _assignments(SNAKE8_ROLES),
+            {f"m{index}": 0.1 for index in range(7)},
+        )
+
+
+def test_module_state_tilts_are_converted_to_primitive_coordinates() -> None:
+    assert logical_tilt_positions(
+        {
+            "modules": [
+                {
+                    "module_id": "smores_01",
+                    "actuators": {
+                        "tilt": {"position_rad": -0.11},
+                    },
+                },
+                {"module_id": "missing-actuator"},
+            ]
+        }
+    ) == {"smores_01": pytest.approx(0.11)}
 
 
 def test_coordinated_posture_targets_do_not_hold_each_other() -> None:

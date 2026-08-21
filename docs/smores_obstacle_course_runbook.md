@@ -182,9 +182,11 @@ run_behavior snake8 snake-straight-01 straighten '{}'
 run_behavior snake8 snake-train-01 train '{"linear_m_s":0.025,"duration_s":6.0}'
 ```
 
-`straighten` is a posture command, not a drive command. It returns all eight
-TILT coordinates to zero in one coordinated barrier and then retains that
-rest pose. `train` energizes all eight wheel pairs in the same control cycle;
+`straighten` is a posture command, not a drive command. The behavior node
+captures all eight TILT coordinates after assembly and restores those exact
+neutral values in one coordinated barrier. It does not assume that the
+loaded straight chain has zero-valued joints. `train` energizes all eight
+wheel pairs in the same control cycle;
 PAN and TILT remain under rigid position hold instead of becoming passive.
 The live quaternion projection selects the correct local wheel sign for each
 assigned module.

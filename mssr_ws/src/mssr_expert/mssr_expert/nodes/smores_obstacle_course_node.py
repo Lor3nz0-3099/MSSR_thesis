@@ -47,7 +47,12 @@ from mssr_expert.planning.smores_ep.course_landmarks import (
 from mssr_expert.planning.smores_ep.obstacle_course_policy import CourseStep, ObstacleCoursePolicy
 from mssr_expert.planning.smores_ep.parallel_self_assembly_planner import ParallelSelfAssemblyPlanner
 from mssr_expert.planning.smores_ep.self_reconfiguration_planner import SmoresSelfReconfigurationPlanner
-from mssr_expert.primitives.common import distance_3d, extract_modules, module_position
+from mssr_expert.primitives.common import (
+    distance_3d,
+    extract_modules,
+    logical_tilt_positions,
+    module_position,
+)
 from mssr_expert.utils.json_io import dict_to_string_msg, string_msg_to_dict
 
 
@@ -101,6 +106,10 @@ class SmoresObstacleCourseNode(Node):
         self._terminal = False
         self._awaiting_completion_event = False
         self._primitive_preflight_complete = False
+        self._neutral_tilt_rad_by_module: dict[str, float] = {}
+        self._neutral_assignment_signature: tuple[
+            str, tuple[tuple[str, str], ...]
+        ] | None = None
 
         self._goal_publisher = self.create_publisher(String, "/mssr/primitives/goal", 10)
         self._cancel_publisher = self.create_publisher(String, "/mssr/primitives/cancel", 10)
@@ -332,7 +341,47 @@ class SmoresObstacleCourseNode(Node):
             for vertex, module_id in sorted(self._assignment.items())
         )
         executor = MorphologyBehaviorExecutor(self._behavior_library)
-        executor.start(MorphologyCommand(execution_id, course_step.morphology, course_step.behavior, course_step.parameters or {}), assignments)
+        neutral_tilts: Mapping[str, float] = {}
+        if self._behavior_library.uses_captured_neutral(
+            course_step.morphology
+        ):
+            assignment_signature = (
+                course_step.morphology,
+                tuple(
+                    (item.target_vertex_id, item.module_id)
+                    for item in assignments
+                ),
+            )
+            if self._neutral_assignment_signature != assignment_signature:
+                latest_tilts = logical_tilt_positions(
+                    self._latest_observation
+                )
+                missing = sorted(
+                    item.module_id
+                    for item in assignments
+                    if item.module_id not in latest_tilts
+                )
+                if missing:
+                    raise ValueError(
+                        "Cannot capture the assembled neutral TILT posture; "
+                        f"missing module states for {missing}"
+                    )
+                self._neutral_tilt_rad_by_module = {
+                    item.module_id: latest_tilts[item.module_id]
+                    for item in assignments
+                }
+                self._neutral_assignment_signature = assignment_signature
+            neutral_tilts = self._neutral_tilt_rad_by_module
+        executor.start(
+            MorphologyCommand(
+                execution_id,
+                course_step.morphology,
+                course_step.behavior,
+                course_step.parameters or {},
+            ),
+            assignments,
+            neutral_tilts,
+        )
         self._engine = (executor, assignments)
 
     @staticmethod

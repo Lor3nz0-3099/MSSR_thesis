@@ -33,6 +33,7 @@ class JointTarget:
     pusher_linear_m_s: float | None = None
     max_servo_error_rad: float | None = None
     structural_hold_module_ids: tuple[str, ...] = ()
+    angle_reference: str = "absolute"
 
 
 @dataclass(frozen=True)
@@ -80,6 +81,21 @@ class MorphologyLibrary:
     @property
     def morphology_names(self) -> tuple[str, ...]:
         return tuple(sorted(self._profiles))
+
+    def uses_captured_neutral(self, morphology_name: str) -> bool:
+        """Return whether any posture restores an observed neutral angle."""
+
+        profile = self._profile(morphology_name)
+        postures = profile.get("postures", {})
+        if not isinstance(postures, Mapping):
+            return False
+        return any(
+            isinstance(target, Mapping)
+            and target.get("angle_reference") == "captured_neutral"
+            for targets in postures.values()
+            if isinstance(targets, list | tuple)
+            for target in targets
+        )
 
     def validate_assignment(
         self,
@@ -521,6 +537,18 @@ class MorphologyLibrary:
             angle = float(raw_target.get("angle_rad"))
             if not math.isfinite(angle):
                 raise MorphologyLibraryError("Joint target must be finite")
+            angle_reference = str(
+                raw_target.get("angle_reference", "absolute")
+            )
+            if angle_reference not in {"absolute", "captured_neutral"}:
+                raise MorphologyLibraryError(
+                    "Joint angle_reference must be absolute or "
+                    "captured_neutral"
+                )
+            if angle_reference == "captured_neutral" and joint != "tilt":
+                raise MorphologyLibraryError(
+                    "Only tilt targets can use captured_neutral"
+                )
             raw_tolerance = raw_target.get("tolerance_rad")
             tolerance = (
                 None
@@ -611,6 +639,7 @@ class MorphologyLibrary:
                         pusher_module_id=pusher_module_id,
                         pusher_linear_m_s=pusher_speed,
                         max_servo_error_rad=max_servo_error,
+                        angle_reference=angle_reference,
                     )
                 )
         return result
