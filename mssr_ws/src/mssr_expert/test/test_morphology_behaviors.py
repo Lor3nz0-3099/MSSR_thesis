@@ -19,6 +19,7 @@ from mssr_expert.execution.morphology_behavior_executor import (
 from mssr_expert.nodes.smores_morphology_behavior_node import (
     assembly_readiness,
     load_behavior_morphology_catalog,
+    neutral_tilt_override,
 )
 from mssr_expert.nodes.smores_self_reconfiguration_node import (
     load_morphology_catalog,
@@ -836,7 +837,33 @@ def test_module_state_tilts_are_converted_to_primitive_coordinates() -> None:
                 {"module_id": "missing-actuator"},
             ]
         }
-    ) == {"smores_01": pytest.approx(0.11)}
+    ) == {"smores_01": pytest.approx(-0.11)}
+
+
+def test_explicit_neutral_recovery_requires_every_assigned_module() -> None:
+    assignments = _assignments(SNAKE8_ROLES)
+    recovered = neutral_tilt_override(
+        {
+            "neutral_tilt_rad_by_module": {
+                assignment.module_id: -0.08 - 0.005 * index
+                for index, assignment in enumerate(assignments)
+            }
+        },
+        assignments,
+    )
+    assert recovered is not None
+    assert recovered["m0"] == pytest.approx(-0.08)
+    assert recovered["m7"] == pytest.approx(-0.115)
+
+    with pytest.raises(ValueError, match=r"missing=\['m7'\]"):
+        neutral_tilt_override(
+            {
+                "neutral_tilt_rad_by_module": {
+                    f"m{index}": -0.1 for index in range(7)
+                }
+            },
+            assignments,
+        )
 
 
 def test_coordinated_posture_targets_do_not_hold_each_other() -> None:

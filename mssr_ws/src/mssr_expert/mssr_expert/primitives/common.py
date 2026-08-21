@@ -44,9 +44,9 @@ def logical_tilt_positions(
         except (KeyError, TypeError, ValueError):
             continue
         if math.isfinite(raw_position):
-            # Isaac exports the articulation coordinate; the primitive
-            # protocol deliberately uses its opposite sign.
-            result[module_id] = -raw_position
+            # The Isaac state publisher has already converted the raw
+            # articulation coordinate into the primitive-protocol sign.
+            result[module_id] = raw_position
     return result
 
 

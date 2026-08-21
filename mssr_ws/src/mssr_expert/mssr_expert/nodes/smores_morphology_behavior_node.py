@@ -92,6 +92,36 @@ def assembly_readiness(
     return ready, state
 
 
+def neutral_tilt_override(
+    parameters: Mapping[str, Any],
+    assignments: tuple[AssignedModule, ...],
+) -> dict[str, float] | None:
+    """Validate an explicit per-module neutral-posture recovery map."""
+
+    raw = parameters.get("neutral_tilt_rad_by_module")
+    if raw is None:
+        return None
+    if not isinstance(raw, Mapping):
+        raise ValueError("neutral_tilt_rad_by_module must be an object")
+    expected = {item.module_id for item in assignments}
+    actual = {str(module_id) for module_id in raw}
+    if actual != expected:
+        raise ValueError(
+            "neutral_tilt_rad_by_module must contain exactly the assigned "
+            f"modules; missing={sorted(expected - actual)}, "
+            f"extra={sorted(actual - expected)}"
+        )
+    result: dict[str, float] = {}
+    for module_id, value in raw.items():
+        angle = float(value)
+        if not math.isfinite(angle) or abs(angle) > math.pi / 2.0:
+            raise ValueError(
+                f"Invalid neutral TILT angle for {module_id}: {value!r}"
+            )
+        result[str(module_id)] = angle
+    return result
+
+
 class SmoresMorphologyBehaviorNode(Node):
     """Map high-level morphology commands to posture and cluster motion."""
 
@@ -484,7 +514,20 @@ class SmoresMorphologyBehaviorNode(Node):
                         for item in self._assignments
                     ),
                 )
-                if (
+                override = neutral_tilt_override(
+                    command.parameters,
+                    self._assignments,
+                )
+                if override is not None:
+                    self._neutral_tilt_rad_by_module = override
+                    self._neutral_assignment_signature = (
+                        assignment_signature
+                    )
+                    self.get_logger().warning(
+                        "Using an explicit recovered neutral TILT posture "
+                        f"for {self._morphology_name!r}."
+                    )
+                elif (
                     self._neutral_assignment_signature
                     != assignment_signature
                 ):
