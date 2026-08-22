@@ -148,7 +148,34 @@ ros2 launch mssr_expert smores_runtime.launch.py \
 Do not also pass `obstacle_course:=true`; the two physical stages are
 mutually exclusive. Start only the Snake8 self-assembly expert in another
 sourced terminal, using the command in section 1. After assembly, define
-`run_behavior` as below and validate the stopped postures in order:
+`run_behavior` as below. The isolated stage and full obstacle course now use
+the same uniform geometry: 65 mm rise and 280 mm tread.
+
+The preferred complete behavior is generated from the live geometry. Start
+with Snake8 straight, aligned with world +X, and with its head close to the
+first riser:
+
+```bash
+run_behavior snake8 stair-crawl-01 crawl_stairs \
+  '{"riser_approach_linear_m_s":0.060,"linear_m_s":0.030,"profile_substeps":3,"slip_compensation":1.5,"tread_advance_duration_s":4.0}'
+```
+
+`crawl_stairs` reads module poses and Isaac stair landmarks from the robot
+graph. It measures the connected-module pitch and derives the bend angle from
+the actual rise. A riser becomes an inclined link followed by an opposite bend
+back onto the tread. When the chain spans two risers, both bend pairs remain
+active simultaneously. Each one-link shift is divided into
+`profile_substeps` posture/traction microsteps, approximating continuous
+follow-the-leader motion without driving wheels while TILT joints move.
+
+The initial approach duration is computed from the observed world-X position
+of `v4` and the first-riser coordinate. `riser_approach_duration_s` remains an
+optional explicit override. Admission is rejected if the chain differs from
+the +X stair direction by more than `max_alignment_error_rad` (default 0.35
+rad).
+
+The following commands are retained for inspecting the individual legacy
+postures and traction groups:
 
 ```bash
 run_behavior snake8 stair-neutral-01 straighten '{}'
@@ -177,9 +204,8 @@ profile then has a horizontal ground section, one nearly vertical 77.77 mm
 link, and a horizontal two-module hook. The three transfer commands move that
 profile toward the tail one link at a time. After the hook and after every
 transfer, only the modules already supported by the upper tread advance: first
-`v6..v7`, then `v5..v7`, `v4..v7`, and finally `v3..v7`. Only after these
-phases have been visually confirmed should the complete timed program be
-tested close to the first riser:
+`v6..v7`, then `v5..v7`, `v4..v7`, and finally `v3..v7`. The legacy
+single-riser timed program remains available for comparison:
 
 ```bash
 run_behavior snake8 stair-pull-01 pull_over_step \

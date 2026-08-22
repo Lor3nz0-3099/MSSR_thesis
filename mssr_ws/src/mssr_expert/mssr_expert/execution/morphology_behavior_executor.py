@@ -105,10 +105,18 @@ class MorphologyBehaviorExecutor:
         command: MorphologyCommand,
         assignments: Sequence[AssignedModule],
         neutral_tilt_rad_by_module: Mapping[str, float] | None = None,
+        program_steps_override: Sequence[BehaviorProgramStep] | None = None,
     ) -> None:
         assignments = tuple(assignments)
         self._library.validate_assignment(command.morphology, assignments)
-        if command.behavior == "drive":
+        if program_steps_override is not None:
+            program_steps = tuple(program_steps_override)
+            if not program_steps:
+                raise MorphologyLibraryError(
+                    "Behavior program cannot be empty"
+                )
+            targets = ()
+        elif command.behavior == "drive":
             self._validate_drive_parameters(command)
             targets = self._library.drive_joint_targets(
                 command.morphology,

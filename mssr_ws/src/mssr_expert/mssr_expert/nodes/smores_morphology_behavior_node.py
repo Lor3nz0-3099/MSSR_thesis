@@ -28,6 +28,7 @@ from mssr_expert.behaviors.morphology_locomotion import (
     coherent_planar_train_commands,
     validate_locomotion_dofs,
 )
+from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitPlanner
 from mssr_expert.behaviors.morphology_dof_model import (
     MorphologyDofInventory,
     SmoresMorphologyDofAnalyzer,
@@ -174,6 +175,7 @@ class SmoresMorphologyBehaviorNode(Node):
             package_share / "config"
         )
         self._topology_matcher = SmoresSelfReconfigurationPlanner()
+        self._stair_gait_planner = SnakeStairGaitPlanner()
         self._morphology_name = ""
         self._assignments: tuple[AssignedModule, ...] = ()
         self._assembly_ready = False
@@ -557,10 +559,20 @@ class SmoresMorphologyBehaviorNode(Node):
                         f"{self._morphology_name!r}."
                     )
                 neutral_tilts = self._neutral_tilt_rad_by_module
+            program_override = None
+            if command.behavior == "crawl_stairs":
+                if command.morphology != "snake8":
+                    raise ValueError("crawl_stairs requires snake8")
+                program_override = self._stair_gait_planner.plan(
+                    self._latest_robot_graph,
+                    self._assignments,
+                    command.parameters,
+                )
             self._executor.start(
                 command,
                 self._assignments,
                 neutral_tilts,
+                program_override,
             )
             self._last_terminal_command_id = ""
             self._publish_status(

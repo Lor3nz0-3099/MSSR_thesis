@@ -21,12 +21,12 @@ def test_manual_obstacle_course_exports_world_landmarks() -> None:
             "top_height_m": 0.0,
         },
         "stairs": {
-            "top_heights_m": [0.04, 0.08, 0.12],
+            "top_heights_m": [0.065, 0.13, 0.195],
             "first_riser_x_m": 1.25,
-            "riser_depth_m": 0.30,
+            "riser_depth_m": 0.28,
         },
-        "button": {"center_xyz_m": [2.65, 0.455, 0.29]},
-        "exit": {"center_xyz_m": [3.55, 0.0, 0.31]},
+        "button": {"center_xyz_m": [2.65, 0.455, 0.365]},
+        "exit": {"center_xyz_m": [3.55, 0.0, 0.385]},
     }
 
 
@@ -45,7 +45,7 @@ def test_manual_course_has_a_real_gap_and_monotonic_stairs() -> None:
     assert course.stair_top_heights_m == tuple(
         sorted(course.stair_top_heights_m)
     )
-    assert course.stair_top_heights_m == pytest.approx((0.04, 0.08, 0.12))
+    assert course.stair_top_heights_m == pytest.approx((0.065, 0.13, 0.195))
 
 
 def test_manual_course_exposes_future_task_landmarks() -> None:
