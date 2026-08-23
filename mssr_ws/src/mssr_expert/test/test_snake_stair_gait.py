@@ -99,10 +99,32 @@ def test_profiles_hold_two_risers_when_chain_spans_two_steps() -> None:
     ) == pytest.approx((0, 0, 0, 0, angle, -angle, 0, 0))
     assert planner.profile_offsets(
         phase=2, stair_count=3, stride=4, bend_angle=angle
-    ) == pytest.approx((0, 0, angle, -angle, 0, 0, 0, 0))
+    ) == pytest.approx(
+        (0, 0, angle, -angle, 0, 0, angle, -angle)
+    )
     assert planner.profile_offsets(
         phase=3, stair_count=3, stride=4, bend_angle=angle
     ) == pytest.approx((0, angle, -angle, 0, 0, angle, -angle, 0))
+
+
+def test_second_riser_pre_lifts_head_while_first_bend_moves_tailward() -> None:
+    program = SnakeStairGaitPlanner().plan(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+    posture = next(step for step in program if step.phase == "PROFILE_01_01")
+    targets = {
+        target.module_id: target.angle_rad
+        for target in posture.posture_targets
+    }
+    crawl = next(step for step in program if step.phase == "CRAWL_01_01")
+
+    assert targets["m6"] > 0.0
+    assert targets["m7"] < 0.0
+    assert crawl.position_goal is not None
+    assert crawl.position_goal.module_id == "m7"
+    assert crawl.position_goal.target_x_m < 0.93
 
 
 def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:

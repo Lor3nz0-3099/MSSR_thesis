@@ -310,8 +310,8 @@ class SnakeStairGaitPlanner:
             )
             new_edge = old_edge - 1
             if (
-                0 <= old_edge <= self.MODULE_COUNT - 3
-                or 0 <= new_edge <= self.MODULE_COUNT - 3
+                0 <= old_edge <= self.MODULE_COUNT - 2
+                or 0 <= new_edge <= self.MODULE_COUNT - 2
             ):
                 reference_index = min(
                     self.MODULE_COUNT - 1,
@@ -341,9 +341,11 @@ class SnakeStairGaitPlanner:
         offsets = [0.0] * self.MODULE_COUNT
         for stair_index in range(stair_count):
             edge = self.INITIAL_RISER_EDGE + stride * stair_index - phase
-            # Two modules are needed beyond a riser: one turns vertically
-            # and the next turns back onto the horizontal tread.
-            if 0 <= edge <= self.MODULE_COUNT - 3:
+            # Two adjacent TILT joints form the riser and return the leading
+            # module to horizontal.  The terminal pair v6/v7 is valid: it
+            # pre-lifts the head while an earlier bend is still moving toward
+            # the tail, before the head wheel can strike the next riser.
+            if 0 <= edge <= self.MODULE_COUNT - 2:
                 offsets[edge] += bend_angle
                 offsets[edge + 1] -= bend_angle
         return tuple(offsets)
@@ -408,7 +410,7 @@ class SnakeStairGaitPlanner:
         rises = {
             edge
             for edge in rises
-            if 0 <= edge <= self.MODULE_COUNT - 3
+            if 0 <= edge <= self.MODULE_COUNT - 2
         }
         vertical_modules = {edge + 1 for edge in rises}
         return {

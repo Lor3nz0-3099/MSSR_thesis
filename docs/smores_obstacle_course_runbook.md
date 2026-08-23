@@ -164,7 +164,9 @@ run_behavior snake8 stair-crawl-01 crawl_stairs \
 graph. It measures the connected-module pitch and derives the bend angle from
 the actual rise. A riser becomes an inclined link followed by an opposite bend
 back onto the tread. When the chain spans two risers, both bend pairs remain
-active simultaneously. Each one-link shift is divided into
+active simultaneously. The terminal `v6/v7` pair begins lifting the head as
+soon as the next riser enters its reachable profile, while the preceding bend
+is still moving toward the tail. Each one-link shift is divided into
 `profile_substeps` posture/traction microsteps (six by default), approximating continuous
 follow-the-leader motion without driving wheels while TILT joints move.
 
