@@ -145,6 +145,15 @@ class SnakeStairGaitPlanner:
             raise SnakeStairGaitError(
                 "crawl_goal_tolerance_m must be in [0.001, 0.010]"
             )
+        transition_clearance = self._number(
+            parameters,
+            "transition_clearance_m",
+            0.10 * staircase.rise_m,
+        )
+        if not 0.0 <= transition_clearance <= 0.015:
+            raise SnakeStairGaitError(
+                "transition_clearance_m must be in [0.0, 0.015]"
+            )
 
         steps: list[BehaviorProgramStep] = []
         zero = (0.0,) * self.MODULE_COUNT
@@ -217,33 +226,49 @@ class SnakeStairGaitPlanner:
                 stride,
                 ordered,
             )
-            active_module_ids = tuple(
-                item.module_id
-                for item in ordered
-                if item.target_role in active_roles
-            )
             segment_start = current
             for substep in range(1, substeps + 1):
                 fraction = substep / substeps
-                target = tuple(
-                    start + fraction * (end - start)
+                edge_lead_m = transition_clearance * math.sin(
+                    math.pi * fraction
+                )
+                posture_fraction = min(
+                    1.0,
+                    fraction + edge_lead_m / spacing,
+                )
+                target_tuple = tuple(
+                    start + posture_fraction * (end - start)
                     for start, end in zip(segment_start, following)
                 )
                 label = f"PROFILE_{phase:02d}_{substep:02d}"
-                steps.append(self._posture(label, current, target, ordered))
+                steps.append(
+                    self._posture(label, current, target_tuple, ordered)
+                )
+                reference, riser_x_m = self._edge_reference(
+                    phase,
+                    len(staircase.top_heights_m),
+                    stride,
+                    staircase,
+                    ordered,
+                )
                 steps.append(
                     BehaviorProgramStep(
                         phase=f"CRAWL_{phase:02d}_{substep:02d}",
                         linear_m_s=crawl_speed,
                         active_target_roles=active_roles,
-                        displacement_goal=LongitudinalDisplacementGoal(
-                            module_ids=active_module_ids,
-                            distance_m=micro_distance,
+                        position_goal=LongitudinalPositionGoal(
+                            module_id=reference.module_id,
+                            target_x_m=(
+                                riser_x_m
+                                - wheel_radius
+                                + fraction * spacing
+                                - edge_lead_m
+                            ),
                             tolerance_m=crawl_tolerance,
                         ),
                     )
                 )
-                current = target
+                current = target_tuple
 
         upper_deck_distance = self._number(
             parameters, "upper_deck_advance_distance_m", spacing
@@ -268,6 +293,41 @@ class SnakeStairGaitPlanner:
             )
         )
         return tuple(steps)
+
+    def _edge_reference(
+        self,
+        phase: int,
+        stair_count: int,
+        stride: int,
+        staircase: UniformStaircase,
+        assignments: Sequence[AssignedModule],
+    ) -> tuple[AssignedModule, float]:
+        """Select the foremost live wheel whose riser transfer is active."""
+        candidates: list[tuple[int, int]] = []
+        for stair_index in range(stair_count):
+            old_edge = (
+                self.INITIAL_RISER_EDGE + stride * stair_index - phase
+            )
+            new_edge = old_edge - 1
+            if (
+                0 <= old_edge <= self.MODULE_COUNT - 3
+                or 0 <= new_edge <= self.MODULE_COUNT - 3
+            ):
+                reference_index = min(
+                    self.MODULE_COUNT - 1,
+                    max(0, old_edge + 1),
+                )
+                candidates.append((stair_index, reference_index))
+        if not candidates:
+            raise SnakeStairGaitError(
+                "No stair edge reference during Snake8 transfer"
+            )
+        stair_index, reference_index = max(candidates)
+        return (
+            assignments[reference_index],
+            staircase.first_riser_x_m
+            + stair_index * staircase.tread_depth_m,
+        )
 
     def profile_offsets(
         self,

@@ -150,19 +150,17 @@ def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
         "snake_head",
     )
     assert crawl.duration_s is None
-    assert crawl.displacement_goal is not None
-    assert crawl.displacement_goal.module_ids == (
-        "m0",
-        "m1",
-        "m2",
-        "m3",
-        "m4",
-        "m5",
-        "m6",
-        "m7",
+    assert crawl.displacement_goal is None
+    assert crawl.position_goal is not None
+    assert crawl.position_goal.module_id == "m7"
+    expected_clearance = 0.10 * 0.065
+    assert crawl.position_goal.target_x_m == pytest.approx(
+        0.93
+        - 0.03106
+        + 0.5 * 0.07777
+        - expected_clearance
     )
-    assert crawl.displacement_goal.distance_m == pytest.approx(0.07777 / 2)
-    assert crawl.displacement_goal.tolerance_m == pytest.approx(0.004)
+    assert crawl.position_goal.tolerance_m == pytest.approx(0.004)
     upper_deck = program[-1]
     assert upper_deck.duration_s is None
     assert upper_deck.displacement_goal is not None
@@ -193,16 +191,57 @@ def test_first_crawl_also_drives_wheels_transitioning_over_riser() -> None:
         "snake_neck",
         "snake_head",
     )
-    assert first_crawl.displacement_goal is not None
-    assert first_crawl.displacement_goal.module_ids == (
-        "m0",
-        "m1",
-        "m2",
-        "m3",
-        "m4",
-        "m5",
-        "m6",
-        "m7",
+    assert first_crawl.position_goal is not None
+    assert first_crawl.position_goal.module_id == "m5"
+
+
+def test_transition_lead_straightens_front_and_moves_bend_rearward() -> None:
+    planner = SnakeStairGaitPlanner()
+    program = planner.plan(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 2, "transition_clearance_m": 0.008},
+    )
+    angle = math.asin(0.065 / 0.07777)
+    middle = next(step for step in program if step.phase == "PROFILE_00_01")
+    middle_targets = {
+        target.module_id: target.angle_rad
+        for target in middle.posture_targets
+    }
+    endpoint = next(step for step in program if step.phase == "PROFILE_00_02")
+    endpoint_targets = {
+        target.module_id: target.angle_rad
+        for target in endpoint.posture_targets
+    }
+
+    assert middle_targets["m3"] > 0.5 * angle
+    assert middle_targets["m4"] < 0.0
+    assert middle_targets["m5"] > -0.5 * angle
+    assert endpoint_targets["m3"] == pytest.approx(angle)
+    assert endpoint_targets["m4"] == pytest.approx(-angle)
+    assert endpoint_targets["m5"] == pytest.approx(0.0)
+
+
+def test_crawl_uses_world_edge_targets_with_temporary_lead() -> None:
+    program = SnakeStairGaitPlanner().plan(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+    fourth = next(step for step in program if step.phase == "CRAWL_00_04")
+    endpoint = next(step for step in program if step.phase == "CRAWL_00_06")
+
+    assert fourth.position_goal is not None
+    assert fourth.position_goal.module_id == "m5"
+    assert fourth.position_goal.target_x_m == pytest.approx(
+        0.65
+        - 0.03106
+        + 4.0 * 0.07777 / 6.0
+        - 0.0065 * math.sin(4.0 * math.pi / 6.0)
+    )
+    assert endpoint.position_goal is not None
+    assert endpoint.position_goal.target_x_m == pytest.approx(
+        0.65 - 0.03106 + 0.07777
     )
 
 
@@ -514,6 +553,7 @@ def test_recognizer_rejects_nonuniform_risers() -> None:
         ({"max_alignment_error_rad": 0.0}, "must be in"),
         ({"riser_approach_tolerance_m": 0.001}, "must be in"),
         ({"crawl_goal_tolerance_m": 0.020}, "must be in"),
+        ({"transition_clearance_m": 0.020}, "must be in"),
         ({"profile_substeps": 6, "crawl_goal_tolerance_m": 0.010}, "half"),
         ({"upper_deck_advance_distance_m": 0.010}, "half one link"),
         ({"slip_compensation": 1.5}, "does not accept timed parameters"),

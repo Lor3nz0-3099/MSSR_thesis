@@ -157,7 +157,7 @@ first riser:
 
 ```bash
 run_behavior snake8 stair-crawl-01 crawl_stairs \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"transition_clearance_m":0.0065,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
 `crawl_stairs` reads module poses and Isaac stair landmarks from the robot
@@ -172,13 +172,21 @@ All locomotion phases are closed-loop rather than timed. After lifting the
 head, the controller keeps the five grounded modules moving until the leading
 wheel surface of the first elevated module (`v5`) reaches the first-riser
 plane. That surface is reconstructed from its live world-X center and the
-wheel radius exported by Isaac. Each subsequent traction phase drives the
+wheel radius exported by Isaac. Each subsequent traction phase targets the
+live world-X position of the wheel transferring over the corresponding riser,
+rather than accumulating a centroid displacement. During the middle of a
+one-link transfer, `transition_clearance_m` temporarily advances the next
+posture: the module beyond the edge straightens sooner while the bend moves
+rearward onto the grounded chain. The default lead is 10% of the recognized
+riser height; it returns to zero at both endpoint profiles, so it does not
+accumulate along the stairs.
+
+Each traction phase drives the
 union of wheels supporting the posture before and after the transition. This
 includes wheels entering or leaving contact at a riser, preventing a passive
 wheel from jamming against the tread edge while the grounded tail and leading
-modules compress the chain. The controller captures the world-X centroid of
-that complete traction set and advances it by exactly one profile substep. The upper-deck
-phase similarly advances the centroid of all eight modules by a geometric
+modules compress the chain. The upper-deck phase advances the centroid of all
+eight modules by a geometric
 distance (one measured link by default). Status messages report current X,
 distance traveled, target and remaining error. There is no locomotion time
 limit: a slow but progressing phase continues until its geometric goal is
@@ -368,7 +376,7 @@ the measured world positions rather than elapsed time:
 ```bash
 run_behavior snake8 stair-straight-01 straighten '{}'
 run_behavior snake8 stair-crawl-01 crawl_stairs \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"transition_clearance_m":0.0065,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
 The unified obstacle-course policy uses this same `crawl_stairs` program once;
