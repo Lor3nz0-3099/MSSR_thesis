@@ -132,7 +132,8 @@ def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
         0.65 - 0.5 * math.sqrt(0.07777**2 - 0.065**2)
     )
     assert approach.position_goal.tolerance_m == pytest.approx(0.010)
-    assert approach.duration_s == pytest.approx(90.0)
+    assert approach.duration_s is None
+    assert approach.kind == "drive"
     assert crawl.active_target_roles == (
         "snake_center_front",
         "snake_shoulder",
@@ -230,12 +231,12 @@ def test_approach_drives_until_the_live_world_x_goal() -> None:
     assert not reached.done
 
 
-def test_approach_fails_instead_of_folding_when_goal_times_out() -> None:
+def test_approach_has_no_time_limit_while_position_keeps_progressing() -> None:
     assignments = _assignments()
     program = SnakeStairGaitPlanner().plan(
         _graph(),
         assignments,
-        {"profile_substeps": 1, "riser_approach_timeout_s": 2.0},
+        {"profile_substeps": 1},
     )
     executor = MorphologyBehaviorExecutor(
         MorphologyLibrary.load(
@@ -245,7 +246,7 @@ def test_approach_fails_instead_of_folding_when_goal_times_out() -> None:
         )
     )
     executor.start(
-        MorphologyCommand("crawl-timeout", "snake8", "crawl_stairs"),
+        MorphologyCommand("crawl-slow", "snake8", "crawl_stairs"),
         assignments,
         {item.module_id: 0.0 for item in assignments},
         program,
@@ -270,15 +271,57 @@ def test_approach_fails_instead_of_folding_when_goal_times_out() -> None:
         0.2,
         module_positions={"m4": (goal.target_x_m - 0.10, 0.0, 0.031)},
     )
-    failed = executor.step(
-        2.21,
+    still_moving = executor.step(
+        3600.0,
         module_positions={"m4": (goal.target_x_m - 0.08, 0.0, 0.031)},
     )
 
-    assert failed.done
-    assert not failed.success
-    assert failed.state == "FAILED"
-    assert "timed out" in failed.message
+    assert not still_moving.done
+    assert still_moving.state == "RUNNING_PROGRAM_DRIVE"
+    assert still_moving.phase == "APPROACH_FIRST_RISER"
+    assert still_moving.locomotion
+
+
+def test_approach_waits_without_driving_when_live_pose_is_missing() -> None:
+    assignments = _assignments()
+    program = SnakeStairGaitPlanner().plan(
+        _graph(), assignments, {"profile_substeps": 1}
+    )
+    executor = MorphologyBehaviorExecutor(
+        MorphologyLibrary.load(
+            Path(__file__).parents[1]
+            / "config"
+            / "smores_morphology_behaviors.json"
+        )
+    )
+    executor.start(
+        MorphologyCommand("crawl-no-pose", "snake8", "crawl_stairs"),
+        assignments,
+        {item.module_id: 0.0 for item in assignments},
+        program,
+    )
+    first = executor.step(0.0)
+    executor.step(
+        0.1,
+        {
+            "schema_version": "mssr.primitive_status.v1",
+            "goal_id": first.primitive_goal.goal_id,
+            "primitive": first.primitive_goal.primitive,
+            "module_ids": list(first.primitive_goal.module_ids),
+            "state": "succeeded",
+            "phase": "terminal",
+            "progress": 1.0,
+            "code": "JOINT_TARGET_REACHED",
+            "message": "done",
+        },
+    )
+
+    waiting = executor.step(1000.0, module_positions={})
+
+    assert not waiting.done
+    assert waiting.state == "WAITING_PROGRAM_POSITION"
+    assert not waiting.locomotion
+    assert "locomotion stopped" in waiting.message
 
 
 def test_recognizer_rejects_nonuniform_risers() -> None:
@@ -295,8 +338,6 @@ def test_recognizer_rejects_nonuniform_risers() -> None:
         ({"profile_substeps": "three"}, "must be an integer"),
         ({"profile_substeps": float("inf")}, "must be an integer"),
         ({"max_alignment_error_rad": 0.0}, "must be in"),
-        ({"riser_approach_timeout_s": -1.0}, "must be in"),
-        ({"riser_approach_timeout_s": float("nan")}, "must be finite"),
         ({"riser_approach_tolerance_m": 0.001}, "must be in"),
     ],
 )

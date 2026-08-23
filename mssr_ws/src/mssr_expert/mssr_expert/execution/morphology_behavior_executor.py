@@ -547,13 +547,26 @@ class MorphologyBehaviorExecutor:
             str, tuple[float, float, float]
         ] | None,
     ) -> MorphologyBehaviorDecision:
-        if step.duration_s is None:
-            raise RuntimeError("Composite drive step has no duration")
+        if step.duration_s is None and step.position_goal is None:
+            raise RuntimeError("Composite drive step has no stop condition")
         if self._program_drive_started_s is None:
             self._program_drive_started_s = now_s
         elapsed_s = now_s - self._program_drive_started_s
         goal_message = ""
         if step.position_goal is not None:
+            if (
+                module_positions is None
+                or step.position_goal.module_id not in module_positions
+            ):
+                self._state = "WAITING_PROGRAM_POSITION"
+                return self._decision(
+                    phase=step.phase,
+                    progress=self._active_progress(now_s),
+                    message=(
+                        "Waiting for live pose of "
+                        f"{step.position_goal.module_id}; locomotion stopped."
+                    ),
+                )
             reached, goal_message = self._position_goal_reached(
                 step.position_goal,
                 step.linear_m_s,
@@ -572,18 +585,7 @@ class MorphologyBehaviorExecutor:
                         f"{goal_message}; locomotion stopped."
                     ),
                 )
-        if elapsed_s >= step.duration_s:
-            if step.position_goal is not None:
-                self._state = "FAILED"
-                self._failure_message = (
-                    f"{step.phase} timed out after {step.duration_s:.1f}s "
-                    f"before its position goal: {goal_message}."
-                )
-                return self._decision(
-                    phase="TERMINAL",
-                    done=True,
-                    message=self._failure_message,
-                )
+        if step.duration_s is not None and elapsed_s >= step.duration_s:
             completed_phase = step.phase
             self._program_step_index += 1
             self._program_drive_started_s = None

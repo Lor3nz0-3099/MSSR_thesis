@@ -132,15 +132,6 @@ class SnakeStairGaitPlanner:
         )
 
         desired_bend_x = staircase.first_riser_x_m - 0.5 * diagonal_run
-        approach_timeout = self._number(
-            parameters,
-            "riser_approach_timeout_s",
-            90.0,
-        )
-        if approach_timeout <= 0.0 or approach_timeout > 300.0:
-            raise SnakeStairGaitError(
-                "riser_approach_timeout_s must be in (0, 300]"
-            )
         approach_tolerance = self._number(
             parameters,
             "riser_approach_tolerance_m",
@@ -154,7 +145,6 @@ class SnakeStairGaitPlanner:
         steps.append(
             BehaviorProgramStep(
                 phase="APPROACH_FIRST_RISER",
-                duration_s=approach_timeout,
                 linear_m_s=approach_speed,
                 active_target_roles=tuple(
                     item.target_role for item in ordered[:5]

@@ -47,7 +47,7 @@ class LongitudinalPositionGoal:
 
 @dataclass(frozen=True)
 class BehaviorProgramStep:
-    """One posture or timed locomotion phase of a composite behavior."""
+    """One posture, timed drive, or position-goal drive program phase."""
 
     phase: str
     posture_targets: tuple[JointTarget, ...] = ()
@@ -60,7 +60,11 @@ class BehaviorProgramStep:
 
     @property
     def kind(self) -> str:
-        return "drive" if self.duration_s is not None else "posture"
+        return (
+            "drive"
+            if self.duration_s is not None or self.position_goal is not None
+            else "posture"
+        )
 
 
 class MorphologyLibrary:
