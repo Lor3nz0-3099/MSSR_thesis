@@ -345,12 +345,10 @@ class SnakeStairGaitPlanner:
             for edge in rises
             if 0 <= edge <= self.MODULE_COUNT - 3
         }
-        first_edge = self.INITIAL_RISER_EDGE - phase
-        minimum = first_edge + 2 if first_edge >= 0 else 0
         vertical_modules = {edge + 1 for edge in rises}
         return {
             index
-            for index in range(max(0, minimum), self.MODULE_COUNT)
+            for index in range(self.MODULE_COUNT)
             if index not in vertical_modules
         }
 

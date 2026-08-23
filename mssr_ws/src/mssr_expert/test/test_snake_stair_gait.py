@@ -140,13 +140,21 @@ def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
     assert approach.duration_s is None
     assert approach.kind == "drive"
     assert crawl.active_target_roles == (
+        "snake_tail",
+        "snake_rear",
         "snake_center_front",
         "snake_shoulder",
         "snake_head",
     )
     assert crawl.duration_s is None
     assert crawl.displacement_goal is not None
-    assert crawl.displacement_goal.module_ids == ("m4", "m5", "m7")
+    assert crawl.displacement_goal.module_ids == (
+        "m0",
+        "m1",
+        "m4",
+        "m5",
+        "m7",
+    )
     assert crawl.displacement_goal.distance_m == pytest.approx(0.07777 / 2)
     assert crawl.displacement_goal.tolerance_m == pytest.approx(0.004)
     upper_deck = program[-1]
@@ -156,6 +164,36 @@ def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
         f"m{index}" for index in range(8)
     )
     assert upper_deck.displacement_goal.distance_m == pytest.approx(0.07777)
+
+
+def test_first_crawl_uses_ground_tail_and_upper_tread_supports() -> None:
+    program = SnakeStairGaitPlanner().plan(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 1},
+    )
+
+    first_crawl = next(
+        step for step in program if step.phase == "CRAWL_00_01"
+    )
+
+    assert first_crawl.active_target_roles == (
+        "snake_tail",
+        "snake_rear",
+        "snake_hip",
+        "snake_center_rear",
+        "snake_neck",
+        "snake_head",
+    )
+    assert first_crawl.displacement_goal is not None
+    assert first_crawl.displacement_goal.module_ids == (
+        "m0",
+        "m1",
+        "m2",
+        "m3",
+        "m6",
+        "m7",
+    )
 
 
 def test_plan_rejects_a_snake_not_aligned_with_the_known_stairs() -> None:
