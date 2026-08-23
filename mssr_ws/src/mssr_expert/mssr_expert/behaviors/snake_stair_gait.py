@@ -11,6 +11,7 @@ from mssr_expert.behaviors.morphology_library import (
     AssignedModule,
     BehaviorProgramStep,
     JointTarget,
+    LongitudinalDisplacementGoal,
     LongitudinalPositionGoal,
 )
 from mssr_expert.graph.attributed_robot_graph import AttributedRobotGraph
@@ -70,6 +71,15 @@ class SnakeStairGaitPlanner:
 
     MODULE_COUNT = 8
     INITIAL_RISER_EDGE = 4
+    TIMED_PARAMETER_NAMES = frozenset(
+        {
+            "riser_approach_duration_s",
+            "front_pull_duration_s",
+            "transfer_pull_duration_s",
+            "tread_advance_duration_s",
+            "slip_compensation",
+        }
+    )
 
     def plan(
         self,
@@ -77,6 +87,14 @@ class SnakeStairGaitPlanner:
         assignments: Sequence[AssignedModule],
         parameters: Mapping[str, Any],
     ) -> tuple[BehaviorProgramStep, ...]:
+        timed_parameters = sorted(
+            self.TIMED_PARAMETER_NAMES.intersection(parameters)
+        )
+        if timed_parameters:
+            raise SnakeStairGaitError(
+                "crawl_stairs uses geometric world-pose goals and does not "
+                "accept timed parameters: " + ", ".join(timed_parameters)
+            )
         ordered = tuple(sorted(assignments, key=self._vertex_index))
         if len(ordered) != self.MODULE_COUNT:
             raise SnakeStairGaitError(
@@ -119,9 +137,13 @@ class SnakeStairGaitPlanner:
             parameters, "riser_approach_linear_m_s", 0.060
         )
         crawl_speed = self._speed(parameters, "linear_m_s", 0.030)
-        slip = self._number(parameters, "slip_compensation", 1.5)
-        if slip < 1.0 or slip > 4.0:
-            raise SnakeStairGaitError("slip_compensation must be in [1, 4]")
+        crawl_tolerance = self._number(
+            parameters, "crawl_goal_tolerance_m", 0.004
+        )
+        if not 0.001 <= crawl_tolerance <= 0.010:
+            raise SnakeStairGaitError(
+                "crawl_goal_tolerance_m must be in [0.001, 0.010]"
+            )
 
         steps: list[BehaviorProgramStep] = []
         zero = (0.0,) * self.MODULE_COUNT
@@ -173,7 +195,11 @@ class SnakeStairGaitPlanner:
             len(staircase.top_heights_m) - 1
         ) + 1
         micro_distance = spacing / substeps
-        micro_duration = slip * micro_distance / crawl_speed
+        if crawl_tolerance >= 0.5 * micro_distance:
+            raise SnakeStairGaitError(
+                "crawl_goal_tolerance_m must be less than half one "
+                "profile-substep distance"
+            )
         for phase in range(final_phase):
             following = self.profile_offsets(
                 phase=phase + 1,
@@ -188,6 +214,11 @@ class SnakeStairGaitPlanner:
                 stride,
                 ordered,
             )
+            active_module_ids = tuple(
+                item.module_id
+                for item in ordered
+                if item.target_role in active_roles
+            )
             segment_start = current
             for substep in range(1, substeps + 1):
                 fraction = substep / substeps
@@ -200,27 +231,36 @@ class SnakeStairGaitPlanner:
                 steps.append(
                     BehaviorProgramStep(
                         phase=f"CRAWL_{phase:02d}_{substep:02d}",
-                        duration_s=micro_duration,
                         linear_m_s=crawl_speed,
                         active_target_roles=active_roles,
+                        displacement_goal=LongitudinalDisplacementGoal(
+                            module_ids=active_module_ids,
+                            distance_m=micro_distance,
+                            tolerance_m=crawl_tolerance,
+                        ),
                     )
                 )
                 current = target
 
-        final_duration = self._number(
-            parameters, "tread_advance_duration_s", 4.0
+        upper_deck_distance = self._number(
+            parameters, "upper_deck_advance_distance_m", spacing
         )
-        if final_duration <= 0.0:
+        if not 0.5 * spacing <= upper_deck_distance <= staircase.tread_depth_m:
             raise SnakeStairGaitError(
-                "tread_advance_duration_s must be positive"
+                "upper_deck_advance_distance_m must be between half one "
+                "link and one tread depth"
             )
         steps.append(
             BehaviorProgramStep(
                 phase="UPPER_DECK_ADVANCE",
-                duration_s=final_duration,
                 linear_m_s=crawl_speed,
                 active_target_roles=tuple(
                     item.target_role for item in ordered
+                ),
+                displacement_goal=LongitudinalDisplacementGoal(
+                    module_ids=tuple(item.module_id for item in ordered),
+                    distance_m=upper_deck_distance,
+                    tolerance_m=crawl_tolerance,
                 ),
             )
         )

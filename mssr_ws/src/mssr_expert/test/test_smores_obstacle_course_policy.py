@@ -24,7 +24,7 @@ def test_policy_selects_one_capable_morphology_per_course_task() -> None:
 
     assert [step.morphology for step in steps] == (
         ["rc_car8"] * 3
-        + ["snake8"] * 17
+        + ["snake8"] * 7
         + ["mobile_manipulator8"] * 5
         + ["rc_car8"] * 3
     )
@@ -42,29 +42,21 @@ def test_policy_selects_one_capable_morphology_per_course_task() -> None:
         "safe_before_snake_reconfiguration",
         "rear_past_gap",
         "front_before_stair_1",
-        "front_before_stair_2",
-        "front_before_stair_3",
         "front_on_upper_deck",
         "button_standoff",
         "button_retreat",
         "cross_exit",
     }
-    stair_pulls = [
-        step for step in steps if step.task.startswith("stairs_pull_")
-    ]
-    assert len(stair_pulls) == 3
-    assert all(
-        step.parameters
-        == {
-            "linear_m_s": 0.030,
-            "riser_approach_linear_m_s": 0.060,
-            "riser_approach_duration_s": 4.0,
-            "front_pull_duration_s": 3.0,
-            "transfer_pull_duration_s": 3.0,
-            "tread_advance_duration_s": 5.0,
-        }
-        for step in stair_pulls
-    )
+    stair_crawl = next(step for step in steps if step.task == "stairs_crawl")
+    assert stair_crawl.behavior == "crawl_stairs"
+    assert stair_crawl.parameters == {
+        "linear_m_s": 0.030,
+        "riser_approach_linear_m_s": 0.060,
+        "riser_approach_tolerance_m": 0.010,
+        "crawl_goal_tolerance_m": 0.004,
+        "profile_substeps": 3,
+        "upper_deck_advance_distance_m": 0.080,
+    }
 
 
 def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None:
@@ -76,6 +68,11 @@ def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None
 
     for step in policy.steps():
         if step.behavior is None:
+            continue
+        if step.behavior == "crawl_stairs":
+            # This behavior is generated from live world poses and course
+            # landmarks by SnakeStairGaitPlanner, rather than loaded from the
+            # static morphology library.
             continue
         target_graph = load_attributed_graph(
             package_root / "config" / f"smores_{step.morphology}.json"

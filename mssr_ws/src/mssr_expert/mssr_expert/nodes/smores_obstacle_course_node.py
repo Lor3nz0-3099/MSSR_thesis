@@ -20,6 +20,7 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import String
 
 from mssr_expert.behaviors.morphology_library import AssignedModule, MorphologyLibrary
+from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitPlanner
 from mssr_expert.behaviors.morphology_locomotion import coherent_planar_train_commands
 from mssr_expert.dataset.dataset_logger import DatasetLogger
 from mssr_expert.execution.assembly_policy import DEFAULT_ASSEMBLY_EXECUTION_POLICY
@@ -36,7 +37,6 @@ from mssr_expert.execution.primitive_protocol import parse_primitive_statuses
 from mssr_expert.execution.self_reconfiguration_executor import SelfReconfigurationExecutor
 from mssr_expert.experts.expert_output import ExpertOutput
 from mssr_expert.graph.graph_builder import GraphBuilder
-from mssr_expert.graph.serialization import load_attributed_graph
 from mssr_expert.graph.task_graph import TaskGraphBuilder
 from mssr_expert.nodes.smores_self_reconfiguration_node import load_morphology_catalog
 from mssr_expert.planning.smores_ep.attributed_adapter import target_roles_from_graph
@@ -82,6 +82,7 @@ class SmoresObstacleCourseNode(Node):
         self._behavior_library = MorphologyLibrary.load(
             package_share / "config" / "smores_morphology_behaviors.json"
         )
+        self._stair_gait_planner = SnakeStairGaitPlanner()
         self._policy = ObstacleCoursePolicy()
         self._steps = self._policy.steps()
         self._assembly_planner = ParallelSelfAssemblyPlanner()
@@ -372,6 +373,13 @@ class SmoresObstacleCourseNode(Node):
                 }
                 self._neutral_assignment_signature = assignment_signature
             neutral_tilts = self._neutral_tilt_rad_by_module
+        program_override = None
+        if course_step.behavior == "crawl_stairs":
+            program_override = self._stair_gait_planner.plan(
+                current_graph,
+                assignments,
+                course_step.parameters or {},
+            )
         executor.start(
             MorphologyCommand(
                 execution_id,
@@ -381,6 +389,7 @@ class SmoresObstacleCourseNode(Node):
             ),
             assignments,
             neutral_tilts,
+            program_override,
         )
         self._engine = (executor, assignments)
 
@@ -433,7 +442,19 @@ class SmoresObstacleCourseNode(Node):
             output = ExpertOutput(fsm_state=decision.state, primitive_goal=decision.primitive_goal_payload, success=decision.success, done=decision.done)
             return decision, output
         executor, assignments = self._engine
-        decision = executor.step(time.monotonic(), self._latest_status)
+        nodes = current_graph.node_by_id()
+        module_positions = {
+            assignment.module_id: module_position(
+                nodes[assignment.module_id].attributes
+            )
+            for assignment in assignments
+            if assignment.module_id in nodes
+        }
+        decision = executor.step(
+            time.monotonic(),
+            self._latest_status,
+            module_positions,
+        )
         if decision.primitive_goal is not None:
             self._goal_publisher.publish(dict_to_string_msg(decision.primitive_goal.to_dict()))
         locomotion = coherent_planar_train_commands(current_graph, decision.locomotion)

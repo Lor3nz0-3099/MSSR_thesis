@@ -10,6 +10,7 @@ from mssr_expert.behaviors.morphology_library import (
     AssignedModule,
     BehaviorProgramStep,
     JointTarget,
+    LongitudinalDisplacementGoal,
     LongitudinalPositionGoal,
     MorphologyLibrary,
     MorphologyLibraryError,
@@ -90,6 +91,7 @@ class MorphologyBehaviorExecutor:
         self._program_step_index = 0
         self._program_loaded_posture_index: int | None = None
         self._program_drive_started_s: float | None = None
+        self._program_drive_origin_x_m: float | None = None
         self._state = "IDLE"
         self._failure_message = ""
         self._neutral_tilt_rad_by_module: dict[str, float] = {}
@@ -178,6 +180,7 @@ class MorphologyBehaviorExecutor:
         self._program_step_index = 0
         self._program_loaded_posture_index = None
         self._program_drive_started_s = None
+        self._program_drive_origin_x_m = None
         self._state = "READY"
         self._failure_message = ""
         self._neutral_tilt_rad_by_module = neutral_tilts
@@ -547,8 +550,18 @@ class MorphologyBehaviorExecutor:
             str, tuple[float, float, float]
         ] | None,
     ) -> MorphologyBehaviorDecision:
-        if step.duration_s is None and step.position_goal is None:
-            raise RuntimeError("Composite drive step has no stop condition")
+        stop_conditions = sum(
+            condition is not None
+            for condition in (
+                step.duration_s,
+                step.position_goal,
+                step.displacement_goal,
+            )
+        )
+        if stop_conditions != 1:
+            raise RuntimeError(
+                "Composite drive step must have exactly one stop condition"
+            )
         if self._program_drive_started_s is None:
             self._program_drive_started_s = now_s
         elapsed_s = now_s - self._program_drive_started_s
@@ -576,6 +589,7 @@ class MorphologyBehaviorExecutor:
                 completed_phase = step.phase
                 self._program_step_index += 1
                 self._program_drive_started_s = None
+                self._program_drive_origin_x_m = None
                 self._state = "PROGRAM_BARRIER"
                 return self._decision(
                     phase=f"{completed_phase}_GOAL_REACHED",
@@ -585,10 +599,45 @@ class MorphologyBehaviorExecutor:
                         f"{goal_message}; locomotion stopped."
                     ),
                 )
+        if step.displacement_goal is not None:
+            missing = self._missing_goal_positions(
+                step.displacement_goal.module_ids,
+                module_positions,
+            )
+            if missing:
+                self._state = "WAITING_PROGRAM_POSITION"
+                return self._decision(
+                    phase=step.phase,
+                    progress=self._active_progress(now_s),
+                    message=(
+                        "Waiting for live world poses of "
+                        f"{list(missing)}; locomotion stopped."
+                    ),
+                )
+            reached, goal_message = self._displacement_goal_reached(
+                step.displacement_goal,
+                step.linear_m_s,
+                module_positions,
+            )
+            if reached:
+                completed_phase = step.phase
+                self._program_step_index += 1
+                self._program_drive_started_s = None
+                self._program_drive_origin_x_m = None
+                self._state = "PROGRAM_BARRIER"
+                return self._decision(
+                    phase=f"{completed_phase}_GOAL_REACHED",
+                    progress=self._active_progress(now_s),
+                    message=(
+                        f"{completed_phase} displacement goal reached; "
+                        f"{goal_message}; locomotion stopped."
+                    ),
+                )
         if step.duration_s is not None and elapsed_s >= step.duration_s:
             completed_phase = step.phase
             self._program_step_index += 1
             self._program_drive_started_s = None
+            self._program_drive_origin_x_m = None
             self._state = "PROGRAM_BARRIER"
             return self._decision(
                 phase=f"{completed_phase}_STOP",
@@ -668,6 +717,91 @@ class MorphologyBehaviorExecutor:
         return reached, (
             f"x({goal.module_id})={current_x_m:.3f}m, "
             f"target={goal.target_x_m:.3f}m, error={error_m:.3f}m"
+        )
+
+    @staticmethod
+    def _missing_goal_positions(
+        module_ids: tuple[str, ...],
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ] | None,
+    ) -> tuple[str, ...]:
+        if module_positions is None:
+            return module_ids
+        return tuple(
+            module_id
+            for module_id in module_ids
+            if module_id not in module_positions
+        )
+
+    def _displacement_goal_reached(
+        self,
+        goal: LongitudinalDisplacementGoal,
+        linear_m_s: float,
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ] | None,
+    ) -> tuple[bool, str]:
+        if (
+            not goal.module_ids
+            or len(set(goal.module_ids)) != len(goal.module_ids)
+        ):
+            raise MorphologyLibraryError(
+                "Displacement goal requires unique module IDs"
+            )
+        if (
+            not math.isfinite(goal.distance_m)
+            or not math.isfinite(goal.tolerance_m)
+            or goal.distance_m == 0.0
+            or goal.tolerance_m <= 0.0
+            or goal.tolerance_m >= abs(goal.distance_m)
+        ):
+            raise MorphologyLibraryError(
+                "Displacement goal distance and tolerance are invalid"
+            )
+        if linear_m_s * goal.distance_m <= 0.0:
+            raise MorphologyLibraryError(
+                "Displacement goal direction disagrees with drive speed"
+            )
+        missing = self._missing_goal_positions(
+            goal.module_ids, module_positions
+        )
+        if missing or module_positions is None:
+            return False, f"waiting for poses of {list(missing)}"
+        current_x_m = self._mean_world_x(goal.module_ids, module_positions)
+        if self._program_drive_origin_x_m is None:
+            self._program_drive_origin_x_m = current_x_m
+        traveled_m = current_x_m - self._program_drive_origin_x_m
+        error_m = goal.distance_m - traveled_m
+        reached = (
+            error_m <= goal.tolerance_m
+            if goal.distance_m > 0.0
+            else error_m >= -goal.tolerance_m
+        )
+        return reached, (
+            f"centroid_x={current_x_m:.3f}m, "
+            f"traveled={traveled_m:.3f}m, "
+            f"goal={goal.distance_m:.3f}m, error={error_m:.3f}m"
+        )
+
+    @staticmethod
+    def _mean_world_x(
+        module_ids: tuple[str, ...],
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ],
+    ) -> float:
+        positions = [module_positions[module_id] for module_id in module_ids]
+        if any(
+            len(position) != 3
+            or not all(math.isfinite(float(value)) for value in position)
+            for position in positions
+        ):
+            raise MorphologyLibraryError(
+                "Displacement goal received an invalid live module pose"
+            )
+        return sum(float(position[0]) for position in positions) / len(
+            positions
         )
 
     def _active_posture_phase(self) -> str:

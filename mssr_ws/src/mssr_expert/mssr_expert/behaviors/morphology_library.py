@@ -46,6 +46,15 @@ class LongitudinalPositionGoal:
 
 
 @dataclass(frozen=True)
+class LongitudinalDisplacementGoal:
+    """World-X centroid displacement measured from a drive-phase start."""
+
+    module_ids: tuple[str, ...]
+    distance_m: float
+    tolerance_m: float
+
+
+@dataclass(frozen=True)
 class BehaviorProgramStep:
     """One posture, timed drive, or position-goal drive program phase."""
 
@@ -57,12 +66,17 @@ class BehaviorProgramStep:
     lateral_m_s: float = 0.0
     active_target_roles: tuple[str, ...] = ()
     position_goal: LongitudinalPositionGoal | None = None
+    displacement_goal: LongitudinalDisplacementGoal | None = None
 
     @property
     def kind(self) -> str:
         return (
             "drive"
-            if self.duration_s is not None or self.position_goal is not None
+            if (
+                self.duration_s is not None
+                or self.position_goal is not None
+                or self.displacement_goal is not None
+            )
             else "posture"
         )
 

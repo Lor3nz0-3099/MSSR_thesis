@@ -9,6 +9,8 @@ import pytest
 
 from mssr_expert.behaviors.morphology_library import (
     AssignedModule,
+    BehaviorProgramStep,
+    LongitudinalDisplacementGoal,
     MorphologyLibrary,
 )
 from mssr_expert.behaviors.snake_stair_gait import (
@@ -106,11 +108,11 @@ def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
         _assignments(),
         {
             "profile_substeps": 2,
-            "slip_compensation": 1.0,
             "linear_m_s": 0.030,
         },
     )
     phases = [step.phase for step in program]
+    drive_steps = [step for step in program if step.kind == "drive"]
 
     assert phases[:3] == [
         "LIFT_FIRST_RISER",
@@ -124,6 +126,8 @@ def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
         "CRAWL_00_02",
     ]
     assert phases[-1] == "UPPER_DECK_ADVANCE"
+    assert drive_steps
+    assert all(step.duration_s is None for step in drive_steps)
     crawl = next(step for step in program if step.phase == "CRAWL_02_01")
     approach = program[1]
     assert approach.position_goal is not None
@@ -139,7 +143,18 @@ def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
         "snake_shoulder",
         "snake_head",
     )
-    assert crawl.duration_s == pytest.approx((0.07777 / 2) / 0.030)
+    assert crawl.duration_s is None
+    assert crawl.displacement_goal is not None
+    assert crawl.displacement_goal.module_ids == ("m4", "m5", "m7")
+    assert crawl.displacement_goal.distance_m == pytest.approx(0.07777 / 2)
+    assert crawl.displacement_goal.tolerance_m == pytest.approx(0.004)
+    upper_deck = program[-1]
+    assert upper_deck.duration_s is None
+    assert upper_deck.displacement_goal is not None
+    assert upper_deck.displacement_goal.module_ids == tuple(
+        f"m{index}" for index in range(8)
+    )
+    assert upper_deck.displacement_goal.distance_m == pytest.approx(0.07777)
 
 
 def test_plan_rejects_a_snake_not_aligned_with_the_known_stairs() -> None:
@@ -324,6 +339,107 @@ def test_approach_waits_without_driving_when_live_pose_is_missing() -> None:
     assert "locomotion stopped" in waiting.message
 
 
+def test_crawl_displacement_uses_live_support_centroid_without_timer() -> None:
+    assignments = _assignments()
+    executor = MorphologyBehaviorExecutor(
+        MorphologyLibrary.load(
+            Path(__file__).parents[1]
+            / "config"
+            / "smores_morphology_behaviors.json"
+        )
+    )
+    goal = LongitudinalDisplacementGoal(
+        module_ids=("m4", "m5", "m7"),
+        distance_m=0.040,
+        tolerance_m=0.003,
+    )
+    executor.start(
+        MorphologyCommand("crawl-centroid", "snake8", "crawl_stairs"),
+        assignments,
+        {item.module_id: 0.0 for item in assignments},
+        (
+            BehaviorProgramStep(
+                phase="CRAWL_GEOMETRIC",
+                linear_m_s=0.030,
+                active_target_roles=(
+                    "snake_center_front",
+                    "snake_shoulder",
+                    "snake_head",
+                ),
+                displacement_goal=goal,
+            ),
+        ),
+    )
+    origin = {
+        "m4": (0.40, 0.0, 0.031),
+        "m5": (0.50, 0.0, 0.096),
+        "m7": (0.70, 0.0, 0.096),
+    }
+
+    moving = executor.step(0.0, module_positions=origin)
+    assert moving.phase == "CRAWL_GEOMETRIC"
+    assert moving.locomotion
+    assert "traveled=0.000m" in moving.message
+
+    slow = executor.step(
+        3600.0,
+        module_positions={
+            module_id: (position[0] + 0.020, position[1], position[2])
+            for module_id, position in origin.items()
+        },
+    )
+    assert slow.locomotion
+    assert not slow.done
+    assert "traveled=0.020m" in slow.message
+
+    reached = executor.step(
+        7200.0,
+        module_positions={
+            module_id: (position[0] + 0.038, position[1], position[2])
+            for module_id, position in origin.items()
+        },
+    )
+    assert reached.phase == "CRAWL_GEOMETRIC_GOAL_REACHED"
+    assert not reached.locomotion
+
+
+def test_crawl_displacement_waits_if_one_support_pose_is_missing() -> None:
+    assignments = _assignments()
+    executor = MorphologyBehaviorExecutor(
+        MorphologyLibrary.load(
+            Path(__file__).parents[1]
+            / "config"
+            / "smores_morphology_behaviors.json"
+        )
+    )
+    executor.start(
+        MorphologyCommand("crawl-missing-support", "snake8", "crawl_stairs"),
+        assignments,
+        {item.module_id: 0.0 for item in assignments},
+        (
+            BehaviorProgramStep(
+                phase="CRAWL_GEOMETRIC",
+                linear_m_s=0.030,
+                active_target_roles=("snake_center_front", "snake_head"),
+                displacement_goal=LongitudinalDisplacementGoal(
+                    module_ids=("m4", "m7"),
+                    distance_m=0.040,
+                    tolerance_m=0.003,
+                ),
+            ),
+        ),
+    )
+
+    waiting = executor.step(
+        1000.0,
+        module_positions={"m4": (0.4, 0.0, 0.031)},
+    )
+
+    assert waiting.state == "WAITING_PROGRAM_POSITION"
+    assert not waiting.locomotion
+    assert "m7" in waiting.message
+
+
 def test_recognizer_rejects_nonuniform_risers() -> None:
     course = _course()
     course["stairs"]["top_heights_m"] = [0.065, 0.15, 0.195]
@@ -339,6 +455,11 @@ def test_recognizer_rejects_nonuniform_risers() -> None:
         ({"profile_substeps": float("inf")}, "must be an integer"),
         ({"max_alignment_error_rad": 0.0}, "must be in"),
         ({"riser_approach_tolerance_m": 0.001}, "must be in"),
+        ({"crawl_goal_tolerance_m": 0.020}, "must be in"),
+        ({"profile_substeps": 6, "crawl_goal_tolerance_m": 0.010}, "half"),
+        ({"upper_deck_advance_distance_m": 0.010}, "half one link"),
+        ({"slip_compensation": 1.5}, "does not accept timed parameters"),
+        ({"tread_advance_duration_s": 4.0}, "does not accept timed"),
     ],
 )
 def test_plan_rejects_invalid_runtime_parameters(

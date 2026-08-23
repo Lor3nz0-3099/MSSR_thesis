@@ -157,7 +157,7 @@ first riser:
 
 ```bash
 run_behavior snake8 stair-crawl-01 crawl_stairs \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":3,"slip_compensation":1.5,"tread_advance_duration_s":4.0}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":3,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
 `crawl_stairs` reads module poses and Isaac stair landmarks from the robot
@@ -168,15 +168,21 @@ active simultaneously. Each one-link shift is divided into
 `profile_substeps` posture/traction microsteps, approximating continuous
 follow-the-leader motion without driving wheels while TILT joints move.
 
-The initial approach is closed-loop rather than timed. After lifting the head,
-the controller keeps the five grounded modules moving until the live world-X
-position of `v4` reaches the first-riser target derived from the inclined-link
-geometry. Status messages report current X, target and remaining error. The
-default tolerance is 10 mm. There is no time limit: a slow but progressing
-approach continues until the geometric goal is reached. If its live pose is
-temporarily unavailable, the controller publishes no wheel commands and waits
-for feedback. Admission is rejected if the chain differs from the +X stair
-direction by more than `max_alignment_error_rad` (default 0.35 rad).
+All locomotion phases are closed-loop rather than timed. After lifting the
+head, the controller keeps the five grounded modules moving until the live
+world-X position of `v4` reaches the first-riser target derived from the
+inclined-link geometry. Each subsequent traction phase captures the world-X
+centroid of the modules that remain supported across the posture transition
+and advances that centroid by exactly one profile substep. The upper-deck
+phase similarly advances the centroid of all eight modules by a geometric
+distance (one measured link by default). Status messages report current X,
+distance traveled, target and remaining error. There is no locomotion time
+limit: a slow but progressing phase continues until its geometric goal is
+reached. If any required live pose is temporarily unavailable, the controller
+publishes no wheel commands and waits for feedback. Primitive joint timeouts
+remain only as actuator-failure guards; they do not determine stair progress.
+Admission is rejected if the chain differs from the +X stair direction by
+more than `max_alignment_error_rad` (default 0.35 rad).
 
 The following commands are retained for inspecting the individual legacy
 postures and traction groups:
@@ -209,7 +215,8 @@ link, and a horizontal two-module hook. The three transfer commands move that
 profile toward the tail one link at a time. After the hook and after every
 transfer, only the modules already supported by the upper tread advance: first
 `v6..v7`, then `v5..v7`, `v4..v7`, and finally `v3..v7`. The legacy
-single-riser timed program remains available for comparison:
+single-riser timed program remains available only for comparison and is not
+used by the KAIRO/Tanaka course policy:
 
 ```bash
 run_behavior snake8 stair-pull-01 pull_over_step \
@@ -345,28 +352,21 @@ ros2 run mssr_expert mssr_smores_self_reconfiguration_node --ros-args \
 ```
 
 This transition retains six of seven connections and changes only the front
-terminal docking relation. The stair behavior uses two opposing folds rather
-than a progressive arch: the rear remains horizontal, one serial link becomes
-nearly vertical, and the two front modules form a horizontal hook.
-`pull_over_step` lifts the front, closes the post-lift distance using only the
-five grounded modules, forms the hook, and advances only the two modules on
-the upper tread. It then shifts the square profile toward the tail three
-times; after each completed shift, the newly supported upper group advances.
-It never drives wheels below the riser during those four phases. Finally it
-restores the captured neutral posture and advances on the tread:
+terminal docking relation. The preferred stair controller follows the full
+three-riser profile in one command. It forms opposing bends at every active
+riser, shifts those bends toward the tail, and advances only wheel groups that
+remain supported before and after each shift. Every advance terminates from
+the measured world positions rather than elapsed time:
 
 ```bash
 run_behavior snake8 stair-straight-01 straighten '{}'
-run_behavior snake8 stair-approach-01 train '{"linear_m_s":0.020,"duration_s":5.0}'
-run_behavior snake8 stair-lift-01 lift_head '{}'
-run_behavior snake8 stair-hook-01 hook_step '{}'
-run_behavior snake8 stair-pull-01 pull_over_step '{"riser_approach_linear_m_s":0.060,"riser_approach_duration_s":4.0,"linear_m_s":0.030,"front_pull_duration_s":3.0,"transfer_pull_duration_s":3.0,"tread_advance_duration_s":5.0}'
+run_behavior snake8 stair-crawl-01 crawl_stairs \
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":3,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
-Repeat `lift_head -> hook_step -> pull_over_step` for another riser. The
-current implementation is open-loop; stair contact will replace the duration
-parameters when the obstacle recognizer is added. Then stop the completed
-reconfiguration expert.
+The unified obstacle-course policy uses this same `crawl_stairs` program once;
+it no longer repeats the timed `lift_head -> hook_step -> pull_over_step`
+sequence for each riser. Then stop the completed reconfiguration expert.
 
 ## 4. Reconfigure Snake8 to MobileManipulator8 and press a button
 
