@@ -48,7 +48,10 @@ from mssr_expert.planning.smores_ep.attributed_adapter import (
 from mssr_expert.planning.smores_ep.self_reconfiguration_planner import (
     SmoresSelfReconfigurationPlanner,
 )
-from mssr_expert.primitives.common import logical_tilt_positions
+from mssr_expert.primitives.common import (
+    logical_tilt_positions,
+    module_position,
+)
 from mssr_expert.utils.json_io import dict_to_string_msg, string_msg_to_dict
 
 
@@ -604,8 +607,22 @@ class SmoresMorphologyBehaviorNode(Node):
         if not self._executor.active and self._step_cmd_vel():
             return
 
+        nodes = self._latest_robot_graph.node_by_id()
+        module_positions = {}
+        for assignment in self._assignments:
+            node = nodes.get(assignment.module_id)
+            if node is None:
+                continue
+            try:
+                module_positions[assignment.module_id] = module_position(
+                    node.attributes
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
         decision = self._executor.step(
-            time.monotonic(), self._latest_primitive_status
+            time.monotonic(),
+            self._latest_primitive_status,
+            module_positions,
         )
         if not decision.command_id:
             return

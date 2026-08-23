@@ -125,6 +125,14 @@ def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
     ]
     assert phases[-1] == "UPPER_DECK_ADVANCE"
     crawl = next(step for step in program if step.phase == "CRAWL_02_01")
+    approach = program[1]
+    assert approach.position_goal is not None
+    assert approach.position_goal.module_id == "m4"
+    assert approach.position_goal.target_x_m == pytest.approx(
+        0.65 - 0.5 * math.sqrt(0.07777**2 - 0.065**2)
+    )
+    assert approach.position_goal.tolerance_m == pytest.approx(0.010)
+    assert approach.duration_s == pytest.approx(90.0)
     assert crawl.active_target_roles == (
         "snake_center_front",
         "snake_shoulder",
@@ -166,6 +174,113 @@ def test_executor_accepts_generated_program_without_library_entry() -> None:
     assert first.primitive_goal.module_ids == ("m4",)
 
 
+def test_approach_drives_until_the_live_world_x_goal() -> None:
+    assignments = _assignments()
+    program = SnakeStairGaitPlanner().plan(
+        _graph(), assignments, {"profile_substeps": 1}
+    )
+    executor = MorphologyBehaviorExecutor(
+        MorphologyLibrary.load(
+            Path(__file__).parents[1]
+            / "config"
+            / "smores_morphology_behaviors.json"
+        )
+    )
+    executor.start(
+        MorphologyCommand("crawl-goal", "snake8", "crawl_stairs"),
+        assignments,
+        {item.module_id: 0.0 for item in assignments},
+        program,
+    )
+    first = executor.step(0.0)
+    completed_lift = executor.step(
+        0.1,
+        {
+            "schema_version": "mssr.primitive_status.v1",
+            "goal_id": first.primitive_goal.goal_id,
+            "primitive": first.primitive_goal.primitive,
+            "module_ids": list(first.primitive_goal.module_ids),
+            "state": "succeeded",
+            "phase": "terminal",
+            "progress": 1.0,
+            "code": "JOINT_TARGET_REACHED",
+            "message": "done",
+        },
+    )
+    assert completed_lift.phase == "LIFT_FIRST_RISER_COMPLETE"
+
+    goal = program[1].position_goal
+    assert goal is not None
+    moving = executor.step(
+        0.2,
+        module_positions={"m4": (goal.target_x_m - 0.10, 0.0, 0.031)},
+    )
+    assert moving.phase == "APPROACH_FIRST_RISER"
+    assert moving.locomotion
+    assert "error=0.100m" in moving.message
+
+    reached = executor.step(
+        5.0,
+        module_positions={
+            "m4": (goal.target_x_m - 0.005, 0.0, 0.031)
+        },
+    )
+    assert reached.phase == "APPROACH_FIRST_RISER_GOAL_REACHED"
+    assert not reached.locomotion
+    assert not reached.done
+
+
+def test_approach_fails_instead_of_folding_when_goal_times_out() -> None:
+    assignments = _assignments()
+    program = SnakeStairGaitPlanner().plan(
+        _graph(),
+        assignments,
+        {"profile_substeps": 1, "riser_approach_timeout_s": 2.0},
+    )
+    executor = MorphologyBehaviorExecutor(
+        MorphologyLibrary.load(
+            Path(__file__).parents[1]
+            / "config"
+            / "smores_morphology_behaviors.json"
+        )
+    )
+    executor.start(
+        MorphologyCommand("crawl-timeout", "snake8", "crawl_stairs"),
+        assignments,
+        {item.module_id: 0.0 for item in assignments},
+        program,
+    )
+    first = executor.step(0.0)
+    executor.step(
+        0.1,
+        {
+            "schema_version": "mssr.primitive_status.v1",
+            "goal_id": first.primitive_goal.goal_id,
+            "primitive": first.primitive_goal.primitive,
+            "module_ids": list(first.primitive_goal.module_ids),
+            "state": "succeeded",
+            "phase": "terminal",
+            "progress": 1.0,
+            "code": "JOINT_TARGET_REACHED",
+            "message": "done",
+        },
+    )
+    goal = program[1].position_goal
+    executor.step(
+        0.2,
+        module_positions={"m4": (goal.target_x_m - 0.10, 0.0, 0.031)},
+    )
+    failed = executor.step(
+        2.21,
+        module_positions={"m4": (goal.target_x_m - 0.08, 0.0, 0.031)},
+    )
+
+    assert failed.done
+    assert not failed.success
+    assert failed.state == "FAILED"
+    assert "timed out" in failed.message
+
+
 def test_recognizer_rejects_nonuniform_risers() -> None:
     course = _course()
     course["stairs"]["top_heights_m"] = [0.065, 0.15, 0.195]
@@ -180,8 +295,9 @@ def test_recognizer_rejects_nonuniform_risers() -> None:
         ({"profile_substeps": "three"}, "must be an integer"),
         ({"profile_substeps": float("inf")}, "must be an integer"),
         ({"max_alignment_error_rad": 0.0}, "must be in"),
-        ({"riser_approach_duration_s": -1.0}, "must be non-negative"),
-        ({"riser_approach_duration_s": float("nan")}, "must be finite"),
+        ({"riser_approach_timeout_s": -1.0}, "must be in"),
+        ({"riser_approach_timeout_s": float("nan")}, "must be finite"),
+        ({"riser_approach_tolerance_m": 0.001}, "must be in"),
     ],
 )
 def test_plan_rejects_invalid_runtime_parameters(

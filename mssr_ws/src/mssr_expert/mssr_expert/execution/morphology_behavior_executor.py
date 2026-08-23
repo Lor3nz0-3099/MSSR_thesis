@@ -10,6 +10,7 @@ from mssr_expert.behaviors.morphology_library import (
     AssignedModule,
     BehaviorProgramStep,
     JointTarget,
+    LongitudinalPositionGoal,
     MorphologyLibrary,
     MorphologyLibraryError,
 )
@@ -185,6 +186,9 @@ class MorphologyBehaviorExecutor:
         self,
         now_s: float,
         status_payload: Mapping[str, Any] | None = None,
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ] | None = None,
     ) -> MorphologyBehaviorDecision:
         if not math.isfinite(now_s):
             raise ValueError("Behavior time must be finite")
@@ -251,7 +255,7 @@ class MorphologyBehaviorExecutor:
                 del self._active_goal_ids[goal_id]
 
         if self._program_steps:
-            return self._step_composite_program(now_s)
+            return self._step_composite_program(now_s, module_positions)
 
         if self._next_joint_index < len(self._joint_targets):
             target = self._joint_targets[self._next_joint_index]
@@ -454,6 +458,9 @@ class MorphologyBehaviorExecutor:
     def _step_composite_program(
         self,
         now_s: float,
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ] | None,
     ) -> MorphologyBehaviorDecision:
         """Execute a posture/locomotion program with a stop at each barrier."""
 
@@ -469,7 +476,7 @@ class MorphologyBehaviorExecutor:
         step = self._program_steps[self._program_step_index]
         if step.kind == "posture":
             return self._step_program_posture(step, now_s)
-        return self._step_program_drive(step, now_s)
+        return self._step_program_drive(step, now_s, module_positions)
 
     def _step_program_posture(
         self,
@@ -536,13 +543,47 @@ class MorphologyBehaviorExecutor:
         self,
         step: BehaviorProgramStep,
         now_s: float,
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ] | None,
     ) -> MorphologyBehaviorDecision:
         if step.duration_s is None:
             raise RuntimeError("Composite drive step has no duration")
         if self._program_drive_started_s is None:
             self._program_drive_started_s = now_s
         elapsed_s = now_s - self._program_drive_started_s
+        goal_message = ""
+        if step.position_goal is not None:
+            reached, goal_message = self._position_goal_reached(
+                step.position_goal,
+                step.linear_m_s,
+                module_positions,
+            )
+            if reached:
+                completed_phase = step.phase
+                self._program_step_index += 1
+                self._program_drive_started_s = None
+                self._state = "PROGRAM_BARRIER"
+                return self._decision(
+                    phase=f"{completed_phase}_GOAL_REACHED",
+                    progress=self._active_progress(now_s),
+                    message=(
+                        f"{completed_phase} position goal reached; "
+                        f"{goal_message}; locomotion stopped."
+                    ),
+                )
         if elapsed_s >= step.duration_s:
+            if step.position_goal is not None:
+                self._state = "FAILED"
+                self._failure_message = (
+                    f"{step.phase} timed out after {step.duration_s:.1f}s "
+                    f"before its position goal: {goal_message}."
+                )
+                return self._decision(
+                    phase="TERMINAL",
+                    done=True,
+                    message=self._failure_message,
+                )
             completed_phase = step.phase
             self._program_step_index += 1
             self._program_drive_started_s = None
@@ -581,8 +622,50 @@ class MorphologyBehaviorExecutor:
             progress=self._active_progress(now_s),
             message=(
                 f"Executing {step.phase} with supports "
-                f"{list(step.active_target_roles)}."
+                f"{list(step.active_target_roles)}"
+                + (f"; {goal_message}." if goal_message else ".")
             ),
+        )
+
+    @staticmethod
+    def _position_goal_reached(
+        goal: LongitudinalPositionGoal,
+        linear_m_s: float,
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ] | None,
+    ) -> tuple[bool, str]:
+        if (
+            not math.isfinite(goal.target_x_m)
+            or not math.isfinite(goal.tolerance_m)
+            or goal.tolerance_m <= 0.0
+        ):
+            raise MorphologyLibraryError(
+                "Position goal target and tolerance must be finite; "
+                "tolerance must be positive"
+            )
+        if module_positions is None or goal.module_id not in module_positions:
+            return False, f"waiting for pose of {goal.module_id}"
+        position = module_positions[goal.module_id]
+        if len(position) != 3 or not all(
+            math.isfinite(float(value)) for value in position
+        ):
+            raise MorphologyLibraryError(
+                f"Invalid live position for {goal.module_id}"
+            )
+        current_x_m = float(position[0])
+        error_m = goal.target_x_m - current_x_m
+        if linear_m_s > 0.0:
+            reached = error_m <= goal.tolerance_m
+        elif linear_m_s < 0.0:
+            reached = error_m >= -goal.tolerance_m
+        else:
+            raise MorphologyLibraryError(
+                "A position-goal drive must have non-zero linear speed"
+            )
+        return reached, (
+            f"x({goal.module_id})={current_x_m:.3f}m, "
+            f"target={goal.target_x_m:.3f}m, error={error_m:.3f}m"
         )
 
     def _active_posture_phase(self) -> str:

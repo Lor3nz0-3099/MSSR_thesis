@@ -37,6 +37,15 @@ class JointTarget:
 
 
 @dataclass(frozen=True)
+class LongitudinalPositionGoal:
+    """World-X stop condition for a connected-morphology drive phase."""
+
+    module_id: str
+    target_x_m: float
+    tolerance_m: float
+
+
+@dataclass(frozen=True)
 class BehaviorProgramStep:
     """One posture or timed locomotion phase of a composite behavior."""
 
@@ -47,6 +56,7 @@ class BehaviorProgramStep:
     yaw_rate_rad_s: float = 0.0
     lateral_m_s: float = 0.0
     active_target_roles: tuple[str, ...] = ()
+    position_goal: LongitudinalPositionGoal | None = None
 
     @property
     def kind(self) -> str:

@@ -11,6 +11,7 @@ from mssr_expert.behaviors.morphology_library import (
     AssignedModule,
     BehaviorProgramStep,
     JointTarget,
+    LongitudinalPositionGoal,
 )
 from mssr_expert.graph.attributed_robot_graph import AttributedRobotGraph
 from mssr_expert.primitives.common import module_position
@@ -131,31 +132,40 @@ class SnakeStairGaitPlanner:
         )
 
         desired_bend_x = staircase.first_riser_x_m - 0.5 * diagonal_run
-        approach_distance = max(
-            0.0,
-            desired_bend_x - positions[self.INITIAL_RISER_EDGE][0],
+        approach_timeout = self._number(
+            parameters,
+            "riser_approach_timeout_s",
+            90.0,
         )
-        raw_approach_duration = parameters.get("riser_approach_duration_s")
-        approach_duration = (
-            self._number(parameters, "riser_approach_duration_s", 0.0)
-            if raw_approach_duration is not None
-            else slip * approach_distance / approach_speed
-        )
-        if approach_duration < 0.0:
+        if approach_timeout <= 0.0 or approach_timeout > 300.0:
             raise SnakeStairGaitError(
-                "riser_approach_duration_s must be non-negative"
+                "riser_approach_timeout_s must be in (0, 300]"
             )
-        if approach_duration > 1e-3:
-            steps.append(
-                BehaviorProgramStep(
-                    phase="APPROACH_FIRST_RISER",
-                    duration_s=approach_duration,
-                    linear_m_s=approach_speed,
-                    active_target_roles=tuple(
-                        item.target_role for item in ordered[:5]
-                    ),
-                )
+        approach_tolerance = self._number(
+            parameters,
+            "riser_approach_tolerance_m",
+            0.010,
+        )
+        if not 0.003 <= approach_tolerance <= 0.030:
+            raise SnakeStairGaitError(
+                "riser_approach_tolerance_m must be in [0.003, 0.030]"
             )
+        reference = ordered[self.INITIAL_RISER_EDGE]
+        steps.append(
+            BehaviorProgramStep(
+                phase="APPROACH_FIRST_RISER",
+                duration_s=approach_timeout,
+                linear_m_s=approach_speed,
+                active_target_roles=tuple(
+                    item.target_role for item in ordered[:5]
+                ),
+                position_goal=LongitudinalPositionGoal(
+                    module_id=reference.module_id,
+                    target_x_m=desired_bend_x,
+                    tolerance_m=approach_tolerance,
+                ),
+            )
+        )
 
         current = tuple(lifted)
         hooked = self.profile_offsets(

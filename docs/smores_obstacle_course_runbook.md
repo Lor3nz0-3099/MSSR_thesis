@@ -157,7 +157,7 @@ first riser:
 
 ```bash
 run_behavior snake8 stair-crawl-01 crawl_stairs \
-  '{"riser_approach_linear_m_s":0.060,"linear_m_s":0.030,"profile_substeps":3,"slip_compensation":1.5,"tread_advance_duration_s":4.0}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_timeout_s":90.0,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":3,"slip_compensation":1.5,"tread_advance_duration_s":4.0}'
 ```
 
 `crawl_stairs` reads module poses and Isaac stair landmarks from the robot
@@ -168,11 +168,14 @@ active simultaneously. Each one-link shift is divided into
 `profile_substeps` posture/traction microsteps, approximating continuous
 follow-the-leader motion without driving wheels while TILT joints move.
 
-The initial approach duration is computed from the observed world-X position
-of `v4` and the first-riser coordinate. `riser_approach_duration_s` remains an
-optional explicit override. Admission is rejected if the chain differs from
-the +X stair direction by more than `max_alignment_error_rad` (default 0.35
-rad).
+The initial approach is closed-loop rather than timed. After lifting the head,
+the controller keeps the five grounded modules moving until the live world-X
+position of `v4` reaches the first-riser target derived from the inclined-link
+geometry. Status messages report current X, target and remaining error. The
+default tolerance is 10 mm; if the target is not reached within
+`riser_approach_timeout_s`, the command fails without forming the hook.
+Admission is rejected if the chain differs from the +X stair direction by
+more than `max_alignment_error_rad` (default 0.35 rad).
 
 The following commands are retained for inspecting the individual legacy
 postures and traction groups:
