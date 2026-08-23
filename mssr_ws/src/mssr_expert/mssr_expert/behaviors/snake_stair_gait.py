@@ -133,7 +133,7 @@ class SnakeStairGaitPlanner:
             round((staircase.tread_depth_m - diagonal_run) / spacing),
         )
         stride = horizontal_links + 1
-        substeps = self._integer(parameters, "profile_substeps", 3, 1, 6)
+        substeps = self._integer(parameters, "profile_substeps", 6, 1, 6)
         approach_speed = self._speed(
             parameters, "riser_approach_linear_m_s", 0.060
         )
@@ -326,12 +326,17 @@ class SnakeStairGaitPlanner:
     ) -> tuple[str, ...]:
         first = self._support_indices(first_phase, stair_count, stride)
         second = self._support_indices(second_phase, stair_count, stride)
-        stable = sorted(first & second)
-        if not stable:
+        # Wheels that support either endpoint of the shift must keep rolling.
+        # In particular, a wheel entering or leaving riser contact would
+        # otherwise become a passive obstacle against the tread edge.
+        traction = sorted(first | second)
+        if not traction:
             raise SnakeStairGaitError(
                 "No stable wheel support during stair crawl"
             )
-        return tuple(assignments[index].target_role for index in stable)
+        return tuple(
+            assignments[index].target_role for index in traction
+        )
 
     def _support_indices(
         self, phase: int, stair_count: int, stride: int
