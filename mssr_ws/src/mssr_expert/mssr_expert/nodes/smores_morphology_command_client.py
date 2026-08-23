@@ -134,14 +134,25 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--command-id", required=True)
     parser.add_argument("--parameters-json", default="{}")
     parser.add_argument("--discovery-timeout-s", type=float, default=5.0)
-    parser.add_argument("--timeout-s", type=float, default=180.0)
+    parser.add_argument(
+        "--timeout-s",
+        type=float,
+        default=0.0,
+        help=(
+            "Maximum command wait in seconds; 0 waits indefinitely "
+            "(default)."
+        ),
+    )
     return parser
 
 
 def main(args: Sequence[str] | None = None) -> None:
     parsed = build_argument_parser().parse_args(args)
-    if parsed.discovery_timeout_s <= 0.0 or parsed.timeout_s <= 0.0:
-        raise SystemExit("Timeouts must be positive")
+    if parsed.discovery_timeout_s <= 0.0 or parsed.timeout_s < 0.0:
+        raise SystemExit(
+            "Discovery timeout must be positive and command timeout must "
+            "be non-negative"
+        )
     try:
         payload = build_command_payload(
             command_id=parsed.command_id,
@@ -171,8 +182,14 @@ def main(args: Sequence[str] | None = None) -> None:
 
         print(json.dumps(payload, sort_keys=True), flush=True)
         node.publish()
-        deadline = time.monotonic() + parsed.timeout_s
-        while node.terminal is None and time.monotonic() < deadline:
+        deadline = (
+            None
+            if parsed.timeout_s == 0.0
+            else time.monotonic() + parsed.timeout_s
+        )
+        while node.terminal is None and (
+            deadline is None or time.monotonic() < deadline
+        ):
             rclpy.spin_once(node, timeout_sec=0.1)
         terminal = node.terminal
         if terminal is None:

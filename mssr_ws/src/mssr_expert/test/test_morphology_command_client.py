@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 
 from mssr_expert.nodes.smores_morphology_command_client import (
+    build_argument_parser,
     build_command_payload,
     parse_parameters_json,
 )
@@ -42,3 +43,35 @@ def test_empty_command_identifier_is_rejected_before_ros_publish() -> None:
             behavior="cross_gap",
             parameters={},
         )
+
+
+def test_command_client_waits_indefinitely_by_default() -> None:
+    parsed = build_argument_parser().parse_args(
+        [
+            "--morphology",
+            "snake8",
+            "--behavior",
+            "crawl_stairs",
+            "--command-id",
+            "stair-test",
+        ]
+    )
+
+    assert parsed.timeout_s == 0.0
+
+
+def test_command_client_accepts_an_explicit_finite_timeout() -> None:
+    parsed = build_argument_parser().parse_args(
+        [
+            "--morphology",
+            "snake8",
+            "--behavior",
+            "crawl_stairs",
+            "--command-id",
+            "stair-test",
+            "--timeout-s",
+            "600",
+        ]
+    )
+
+    assert parsed.timeout_s == 600.0

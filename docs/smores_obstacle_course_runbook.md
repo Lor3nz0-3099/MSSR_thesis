@@ -240,7 +240,10 @@ ros2 topic echo /mssr/morphology/status std_msgs/msg/String
 Define this helper in any sourced ROS terminal. It delegates JSON encoding and
 status matching to the validated ROS client. Every call blocks until the same
 command ID reaches a terminal state, so a failed behavior cannot be mistaken
-for a completed one:
+for a completed one. The client waits indefinitely by default because
+geometric completion, rather than elapsed wall time, terminates obstacle
+behaviors. Pass `--timeout-s N` directly to the client only when a bounded
+operator-side wait is explicitly desired:
 
 ```bash
 run_behavior() {
