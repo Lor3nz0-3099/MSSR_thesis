@@ -166,6 +166,9 @@ class SmoresStateGraphPublisher:
             "global_attributes": {
                 "robot_families": ["smores_ep"],
                 "module_count": len(modules),
+                "module_geometry": {
+                    "wheel_radius_m": self._geometry.wheel_radius_m,
+                },
                 "latched_connection_count": len(attachments),
                 "contact_candidate_count": len(contacts),
                 "experiment_profile": experiment_profile,

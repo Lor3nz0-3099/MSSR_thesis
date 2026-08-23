@@ -75,7 +75,10 @@ def _graph(*, lateral_step_m: float = 0.0) -> AttributedRobotGraph:
             )
             for index in range(8)
         ),
-        global_attributes={"course": _course()},
+        global_attributes={
+            "course": _course(),
+            "module_geometry": {"wheel_radius_m": 0.03106},
+        },
     )
 
 
@@ -131,10 +134,8 @@ def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
     crawl = next(step for step in program if step.phase == "CRAWL_02_01")
     approach = program[1]
     assert approach.position_goal is not None
-    assert approach.position_goal.module_id == "m4"
-    assert approach.position_goal.target_x_m == pytest.approx(
-        0.65 - 0.5 * math.sqrt(0.07777**2 - 0.065**2)
-    )
+    assert approach.position_goal.module_id == "m5"
+    assert approach.position_goal.target_x_m == pytest.approx(0.65 - 0.03106)
     assert approach.position_goal.tolerance_m == pytest.approx(0.010)
     assert approach.duration_s is None
     assert approach.kind == "drive"
@@ -229,7 +230,7 @@ def test_approach_drives_until_the_live_world_x_goal() -> None:
     assert goal is not None
     moving = executor.step(
         0.2,
-        module_positions={"m4": (goal.target_x_m - 0.10, 0.0, 0.031)},
+        module_positions={"m5": (goal.target_x_m - 0.10, 0.0, 0.096)},
     )
     assert moving.phase == "APPROACH_FIRST_RISER"
     assert moving.locomotion
@@ -238,7 +239,8 @@ def test_approach_drives_until_the_live_world_x_goal() -> None:
     reached = executor.step(
         5.0,
         module_positions={
-            "m4": (goal.target_x_m - 0.005, 0.0, 0.031)
+            "m4": (0.585, 0.0, 0.031),
+            "m5": (0.636, 0.0, 0.096),
         },
     )
     assert reached.phase == "APPROACH_FIRST_RISER_GOAL_REACHED"
@@ -284,11 +286,11 @@ def test_approach_has_no_time_limit_while_position_keeps_progressing() -> None:
     goal = program[1].position_goal
     executor.step(
         0.2,
-        module_positions={"m4": (goal.target_x_m - 0.10, 0.0, 0.031)},
+        module_positions={"m5": (goal.target_x_m - 0.10, 0.0, 0.096)},
     )
     still_moving = executor.step(
         3600.0,
-        module_positions={"m4": (goal.target_x_m - 0.08, 0.0, 0.031)},
+        module_positions={"m5": (goal.target_x_m - 0.08, 0.0, 0.096)},
     )
 
     assert not still_moving.done

@@ -169,11 +169,12 @@ active simultaneously. Each one-link shift is divided into
 follow-the-leader motion without driving wheels while TILT joints move.
 
 All locomotion phases are closed-loop rather than timed. After lifting the
-head, the controller keeps the five grounded modules moving until the live
-world-X position of `v4` reaches the first-riser target derived from the
-inclined-link geometry. Each subsequent traction phase captures the world-X
-centroid of the modules that remain supported across the posture transition
-and advances that centroid by exactly one profile substep. The upper-deck
+head, the controller keeps the five grounded modules moving until the leading
+wheel surface of the first elevated module (`v5`) reaches the first-riser
+plane. That surface is reconstructed from its live world-X center and the
+wheel radius exported by Isaac. Each subsequent traction phase captures the
+world-X centroid of the modules that remain supported across the posture
+transition and advances that centroid by exactly one profile substep. The upper-deck
 phase similarly advances the centroid of all eight modules by a geometric
 distance (one measured link by default). Status messages report current X,
 distance traveled, target and remaining error. There is no locomotion time

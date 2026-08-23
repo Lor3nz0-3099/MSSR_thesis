@@ -106,6 +106,7 @@ class SnakeStairGaitPlanner:
         staircase = UniformStaircase.from_course(course)
         positions = self._ordered_positions(graph, ordered)
         spacing = self._link_spacing(positions)
+        wheel_radius = self._wheel_radius(graph)
         if staircase.rise_m >= spacing:
             raise SnakeStairGaitError("Stair rise exceeds one Snake8 link")
         heading = math.atan2(
@@ -153,7 +154,9 @@ class SnakeStairGaitPlanner:
             self._posture("LIFT_FIRST_RISER", zero, tuple(lifted), ordered)
         )
 
-        desired_bend_x = staircase.first_riser_x_m - 0.5 * diagonal_run
+        desired_elevated_center_x = (
+            staircase.first_riser_x_m - wheel_radius
+        )
         approach_tolerance = self._number(
             parameters,
             "riser_approach_tolerance_m",
@@ -163,7 +166,7 @@ class SnakeStairGaitPlanner:
             raise SnakeStairGaitError(
                 "riser_approach_tolerance_m must be in [0.003, 0.030]"
             )
-        reference = ordered[self.INITIAL_RISER_EDGE]
+        first_elevated = ordered[self.INITIAL_RISER_EDGE + 1]
         steps.append(
             BehaviorProgramStep(
                 phase="APPROACH_FIRST_RISER",
@@ -172,8 +175,8 @@ class SnakeStairGaitPlanner:
                     item.target_role for item in ordered[:5]
                 ),
                 position_goal=LongitudinalPositionGoal(
-                    module_id=reference.module_id,
-                    target_x_m=desired_bend_x,
+                    module_id=first_elevated.module_id,
+                    target_x_m=desired_elevated_center_x,
                     tolerance_m=approach_tolerance,
                 ),
             )
@@ -381,6 +384,25 @@ class SnakeStairGaitPlanner:
                 f"Invalid Snake8 link spacing {spacing:.4f} m"
             )
         return spacing
+
+    @staticmethod
+    def _wheel_radius(graph: AttributedRobotGraph) -> float:
+        raw_geometry = graph.global_attributes.get("module_geometry")
+        if not isinstance(raw_geometry, Mapping):
+            raise SnakeStairGaitError(
+                "Robot graph has no module geometry metadata"
+            )
+        try:
+            radius = float(raw_geometry["wheel_radius_m"])
+        except (KeyError, TypeError, ValueError) as error:
+            raise SnakeStairGaitError(
+                "Invalid SMORES wheel radius metadata"
+            ) from error
+        if not math.isfinite(radius) or not 0.020 <= radius <= 0.050:
+            raise SnakeStairGaitError(
+                f"Invalid SMORES wheel radius {radius:.4f} m"
+            )
+        return radius
 
     @staticmethod
     def _vertex_index(assignment: AssignedModule) -> int:
