@@ -322,7 +322,7 @@ def test_transition_lead_straightens_front_and_moves_bend_rearward() -> None:
     assert "m7" not in endpoint_targets
 
 
-def test_edge_release_lead_clears_outgoing_bottom_face_cyclically() -> None:
+def test_upper_riser_release_preserves_first_wave_and_repeats_above() -> None:
     planner = SnakeStairGaitPlanner()
     baseline = planner.plan(
         _graph(),
@@ -330,7 +330,7 @@ def test_edge_release_lead_clears_outgoing_bottom_face_cyclically() -> None:
         {
             "profile_substeps": 6,
             "transition_clearance_m": 0.0065,
-            "edge_release_lead_m": 0.0,
+            "upper_riser_edge_release_lead_m": 0.0,
         },
     )
     released = planner.plan(
@@ -339,15 +339,22 @@ def test_edge_release_lead_clears_outgoing_bottom_face_cyclically() -> None:
         {
             "profile_substeps": 6,
             "transition_clearance_m": 0.0065,
-            "edge_release_lead_m": 0.012,
+            "upper_riser_edge_release_lead_m": 0.012,
         },
     )
 
-    for phase in ("PROFILE_00_03", "PROFILE_04_03"):
+    # Every posture in the first-riser wave remains exactly as it was before
+    # the upper-riser correction was introduced.
+    for substep in range(1, 7):
+        phase = f"PROFILE_00_{substep:02d}"
         baseline_state = _posture_state_at(baseline, phase)
         released_state = _posture_state_at(released, phase)
-        # m5 is the module beyond the active riser in both repeated cycles.
-        # Only its declining edge angle is released ahead of the base wave.
+        assert released_state == pytest.approx(baseline_state)
+
+    # The local release starts on the second riser and repeats on the third.
+    for phase in ("PROFILE_04_03", "PROFILE_08_03"):
+        baseline_state = _posture_state_at(baseline, phase)
+        released_state = _posture_state_at(released, phase)
         assert abs(released_state["m5"]) < abs(baseline_state["m5"])
         assert released_state["m3"] == pytest.approx(
             baseline_state["m3"]
@@ -359,12 +366,6 @@ def test_edge_release_lead_clears_outgoing_bottom_face_cyclically() -> None:
     endpoint = _posture_state_at(released, "PROFILE_04_06")
     baseline_endpoint = _posture_state_at(baseline, "PROFILE_04_06")
     assert endpoint == pytest.approx(baseline_endpoint)
-
-    # Keep the module flat through the late part of both repeated transfers;
-    # the former falling envelope left a small residual edge angle here.
-    for phase in ("PROFILE_00_05", "PROFILE_04_05"):
-        released_state = _posture_state_at(released, phase)
-        assert released_state["m5"] == pytest.approx(0.0)
 
 
 def test_crawl_uses_world_edge_targets_with_temporary_lead() -> None:
@@ -699,7 +700,10 @@ def test_recognizer_rejects_nonuniform_risers() -> None:
         ({"riser_approach_tolerance_m": 0.001}, "must be in"),
         ({"crawl_goal_tolerance_m": 0.020}, "must be in"),
         ({"transition_clearance_m": 0.020}, "must be in"),
-        ({"edge_release_lead_m": 0.030}, "edge_release_lead_m"),
+        (
+            {"upper_riser_edge_release_lead_m": 0.030},
+            "upper_riser_edge_release_lead_m",
+        ),
         ({"head_prelift_lookahead_m": 0.020}, "must be in"),
         (
             {

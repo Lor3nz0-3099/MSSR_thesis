@@ -154,14 +154,15 @@ class SnakeStairGaitPlanner:
             raise SnakeStairGaitError(
                 "transition_clearance_m must be in [0.0, 0.015]"
             )
-        edge_release_lead = self._number(
+        upper_riser_edge_release_lead = self._number(
             parameters,
-            "edge_release_lead_m",
+            "upper_riser_edge_release_lead_m",
             0.012,
         )
-        if not 0.0 <= edge_release_lead <= 0.025:
+        if not 0.0 <= upper_riser_edge_release_lead <= 0.025:
             raise SnakeStairGaitError(
-                "edge_release_lead_m must be in [0.0, 0.025]"
+                "upper_riser_edge_release_lead_m must be in "
+                "[0.0, 0.025]"
             )
         head_prelift_lookahead = self._number(
             parameters,
@@ -302,30 +303,19 @@ class SnakeStairGaitPlanner:
                     start + posture_fraction * (end - start)
                     for start, end in zip(segment_start, following)
                 ]
-                # The module immediately beyond each active riser is the
-                # first body whose BOTTOM face can meet the tread edge while
-                # the bend travels rearward.  Release only that outgoing
-                # angle sooner than the rest of the profile.  This preserves
-                # the supporting bends, returns to the exact endpoint at
-                # both ends of the micro-cycle, and repeats for every module
-                # crossing every riser.
-                # Once the outgoing module reaches the middle of the
-                # transfer, keep the maximum release lead until the endpoint.
-                # Letting the envelope fall again in the second half left the
-                # rear of an otherwise seated module a few millimetres below
-                # the tread edge during CRAWL_*_05.
-                release_envelope = math.sin(
-                    math.pi * min(fraction, 0.5)
-                )
                 release_fraction = min(
                     1.0,
                     posture_fraction
-                    + edge_release_lead
-                    * release_envelope
+                    + upper_riser_edge_release_lead
+                    * math.sin(math.pi * fraction)
                     / spacing,
                 )
+                # Preserve the validated first-riser wave exactly.  Once the
+                # chain spans multiple levels, release only the module beyond
+                # the second (or a later) riser a little sooner.  This targets
+                # the upper-edge BOTTOM-face jam without changing CRAWL_00_*.
                 for stair_index in range(
-                    len(staircase.top_heights_m)
+                    1, len(staircase.top_heights_m)
                 ):
                     outgoing_edge = (
                         self.INITIAL_RISER_EDGE
