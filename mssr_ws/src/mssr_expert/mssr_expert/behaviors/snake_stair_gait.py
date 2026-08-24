@@ -173,6 +173,16 @@ class SnakeStairGaitPlanner:
                 "head_prelift_ramp_m must be in [0.010, "
                 "head_prelift_lookahead_m]"
             )
+        head_hook_transfer = self._number(
+            parameters,
+            "head_hook_transfer_m",
+            0.040,
+        )
+        if not 0.010 <= head_hook_transfer <= spacing:
+            raise SnakeStairGaitError(
+                "head_hook_transfer_m must be between 0.010 m and one "
+                "Snake8 link"
+            )
 
         steps: list[BehaviorProgramStep] = []
         zero = (0.0,) * self.MODULE_COUNT
@@ -264,22 +274,34 @@ class SnakeStairGaitPlanner:
                 for stair_index in range(
                     1, len(staircase.top_heights_m)
                 ):
-                    preview_fraction = self._head_preview_fraction(
-                        wave_progress=wave_progress,
-                        profile_progress=phase + posture_fraction,
-                        stair_index=stair_index,
-                        stride=stride,
-                        tread_depth_m=staircase.tread_depth_m,
-                        spacing_m=spacing,
-                        wheel_radius_m=wheel_radius,
-                        lookahead_m=head_prelift_lookahead,
-                        ramp_m=head_prelift_ramp,
+                    terminal_preview, shoulder_preview = (
+                        self._head_preview_weights(
+                            wave_progress=wave_progress,
+                            profile_progress=phase + posture_fraction,
+                            stair_index=stair_index,
+                            stride=stride,
+                            tread_depth_m=staircase.tread_depth_m,
+                            spacing_m=spacing,
+                            wheel_radius_m=wheel_radius,
+                            lookahead_m=head_prelift_lookahead,
+                            ramp_m=head_prelift_ramp,
+                            hook_transfer_m=head_hook_transfer,
+                        )
+                    )
+                    # First lift only the terminal module with the v6/v7
+                    # pair, leaving v6 wheel-supported.  Once the head reaches
+                    # the riser, migrate the hook rearward to v5/v6.
+                    target[self.MODULE_COUNT - 2] += (
+                        bend_angle * terminal_preview
+                    )
+                    target[self.MODULE_COUNT - 1] -= (
+                        bend_angle * terminal_preview
                     )
                     target[self.MODULE_COUNT - 3] += (
-                        bend_angle * preview_fraction
+                        bend_angle * shoulder_preview
                     )
                     target[self.MODULE_COUNT - 2] -= (
-                        bend_angle * preview_fraction
+                        bend_angle * shoulder_preview
                     )
                 target_tuple = tuple(target)
                 label = f"PROFILE_{phase:02d}_{substep:02d}"
@@ -337,7 +359,7 @@ class SnakeStairGaitPlanner:
         )
         return tuple(steps)
 
-    def _head_preview_fraction(
+    def _head_preview_weights(
         self,
         *,
         wave_progress: float,
@@ -349,8 +371,9 @@ class SnakeStairGaitPlanner:
         wheel_radius_m: float,
         lookahead_m: float,
         ramp_m: float,
-    ) -> float:
-        """Pre-lift neck/head after the shoulder is fully on its tread."""
+        hook_transfer_m: float,
+    ) -> tuple[float, float]:
+        """Lift the head, hold it, then migrate its hook one module back."""
         tread_start = stride * (stair_index - 1)
         head_contact_progress = tread_start + (
             tread_depth_m - 2.0 * spacing_m
@@ -358,19 +381,26 @@ class SnakeStairGaitPlanner:
         lookahead_progress = head_contact_progress - (
             lookahead_m / spacing_m
         )
-        shoulder_supported_progress = tread_start + (
-            2.0 * wheel_radius_m / spacing_m
-        )
-        preview_start = max(
+        head_at_tread_center_progress = tread_start + (
+            0.5 * tread_depth_m + wheel_radius_m - 2.0 * spacing_m
+        ) / spacing_m
+        preview_start = min(
             lookahead_progress,
-            shoulder_supported_progress,
+            head_at_tread_center_progress,
         )
-        preview = self._clamp01(
+        lift = self._clamp01(
             (wave_progress - preview_start) * spacing_m / ramp_m
         )
+        hook_transfer = self._clamp01(
+            (wave_progress - head_contact_progress)
+            * spacing_m
+            / hook_transfer_m
+        )
+        terminal_preview = lift * (1.0 - hook_transfer)
+        desired_shoulder_hook = lift * hook_transfer
 
-        # Cross-fade the preview into the ordinary edge-5 profile instead of
-        # adding the same bend twice when the traveling wave catches up.
+        # Cross-fade the migrated hook into the ordinary edge-5 profile
+        # instead of adding the same bend twice when the wave catches up.
         natural_entry = (
             self.INITIAL_RISER_EDGE
             + stride * stair_index
@@ -379,7 +409,8 @@ class SnakeStairGaitPlanner:
         natural = self._clamp01(
             profile_progress - (natural_entry - 1.0)
         )
-        return max(0.0, preview - natural)
+        shoulder_preview = max(0.0, desired_shoulder_hook - natural)
+        return terminal_preview, shoulder_preview
 
     @staticmethod
     def _clamp01(value: float) -> float:

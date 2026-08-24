@@ -157,21 +157,23 @@ first riser:
 
 ```bash
 run_behavior snake8 stair-crawl-01 crawl_stairs \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"head_hook_transfer_m":0.040,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
 `crawl_stairs` reads module poses and Isaac stair landmarks from the robot
 graph. It measures the connected-module pitch and derives the bend angle from
 the actual rise. A riser becomes an inclined link followed by an opposite bend
 back onto the tread. When the chain spans two risers, both bend pairs remain
-active simultaneously. Once the third module from the head has full wheel
-support on the current tread, the `v5/v6` TILT pair raises the leading two
-modules toward the next tread while the preceding bend is still moving toward
-the tail. `head_prelift_lookahead_m` requests 80 mm of warning by default; the
-support constraint of the 65 mm fixture reduces the effective start distance
-to about 62 mm. `head_prelift_ramp_m` completes the lift over the following
-40 mm, about 22 mm before nominal head-wheel contact. Each one-link shift is
-divided into
+active simultaneously. When the head reaches the center of its current tread,
+the terminal `v6/v7` TILT pair lifts only that module; the neck remains wheel
+supported and keeps providing traction while the preceding bend moves toward
+the tail. The head stays raised until its wheel reaches the next riser. The
+controller then migrates the bend progressively from `v6/v7` to `v5/v6` over
+`head_hook_transfer_m`, forming the next hook only after the head has support
+available at the edge. `head_prelift_lookahead_m` remains a safety lower bound
+on warning distance: with the 65 mm fixture, the tread-center trigger provides
+about 109 mm. `head_prelift_ramp_m` completes the initial lift over 40 mm. Each
+one-link shift is divided into
 `profile_substeps` posture/traction microsteps (six by default), approximating continuous
 follow-the-leader motion without driving wheels while TILT joints move.
 
@@ -383,7 +385,7 @@ the measured world positions rather than elapsed time:
 ```bash
 run_behavior snake8 stair-straight-01 straighten '{}'
 run_behavior snake8 stair-crawl-01 crawl_stairs \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"head_hook_transfer_m":0.040,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
 The unified obstacle-course policy uses this same `crawl_stairs` program once;
