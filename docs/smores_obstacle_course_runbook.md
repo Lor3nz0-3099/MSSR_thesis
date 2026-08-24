@@ -204,8 +204,10 @@ riser height; it returns to zero at both endpoint profiles, so it does not
 accumulate along the stairs. In addition, `edge_release_lead_m` advances only
 the declining angle of the module leaving each tread edge. Its 12 mm default
 keeps that module's BOTTOM face above the corner without prematurely moving
-the two supporting bends. This local release also returns to zero at each
-endpoint and is applied cyclically to every module and every riser.
+the two supporting bends. The maximum release is held from the midpoint until
+the wheel is seated past the edge, rather than lowering the rear of the module
+during the last microstep. The local correction still reaches the exact
+profile at each endpoint and is applied cyclically to every module and riser.
 
 Each traction phase drives the
 union of wheels supporting the posture before and after the transition. This

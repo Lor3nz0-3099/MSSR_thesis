@@ -360,6 +360,12 @@ def test_edge_release_lead_clears_outgoing_bottom_face_cyclically() -> None:
     baseline_endpoint = _posture_state_at(baseline, "PROFILE_04_06")
     assert endpoint == pytest.approx(baseline_endpoint)
 
+    # Keep the module flat through the late part of both repeated transfers;
+    # the former falling envelope left a small residual edge angle here.
+    for phase in ("PROFILE_00_05", "PROFILE_04_05"):
+        released_state = _posture_state_at(released, phase)
+        assert released_state["m5"] == pytest.approx(0.0)
+
 
 def test_crawl_uses_world_edge_targets_with_temporary_lead() -> None:
     program = SnakeStairGaitPlanner().plan(

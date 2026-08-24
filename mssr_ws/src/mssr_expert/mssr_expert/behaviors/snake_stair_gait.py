@@ -309,11 +309,19 @@ class SnakeStairGaitPlanner:
                 # the supporting bends, returns to the exact endpoint at
                 # both ends of the micro-cycle, and repeats for every module
                 # crossing every riser.
+                # Once the outgoing module reaches the middle of the
+                # transfer, keep the maximum release lead until the endpoint.
+                # Letting the envelope fall again in the second half left the
+                # rear of an otherwise seated module a few millimetres below
+                # the tread edge during CRAWL_*_05.
+                release_envelope = math.sin(
+                    math.pi * min(fraction, 0.5)
+                )
                 release_fraction = min(
                     1.0,
                     posture_fraction
                     + edge_release_lead
-                    * math.sin(math.pi * fraction)
+                    * release_envelope
                     / spacing,
                 )
                 for stair_index in range(
