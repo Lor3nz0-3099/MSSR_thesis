@@ -166,6 +166,24 @@ run_behavior snake8 stair-crawl-01 crawl_stairs \
   '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"head_hook_transfer_m":0.040,"head_overstep_clearance_m":0.010,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
+The original profile follower above remains available.  The experimental
+SMORES-inspired broad arch wave is a separate behavior, so it can be validated
+without replacing the known baseline:
+
+```bash
+run_behavior snake8 stair-arch-01 crawl_stairs_arch_wave \
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"arch_clearance_m":0.012,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+```
+
+`crawl_stairs_arch_wave` preserves `ARCH_00_*` at exactly the same TILT
+targets as the validated first-riser `PROFILE_00_*` wave.  Starting with the
+second riser it distributes one rise over two links, rather than concentrating
+it in one nearly vertical link.  Halfway through every transfer it adds the
+temporary vertical margin `arch_clearance_m` (12 mm by default), then returns
+to the geometry-derived settled angle at the endpoint.  All eight wheel pairs
+remain commanded and every drive phase still terminates from a live world-X
+goal; the arch wave introduces no locomotion timer.
+
 `crawl_stairs` reads module poses and Isaac stair landmarks from the robot
 graph. It measures the connected-module pitch and derives the bend angle from
 the actual rise. A riser becomes an inclined link followed by an opposite bend

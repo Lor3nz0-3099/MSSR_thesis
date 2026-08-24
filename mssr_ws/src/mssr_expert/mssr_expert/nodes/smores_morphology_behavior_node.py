@@ -563,10 +563,20 @@ class SmoresMorphologyBehaviorNode(Node):
                     )
                 neutral_tilts = self._neutral_tilt_rad_by_module
             program_override = None
-            if command.behavior == "crawl_stairs":
+            if command.behavior in {
+                "crawl_stairs",
+                "crawl_stairs_arch_wave",
+            }:
                 if command.morphology != "snake8":
-                    raise ValueError("crawl_stairs requires snake8")
-                program_override = self._stair_gait_planner.plan(
+                    raise ValueError(
+                        f"{command.behavior} requires snake8"
+                    )
+                planner = (
+                    self._stair_gait_planner.plan_arch_wave
+                    if command.behavior == "crawl_stairs_arch_wave"
+                    else self._stair_gait_planner.plan
+                )
+                program_override = planner(
                     self._latest_robot_graph,
                     self._assignments,
                     command.parameters,

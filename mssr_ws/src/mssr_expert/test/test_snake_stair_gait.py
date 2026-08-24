@@ -399,6 +399,76 @@ def test_default_profile_uses_six_progressive_microsteps() -> None:
     assert "CRAWL_00_06" in phases
 
 
+def test_arch_wave_preserves_the_validated_first_riser_wave() -> None:
+    planner = SnakeStairGaitPlanner()
+    parameters = {
+        "profile_substeps": 6,
+        "transition_clearance_m": 0.0065,
+    }
+    legacy = planner.plan(_graph(), _assignments(), parameters)
+    arch = planner.plan_arch_wave(_graph(), _assignments(), parameters)
+
+    for substep in range(1, 7):
+        assert _posture_state_at(
+            arch, f"ARCH_00_{substep:02d}"
+        ) == pytest.approx(
+            _posture_state_at(legacy, f"PROFILE_00_{substep:02d}")
+        )
+
+
+def test_arch_wave_distributes_upper_rise_over_two_links() -> None:
+    planner = SnakeStairGaitPlanner()
+    program = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+    settled = _posture_state_at(program, "ARCH_01_06")
+    distributed_angle = math.asin(0.065 / (2.0 * 0.07777))
+
+    assert settled["m5"] == pytest.approx(distributed_angle)
+    assert settled["m6"] == pytest.approx(0.0)
+    assert settled["m7"] == pytest.approx(-distributed_angle)
+    assert distributed_angle < 0.5 * math.asin(0.065 / 0.07777)
+
+
+def test_arch_wave_clearance_increases_mid_transfer_arch_only() -> None:
+    planner = SnakeStairGaitPlanner()
+    low = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "arch_clearance_m": 0.004},
+    )
+    high = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "arch_clearance_m": 0.020},
+    )
+
+    low_mid = _posture_state_at(low, "ARCH_01_03")
+    high_mid = _posture_state_at(high, "ARCH_01_03")
+    assert high_mid["m5"] > low_mid["m5"]
+    assert abs(high_mid["m7"]) > abs(low_mid["m7"])
+    assert _posture_state_at(high, "ARCH_01_06") == pytest.approx(
+        _posture_state_at(low, "ARCH_01_06")
+    )
+
+
+def test_arch_wave_keeps_all_wheels_commanded() -> None:
+    program = SnakeStairGaitPlanner().plan_arch_wave(
+        _graph(), _assignments(), {"profile_substeps": 6}
+    )
+    drive = next(
+        step for step in program if step.phase == "ARCH_DRIVE_04_03"
+    )
+
+    assert drive.active_target_roles == tuple(
+        assignment.target_role for assignment in _assignments()
+    )
+    assert drive.duration_s is None
+    assert drive.position_goal is not None
+
+
 def test_plan_rejects_a_snake_not_aligned_with_the_known_stairs() -> None:
     with pytest.raises(SnakeStairGaitError, match="not aligned"):
         SnakeStairGaitPlanner().plan(
@@ -731,4 +801,14 @@ def test_plan_rejects_invalid_runtime_parameters(
             _graph(),
             _assignments(),
             parameters,
+        )
+
+
+@pytest.mark.parametrize("clearance", (0.003, 0.021))
+def test_arch_wave_rejects_invalid_clearance(clearance: float) -> None:
+    with pytest.raises(SnakeStairGaitError, match="arch_clearance_m"):
+        SnakeStairGaitPlanner().plan_arch_wave(
+            _graph(),
+            _assignments(),
+            {"arch_clearance_m": clearance},
         )

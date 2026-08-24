@@ -1,4 +1,4 @@
-"""Deterministic follow-the-leader gait for a serial Snake8 on stairs."""
+"""Deterministic profile-following and arch-wave gaits for Snake8 stairs."""
 
 from __future__ import annotations
 
@@ -86,6 +86,8 @@ class SnakeStairGaitPlanner:
         graph: AttributedRobotGraph,
         assignments: Sequence[AssignedModule],
         parameters: Mapping[str, Any],
+        *,
+        arch_wave: bool = False,
     ) -> tuple[BehaviorProgramStep, ...]:
         timed_parameters = sorted(
             self.TIMED_PARAMETER_NAMES.intersection(parameters)
@@ -127,6 +129,21 @@ class SnakeStairGaitPlanner:
             )
 
         bend_angle = math.asin(staircase.rise_m / spacing)
+        arch_clearance = 0.0
+        if arch_wave:
+            arch_clearance = self._number(
+                parameters,
+                "arch_clearance_m",
+                0.012,
+            )
+            if not 0.004 <= arch_clearance <= 0.020:
+                raise SnakeStairGaitError(
+                    "arch_clearance_m must be in [0.004, 0.020]"
+                )
+            if staircase.rise_m + arch_clearance >= 2.0 * spacing:
+                raise SnakeStairGaitError(
+                    "rise plus arch_clearance_m exceeds two Snake8 links"
+                )
         diagonal_run = math.sqrt(spacing**2 - staircase.rise_m**2)
         horizontal_links = max(
             1,
@@ -256,14 +273,24 @@ class SnakeStairGaitPlanner:
         )
 
         current = tuple(lifted)
-        hooked = self.profile_offsets(
+        hooked = self._gait_offsets(
             phase=0,
             stair_count=len(staircase.top_heights_m),
             stride=stride,
             bend_angle=bend_angle,
+            arch_wave=arch_wave,
+            upper_bend_angle=self._distributed_rise_angle(
+                staircase.rise_m,
+                spacing,
+            ),
         )
         steps.append(
-            self._posture("CONFORM_PROFILE_00", current, hooked, ordered)
+            self._posture(
+                "CONFORM_ARCH_00" if arch_wave else "CONFORM_PROFILE_00",
+                current,
+                hooked,
+                ordered,
+            )
         )
         current = hooked
         base_current = hooked
@@ -278,18 +305,27 @@ class SnakeStairGaitPlanner:
                 "profile-substep distance"
             )
         for phase in range(final_phase):
-            following = self.profile_offsets(
+            following = self._gait_offsets(
                 phase=phase + 1,
                 stair_count=len(staircase.top_heights_m),
                 stride=stride,
                 bend_angle=bend_angle,
+                arch_wave=arch_wave,
+                upper_bend_angle=self._distributed_rise_angle(
+                    staircase.rise_m,
+                    spacing,
+                ),
             )
-            active_roles = self._stable_support_roles(
-                phase,
-                phase + 1,
-                len(staircase.top_heights_m),
-                stride,
-                ordered,
+            active_roles = (
+                tuple(item.target_role for item in ordered)
+                if arch_wave
+                else self._stable_support_roles(
+                    phase,
+                    phase + 1,
+                    len(staircase.top_heights_m),
+                    stride,
+                    ordered,
+                )
             )
             segment_start = base_current
             for substep in range(1, substeps + 1):
@@ -303,10 +339,39 @@ class SnakeStairGaitPlanner:
                     1.0,
                     fraction + edge_lead_m / spacing,
                 )
-                target = [
-                    start + posture_fraction * (end - start)
-                    for start, end in zip(segment_start, following)
-                ]
+                if arch_wave:
+                    lifted_rise = staircase.rise_m + (
+                        arch_clearance * math.sin(math.pi * fraction)
+                    )
+                    lifted_angle = self._distributed_rise_angle(
+                        lifted_rise,
+                        spacing,
+                    )
+                    arch_start = self._gait_offsets(
+                        phase=phase,
+                        stair_count=len(staircase.top_heights_m),
+                        stride=stride,
+                        bend_angle=bend_angle,
+                        arch_wave=True,
+                        upper_bend_angle=lifted_angle,
+                    )
+                    arch_end = self._gait_offsets(
+                        phase=phase + 1,
+                        stair_count=len(staircase.top_heights_m),
+                        stride=stride,
+                        bend_angle=bend_angle,
+                        arch_wave=True,
+                        upper_bend_angle=lifted_angle,
+                    )
+                    target = [
+                        start + posture_fraction * (end - start)
+                        for start, end in zip(arch_start, arch_end)
+                    ]
+                else:
+                    target = [
+                        start + posture_fraction * (end - start)
+                        for start, end in zip(segment_start, following)
+                    ]
                 release_fraction = min(
                     1.0,
                     posture_fraction
@@ -319,7 +384,8 @@ class SnakeStairGaitPlanner:
                 # the second (or a later) riser a little sooner.  This targets
                 # the upper-edge BOTTOM-face jam without changing CRAWL_00_*.
                 for stair_index in range(
-                    1, len(staircase.top_heights_m)
+                    1 if not arch_wave else len(staircase.top_heights_m),
+                    len(staircase.top_heights_m),
                 ):
                     outgoing_edge = (
                         self.INITIAL_RISER_EDGE
@@ -337,7 +403,8 @@ class SnakeStairGaitPlanner:
                         start + release_fraction * (end - start)
                     )
                 for stair_index in range(
-                    1, len(staircase.top_heights_m)
+                    1 if not arch_wave else len(staircase.top_heights_m),
+                    len(staircase.top_heights_m),
                 ):
                     terminal_preview, shoulder_preview = (
                         self._head_preview_angles(
@@ -374,7 +441,8 @@ class SnakeStairGaitPlanner:
                         shoulder_preview
                     )
                 target_tuple = tuple(target)
-                label = f"PROFILE_{phase:02d}_{substep:02d}"
+                prefix = "ARCH" if arch_wave else "PROFILE"
+                label = f"{prefix}_{phase:02d}_{substep:02d}"
                 steps.append(
                     self._posture(label, current, target_tuple, ordered)
                 )
@@ -387,7 +455,11 @@ class SnakeStairGaitPlanner:
                 )
                 steps.append(
                     BehaviorProgramStep(
-                        phase=f"CRAWL_{phase:02d}_{substep:02d}",
+                        phase=(
+                            f"ARCH_DRIVE_{phase:02d}_{substep:02d}"
+                            if arch_wave
+                            else f"CRAWL_{phase:02d}_{substep:02d}"
+                        ),
                         linear_m_s=crawl_speed,
                         active_target_roles=active_roles,
                         position_goal=LongitudinalPositionGoal(
@@ -428,6 +500,20 @@ class SnakeStairGaitPlanner:
             )
         )
         return tuple(steps)
+
+    def plan_arch_wave(
+        self,
+        graph: AttributedRobotGraph,
+        assignments: Sequence[AssignedModule],
+        parameters: Mapping[str, Any],
+    ) -> tuple[BehaviorProgramStep, ...]:
+        """Plan the experimental broad arch gait without changing legacy gait."""
+        return self.plan(
+            graph,
+            assignments,
+            parameters,
+            arch_wave=True,
+        )
 
     def _head_preview_angles(
         self,
@@ -555,6 +641,75 @@ class SnakeStairGaitPlanner:
                 offsets[edge] += bend_angle
                 offsets[edge + 1] -= bend_angle
         return tuple(offsets)
+
+    def arch_wave_offsets(
+        self,
+        *,
+        phase: int,
+        stair_count: int,
+        stride: int,
+        legacy_bend_angle: float,
+        upper_bend_angle: float,
+    ) -> tuple[float, ...]:
+        """Return a moving two-link arch while preserving the first riser.
+
+        The original profile concentrates one complete stair rise between two
+        consecutive TILT joints.  For upper risers this gait distributes the
+        same rise over two links: ``+angle, 0, -angle``.  During a transfer the
+        caller temporarily increases ``upper_bend_angle`` to carry module
+        bodies over the edge rather than conforming tightly to it.
+        """
+        offsets = [0.0] * self.MODULE_COUNT
+        for stair_index in range(stair_count):
+            edge = self.INITIAL_RISER_EDGE + stride * stair_index - phase
+            if stair_index == 0:
+                if 0 <= edge <= self.MODULE_COUNT - 3:
+                    offsets[edge] += legacy_bend_angle
+                    offsets[edge + 1] -= legacy_bend_angle
+                continue
+            if 1 <= edge <= self.MODULE_COUNT - 2:
+                offsets[edge - 1] += upper_bend_angle
+                offsets[edge + 1] -= upper_bend_angle
+            elif edge == 0:
+                # At the tail boundary there is no second lower link left.
+                # Finish the transfer with the already validated sharp pair.
+                offsets[0] += legacy_bend_angle
+                offsets[1] -= legacy_bend_angle
+        return tuple(offsets)
+
+    def _gait_offsets(
+        self,
+        *,
+        phase: int,
+        stair_count: int,
+        stride: int,
+        bend_angle: float,
+        arch_wave: bool,
+        upper_bend_angle: float,
+    ) -> tuple[float, ...]:
+        if arch_wave:
+            return self.arch_wave_offsets(
+                phase=phase,
+                stair_count=stair_count,
+                stride=stride,
+                legacy_bend_angle=bend_angle,
+                upper_bend_angle=upper_bend_angle,
+            )
+        return self.profile_offsets(
+            phase=phase,
+            stair_count=stair_count,
+            stride=stride,
+            bend_angle=bend_angle,
+        )
+
+    @staticmethod
+    def _distributed_rise_angle(rise_m: float, spacing_m: float) -> float:
+        ratio = rise_m / (2.0 * spacing_m)
+        if not 0.0 <= ratio < 1.0:
+            raise SnakeStairGaitError(
+                "Distributed stair rise exceeds two Snake8 links"
+            )
+        return math.asin(ratio)
 
     def _posture(
         self,
