@@ -82,6 +82,19 @@ def _graph(*, lateral_step_m: float = 0.0) -> AttributedRobotGraph:
     )
 
 
+def _posture_state_at(
+    program: tuple[BehaviorProgramStep, ...],
+    phase: str,
+) -> dict[str, float]:
+    state = {f"m{index}": 0.0 for index in range(8)}
+    for step in program:
+        for target in step.posture_targets:
+            state[target.module_id] = target.angle_rad
+        if step.phase == phase:
+            return state
+    raise AssertionError(f"Missing program phase {phase}")
+
+
 def test_uniform_staircase_recognizes_the_shared_course_geometry() -> None:
     stairs = UniformStaircase.from_course(_course())
 
@@ -111,36 +124,68 @@ def test_next_riser_lifts_head_then_migrates_hook_after_contact() -> None:
         _assignments(),
         {"profile_substeps": 6, "transition_clearance_m": 0.0065},
     )
-    before = next(step for step in program if step.phase == "PROFILE_00_01")
-    start = next(step for step in program if step.phase == "PROFILE_00_02")
-    lifted = next(step for step in program if step.phase == "PROFILE_00_05")
-    hook = next(step for step in program if step.phase == "PROFILE_01_04")
-    merged = next(step for step in program if step.phase == "PROFILE_02_03")
-    start_targets = {
-        target.module_id: target.angle_rad
-        for target in start.posture_targets
-    }
-    lifted_targets = {
-        target.module_id: target.angle_rad
-        for target in lifted.posture_targets
-    }
-    hook_targets = {
-        target.module_id: target.angle_rad
-        for target in hook.posture_targets
-    }
+    before_targets = _posture_state_at(program, "PROFILE_00_06")
+    start_targets = _posture_state_at(program, "PROFILE_01_01")
+    lifted_targets = _posture_state_at(program, "PROFILE_01_04")
+    hook_targets = _posture_state_at(program, "PROFILE_01_05")
+    merged_targets = _posture_state_at(program, "PROFILE_02_06")
     angle = math.asin(0.065 / 0.07777)
     clearance_angle = math.asin((0.065 + 0.010) / 0.07777)
 
-    assert all(target.module_id != "m7" for target in before.posture_targets)
+    assert before_targets["m7"] == pytest.approx(0.0)
     assert start_targets["m6"] > 0.0
     assert start_targets["m7"] < 0.0
     assert lifted_targets["m6"] == pytest.approx(clearance_angle)
     assert lifted_targets["m7"] == pytest.approx(-clearance_angle)
     assert hook_targets["m5"] > 0.0
     assert hook_targets["m7"] > -clearance_angle
-    assert all(
-        target.module_id not in {"m5", "m6", "m7"}
-        for target in merged.posture_targets
+    assert merged_targets["m5"] == pytest.approx(angle)
+    assert merged_targets["m6"] == pytest.approx(-angle)
+    assert merged_targets["m7"] == pytest.approx(0.0)
+
+    support_drive = next(
+        step for step in program if step.phase == "CRAWL_00_06"
+    )
+    assert support_drive.position_goal is not None
+    assert support_drive.position_goal.module_id == "m5"
+    assert (
+        support_drive.position_goal.target_x_m
+        - support_drive.position_goal.tolerance_m
+        > 0.65 + 0.03106
+    )
+
+
+def test_head_overstep_cycle_repeats_for_third_riser() -> None:
+    program = SnakeStairGaitPlanner().plan(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+    before_targets = _posture_state_at(program, "PROFILE_04_06")
+    start_targets = _posture_state_at(program, "PROFILE_05_01")
+    lifted_targets = _posture_state_at(program, "PROFILE_05_04")
+    hook_targets = _posture_state_at(program, "PROFILE_05_05")
+    clearance_angle = math.asin((0.065 + 0.010) / 0.07777)
+
+    assert before_targets["m5"] == pytest.approx(0.0)
+    assert before_targets["m6"] == pytest.approx(0.0)
+    assert before_targets["m7"] == pytest.approx(0.0)
+    assert start_targets["m6"] > 0.0
+    assert start_targets["m7"] < 0.0
+    assert lifted_targets["m6"] == pytest.approx(clearance_angle)
+    assert lifted_targets["m7"] == pytest.approx(-clearance_angle)
+    assert hook_targets["m5"] > 0.0
+    assert hook_targets["m7"] > -clearance_angle
+
+    support_drive = next(
+        step for step in program if step.phase == "CRAWL_04_06"
+    )
+    assert support_drive.position_goal is not None
+    assert support_drive.position_goal.module_id == "m5"
+    assert (
+        support_drive.position_goal.target_x_m
+        - support_drive.position_goal.tolerance_m
+        > 0.93 + 0.03106
     )
 
 
@@ -273,8 +318,8 @@ def test_transition_lead_straightens_front_and_moves_bend_rearward() -> None:
     assert endpoint_targets["m3"] == pytest.approx(angle)
     assert endpoint_targets["m4"] == pytest.approx(-angle)
     assert endpoint_targets["m5"] == pytest.approx(0.0)
-    assert endpoint_targets["m6"] > 0.0
-    assert endpoint_targets["m7"] < 0.0
+    assert "m6" not in endpoint_targets
+    assert "m7" not in endpoint_targets
 
 
 def test_crawl_uses_world_edge_targets_with_temporary_lead() -> None:

@@ -281,6 +281,7 @@ class SnakeStairGaitPlanner:
             for substep in range(1, substeps + 1):
                 fraction = substep / substeps
                 wave_progress = phase + fraction
+                settled_wave_progress = phase + (substep - 1) / substeps
                 edge_lead_m = transition_clearance * math.sin(
                     math.pi * fraction
                 )
@@ -297,13 +298,16 @@ class SnakeStairGaitPlanner:
                 ):
                     terminal_preview, shoulder_preview = (
                         self._head_preview_angles(
-                            wave_progress=wave_progress,
+                            wave_progress=settled_wave_progress,
                             profile_progress=phase + posture_fraction,
                             stair_index=stair_index,
                             stride=stride,
                             tread_depth_m=staircase.tread_depth_m,
                             spacing_m=spacing,
                             wheel_radius_m=wheel_radius,
+                            support_guard_m=(
+                                transition_clearance + crawl_tolerance
+                            ),
                             lookahead_m=head_prelift_lookahead,
                             ramp_m=head_prelift_ramp,
                             hook_transfer_m=head_hook_transfer,
@@ -392,6 +396,7 @@ class SnakeStairGaitPlanner:
         tread_depth_m: float,
         spacing_m: float,
         wheel_radius_m: float,
+        support_guard_m: float,
         lookahead_m: float,
         ramp_m: float,
         hook_transfer_m: float,
@@ -406,12 +411,12 @@ class SnakeStairGaitPlanner:
         lookahead_progress = head_contact_progress - (
             lookahead_m / spacing_m
         )
-        head_at_tread_center_progress = tread_start + (
-            0.5 * tread_depth_m + wheel_radius_m - 2.0 * spacing_m
-        ) / spacing_m
-        preview_start = min(
+        support_fully_on_tread_progress = tread_start + (
+            (2.0 * wheel_radius_m + support_guard_m) / spacing_m
+        )
+        preview_start = max(
             lookahead_progress,
-            head_at_tread_center_progress,
+            support_fully_on_tread_progress,
         )
         lift = self._clamp01(
             (wave_progress - preview_start) * spacing_m / ramp_m
@@ -424,10 +429,11 @@ class SnakeStairGaitPlanner:
         terminal_preview = (
             lift_bend_angle_rad * lift * (1.0 - hook_transfer)
         )
-        desired_shoulder_hook = lift_bend_angle_rad * lift * hook_transfer
 
         # Cross-fade the migrated hook into the ordinary edge-5 profile
-        # instead of adding the same bend twice when the wave catches up.
+        # instead of adding the same bend twice when the wave catches up.  As
+        # that natural bend grows, remove the temporary overstep clearance so
+        # the neck wheel settles back onto the tread before the next cycle.
         natural_entry = (
             self.INITIAL_RISER_EDGE
             + stride * stair_index
@@ -435,6 +441,12 @@ class SnakeStairGaitPlanner:
         )
         natural = self._clamp01(
             profile_progress - (natural_entry - 1.0)
+        )
+        settled_hook_angle = lift_bend_angle_rad - natural * (
+            lift_bend_angle_rad - normal_bend_angle_rad
+        )
+        desired_shoulder_hook = (
+            settled_hook_angle * lift * hook_transfer
         )
         shoulder_preview = max(
             0.0,

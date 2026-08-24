@@ -170,15 +170,18 @@ run_behavior snake8 stair-crawl-01 crawl_stairs \
 graph. It measures the connected-module pitch and derives the bend angle from
 the actual rise. A riser becomes an inclined link followed by an opposite bend
 back onto the tread. When the chain spans two risers, both bend pairs remain
-active simultaneously. When the head reaches the center of its current tread,
-the terminal `v6/v7` TILT pair lifts only that module; the neck remains wheel
-supported and keeps providing traction while the preceding bend moves toward
-the tail. The head stays raised until its wheel reaches the next riser. The
-controller then migrates the bend progressively from `v6/v7` to `v5/v6` over
+active simultaneously. The terminal `v6/v7` TILT pair lifts only the head
+after the preceding support wheel is completely beyond the tread edge; the
+neck remains wheel-supported and keeps providing traction while the preceding
+bend moves toward the tail. The trigger uses the world-X goal completed by the
+previous traction microstep, rather than the future theoretical wave pose. The
+head stays raised until its wheel reaches the next riser. The controller then
+migrates the bend progressively from `v6/v7` to `v5/v6` over
 `head_hook_transfer_m`, forming the next hook only after the head has support
-available at the edge. `head_prelift_lookahead_m` remains a safety lower bound
-on warning distance: with the 65 mm fixture, the tread-center trigger provides
-about 109 mm. `head_prelift_ramp_m` completes the initial lift over 40 mm.
+available at the edge. `head_prelift_lookahead_m` bounds how late the lift may
+start; on the 65 mm fixture, full support is the stricter condition and leaves
+about 52 mm before nominal contact after including transition clearance and
+goal tolerance. `head_prelift_ramp_m` completes the initial lift over 40 mm.
 `head_overstep_clearance_m` temporarily adds 10 mm to the measured rise, so
 the leading link reaches about 75 degrees and keeps the head underside above
 the next tread edge.  The extra angle migrates one joint rearward and then
