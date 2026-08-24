@@ -189,7 +189,12 @@ defaults therefore scale with live module and stair metadata; each may still
 be overridden for an experiment.  `ARCH_HEAD_GATE_01`, then `_02`, stop from
 the live world-X pose of `snake_head` at each upcoming riser minus that
 lookahead; the prelift is therefore not inferred from a timer or from the pose
-of an internal edge module.  Combined broad-arch and terminal-hook
+of an internal edge module.  Once that head goal has crossed the riser, the
+temporary v5/v7 preview is released: the ordinary arch migrates its descending
+bend rearward, returns the head TILT to neutral and lowers its wheels onto the
+new tread.  This landing release is repeated at every upper riser and prevents
+the preview arch from accumulating on top of the moving chain profile.
+Combined broad-arch and terminal-hook
 targets are bounded by the smallest live TILT actuator limit, with a 0.03 rad
 default safety margin, instead of relying on Isaac-side saturation.  All eight
 wheel pairs remain commanded and every drive phase still terminates from a

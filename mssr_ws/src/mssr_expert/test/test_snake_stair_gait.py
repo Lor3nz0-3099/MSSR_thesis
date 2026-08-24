@@ -432,6 +432,33 @@ def test_arch_wave_distributes_upper_rise_over_two_links() -> None:
     assert distributed_angle < 0.5 * math.asin(0.065 / 0.07777)
 
 
+def test_arch_wave_releases_head_arch_onto_upper_tread() -> None:
+    planner = SnakeStairGaitPlanner()
+    program = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+    hooked = _posture_state_at(program, "ARCH_01_06")
+    landing = _posture_state_at(program, "ARCH_02_01")
+    landed = _posture_state_at(program, "ARCH_02_06")
+    distributed_angle = math.asin(0.065 / (2.0 * 0.07777))
+
+    # At contact the temporary terminal v5/v7 arch is still present.  On the
+    # next measured microstep it is released, the descending bend migrates to
+    # v6 and the head joint v7 returns progressively to its neutral value.
+    assert hooked["m5"] == pytest.approx(distributed_angle)
+    assert hooked["m6"] == pytest.approx(0.0)
+    assert hooked["m7"] == pytest.approx(-distributed_angle)
+    assert landing["m5"] < hooked["m5"]
+    assert landing["m6"] < 0.0
+    assert abs(landing["m7"]) < abs(hooked["m7"])
+    assert landed["m4"] == pytest.approx(distributed_angle)
+    assert landed["m5"] == pytest.approx(0.0)
+    assert landed["m6"] == pytest.approx(-distributed_angle)
+    assert landed["m7"] == pytest.approx(0.0)
+
+
 def test_arch_wave_prelifts_head_before_each_upper_riser() -> None:
     program = SnakeStairGaitPlanner().plan_arch_wave(
         _graph(),

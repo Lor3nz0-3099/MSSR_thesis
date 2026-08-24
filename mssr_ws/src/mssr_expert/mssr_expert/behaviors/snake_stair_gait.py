@@ -693,6 +693,14 @@ class SnakeStairGaitPlanner:
         head_contact_progress = tread_start + (
             tread_depth_m - 2.0 * spacing_m
         ) / spacing_m
+        preview_complete_progress = math.ceil(head_contact_progress)
+        if wave_progress > preview_complete_progress:
+            # The head wheel has crossed the riser under a live world-X goal.
+            # Stop pinning the terminal v5/v7 arch: the ordinary moving arch
+            # now carries the bend rearward, lowers v7 onto the tread and
+            # restores its wheel contact.  Keeping this preview alive would
+            # superimpose it on the natural arch and lift the head again.
+            return None
         support_fully_on_tread_progress = tread_start + (
             (2.0 * wheel_radius_m + support_guard_m) / spacing_m
         )
@@ -716,7 +724,7 @@ class SnakeStairGaitPlanner:
         # This leaves the ordinary +A,0,-A arch as the settled profile.
         available_transfer_m = max(
             1e-6,
-            math.ceil(head_contact_progress) * spacing_m
+            preview_complete_progress * spacing_m
             - head_contact_progress * spacing_m,
         )
         transfer_distance_m = min(
