@@ -172,17 +172,37 @@ without replacing the known baseline:
 
 ```bash
 run_behavior snake8 stair-arch-01 crawl_stairs_arch_wave \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"arch_clearance_m":0.012,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
 `crawl_stairs_arch_wave` preserves `ARCH_00_*` at exactly the same TILT
 targets as the validated first-riser `PROFILE_00_*` wave.  Starting with the
 second riser it distributes one rise over two links, rather than concentrating
 it in one nearly vertical link.  Halfway through every transfer it adds the
-temporary vertical margin `arch_clearance_m` (12 mm by default), then returns
-to the geometry-derived settled angle at the endpoint.  All eight wheel pairs
-remain commanded and every drive phase still terminates from a live world-X
-goal; the arch wave introduces no locomotion timer.
+temporary vertical margin `arch_clearance_m`, then returns
+to the geometry-derived settled angle at the endpoint.  Before each upper
+riser, the terminal module is raised by a recurring v6/v7 hook and the hook is
+then cross-faded into the broad v5/v7 arch.  The default lookahead is one
+measured chain link plus the transition margin; its ramp is half a measured
+link and its temporary arch clearance is 40% of the wheel radius.  These
+defaults therefore scale with live module and stair metadata; each may still
+be overridden for an experiment.  `ARCH_HEAD_GATE_01`, then `_02`, stop from
+the live world-X pose of `snake_head` at each upcoming riser minus that
+lookahead; the prelift is therefore not inferred from a timer or from the pose
+of an internal edge module.  Combined broad-arch and terminal-hook
+targets are bounded by the smallest live TILT actuator limit, with a 0.03 rad
+default safety margin, instead of relying on Isaac-side saturation.  All eight
+wheel pairs remain commanded and every drive phase still terminates from a
+live world-X goal; the arch wave introduces no locomotion timer.
+
+This is dimension-parametric within its declared model, not yet a universal
+stair controller.  It currently requires an eight-module chain aligned with
+uniform stairs in world +X and rejects non-uniform rises.  It reads the first
+riser, tread depth, top heights, wheel radius and live link spacing instead of
+embedding the coordinates of the test fixture.  Supporting variable rises,
+curved approaches or an unknown stair heading requires a more general course
+observation and is intentionally left explicit rather than hidden behind
+fixture-specific constants.
 
 `crawl_stairs` reads module poses and Isaac stair landmarks from the robot
 graph. It measures the connected-module pitch and derives the bend angle from

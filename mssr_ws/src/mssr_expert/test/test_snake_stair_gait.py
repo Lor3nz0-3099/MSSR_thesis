@@ -432,6 +432,76 @@ def test_arch_wave_distributes_upper_rise_over_two_links() -> None:
     assert distributed_angle < 0.5 * math.asin(0.065 / 0.07777)
 
 
+def test_arch_wave_prelifts_head_before_each_upper_riser() -> None:
+    program = SnakeStairGaitPlanner().plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+
+    first_riser_done = _posture_state_at(program, "ARCH_00_06")
+    second_riser_preview = _posture_state_at(program, "ARCH_01_01")
+    third_riser_preview = _posture_state_at(program, "ARCH_05_01")
+
+    # The validated first-riser wave remains unchanged.  Immediately after
+    # it, the terminal v6/v7 pair raises the head before its wheel envelope
+    # reaches the second riser.  The same geometric gate repeats one tread
+    # later for the third riser.
+    assert first_riser_done["m6"] == pytest.approx(0.0)
+    assert first_riser_done["m7"] == pytest.approx(0.0)
+    assert second_riser_preview["m6"] > 0.0
+    assert second_riser_preview["m7"] < 0.0
+    assert third_riser_preview["m6"] > 0.0
+    assert third_riser_preview["m7"] < 0.0
+    assert all(
+        abs(target.angle_rad) <= math.pi / 2.0 - 0.030 + 1e-9
+        for step in program
+        for target in step.posture_targets
+    )
+
+    second_gate = next(
+        step for step in program if step.phase == "ARCH_HEAD_GATE_01"
+    )
+    third_gate = next(
+        step for step in program if step.phase == "ARCH_HEAD_GATE_02"
+    )
+    assert second_gate.position_goal is not None
+    assert second_gate.position_goal.module_id == "m7"
+    assert second_gate.position_goal.target_x_m == pytest.approx(
+        0.93 - (0.07777 + 0.0065)
+    )
+    assert third_gate.position_goal is not None
+    assert third_gate.position_goal.module_id == "m7"
+    assert third_gate.position_goal.target_x_m == pytest.approx(
+        1.21 - (0.07777 + 0.0065)
+    )
+
+
+def test_arch_wave_default_margins_scale_from_live_module_geometry() -> None:
+    planner = SnakeStairGaitPlanner()
+    derived = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+    explicit = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {
+            "profile_substeps": 6,
+            "transition_clearance_m": 0.0065,
+            "arch_clearance_m": 0.40 * 0.03106,
+            "head_prelift_lookahead_m": 0.07777 + 0.0065,
+            "head_prelift_ramp_m": 0.5 * 0.07777,
+        },
+    )
+
+    for phase in ("ARCH_01_01", "ARCH_01_03", "ARCH_01_06"):
+        assert _posture_state_at(derived, phase) == pytest.approx(
+            _posture_state_at(explicit, phase)
+        )
+
+
 def test_arch_wave_clearance_increases_mid_transfer_arch_only() -> None:
     planner = SnakeStairGaitPlanner()
     low = planner.plan_arch_wave(
@@ -445,8 +515,10 @@ def test_arch_wave_clearance_increases_mid_transfer_arch_only() -> None:
         {"profile_substeps": 6, "arch_clearance_m": 0.020},
     )
 
-    low_mid = _posture_state_at(low, "ARCH_01_03")
-    high_mid = _posture_state_at(high, "ARCH_01_03")
+    # Just after peak terminal lift, the broad overlay is no longer bounded
+    # by the shared TILT safety limit and exposes the requested clearance.
+    low_mid = _posture_state_at(low, "ARCH_01_04")
+    high_mid = _posture_state_at(high, "ARCH_01_04")
     assert high_mid["m5"] > low_mid["m5"]
     assert abs(high_mid["m7"]) > abs(low_mid["m7"])
     assert _posture_state_at(high, "ARCH_01_06") == pytest.approx(

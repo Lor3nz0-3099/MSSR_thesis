@@ -109,6 +109,25 @@ class SnakeStairGaitPlanner:
         positions = self._ordered_positions(graph, ordered)
         spacing = self._link_spacing(positions)
         wheel_radius = self._wheel_radius(graph)
+        usable_tilt_limit = math.inf
+        if arch_wave:
+            tilt_limit_margin = self._number(
+                parameters,
+                "tilt_limit_margin_rad",
+                0.030,
+            )
+            if not 0.0 <= tilt_limit_margin <= 0.15:
+                raise SnakeStairGaitError(
+                    "tilt_limit_margin_rad must be in [0.0, 0.15]"
+                )
+            usable_tilt_limit = (
+                self._symmetric_tilt_limit(graph, ordered)
+                - tilt_limit_margin
+            )
+            if usable_tilt_limit <= 0.0:
+                raise SnakeStairGaitError(
+                    "SMORES TILT limits leave no usable stair range"
+                )
         if staircase.rise_m >= spacing:
             raise SnakeStairGaitError("Stair rise exceeds one Snake8 link")
         heading = math.atan2(
@@ -134,7 +153,7 @@ class SnakeStairGaitPlanner:
             arch_clearance = self._number(
                 parameters,
                 "arch_clearance_m",
-                0.012,
+                0.40 * wheel_radius,
             )
             if not 0.004 <= arch_clearance <= 0.020:
                 raise SnakeStairGaitError(
@@ -188,7 +207,7 @@ class SnakeStairGaitPlanner:
         head_prelift_lookahead = self._number(
             parameters,
             "head_prelift_lookahead_m",
-            0.080,
+            spacing + transition_clearance,
         )
         if not 0.040 <= head_prelift_lookahead <= 0.150:
             raise SnakeStairGaitError(
@@ -197,7 +216,7 @@ class SnakeStairGaitPlanner:
         head_prelift_ramp = self._number(
             parameters,
             "head_prelift_ramp_m",
-            0.040,
+            max(wheel_radius, 0.5 * spacing),
         )
         if not 0.010 <= head_prelift_ramp <= head_prelift_lookahead:
             raise SnakeStairGaitError(
@@ -403,9 +422,54 @@ class SnakeStairGaitPlanner:
                         start + release_fraction * (end - start)
                     )
                 for stair_index in range(
-                    1 if not arch_wave else len(staircase.top_heights_m),
-                    len(staircase.top_heights_m),
+                    1, len(staircase.top_heights_m)
                 ):
+                    if arch_wave:
+                        arch_preview = self._arch_head_preview_angles(
+                            wave_progress=phase + posture_fraction,
+                            stair_index=stair_index,
+                            stride=stride,
+                            tread_depth_m=staircase.tread_depth_m,
+                            spacing_m=spacing,
+                            wheel_radius_m=wheel_radius,
+                            support_guard_m=(
+                                transition_clearance + crawl_tolerance
+                            ),
+                            lookahead_m=head_prelift_lookahead,
+                            ramp_m=head_prelift_ramp,
+                            hook_transfer_m=head_hook_transfer,
+                            distributed_bend_angle_rad=(
+                                self._distributed_rise_angle(
+                                    staircase.rise_m,
+                                    spacing,
+                                )
+                            ),
+                            lift_bend_angle_rad=head_lift_angle,
+                        )
+                        if arch_preview is not None:
+                            # The terminal hook is an absolute local profile,
+                            # not an addition to the broad arch.  Overwriting
+                            # these three free joints prevents double bends
+                            # while it migrates v6/v7 -> v5/v7.
+                            broad = max(
+                                target[self.MODULE_COUNT - 3],
+                                arch_preview[0],
+                            )
+                            terminal = arch_preview[1]
+                            # Keep the opposing terminal target inside the
+                            # live SMORES TILT range.  Preserve the head lift
+                            # first and trim only the temporary broad overlay;
+                            # that overlay returns as the hook migrates.
+                            broad = min(
+                                broad,
+                                max(0.0, usable_tilt_limit - terminal),
+                            )
+                            target[self.MODULE_COUNT - 3 :] = [
+                                broad,
+                                terminal,
+                                -(broad + terminal),
+                            ]
+                        continue
                     terminal_preview, shoulder_preview = (
                         self._head_preview_angles(
                             wave_progress=settled_wave_progress,
@@ -428,18 +492,10 @@ class SnakeStairGaitPlanner:
                     # First lift only the terminal module with the v6/v7
                     # pair, leaving v6 wheel-supported.  Once the head reaches
                     # the riser, migrate the hook rearward to v5/v6.
-                    target[self.MODULE_COUNT - 2] += (
-                        terminal_preview
-                    )
-                    target[self.MODULE_COUNT - 1] -= (
-                        terminal_preview
-                    )
-                    target[self.MODULE_COUNT - 3] += (
-                        shoulder_preview
-                    )
-                    target[self.MODULE_COUNT - 2] -= (
-                        shoulder_preview
-                    )
+                    target[self.MODULE_COUNT - 2] += terminal_preview
+                    target[self.MODULE_COUNT - 1] -= terminal_preview
+                    target[self.MODULE_COUNT - 3] += shoulder_preview
+                    target[self.MODULE_COUNT - 2] -= shoulder_preview
                 target_tuple = tuple(target)
                 prefix = "ARCH" if arch_wave else "PROFILE"
                 label = f"{prefix}_{phase:02d}_{substep:02d}"
@@ -453,23 +509,48 @@ class SnakeStairGaitPlanner:
                     staircase,
                     ordered,
                 )
+                drive_phase = (
+                    f"ARCH_DRIVE_{phase:02d}_{substep:02d}"
+                    if arch_wave
+                    else f"CRAWL_{phase:02d}_{substep:02d}"
+                )
+                target_x_m = (
+                    riser_x_m
+                    - wheel_radius
+                    + fraction * spacing
+                    - edge_lead_m
+                )
+                if arch_wave and substep == substeps:
+                    # Before each upper riser, stop from the actual world-X
+                    # pose of snake_head rather than inferring its clearance
+                    # from an internal edge module.  The following program
+                    # posture starts the recurring v6/v7 prelift.
+                    upper_stair_index = phase // stride + 1
+                    if (
+                        phase == stride * (upper_stair_index - 1)
+                        and upper_stair_index
+                        < len(staircase.top_heights_m)
+                    ):
+                        reference = ordered[-1]
+                        upper_riser_x_m = (
+                            staircase.first_riser_x_m
+                            + upper_stair_index
+                            * staircase.tread_depth_m
+                        )
+                        target_x_m = (
+                            upper_riser_x_m - head_prelift_lookahead
+                        )
+                        drive_phase = (
+                            f"ARCH_HEAD_GATE_{upper_stair_index:02d}"
+                        )
                 steps.append(
                     BehaviorProgramStep(
-                        phase=(
-                            f"ARCH_DRIVE_{phase:02d}_{substep:02d}"
-                            if arch_wave
-                            else f"CRAWL_{phase:02d}_{substep:02d}"
-                        ),
+                        phase=drive_phase,
                         linear_m_s=crawl_speed,
                         active_target_roles=active_roles,
                         position_goal=LongitudinalPositionGoal(
                             module_id=reference.module_id,
-                            target_x_m=(
-                                riser_x_m
-                                - wheel_radius
-                                + fraction * spacing
-                                - edge_lead_m
-                            ),
+                            target_x_m=target_x_m,
                             tolerance_m=crawl_tolerance,
                         ),
                     )
@@ -582,6 +663,74 @@ class SnakeStairGaitPlanner:
             desired_shoulder_hook - normal_bend_angle_rad * natural,
         )
         return terminal_preview, shoulder_preview
+
+    def _arch_head_preview_angles(
+        self,
+        *,
+        wave_progress: float,
+        stair_index: int,
+        stride: int,
+        tread_depth_m: float,
+        spacing_m: float,
+        wheel_radius_m: float,
+        support_guard_m: float,
+        lookahead_m: float,
+        ramp_m: float,
+        hook_transfer_m: float,
+        distributed_bend_angle_rad: float,
+        lift_bend_angle_rad: float,
+    ) -> list[float] | None:
+        """Lift the live head before an upper riser, then broaden its hook.
+
+        Program drives terminate on measured world-X module positions, so
+        ``wave_progress`` advances only after a geometric barrier is reached.
+        The preview therefore has no time assumption.  Its onset is derived
+        from tread depth, chain spacing, wheel radius and the requested
+        clearance; it repeats for every upper riser.
+        """
+
+        tread_start = stride * (stair_index - 1)
+        head_contact_progress = tread_start + (
+            tread_depth_m - 2.0 * spacing_m
+        ) / spacing_m
+        support_fully_on_tread_progress = tread_start + (
+            (2.0 * wheel_radius_m + support_guard_m) / spacing_m
+        )
+        # Do not alter the already validated first-riser transfer.  At its
+        # endpoint the head still has about one link of geometric lookahead,
+        # after which the terminal module may rise without stealing support
+        # from the modules that are climbing the first edge.
+        preview_start = max(
+            head_contact_progress - lookahead_m / spacing_m,
+            support_fully_on_tread_progress,
+            tread_start + 1.0,
+        )
+        lift = self._clamp01(
+            (wave_progress - preview_start) * spacing_m / ramp_m
+        )
+        if lift <= 0.0:
+            return None
+
+        # Complete the terminal-to-broad cross-fade by the next integer wave
+        # boundary even when the user requests a longer generic hook transfer.
+        # This leaves the ordinary +A,0,-A arch as the settled profile.
+        available_transfer_m = max(
+            1e-6,
+            math.ceil(head_contact_progress) * spacing_m
+            - head_contact_progress * spacing_m,
+        )
+        transfer_distance_m = min(
+            hook_transfer_m,
+            available_transfer_m,
+        )
+        transfer = self._clamp01(
+            (wave_progress - head_contact_progress)
+            * spacing_m
+            / transfer_distance_m
+        )
+        terminal = lift_bend_angle_rad * lift * (1.0 - transfer)
+        broad = distributed_bend_angle_rad * lift * transfer
+        return [broad, terminal, -(broad + terminal)]
 
     @staticmethod
     def _clamp01(value: float) -> float:
@@ -829,6 +978,39 @@ class SnakeStairGaitPlanner:
                 f"Invalid SMORES wheel radius {radius:.4f} m"
             )
         return radius
+
+    @staticmethod
+    def _symmetric_tilt_limit(
+        graph: AttributedRobotGraph,
+        assignments: Sequence[AssignedModule],
+    ) -> float:
+        """Return the smallest observed absolute TILT limit in the chain."""
+
+        nodes = graph.node_by_id()
+        limits: list[float] = []
+        for assignment in assignments:
+            node = nodes.get(assignment.module_id)
+            if node is None:
+                continue
+            actuators = node.attributes.get("actuators")
+            if not isinstance(actuators, Mapping):
+                continue
+            tilt = actuators.get("tilt")
+            if not isinstance(tilt, Mapping):
+                continue
+            try:
+                lower = float(tilt["lower_limit_rad"])
+                upper = float(tilt["upper_limit_rad"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            if math.isfinite(lower) and math.isfinite(upper):
+                limits.append(min(-lower, upper))
+        limit = min(limits, default=0.5 * math.pi)
+        if not 0.5 <= limit <= math.pi:
+            raise SnakeStairGaitError(
+                f"Invalid SMORES TILT limit {limit:.4f} rad"
+            )
+        return limit
 
     @staticmethod
     def _vertex_index(assignment: AssignedModule) -> int:
