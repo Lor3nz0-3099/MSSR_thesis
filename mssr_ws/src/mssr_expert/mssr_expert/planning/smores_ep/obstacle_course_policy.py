@@ -84,6 +84,7 @@ class ObstacleCoursePolicy:
                     "riser_approach_tolerance_m": 0.010,
                     "crawl_goal_tolerance_m": 0.004,
                     "profile_substeps": 3,
+                    "edge_release_lead_m": 0.012,
                     "head_overstep_clearance_m": 0.010,
                     "upper_deck_advance_distance_m": 0.080,
                 },

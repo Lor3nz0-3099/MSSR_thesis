@@ -322,6 +322,45 @@ def test_transition_lead_straightens_front_and_moves_bend_rearward() -> None:
     assert "m7" not in endpoint_targets
 
 
+def test_edge_release_lead_clears_outgoing_bottom_face_cyclically() -> None:
+    planner = SnakeStairGaitPlanner()
+    baseline = planner.plan(
+        _graph(),
+        _assignments(),
+        {
+            "profile_substeps": 6,
+            "transition_clearance_m": 0.0065,
+            "edge_release_lead_m": 0.0,
+        },
+    )
+    released = planner.plan(
+        _graph(),
+        _assignments(),
+        {
+            "profile_substeps": 6,
+            "transition_clearance_m": 0.0065,
+            "edge_release_lead_m": 0.012,
+        },
+    )
+
+    for phase in ("PROFILE_00_03", "PROFILE_04_03"):
+        baseline_state = _posture_state_at(baseline, phase)
+        released_state = _posture_state_at(released, phase)
+        # m5 is the module beyond the active riser in both repeated cycles.
+        # Only its declining edge angle is released ahead of the base wave.
+        assert abs(released_state["m5"]) < abs(baseline_state["m5"])
+        assert released_state["m3"] == pytest.approx(
+            baseline_state["m3"]
+        )
+        assert released_state["m4"] == pytest.approx(
+            baseline_state["m4"]
+        )
+
+    endpoint = _posture_state_at(released, "PROFILE_04_06")
+    baseline_endpoint = _posture_state_at(baseline, "PROFILE_04_06")
+    assert endpoint == pytest.approx(baseline_endpoint)
+
+
 def test_crawl_uses_world_edge_targets_with_temporary_lead() -> None:
     program = SnakeStairGaitPlanner().plan(
         _graph(),
@@ -654,6 +693,7 @@ def test_recognizer_rejects_nonuniform_risers() -> None:
         ({"riser_approach_tolerance_m": 0.001}, "must be in"),
         ({"crawl_goal_tolerance_m": 0.020}, "must be in"),
         ({"transition_clearance_m": 0.020}, "must be in"),
+        ({"edge_release_lead_m": 0.030}, "edge_release_lead_m"),
         ({"head_prelift_lookahead_m": 0.020}, "must be in"),
         (
             {

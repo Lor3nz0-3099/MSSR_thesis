@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>mssr_expert</name>
-  <version>0.7.10</version>
+  <version>0.7.11</version>
   <description>Robot-family-agnostic graph, curriculum, and deterministic expert infrastructure for modular self-reconfigurable robots.</description>
   <maintainer email="lorenzo@todo.todo">lorenzo</maintainer>
   <license>TODO</license>

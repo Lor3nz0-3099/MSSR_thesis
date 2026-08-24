@@ -154,6 +154,15 @@ class SnakeStairGaitPlanner:
             raise SnakeStairGaitError(
                 "transition_clearance_m must be in [0.0, 0.015]"
             )
+        edge_release_lead = self._number(
+            parameters,
+            "edge_release_lead_m",
+            0.012,
+        )
+        if not 0.0 <= edge_release_lead <= 0.025:
+            raise SnakeStairGaitError(
+                "edge_release_lead_m must be in [0.0, 0.025]"
+            )
         head_prelift_lookahead = self._number(
             parameters,
             "head_prelift_lookahead_m",
@@ -293,6 +302,38 @@ class SnakeStairGaitPlanner:
                     start + posture_fraction * (end - start)
                     for start, end in zip(segment_start, following)
                 ]
+                # The module immediately beyond each active riser is the
+                # first body whose BOTTOM face can meet the tread edge while
+                # the bend travels rearward.  Release only that outgoing
+                # angle sooner than the rest of the profile.  This preserves
+                # the supporting bends, returns to the exact endpoint at
+                # both ends of the micro-cycle, and repeats for every module
+                # crossing every riser.
+                release_fraction = min(
+                    1.0,
+                    posture_fraction
+                    + edge_release_lead
+                    * math.sin(math.pi * fraction)
+                    / spacing,
+                )
+                for stair_index in range(
+                    len(staircase.top_heights_m)
+                ):
+                    outgoing_edge = (
+                        self.INITIAL_RISER_EDGE
+                        + stride * stair_index
+                        - phase
+                    )
+                    if not 0 <= outgoing_edge <= self.MODULE_COUNT - 3:
+                        continue
+                    outgoing_module = outgoing_edge + 1
+                    start = segment_start[outgoing_module]
+                    end = following[outgoing_module]
+                    if abs(end) + 1e-9 >= abs(start):
+                        continue
+                    target[outgoing_module] = (
+                        start + release_fraction * (end - start)
+                    )
                 for stair_index in range(
                     1, len(staircase.top_heights_m)
                 ):
