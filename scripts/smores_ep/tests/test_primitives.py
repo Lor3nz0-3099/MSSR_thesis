@@ -1203,6 +1203,10 @@ def test_face_approach_only_recovers_from_material_axis_error() -> None:
         executor._face_staging_pose_controller.position_tolerance_m
         == 0.002
     )
+    assert (
+        executor._face_staging_pose_controller.max_linear_speed_m_s
+        == pytest.approx(0.055)
+    )
     assert executor._face_staging_pose_controller.yaw_tolerance_rad == (
         pytest.approx(math.radians(1.5))
     )
@@ -1276,7 +1280,7 @@ def test_axial_face_pose_adjustment_translates_while_steering() -> None:
     assert subphase == "axial_pose_adjustment"
     assert not ready
     assert runtime.alignment_staging_drive_direction == -1.0
-    assert step.linear_x_m_s < 0.0
+    assert step.linear_x_m_s == pytest.approx(-0.035)
     assert step.angular_z_rad_s > 0.0
     # In the target frame, the signed lateral velocity must oppose the
     # positive 7.2 mm error instead of rotating at a fixed position.

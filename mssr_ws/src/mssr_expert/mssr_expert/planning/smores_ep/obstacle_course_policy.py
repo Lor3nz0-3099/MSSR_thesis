@@ -79,11 +79,12 @@ class ObstacleCoursePolicy:
                 snake,
                 "crawl_stairs",
                 {
-                    "linear_m_s": 0.030,
+                    "linear_m_s": 0.040,
                     "riser_approach_linear_m_s": 0.060,
                     "riser_approach_tolerance_m": 0.010,
                     "crawl_goal_tolerance_m": 0.004,
                     "profile_substeps": 3,
+                    "head_overstep_clearance_m": 0.010,
                     "upper_deck_advance_distance_m": 0.080,
                 },
             ),

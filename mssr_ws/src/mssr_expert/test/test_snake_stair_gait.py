@@ -129,14 +129,15 @@ def test_next_riser_lifts_head_then_migrates_hook_after_contact() -> None:
         for target in hook.posture_targets
     }
     angle = math.asin(0.065 / 0.07777)
+    clearance_angle = math.asin((0.065 + 0.010) / 0.07777)
 
     assert all(target.module_id != "m7" for target in before.posture_targets)
     assert start_targets["m6"] > 0.0
     assert start_targets["m7"] < 0.0
-    assert lifted_targets["m6"] == pytest.approx(angle)
-    assert lifted_targets["m7"] == pytest.approx(-angle)
+    assert lifted_targets["m6"] == pytest.approx(clearance_angle)
+    assert lifted_targets["m7"] == pytest.approx(-clearance_angle)
     assert hook_targets["m5"] > 0.0
-    assert hook_targets["m7"] > -angle
+    assert hook_targets["m7"] > -clearance_angle
     assert all(
         target.module_id not in {"m5", "m6", "m7"}
         for target in merged.posture_targets
@@ -231,6 +232,20 @@ def test_first_crawl_also_drives_wheels_transitioning_over_riser() -> None:
     )
     assert first_crawl.position_goal is not None
     assert first_crawl.position_goal.module_id == "m5"
+
+
+def test_next_riser_crawl_keeps_every_wheel_commanded() -> None:
+    program = SnakeStairGaitPlanner().plan(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6},
+    )
+
+    crawl = next(step for step in program if step.phase == "CRAWL_01_04")
+
+    assert crawl.active_target_roles == tuple(
+        assignment.target_role for assignment in _assignments()
+    )
 
 
 def test_transition_lead_straightens_front_and_moves_bend_rearward() -> None:
@@ -603,6 +618,10 @@ def test_recognizer_rejects_nonuniform_risers() -> None:
             "head_prelift_ramp_m",
         ),
         ({"head_hook_transfer_m": 0.005}, "head_hook_transfer_m"),
+        (
+            {"head_overstep_clearance_m": 0.020},
+            "head_overstep_clearance_m",
+        ),
         ({"profile_substeps": 6, "crawl_goal_tolerance_m": 0.010}, "half"),
         ({"upper_deck_advance_distance_m": 0.010}, "half one link"),
         ({"slip_compensation": 1.5}, "does not accept timed parameters"),

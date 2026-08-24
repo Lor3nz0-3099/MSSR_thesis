@@ -145,6 +145,12 @@ ros2 launch mssr_expert smores_runtime.launch.py \
   performance:=true
 ```
 
+The Isaac assembly executor uses 55 mm/s for collision-aware free-space
+staging and 35 mm/s for the local connector-alignment arc.  The final magnetic
+approach remains limited to 25 mm/s, preserving the validated contact gate.
+These are command-speed changes only; actuator effort, damping, contact
+material and physics frequency are unchanged.
+
 Do not also pass `obstacle_course:=true`; the two physical stages are
 mutually exclusive. Start only the Snake8 self-assembly expert in another
 sourced terminal, using the command in section 1. After assembly, define
@@ -157,7 +163,7 @@ first riser:
 
 ```bash
 run_behavior snake8 stair-crawl-01 crawl_stairs \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"head_hook_transfer_m":0.040,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"head_hook_transfer_m":0.040,"head_overstep_clearance_m":0.010,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
 `crawl_stairs` reads module poses and Isaac stair landmarks from the robot
@@ -172,8 +178,12 @@ controller then migrates the bend progressively from `v6/v7` to `v5/v6` over
 `head_hook_transfer_m`, forming the next hook only after the head has support
 available at the edge. `head_prelift_lookahead_m` remains a safety lower bound
 on warning distance: with the 65 mm fixture, the tread-center trigger provides
-about 109 mm. `head_prelift_ramp_m` completes the initial lift over 40 mm. Each
-one-link shift is divided into
+about 109 mm. `head_prelift_ramp_m` completes the initial lift over 40 mm.
+`head_overstep_clearance_m` temporarily adds 10 mm to the measured rise, so
+the leading link reaches about 75 degrees and keeps the head underside above
+the next tread edge.  The extra angle migrates one joint rearward and then
+cross-fades back to the exact stair-height angle once the wheel has crossed.
+Each one-link shift is divided into
 `profile_substeps` posture/traction microsteps (six by default), approximating continuous
 follow-the-leader motion without driving wheels while TILT joints move.
 
@@ -385,7 +395,7 @@ the measured world positions rather than elapsed time:
 ```bash
 run_behavior snake8 stair-straight-01 straighten '{}'
 run_behavior snake8 stair-crawl-01 crawl_stairs \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.030,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"head_hook_transfer_m":0.040,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"head_hook_transfer_m":0.040,"head_overstep_clearance_m":0.010,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
 ```
 
 The unified obstacle-course policy uses this same `crawl_stairs` program once;

@@ -192,7 +192,7 @@ class IsaacPrimitiveExecutor:
             self._pose_controller,
             max_linear_speed_m_s=min(
                 self._pose_controller.max_linear_speed_m_s,
-                0.045,
+                0.055,
             ),
             position_tolerance_m=0.002,
             yaw_tolerance_rad=face_alignment_staging_yaw_tolerance_rad,
@@ -1821,7 +1821,9 @@ class IsaacPrimitiveExecutor:
             mode = "curve"
 
         if mode == "curve":
-            translation_speed_m_s = 0.025
+            # Keep the local correction slower than free-space staging, but
+            # avoid spending most of an assembly wave on a long 25 mm/s arc.
+            translation_speed_m_s = 0.035
             # Eq. (4)-(5) in Liu et al. controls y' and theta' in the target
             # connector frame with K=diag(2, 1). The helper below is the
             # bounded, nonsingular realization of that law: at the requested
