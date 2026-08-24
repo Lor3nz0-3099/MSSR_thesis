@@ -172,7 +172,7 @@ without replacing the known baseline:
 
 ```bash
 run_behavior snake8 stair-arch-01 crawl_stairs_arch_wave \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"crawl_goal_tolerance_m":0.004}'
 ```
 
 `crawl_stairs_arch_wave` preserves `ARCH_00_*` at exactly the same TILT
@@ -199,6 +199,14 @@ targets are bounded by the smallest live TILT actuator limit, with a 0.03 rad
 default safety margin, instead of relying on Isaac-side saturation.  All eight
 wheel pairs remain commanded and every drive phase still terminates from a
 live world-X goal; the arch wave introduces no locomotion timer.
+
+The final `ARCH_TAIL_LIFT_COMPLETE` phase stops when the module adjacent to
+the tail is one measured wheel radius beyond the last riser.  At that point
+the final posture has already lifted the tail onto the top-deck elevation, so
+the arch-wave completes without an extra traction-only run.  An optional
+`upper_deck_advance_distance_m` greater than zero remains available for
+experiments, but is deliberately disabled by default; ordinary train/Nav2
+locomotion should perform any subsequent top-deck travel.
 
 This is dimension-parametric within its declared model, not yet a universal
 stair controller.  It currently requires an eight-module chain aligned with

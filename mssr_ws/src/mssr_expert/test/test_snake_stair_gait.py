@@ -568,6 +568,35 @@ def test_arch_wave_keeps_all_wheels_commanded() -> None:
     assert drive.position_goal is not None
 
 
+def test_arch_wave_finishes_after_geometric_tail_lift() -> None:
+    planner = SnakeStairGaitPlanner()
+    program = planner.plan_arch_wave(
+        _graph(), _assignments(), {"profile_substeps": 6}
+    )
+
+    final_drive = program[-1]
+    assert final_drive.phase == "ARCH_TAIL_LIFT_COMPLETE"
+    assert final_drive.position_goal is not None
+    assert final_drive.position_goal.module_id == "m1"
+    assert final_drive.position_goal.target_x_m == pytest.approx(
+        1.21 + 0.03106
+    )
+    assert not any(
+        step.phase == "UPPER_DECK_ADVANCE" for step in program
+    )
+
+    with_advance = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {
+            "profile_substeps": 6,
+            "upper_deck_advance_distance_m": 0.080,
+        },
+    )
+    assert with_advance[-2].phase == "ARCH_TAIL_LIFT_COMPLETE"
+    assert with_advance[-1].phase == "UPPER_DECK_ADVANCE"
+
+
 def test_plan_rejects_a_snake_not_aligned_with_the_known_stairs() -> None:
     with pytest.raises(SnakeStairGaitError, match="not aligned"):
         SnakeStairGaitPlanner().plan(

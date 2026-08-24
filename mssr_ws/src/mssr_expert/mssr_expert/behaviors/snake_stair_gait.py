@@ -543,6 +543,20 @@ class SnakeStairGaitPlanner:
                         drive_phase = (
                             f"ARCH_HEAD_GATE_{upper_stair_index:02d}"
                         )
+                    if phase == final_phase - 1:
+                        # The final posture has already lifted the tail.  End
+                        # the climb once the adjacent support wheel is one
+                        # radius beyond the last riser; demanding another full
+                        # link of travel leaves an elevated tail with no useful
+                        # traction and makes all wheels spin on the top deck.
+                        reference = ordered[1]
+                        final_riser_x_m = (
+                            staircase.first_riser_x_m
+                            + (len(staircase.top_heights_m) - 1)
+                            * staircase.tread_depth_m
+                        )
+                        target_x_m = final_riser_x_m + wheel_radius
+                        drive_phase = "ARCH_TAIL_LIFT_COMPLETE"
                 steps.append(
                     BehaviorProgramStep(
                         phase=drive_phase,
@@ -559,27 +573,42 @@ class SnakeStairGaitPlanner:
             base_current = following
 
         upper_deck_distance = self._number(
-            parameters, "upper_deck_advance_distance_m", spacing
+            parameters,
+            "upper_deck_advance_distance_m",
+            0.0 if arch_wave else spacing,
         )
-        if not 0.5 * spacing <= upper_deck_distance <= staircase.tread_depth_m:
+        if arch_wave:
+            if not 0.0 <= upper_deck_distance <= staircase.tread_depth_m:
+                raise SnakeStairGaitError(
+                    "upper_deck_advance_distance_m must be in [0.0, one "
+                    "tread depth] for crawl_stairs_arch_wave"
+                )
+        elif not (
+            0.5 * spacing
+            <= upper_deck_distance
+            <= staircase.tread_depth_m
+        ):
             raise SnakeStairGaitError(
                 "upper_deck_advance_distance_m must be between half one "
                 "link and one tread depth"
             )
-        steps.append(
-            BehaviorProgramStep(
-                phase="UPPER_DECK_ADVANCE",
-                linear_m_s=crawl_speed,
-                active_target_roles=tuple(
-                    item.target_role for item in ordered
-                ),
-                displacement_goal=LongitudinalDisplacementGoal(
-                    module_ids=tuple(item.module_id for item in ordered),
-                    distance_m=upper_deck_distance,
-                    tolerance_m=crawl_tolerance,
-                ),
+        if upper_deck_distance > 0.0:
+            steps.append(
+                BehaviorProgramStep(
+                    phase="UPPER_DECK_ADVANCE",
+                    linear_m_s=crawl_speed,
+                    active_target_roles=tuple(
+                        item.target_role for item in ordered
+                    ),
+                    displacement_goal=LongitudinalDisplacementGoal(
+                        module_ids=tuple(
+                            item.module_id for item in ordered
+                        ),
+                        distance_m=upper_deck_distance,
+                        tolerance_m=crawl_tolerance,
+                    ),
+                )
             )
-        )
         return tuple(steps)
 
     def plan_arch_wave(
