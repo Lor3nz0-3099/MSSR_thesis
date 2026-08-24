@@ -154,15 +154,19 @@ class SnakeStairGaitPlanner:
             raise SnakeStairGaitError(
                 "transition_clearance_m must be in [0.0, 0.015]"
             )
+        default_upper_riser_release = max(
+            0.0,
+            0.5 * spacing - transition_clearance,
+        )
         upper_riser_edge_release_lead = self._number(
             parameters,
             "upper_riser_edge_release_lead_m",
-            0.012,
+            default_upper_riser_release,
         )
-        if not 0.0 <= upper_riser_edge_release_lead <= 0.025:
+        if not 0.0 <= upper_riser_edge_release_lead <= 0.5 * spacing:
             raise SnakeStairGaitError(
                 "upper_riser_edge_release_lead_m must be in "
-                "[0.0, 0.025]"
+                "[0.0, half one Snake8 link]"
             )
         head_prelift_lookahead = self._number(
             parameters,

@@ -339,7 +339,6 @@ def test_upper_riser_release_preserves_first_wave_and_repeats_above() -> None:
         {
             "profile_substeps": 6,
             "transition_clearance_m": 0.0065,
-            "upper_riser_edge_release_lead_m": 0.012,
         },
     )
 
@@ -355,6 +354,7 @@ def test_upper_riser_release_preserves_first_wave_and_repeats_above() -> None:
     for phase in ("PROFILE_04_03", "PROFILE_08_03"):
         baseline_state = _posture_state_at(baseline, phase)
         released_state = _posture_state_at(released, phase)
+        assert released_state["m5"] == pytest.approx(0.0)
         assert abs(released_state["m5"]) < abs(baseline_state["m5"])
         assert released_state["m3"] == pytest.approx(
             baseline_state["m3"]
@@ -701,7 +701,7 @@ def test_recognizer_rejects_nonuniform_risers() -> None:
         ({"crawl_goal_tolerance_m": 0.020}, "must be in"),
         ({"transition_clearance_m": 0.020}, "must be in"),
         (
-            {"upper_riser_edge_release_lead_m": 0.030},
+            {"upper_riser_edge_release_lead_m": 0.040},
             "upper_riser_edge_release_lead_m",
         ),
         ({"head_prelift_lookahead_m": 0.020}, "must be in"),
