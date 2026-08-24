@@ -154,6 +154,25 @@ class SnakeStairGaitPlanner:
             raise SnakeStairGaitError(
                 "transition_clearance_m must be in [0.0, 0.015]"
             )
+        head_prelift_lookahead = self._number(
+            parameters,
+            "head_prelift_lookahead_m",
+            0.080,
+        )
+        if not 0.040 <= head_prelift_lookahead <= 0.150:
+            raise SnakeStairGaitError(
+                "head_prelift_lookahead_m must be in [0.040, 0.150]"
+            )
+        head_prelift_ramp = self._number(
+            parameters,
+            "head_prelift_ramp_m",
+            0.040,
+        )
+        if not 0.010 <= head_prelift_ramp <= head_prelift_lookahead:
+            raise SnakeStairGaitError(
+                "head_prelift_ramp_m must be in [0.010, "
+                "head_prelift_lookahead_m]"
+            )
 
         steps: list[BehaviorProgramStep] = []
         zero = (0.0,) * self.MODULE_COUNT
@@ -202,6 +221,7 @@ class SnakeStairGaitPlanner:
             self._posture("CONFORM_PROFILE_00", current, hooked, ordered)
         )
         current = hooked
+        base_current = hooked
 
         final_phase = self.INITIAL_RISER_EDGE + stride * (
             len(staircase.top_heights_m) - 1
@@ -226,9 +246,10 @@ class SnakeStairGaitPlanner:
                 stride,
                 ordered,
             )
-            segment_start = current
+            segment_start = base_current
             for substep in range(1, substeps + 1):
                 fraction = substep / substeps
+                wave_progress = phase + fraction
                 edge_lead_m = transition_clearance * math.sin(
                     math.pi * fraction
                 )
@@ -236,10 +257,31 @@ class SnakeStairGaitPlanner:
                     1.0,
                     fraction + edge_lead_m / spacing,
                 )
-                target_tuple = tuple(
+                target = [
                     start + posture_fraction * (end - start)
                     for start, end in zip(segment_start, following)
-                )
+                ]
+                for stair_index in range(
+                    1, len(staircase.top_heights_m)
+                ):
+                    preview_fraction = self._head_preview_fraction(
+                        wave_progress=wave_progress,
+                        profile_progress=phase + posture_fraction,
+                        stair_index=stair_index,
+                        stride=stride,
+                        tread_depth_m=staircase.tread_depth_m,
+                        spacing_m=spacing,
+                        wheel_radius_m=wheel_radius,
+                        lookahead_m=head_prelift_lookahead,
+                        ramp_m=head_prelift_ramp,
+                    )
+                    target[self.MODULE_COUNT - 3] += (
+                        bend_angle * preview_fraction
+                    )
+                    target[self.MODULE_COUNT - 2] -= (
+                        bend_angle * preview_fraction
+                    )
+                target_tuple = tuple(target)
                 label = f"PROFILE_{phase:02d}_{substep:02d}"
                 steps.append(
                     self._posture(label, current, target_tuple, ordered)
@@ -269,6 +311,7 @@ class SnakeStairGaitPlanner:
                     )
                 )
                 current = target_tuple
+            base_current = following
 
         upper_deck_distance = self._number(
             parameters, "upper_deck_advance_distance_m", spacing
@@ -294,6 +337,54 @@ class SnakeStairGaitPlanner:
         )
         return tuple(steps)
 
+    def _head_preview_fraction(
+        self,
+        *,
+        wave_progress: float,
+        profile_progress: float,
+        stair_index: int,
+        stride: int,
+        tread_depth_m: float,
+        spacing_m: float,
+        wheel_radius_m: float,
+        lookahead_m: float,
+        ramp_m: float,
+    ) -> float:
+        """Pre-lift neck/head after the shoulder is fully on its tread."""
+        tread_start = stride * (stair_index - 1)
+        head_contact_progress = tread_start + (
+            tread_depth_m - 2.0 * spacing_m
+        ) / spacing_m
+        lookahead_progress = head_contact_progress - (
+            lookahead_m / spacing_m
+        )
+        shoulder_supported_progress = tread_start + (
+            2.0 * wheel_radius_m / spacing_m
+        )
+        preview_start = max(
+            lookahead_progress,
+            shoulder_supported_progress,
+        )
+        preview = self._clamp01(
+            (wave_progress - preview_start) * spacing_m / ramp_m
+        )
+
+        # Cross-fade the preview into the ordinary edge-5 profile instead of
+        # adding the same bend twice when the traveling wave catches up.
+        natural_entry = (
+            self.INITIAL_RISER_EDGE
+            + stride * stair_index
+            - (self.MODULE_COUNT - 3)
+        )
+        natural = self._clamp01(
+            profile_progress - (natural_entry - 1.0)
+        )
+        return max(0.0, preview - natural)
+
+    @staticmethod
+    def _clamp01(value: float) -> float:
+        return min(1.0, max(0.0, value))
+
     def _edge_reference(
         self,
         phase: int,
@@ -310,8 +401,8 @@ class SnakeStairGaitPlanner:
             )
             new_edge = old_edge - 1
             if (
-                0 <= old_edge <= self.MODULE_COUNT - 2
-                or 0 <= new_edge <= self.MODULE_COUNT - 2
+                0 <= old_edge <= self.MODULE_COUNT - 3
+                or 0 <= new_edge <= self.MODULE_COUNT - 3
             ):
                 reference_index = min(
                     self.MODULE_COUNT - 1,
@@ -341,11 +432,10 @@ class SnakeStairGaitPlanner:
         offsets = [0.0] * self.MODULE_COUNT
         for stair_index in range(stair_count):
             edge = self.INITIAL_RISER_EDGE + stride * stair_index - phase
-            # Two adjacent TILT joints form the riser and return the leading
-            # module to horizontal.  The terminal pair v6/v7 is valid: it
-            # pre-lifts the head while an earlier bend is still moving toward
-            # the tail, before the head wheel can strike the next riser.
-            if 0 <= edge <= self.MODULE_COUNT - 2:
+            # Two modules are needed beyond a riser: one turns vertically
+            # and the next turns back onto the horizontal tread.  The earlier
+            # head preview is cross-faded into this ordinary edge-5 profile.
+            if 0 <= edge <= self.MODULE_COUNT - 3:
                 offsets[edge] += bend_angle
                 offsets[edge + 1] -= bend_angle
         return tuple(offsets)
@@ -410,7 +500,7 @@ class SnakeStairGaitPlanner:
         rises = {
             edge
             for edge in rises
-            if 0 <= edge <= self.MODULE_COUNT - 2
+            if 0 <= edge <= self.MODULE_COUNT - 3
         }
         vertical_modules = {edge + 1 for edge in rises}
         return {

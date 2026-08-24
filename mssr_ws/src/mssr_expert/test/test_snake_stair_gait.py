@@ -99,32 +99,45 @@ def test_profiles_hold_two_risers_when_chain_spans_two_steps() -> None:
     ) == pytest.approx((0, 0, 0, 0, angle, -angle, 0, 0))
     assert planner.profile_offsets(
         phase=2, stair_count=3, stride=4, bend_angle=angle
-    ) == pytest.approx(
-        (0, 0, angle, -angle, 0, 0, angle, -angle)
-    )
+    ) == pytest.approx((0, 0, angle, -angle, 0, 0, 0, 0))
     assert planner.profile_offsets(
         phase=3, stair_count=3, stride=4, bend_angle=angle
     ) == pytest.approx((0, angle, -angle, 0, 0, angle, -angle, 0))
 
 
-def test_second_riser_pre_lifts_head_while_first_bend_moves_tailward() -> None:
+def test_second_riser_pre_lifts_two_head_modules_after_shoulder_support() -> None:
     program = SnakeStairGaitPlanner().plan(
         _graph(),
         _assignments(),
         {"profile_substeps": 6, "transition_clearance_m": 0.0065},
     )
-    posture = next(step for step in program if step.phase == "PROFILE_01_01")
-    targets = {
+    before = next(step for step in program if step.phase == "PROFILE_00_04")
+    start = next(step for step in program if step.phase == "PROFILE_00_05")
+    lifted = next(step for step in program if step.phase == "PROFILE_01_02")
+    merged = next(step for step in program if step.phase == "PROFILE_02_03")
+    before_targets = {
         target.module_id: target.angle_rad
-        for target in posture.posture_targets
+        for target in before.posture_targets
     }
-    crawl = next(step for step in program if step.phase == "CRAWL_01_01")
+    start_targets = {
+        target.module_id: target.angle_rad
+        for target in start.posture_targets
+    }
+    lifted_targets = {
+        target.module_id: target.angle_rad
+        for target in lifted.posture_targets
+    }
+    angle = math.asin(0.065 / 0.07777)
 
-    assert targets["m6"] > 0.0
-    assert targets["m7"] < 0.0
-    assert crawl.position_goal is not None
-    assert crawl.position_goal.module_id == "m7"
-    assert crawl.position_goal.target_x_m < 0.93
+    assert all(target.module_id != "m6" for target in before.posture_targets)
+    assert start_targets["m5"] > before_targets["m5"]
+    assert start_targets["m6"] < 0.0
+    assert lifted_targets["m5"] == pytest.approx(angle)
+    assert lifted_targets["m6"] == pytest.approx(-angle)
+    assert all(
+        target.module_id not in {"m5", "m6"}
+        for target in merged.posture_targets
+    )
 
 
 def test_plan_micro_interleaves_conforming_postures_and_crawl() -> None:
@@ -241,7 +254,8 @@ def test_transition_lead_straightens_front_and_moves_bend_rearward() -> None:
     assert middle_targets["m5"] > -0.5 * angle
     assert endpoint_targets["m3"] == pytest.approx(angle)
     assert endpoint_targets["m4"] == pytest.approx(-angle)
-    assert endpoint_targets["m5"] == pytest.approx(0.0)
+    assert endpoint_targets["m5"] > 0.0
+    assert endpoint_targets["m6"] < 0.0
 
 
 def test_crawl_uses_world_edge_targets_with_temporary_lead() -> None:
@@ -576,6 +590,14 @@ def test_recognizer_rejects_nonuniform_risers() -> None:
         ({"riser_approach_tolerance_m": 0.001}, "must be in"),
         ({"crawl_goal_tolerance_m": 0.020}, "must be in"),
         ({"transition_clearance_m": 0.020}, "must be in"),
+        ({"head_prelift_lookahead_m": 0.020}, "must be in"),
+        (
+            {
+                "head_prelift_lookahead_m": 0.060,
+                "head_prelift_ramp_m": 0.080,
+            },
+            "head_prelift_ramp_m",
+        ),
         ({"profile_substeps": 6, "crawl_goal_tolerance_m": 0.010}, "half"),
         ({"upper_deck_advance_distance_m": 0.010}, "half one link"),
         ({"slip_compensation": 1.5}, "does not accept timed parameters"),
