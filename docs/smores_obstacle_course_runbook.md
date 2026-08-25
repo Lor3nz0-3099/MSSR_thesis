@@ -256,7 +256,7 @@ Assemble Snake8 with the command in section 1 and then execute:
 
 ```bash
 run_behavior snake8 gap-crossing-01 gap_crossing \
-  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"gap_goal_tolerance_m":0.004}'
+  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"far_bank_transition_links":1.0,"gap_goal_tolerance_m":0.004}'
 ```
 
 `gap_crossing` has no locomotion timer.  It reads the two gap edges, live
@@ -282,13 +282,18 @@ migrates through each module, and exits at the tail while all grounded wheels
 remain available for traction.  There is no symmetric lifting pivot and no
 separate timed tail-lift phase.
 
-The arch span comes from the measured gap width, wheel radius and support
-margins.  Its amplitude defaults to one measured wheel radius plus the edge
-clearance.  Spatial resolution defaults to three substeps per measured link
-and is configurable with `gap_profile_substeps`; it changes smoothness, not
-the physical landmark used to finish.  The final head target is chosen so the
-tail is one complete link beyond the safe far support before all TILTs return
-to captured neutral.
+The arch span comes from the measured gap width, wheel radius, link spacing
+and support margins. Its descending branch extends beyond the safe far-bank
+support by one measured link by default. This keeps each approaching wheel
+above the vertical far edge and lets it descend only after its center has
+entered the landing tread. The extension is configurable as a dimensionless
+`far_bank_transition_links` in `[0.5, 2.0]`, so it scales with the live chain
+rather than with this fixture. Its amplitude defaults to one measured wheel
+radius plus the edge clearance. Spatial resolution defaults to three substeps
+per measured link and is configurable with `gap_profile_substeps`; it changes
+smoothness, not the physical landmark used to finish. The final head target
+is chosen so the tail reaches the end of that transition before all TILTs
+return to captured neutral.
 
 The gait rejects gaps wider than the safe measured five-link unsupported span,
 a misaligned chain, inconsistent world landmarks, legacy duration parameters,

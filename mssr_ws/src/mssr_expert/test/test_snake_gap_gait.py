@@ -197,7 +197,7 @@ def test_gap_width_scales_wave_travel_and_profile_count() -> None:
 
 def test_wider_admissible_gap_still_uses_only_the_backbone_wave() -> None:
     wider = SnakeGapGaitPlanner().plan(
-        _graph(near=0.55, far=0.82),
+        _graph(near=0.55, far=0.78),
         _assignments(),
         {},
     )
@@ -242,16 +242,17 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     expected_clearance = 0.03106 + 0.006
     near_support_x = 0.55 - 0.03106 - 0.006
     far_support_x = 0.75 + 0.03106 + 0.006
+    far_arch_x = far_support_x + spacing
     initial_x = tuple(
         near_support_x - (7 - index) * spacing for index in range(8)
     )
-    body_travel = far_support_x + spacing - initial_x[0]
+    body_travel = far_arch_x - initial_x[0]
     step_count = math.ceil(body_travel / (spacing / 3))
     first_x = tuple(x_m + body_travel / step_count for x_m in initial_x)
     expected_heights = SnakeGapGaitPlanner._traveling_arch_heights(
         first_x,
         near_support_x,
-        far_support_x,
+        far_arch_x,
         expected_clearance,
     )
     landed = _state_at(program, "CONFORM_GAP_PROFILE_01")
@@ -275,7 +276,7 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
         heights = SnakeGapGaitPlanner._traveling_arch_heights(
             nominal_x,
             near_support_x,
-            far_support_x,
+            far_arch_x,
             expected_clearance,
         )
         assert min(heights) >= -1e-9
@@ -296,6 +297,36 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
             _assignments(),
             {"gap_profile_substeps": 2.5},
         )
+    with pytest.raises(SnakeGapGaitError, match="far_bank_transition_links"):
+        SnakeGapGaitPlanner().plan(
+            _graph(),
+            _assignments(),
+            {"far_bank_transition_links": 0.25},
+        )
+
+
+def test_far_bank_transition_keeps_the_head_high_past_the_edge() -> None:
+    spacing = 0.07777
+    wheel_radius = 0.03106
+    near_support_x = 0.55 - wheel_radius - 0.006
+    far_support_x = 0.75 + wheel_radius + 0.006
+    far_arch_x = far_support_x + spacing
+
+    far_edge_height = SnakeGapGaitPlanner._traveling_arch_heights(
+        (0.75,),
+        near_support_x,
+        far_arch_x,
+        wheel_radius + 0.006,
+    )[0]
+    old_far_edge_height = SnakeGapGaitPlanner._traveling_arch_heights(
+        (0.75,),
+        near_support_x,
+        far_support_x,
+        wheel_radius + 0.006,
+    )[0]
+
+    assert far_edge_height > wheel_radius
+    assert far_edge_height > old_far_edge_height
 
 
 def test_wave_is_low_bidirectional_and_migrates_from_head_to_tail() -> None:
