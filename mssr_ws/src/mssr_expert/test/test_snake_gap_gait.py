@@ -106,7 +106,9 @@ def test_gap_program_has_requested_geometric_sequence_without_timers() -> None:
 
     assert tuple(step.phase for step in program) == (
         "RESTORE_GAP_NEUTRAL",
+        "PRELIFT_HEAD_DRAWBRIDGE",
         "LIFT_HEAD_DRAWBRIDGE",
+        "STRAIGHTEN_HEAD_DRAWBRIDGE",
         "ADVANCE_HEAD_PIVOT_TO_EDGE",
         "LOWER_HEAD_ACROSS_GAP",
         "ADVANCE_BODY_TO_FAR_SUPPORT",
@@ -128,15 +130,21 @@ def test_gap_program_has_requested_geometric_sequence_without_timers() -> None:
 
 def test_head_lands_before_body_advances_and_tail_is_lifted() -> None:
     program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
+    prelift = _state_at(program, "PRELIFT_HEAD_DRAWBRIDGE")
     head = _state_at(program, "LIFT_HEAD_DRAWBRIDGE")
+    straight = _state_at(program, "STRAIGHTEN_HEAD_DRAWBRIDGE")
     landed = _state_at(program, "LOWER_HEAD_ACROSS_GAP")
     tail = _state_at(program, "LIFT_TAIL_DRAWBRIDGE")
     lowered = _state_at(program, "LOWER_TAIL_ON_FAR_BANK")
 
     # A 200 mm gap plus two wheel supports requires four raised modules.
-    # The single v3 hinge makes a real drawbridge; there is no cancelling bend.
+    # v4 first selects the head side of the symmetric chain.  v3 then becomes
+    # the positive pivot and v4 is restored, leaving one real drawbridge hinge.
+    assert prelift["m4"] == pytest.approx(0.45)
     assert head["m3"] == pytest.approx(1.20)
-    assert sum(abs(value) > 1e-9 for value in head.values()) == 1
+    assert head["m4"] == pytest.approx(0.45)
+    assert straight["m3"] == pytest.approx(1.20)
+    assert sum(abs(value) > 1e-9 for value in straight.values()) == 1
     assert all(value == pytest.approx(0.0) for value in landed.values())
     assert tail["m3"] == pytest.approx(-1.20)
     assert sum(abs(value) > 1e-9 for value in tail.values()) == 1
@@ -160,18 +168,6 @@ def test_head_lands_before_body_advances_and_tail_is_lifted() -> None:
     assert pull.position_goal.target_x_m == pytest.approx(
         0.75 + 4 * 0.07777 + 0.03106 + 0.006
     )
-    head_target = next(
-        step for step in program if step.phase == "LIFT_HEAD_DRAWBRIDGE"
-    ).posture_targets[0]
-    tail_target = next(
-        step for step in program if step.phase == "LIFT_TAIL_DRAWBRIDGE"
-    ).posture_targets[0]
-    assert head_target.pusher_module_id == "m2"
-    assert head_target.pusher_linear_m_s == pytest.approx(0.020)
-    assert tail_target.pusher_module_id == "m4"
-    assert tail_target.pusher_linear_m_s == pytest.approx(-0.020)
-
-
 def test_drawbridge_module_count_scales_with_gap_width() -> None:
     narrow = SnakeGapGaitPlanner().plan(
         _graph(near=0.55, far=0.65),
@@ -191,6 +187,33 @@ def test_drawbridge_module_count_scales_with_gap_width() -> None:
     assert approach.active_target_roles == ROLES[:5]
 
 
+def test_wider_gap_migrates_fold_to_geometry_selected_pivot() -> None:
+    program = SnakeGapGaitPlanner().plan(
+        _graph(near=0.55, far=0.82),
+        _assignments(),
+        {},
+    )
+
+    phases = tuple(step.phase for step in program)
+    assert phases[:7] == (
+        "RESTORE_GAP_NEUTRAL",
+        "PRELIFT_HEAD_DRAWBRIDGE",
+        "MIGRATE_HEAD_DRAWBRIDGE_V3",
+        "RELEASE_HEAD_DRAWBRIDGE_V4",
+        "LIFT_HEAD_DRAWBRIDGE",
+        "STRAIGHTEN_HEAD_DRAWBRIDGE",
+        "ADVANCE_HEAD_PIVOT_TO_EDGE",
+    )
+    final_fold = _state_at(program, "STRAIGHTEN_HEAD_DRAWBRIDGE")
+    assert final_fold["m2"] == pytest.approx(1.20)
+    assert sum(abs(value) > 1e-9 for value in final_fold.values()) == 1
+    approach = next(
+        step for step in program if step.phase == "ADVANCE_HEAD_PIVOT_TO_EDGE"
+    )
+    assert approach.position_goal.module_id == "m2"
+    assert approach.active_target_roles == ROLES[:3]
+
+
 def test_drawbridge_lift_cannot_degenerate_into_a_flat_arch() -> None:
     with pytest.raises(SnakeGapGaitError, match="at least 0.85"):
         SnakeGapGaitPlanner().plan(
@@ -205,6 +228,9 @@ def test_top_bottom_chain_raises_head_before_tail() -> None:
     head_step = next(
         step for step in program if step.phase == "LIFT_HEAD_DRAWBRIDGE"
     )
+    straight_step = next(
+        step for step in program if step.phase == "STRAIGHTEN_HEAD_DRAWBRIDGE"
+    )
     tail_step = next(
         step for step in program if step.phase == "LIFT_TAIL_DRAWBRIDGE"
     )
@@ -212,6 +238,9 @@ def test_top_bottom_chain_raises_head_before_tail() -> None:
     assert len(head_step.posture_targets) == 1
     assert head_step.posture_targets[0].target_role == "snake_center_rear"
     assert head_step.posture_targets[0].angle_rad > 0.0
+    assert len(straight_step.posture_targets) == 1
+    assert straight_step.posture_targets[0].target_role == "snake_center_front"
+    assert straight_step.posture_targets[0].angle_rad == pytest.approx(0.0)
     assert len(tail_step.posture_targets) == 1
     assert tail_step.posture_targets[0].target_role == "snake_center_rear"
     assert tail_step.posture_targets[0].angle_rad < 0.0

@@ -264,7 +264,8 @@ module positions, measured chain spacing, wheel radius and TILT limits from
 the robot graph.  Its closed-loop program is:
 
 ```text
-RESTORE_GAP_NEUTRAL -> LIFT_HEAD_DRAWBRIDGE
+RESTORE_GAP_NEUTRAL -> PRELIFT_HEAD_DRAWBRIDGE
+-> LIFT_HEAD_DRAWBRIDGE -> STRAIGHTEN_HEAD_DRAWBRIDGE
 -> ADVANCE_HEAD_PIVOT_TO_EDGE -> LOWER_HEAD_ACROSS_GAP
 -> ADVANCE_BODY_TO_FAR_SUPPORT -> LIFT_TAIL_DRAWBRIDGE
 -> PULL_TAIL_TO_SAFE_LANDING -> LOWER_TAIL_ON_FAR_BANK -> CLEAR_FAR_EDGE
@@ -275,10 +276,16 @@ gap width, wheel radius, link spacing and support margins.  It raises that
 entire segment about one hinge by 1.20 rad by default: no downstream
 counter-bend cancels the drawbridge slope.  For the nominal 200 mm gap, `v3`
 is the fifth module from the head/right and receives positive TILT so that
-`v4..v7` form the raised drawbridge.  A small forward wheel reaction on `v2`
-keeps the rear support on the floor instead of letting the symmetric chain
-rotate about its front half; the tail lift uses the spatially mirrored sign
-and reaction.  The grounded pivot is then driven
+`v4..v7` form the raised drawbridge.  A temporary positive pre-fold on `v4`
+first selects the three-module head side of the otherwise symmetric flat
+chain.  After `v3` reaches its positive drawbridge angle, `v4` returns to
+neutral, leaving the four anterior modules in one rigid raised segment.  The
+same rule is gap-parametric: narrower gaps select a more anterior pivot
+directly, while wider admissible gaps migrate the pre-fold rearward through
+as many adjacent hinges as required by the computed suspended-module count.
+The default transfer angle is divided by that migration depth and remains
+operator-overridable as `drawbridge_prelift_angle_rad`.  The tail lift uses
+the spatially mirrored sign.  The grounded pivot is then driven
 to the near edge before the rigid segment is lowered across the opening, with
 at least one supported module on each bank.  Once the head is down, the body
 advances until the first front anchor is safely on the far bank.  The same

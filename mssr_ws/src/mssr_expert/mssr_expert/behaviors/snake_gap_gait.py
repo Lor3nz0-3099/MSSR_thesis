@@ -146,11 +146,6 @@ class SnakeGapGaitPlanner:
             )
         approach_speed = self._speed(parameters, "approach_linear_m_s", 0.050)
         crossing_speed = self._speed(parameters, "linear_m_s", 0.040)
-        fold_bias_speed = self._speed(
-            parameters,
-            "drawbridge_bias_linear_m_s",
-            0.020,
-        )
 
         lift_angle = self._number(
             parameters,
@@ -170,19 +165,92 @@ class SnakeGapGaitPlanner:
                 f"Required gap lift {lift_angle:.3f} rad exceeds usable "
                 f"TILT limit {usable_limit:.3f} rad"
             )
-
         roles = tuple(item.target_role for item in ordered)
         neutral = (0.0,) * self.MODULE_COUNT
         head_pivot_index = self.MODULE_COUNT - lifted_count - 1
         tail_hinge_index = lifted_count - 1
         front_anchor_index = tail_hinge_index + 1
-        head_lift = list(neutral)
+        # Start from v4 whenever the requested pivot is central or rearward.
+        # v4 has five modules on its grounded side and only three on its head
+        # side, so its absolute fold direction is deterministic.  Wider gaps
+        # migrate that fold rearward one hinge at a time until reaching the
+        # geometry-selected pivot.
+        head_seed_index = max(head_pivot_index, self.MODULE_COUNT // 2)
+        migration_count = head_seed_index - head_pivot_index
+        prelift_angle = self._number(
+            parameters,
+            "drawbridge_prelift_angle_rad",
+            min(0.45, lift_angle / (migration_count + 1)),
+        )
+        if not 0.15 <= prelift_angle <= min(0.65, usable_limit):
+            raise SnakeGapGaitError(
+                "drawbridge_prelift_angle_rad must be in [0.15, "
+                f"{min(0.65, usable_limit):.2f}]"
+            )
+
+        head_steps: list[BehaviorProgramStep] = []
+        head_state = list(neutral)
+        if migration_count:
+            seeded = list(head_state)
+            seeded[head_seed_index] = prelift_angle
+            head_steps.append(
+                self._posture(
+                    "PRELIFT_HEAD_DRAWBRIDGE",
+                    tuple(head_state),
+                    tuple(seeded),
+                    ordered,
+                )
+            )
+            head_state = seeded
+
+        for hinge_index in range(
+            head_seed_index - (1 if migration_count else 0),
+            head_pivot_index - 1,
+            -1,
+        ):
+            folded = list(head_state)
+            folded[hinge_index] = (
+                lift_angle
+                if hinge_index == head_pivot_index
+                else prelift_angle
+            )
+            head_steps.append(
+                self._posture(
+                    (
+                        "LIFT_HEAD_DRAWBRIDGE"
+                        if hinge_index == head_pivot_index
+                        else f"MIGRATE_HEAD_DRAWBRIDGE_V{hinge_index}"
+                    ),
+                    tuple(head_state),
+                    tuple(folded),
+                    ordered,
+                )
+            )
+            head_state = folded
+            previous_hinge = hinge_index + 1
+            if previous_hinge <= head_seed_index:
+                straightened = list(head_state)
+                straightened[previous_hinge] = 0.0
+                head_steps.append(
+                    self._posture(
+                        (
+                            "STRAIGHTEN_HEAD_DRAWBRIDGE"
+                            if hinge_index == head_pivot_index
+                            else f"RELEASE_HEAD_DRAWBRIDGE_V{previous_hinge}"
+                        ),
+                        tuple(head_state),
+                        tuple(straightened),
+                        ordered,
+                    )
+                )
+                head_state = straightened
+
+        head_lift = tuple(head_state)
         # v3 is the fifth module from the head for the nominal 200 mm gap.
-        # Its positive TILT raises the four higher-index head modules.  The
-        # immediately rearward wheel supplies a small forward reaction while
-        # the hinge moves; otherwise the nearly symmetric free chain can
-        # satisfy the same relative angle by lifting its rear half instead.
-        head_lift[head_pivot_index] = lift_angle
+        # Its positive TILT raises the four higher-index head modules.  A
+        # temporary fold one joint toward the head breaks the 4-vs-4 static
+        # symmetry before this central hinge moves; it is then straightened
+        # again so the final drawbridge still has exactly one bent joint.
         tail_lift = list(neutral)
         # Spatial mirror: the already landed front segment anchors an equal
         # number of tail modules while they are carried across the opening.
@@ -206,13 +274,7 @@ class SnakeGapGaitPlanner:
 
         return (
             self._posture("RESTORE_GAP_NEUTRAL", neutral, neutral, ordered, all_targets=True),
-            self._posture(
-                "LIFT_HEAD_DRAWBRIDGE",
-                neutral,
-                tuple(head_lift),
-                ordered,
-                pusher=(head_pivot_index - 1, fold_bias_speed),
-            ),
+            *head_steps,
             self._drive_to(
                 "ADVANCE_HEAD_PIVOT_TO_EDGE",
                 ordered[head_pivot_index],
@@ -223,7 +285,7 @@ class SnakeGapGaitPlanner:
             ),
             self._posture(
                 "LOWER_HEAD_ACROSS_GAP",
-                tuple(head_lift),
+                head_lift,
                 neutral,
                 ordered,
             ),
@@ -240,7 +302,6 @@ class SnakeGapGaitPlanner:
                 neutral,
                 tuple(tail_lift),
                 ordered,
-                pusher=(front_anchor_index, -fold_bias_speed),
             ),
             self._drive_to(
                 "PULL_TAIL_TO_SAFE_LANDING",
@@ -294,7 +355,6 @@ class SnakeGapGaitPlanner:
         assignments: Sequence[AssignedModule],
         *,
         all_targets: bool = False,
-        pusher: tuple[int, float] | None = None,
     ) -> BehaviorProgramStep:
         changed = tuple(
             range(len(target))
@@ -316,14 +376,6 @@ class SnakeGapGaitPlanner:
                     target_role=assignments[index].target_role,
                     tolerance_rad=0.08,
                     coordination_group=f"gap:{phase}",
-                    pusher_module_id=(
-                        assignments[pusher[0]].module_id
-                        if pusher is not None
-                        else None
-                    ),
-                    pusher_linear_m_s=(
-                        pusher[1] if pusher is not None else None
-                    ),
                     max_servo_error_rad=0.12,
                     angle_reference="captured_neutral",
                 )
