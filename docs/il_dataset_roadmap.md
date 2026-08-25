@@ -6,7 +6,7 @@ three initial eight-module morphologies.
 ## Separation of responsibilities
 
 - A morphology behavior describes a reusable capability such as
-  `crawl_stairs`, `cross_gap`, or `press_button`. It must be parameterized by
+  `crawl_stairs_arch_wave`, `gap_crossing`, or `press_button`. It must be parameterized by
   live world observations and obstacle geometry, not specialized to one fixed
   course layout or terminated by arbitrary locomotion timers.
 - A scenario generator chooses the course instance. It randomizes obstacle

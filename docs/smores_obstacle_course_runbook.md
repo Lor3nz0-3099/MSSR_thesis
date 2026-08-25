@@ -237,6 +237,110 @@ fixture-specific constants.
 The physically successful reference and its exact Git provenance are frozen
 in `docs/validated_behaviors/snake8_crawl_stairs_arch_wave.md`.
 
+### Isolated Snake8 gap stage
+
+The isolated gap fixture has two coplanar banks separated by a real 200 mm
+opening in world +X.  It is deliberately independent from the older Bridge8
+timed behavior.  Start the complete GUI runtime with:
+
+```bash
+cd ~/MSSR_thesis/mssr_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch mssr_expert smores_runtime.launch.py \
+  gap_test_course:=true \
+  performance:=true
+```
+
+Assemble Snake8 with the command in section 1 and then execute:
+
+```bash
+run_behavior snake8 gap-crossing-01 gap_crossing \
+  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_goal_tolerance_m":0.004}'
+```
+
+`gap_crossing` has no locomotion timer.  It reads the two gap edges, live
+module positions, measured chain spacing, wheel radius and TILT limits from
+the robot graph.  Its closed-loop program is:
+
+```text
+RESTORE_GAP_NEUTRAL -> APPROACH_NEAR_EDGE -> LIFT_HEAD
+-> EXTEND_HEAD_OVER_GAP -> LOWER_HEAD_ON_FAR_BANK -> ADVANCE_BODY
+-> LIFT_TAIL -> PULL_TAIL_OVER_GAP -> LOWER_TAIL_ON_FAR_BANK
+-> CLEAR_FAR_EDGE
+```
+
+The three-module head arch is levelled before extension so the terminal wheel
+lands on the far bank instead of striking its edge.  Once the head is down,
+the whole body advances before the spatially mirrored tail arch is admitted.
+The gait rejects gaps wider than its measured three-link span, a misaligned
+chain, inconsistent world landmarks, or legacy duration parameters.  This is
+the deterministic IL expert for equal-height banks; it is not yet a learned
+general gap controller.
+
+### Isolated MobileManipulator8 button stage with Nav2
+
+This fixture contains only a continuous flat platform, a wall and its button.
+Start from Snake8 exactly as requested; the common launch keeps Isaac, bridge
+and morphology behavior node alive through the reconfiguration:
+
+```bash
+cd ~/MSSR_thesis/mssr_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch mssr_expert smores_runtime.launch.py \
+  button_test_course:=true \
+  performance:=true
+```
+
+In a second sourced terminal assemble Snake8 using section 1.  Stop only that
+self-assembly process after completion, then run:
+
+```bash
+cd ~/MSSR_thesis
+source /opt/ros/humble/setup.bash
+source mssr_ws/install/setup.bash
+ros2 run mssr_expert mssr_smores_self_reconfiguration_node --ros-args \
+  -p source_graph_path:=auto \
+  -p target_morphology:=mobile_manipulator8 \
+  -p execution_id:=button-snake8-to-manip8-01 \
+  -p episode_id:=button-snake8-to-manip8-01 \
+  -p dataset_path:=$PWD/logs/datasets/button_manip8_reconfiguration.jsonl
+```
+
+Only after `Self-reconfiguration completed.`, start Nav2 in a third sourced
+terminal. MobileManipulator8 now exports its own role-anchored `/odom` and
+`odom -> base_link` frame, oriented from `arm_ground_drive` toward
+`front_support`:
+
+```bash
+cd ~/MSSR_thesis/mssr_ws
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch mssr_expert smores_nav2.launch.py
+```
+
+The stage exports the map-frame standoff pose `(x=0.85, y=0.275, yaw=pi/2)`.
+Send it from a fourth sourced terminal:
+
+```bash
+ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  '{pose: {header: {frame_id: map}, pose: {position: {x: 0.85, y: 0.275, z: 0.0}, orientation: {x: 0.0, y: 0.0, z: 0.70710678, w: 0.70710678}}}}' \
+  --feedback
+```
+
+After Nav2 reports success, stop its residual velocity and exercise the arm:
+
+```bash
+run_behavior mobile_manipulator8 manip-stop-at-button-01 stop '{}'
+run_behavior mobile_manipulator8 manip-press-01 press_button '{}'
+run_behavior mobile_manipulator8 manip-release-01 release_button '{}'
+```
+
+Do not start Nav2 before reconfiguration completes: until a morphology with a
+navigation profile is assigned, the behavior node intentionally has no valid
+virtual base pose.
+
 ### Reproducible headless robustness batch
 
 Build and source the workspace, then create a fresh output directory for each

@@ -567,6 +567,11 @@
     },
     "mobile_manipulator8": {
       "module_count": 8,
+      "navigation": {
+        "center_roles": ["chassis_center", "left_drive", "right_drive"],
+        "forward_from_roles": ["arm_ground_drive"],
+        "forward_to_roles": ["front_support"]
+      },
       "ready_posture": "drive_ready",
       "postures": {
         "drive_ready": [

@@ -20,6 +20,7 @@ from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import String
 
 from mssr_expert.behaviors.morphology_library import AssignedModule, MorphologyLibrary
+from mssr_expert.behaviors.snake_gap_gait import SnakeGapGaitPlanner
 from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitPlanner
 from mssr_expert.behaviors.morphology_locomotion import coherent_planar_train_commands
 from mssr_expert.dataset.dataset_logger import DatasetLogger
@@ -114,6 +115,7 @@ class SmoresObstacleCourseNode(Node):
         self._behavior_library = MorphologyLibrary.load(
             package_share / "config" / "smores_morphology_behaviors.json"
         )
+        self._gap_gait_planner = SnakeGapGaitPlanner()
         self._stair_gait_planner = SnakeStairGaitPlanner()
         self._policy = ObstacleCoursePolicy()
         self._steps = self._policy.steps()
@@ -420,12 +422,16 @@ class SmoresObstacleCourseNode(Node):
         if course_step.behavior in {
             "crawl_stairs",
             "crawl_stairs_arch_wave",
+            "gap_crossing",
         }:
-            planner = (
-                self._stair_gait_planner.plan_arch_wave
-                if course_step.behavior == "crawl_stairs_arch_wave"
-                else self._stair_gait_planner.plan
-            )
+            if course_step.behavior == "gap_crossing":
+                planner = self._gap_gait_planner.plan
+            else:
+                planner = (
+                    self._stair_gait_planner.plan_arch_wave
+                    if course_step.behavior == "crawl_stairs_arch_wave"
+                    else self._stair_gait_planner.plan
+                )
             program_override = planner(
                 current_graph,
                 assignments,

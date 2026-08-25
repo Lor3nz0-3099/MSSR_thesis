@@ -143,6 +143,8 @@ def test_self_assembly_cli_defaults_match_target_demonstration() -> None:
     assert args.module_prefix == "smores_"
     assert args.obstacle_course is False
     assert args.stair_test_course is False
+    assert args.button_test_course is False
+    assert args.gap_test_course is False
     assert args.stair_seed is None
     assert args.stair_rise_m is None
     assert args.stair_depth_m is None
@@ -156,8 +158,17 @@ def test_course_cli_options_are_mutually_exclusive() -> None:
     args = parser.parse_args(["--stair-test-course"])
     assert args.stair_test_course is True
     assert args.obstacle_course is False
+    assert args.button_test_course is False
+    assert args.gap_test_course is False
     with pytest.raises(SystemExit):
         parser.parse_args(["--obstacle-course", "--stair-test-course"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--button-test-course", "--gap-test-course"])
+
+    button = parser.parse_args(["--button-test-course"])
+    gap = parser.parse_args(["--gap-test-course"])
+    assert button.button_test_course is True
+    assert gap.gap_test_course is True
 
 
 def test_stair_cli_accepts_seed_and_explicit_geometry_overrides() -> None:
@@ -190,6 +201,12 @@ def test_self_assembly_config_rejects_two_courses(tmp_path) -> None:
             physics_usd=tmp_path / "physics.usd",
             manual_obstacle_course=True,
             stair_test_course=True,
+        )
+    with pytest.raises(ValueError, match="exclusive"):
+        SelfAssemblySimulationConfig(
+            physics_usd=tmp_path / "physics.usd",
+            button_test_course=True,
+            gap_test_course=True,
         )
 
 

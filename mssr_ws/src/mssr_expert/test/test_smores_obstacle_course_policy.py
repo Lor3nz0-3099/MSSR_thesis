@@ -57,6 +57,15 @@ def test_policy_selects_one_capable_morphology_per_course_task() -> None:
         "profile_substeps": 6,
         "transition_clearance_m": 0.0065,
     }
+    gap_crossing = next(
+        step for step in steps if step.task == "snake_gap_crossing"
+    )
+    assert gap_crossing.behavior == "gap_crossing"
+    assert gap_crossing.parameters == {
+        "linear_m_s": 0.040,
+        "approach_linear_m_s": 0.050,
+        "gap_goal_tolerance_m": 0.004,
+    }
 
 
 def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None:
@@ -69,7 +78,11 @@ def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None
     for step in policy.steps():
         if step.behavior is None:
             continue
-        if step.behavior in {"crawl_stairs", "crawl_stairs_arch_wave"}:
+        if step.behavior in {
+            "crawl_stairs",
+            "crawl_stairs_arch_wave",
+            "gap_crossing",
+        }:
             # This behavior is generated from live world poses and course
             # landmarks by SnakeStairGaitPlanner, rather than loaded from the
             # static morphology library.

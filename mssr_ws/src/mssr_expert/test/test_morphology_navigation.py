@@ -167,3 +167,39 @@ def test_snake8_navigation_frame_points_from_tail_to_head() -> None:
     assert state.yaw_rad == pytest.approx(0.0)
     assert state.vx_m_s == pytest.approx(0.04)
     assert state.vy_m_s == pytest.approx(0.0)
+
+
+def test_mobile_manipulator8_navigation_points_from_rear_drive_to_support() -> None:
+    spec = MorphologyLibrary.load(
+        CONFIG / "smores_morphology_behaviors.json"
+    ).navigation_frame_spec("mobile_manipulator8")
+
+    assert spec == {
+        "center_roles": ("chassis_center", "left_drive", "right_drive"),
+        "forward_from_roles": ("arm_ground_drive",),
+        "forward_to_roles": ("front_support",),
+    }
+    role_positions = {
+        "chassis_center": (0.0, 0.0),
+        "left_drive": (0.0, 0.1),
+        "right_drive": (0.0, -0.1),
+        "arm_ground_drive": (-0.1, 0.0),
+        "front_support": (0.1, 0.0),
+    }
+    graph = AttributedRobotGraph(
+        nodes=tuple(
+            _node(role, x, y, 0.03, 0.0)
+            for role, (x, y) in role_positions.items()
+        )
+    )
+    assignments = tuple(
+        AssignedModule(role, f"v{index}", role)
+        for index, role in enumerate(role_positions)
+    )
+
+    state = estimate_planar_morphology_state(graph, assignments, spec)
+
+    assert state.x_m == pytest.approx(0.0)
+    assert state.y_m == pytest.approx(0.0)
+    assert state.yaw_rad == pytest.approx(0.0)
+    assert state.vx_m_s == pytest.approx(0.03)

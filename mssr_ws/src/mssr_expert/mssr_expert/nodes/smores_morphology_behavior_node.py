@@ -29,6 +29,7 @@ from mssr_expert.behaviors.morphology_locomotion import (
     validate_locomotion_dofs,
 )
 from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitPlanner
+from mssr_expert.behaviors.snake_gap_gait import SnakeGapGaitPlanner
 from mssr_expert.behaviors.morphology_dof_model import (
     MorphologyDofInventory,
     SmoresMorphologyDofAnalyzer,
@@ -179,6 +180,7 @@ class SmoresMorphologyBehaviorNode(Node):
         )
         self._topology_matcher = SmoresSelfReconfigurationPlanner()
         self._stair_gait_planner = SnakeStairGaitPlanner()
+        self._gap_gait_planner = SnakeGapGaitPlanner()
         self._morphology_name = ""
         self._assignments: tuple[AssignedModule, ...] = ()
         self._assembly_ready = False
@@ -566,16 +568,20 @@ class SmoresMorphologyBehaviorNode(Node):
             if command.behavior in {
                 "crawl_stairs",
                 "crawl_stairs_arch_wave",
+                "gap_crossing",
             }:
                 if command.morphology != "snake8":
                     raise ValueError(
                         f"{command.behavior} requires snake8"
                     )
-                planner = (
-                    self._stair_gait_planner.plan_arch_wave
-                    if command.behavior == "crawl_stairs_arch_wave"
-                    else self._stair_gait_planner.plan
-                )
+                if command.behavior == "gap_crossing":
+                    planner = self._gap_gait_planner.plan
+                else:
+                    planner = (
+                        self._stair_gait_planner.plan_arch_wave
+                        if command.behavior == "crawl_stairs_arch_wave"
+                        else self._stair_gait_planner.plan
+                    )
                 program_override = planner(
                     self._latest_robot_graph,
                     self._assignments,

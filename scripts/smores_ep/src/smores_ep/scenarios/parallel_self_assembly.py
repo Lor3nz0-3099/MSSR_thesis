@@ -285,6 +285,18 @@ def run_parallel_self_assembly_scenario(
                 seed=config.stair_seed,
             ),
         )
+    elif config.button_test_course:
+        from smores_ep.isaac.obstacle_course import (
+            install_mobile_manipulator_button_test_course,
+        )
+
+        obstacle_course = install_mobile_manipulator_button_test_course(stage)
+    elif config.gap_test_course:
+        from smores_ep.isaac.obstacle_course import (
+            install_snake8_gap_test_course,
+        )
+
+        obstacle_course = install_snake8_gap_test_course(stage)
     layout = self_assembly_spawn_layout(config)
     if config.manual_obstacle_course:
         layout = {
@@ -411,7 +423,11 @@ def run_parallel_self_assembly_scenario(
         course_extent_m = (
             2.4
             if config.manual_obstacle_course
-            else 1.8 if config.stair_test_course else 0.0
+            else 1.8
+            if config.stair_test_course
+            else 1.25
+            if config.button_test_course or config.gap_test_course
+            else 0.0
         )
         camera_extent_m = max(
             0.52,
@@ -430,6 +446,8 @@ def run_parallel_self_assembly_scenario(
                 if config.manual_obstacle_course
                 else [1.0, 0.0, 0.10]
                 if config.stair_test_course
+                else [0.45, 0.0, 0.08]
+                if config.button_test_course or config.gap_test_course
                 else [0.0, 0.0, 0.03]
             ),
         )
@@ -465,12 +483,23 @@ def run_parallel_self_assembly_scenario(
                 f"{obstacle_course.button_center_xyz_m}, exit="
                 f"{obstacle_course.exit_center_xyz_m}"
             )
-        else:
+        elif config.stair_test_course:
             print(
                 "Snake8 stair test course: +X first_riser="
                 f"{obstacle_course.first_riser_x_m} m, depth="
                 f"{obstacle_course.riser_depth_m} m, tops="
                 f"{obstacle_course.stair_top_heights_m} m"
+            )
+        elif config.button_test_course:
+            print(
+                "MobileManipulator8 button test course: button="
+                f"{obstacle_course.button_center_xyz_m}, standoff="
+                f"{obstacle_course.base_standoff_xy_m}"
+            )
+        else:
+            print(
+                "Snake8 gap test course: +X gap="
+                f"{obstacle_course.gap_interval_x_m}"
             )
 
     maximum_steps = config.steps if config.steps > 0 else None

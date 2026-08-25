@@ -348,6 +348,8 @@ class SelfAssemblySimulationConfig:
     spawn_radius_m: float = 0.34
     manual_obstacle_course: bool = False
     stair_test_course: bool = False
+    button_test_course: bool = False
+    gap_test_course: bool = False
     stair_rise_m: float = 0.065
     stair_depth_m: float = 0.280
     stair_count: int = 3
@@ -363,9 +365,16 @@ class SelfAssemblySimulationConfig:
     geometry: SmoresGeometry = field(default_factory=SmoresGeometry)
 
     def __post_init__(self) -> None:
-        if self.manual_obstacle_course and self.stair_test_course:
+        if sum(
+            (
+                self.manual_obstacle_course,
+                self.stair_test_course,
+                self.button_test_course,
+                self.gap_test_course,
+            )
+        ) > 1:
             raise ValueError(
-                "Manual obstacle course and stair test course are exclusive"
+                "Physical obstacle and isolated test courses are exclusive"
             )
         if self.steps < 0:
             raise ValueError("Step count cannot be negative")

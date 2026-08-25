@@ -27,12 +27,12 @@ class ObstacleCoursePolicy:
     """Select the lowest-complexity morphology that satisfies each task."""
 
     _CAPABILITIES = {
-        "snake8": frozenset({"assembly", "stairs", "train"}),
+        "snake8": frozenset({"assembly", "gap", "stairs", "train"}),
         "bridge8": frozenset({"gap", "train"}),
         "mobile_manipulator8": frozenset({"button", "train"}),
         "rc_car8": frozenset({"exit", "train"}),
     }
-    _PREFERENCE = ("bridge8", "snake8", "mobile_manipulator8", "rc_car8")
+    _PREFERENCE = ("snake8", "bridge8", "mobile_manipulator8", "rc_car8")
 
     def choose_morphology(self, required_capability: str) -> str:
         """Return the preferred available morphology for one task capability."""
@@ -65,11 +65,11 @@ class ObstacleCoursePolicy:
             CourseStep(
                 "snake_gap_crossing",
                 snake,
-                "cross_gap_as_bridge",
+                "gap_crossing",
                 {
-                    "linear_m_s": 0.030,
-                    "span_duration_s": 4.0,
-                    "tail_clear_duration_s": 6.0,
+                    "linear_m_s": 0.040,
+                    "approach_linear_m_s": 0.050,
+                    "gap_goal_tolerance_m": 0.004,
                 },
             ),
             CourseStep("gap_clearance", snake, navigation="rear_past_gap"),

@@ -6,7 +6,9 @@ import pytest
 from smores_ep.isaac.obstacle_course import (
     UniformStairSpec,
     manual_obstacle_course,
+    mobile_manipulator_button_test_course,
     sample_uniform_stair_spec,
+    snake8_gap_test_course,
     snake8_stair_test_course,
 )
 
@@ -64,6 +66,50 @@ def test_manual_course_exposes_future_task_landmarks() -> None:
     } <= semantics
     assert course.button_center_xyz_m[2] > course.stair_top_heights_m[-1]
     assert course.exit_center_xyz_m[0] > course.button_center_xyz_m[0]
+
+
+def test_button_test_course_is_flat_isolated_and_nav2_addressable() -> None:
+    course = mobile_manipulator_button_test_course()
+
+    observation = course.to_observation()
+    assert observation["frame_id"] == "world"
+    assert observation["course_profile"] == "mobile_manipulator8_button_test"
+    assert observation["button"]["center_xyz_m"] == pytest.approx(
+        [0.85, 0.475, 0.17]
+    )
+    assert observation["button"]["base_standoff_xy_m"] == pytest.approx(
+        [0.85, 0.275]
+    )
+    assert observation["button"]["base_standoff_yaw_rad"] == pytest.approx(
+        0.5 * 3.141592653589793
+    )
+    semantics = {box.semantic for box in course.boxes}
+    assert semantics == {
+        "button_test_platform",
+        "button_support",
+        "button",
+    }
+    platform = next(
+        box for box in course.boxes if box.semantic == "button_test_platform"
+    )
+    assert platform.center_xyz_m[2] == pytest.approx(-0.01)
+
+
+def test_gap_test_course_has_no_collider_across_open_interval() -> None:
+    course = snake8_gap_test_course()
+    near_x_m, far_x_m = course.gap_interval_x_m
+
+    assert far_x_m - near_x_m == pytest.approx(0.20)
+    assert course.to_observation()["gap"] == {
+        "near_edge_x_m": pytest.approx(0.55),
+        "far_edge_x_m": pytest.approx(0.75),
+        "width_m": pytest.approx(0.20),
+    }
+    for box in course.boxes:
+        half_x_m = 0.5 * box.size_xyz_m[0]
+        start_x_m = box.center_xyz_m[0] - half_x_m
+        end_x_m = box.center_xyz_m[0] + half_x_m
+        assert end_x_m <= near_x_m or start_x_m >= far_x_m
 
 
 def test_snake8_stair_test_course_has_three_wheel_high_risers() -> None:

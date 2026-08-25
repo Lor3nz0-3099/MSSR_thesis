@@ -116,6 +116,10 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         simulation_command.append("--obstacle-course")
     if _as_bool(LaunchConfiguration("stair_test_course").perform(context)):
         simulation_command.append("--stair-test-course")
+    if _as_bool(LaunchConfiguration("button_test_course").perform(context)):
+        simulation_command.append("--button-test-course")
+    if _as_bool(LaunchConfiguration("gap_test_course").perform(context)):
+        simulation_command.append("--gap-test-course")
     if _as_bool(LaunchConfiguration("headless").perform(context)):
         simulation_command.append("--headless")
 
@@ -204,6 +208,18 @@ def generate_launch_description() -> LaunchDescription:
                 "stair_test_course",
                 default_value="false",
                 description="Spawn the isolated three-step Snake8 test stage.",
+            ),
+            DeclareLaunchArgument(
+                "button_test_course",
+                default_value="false",
+                description=(
+                    "Spawn the isolated MobileManipulator8 button test stage."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "gap_test_course",
+                default_value="false",
+                description="Spawn the isolated Snake8 gap test stage.",
             ),
             DeclareLaunchArgument(
                 "headless",

@@ -147,6 +147,22 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "behavior test course"
         ),
     )
+    course_group.add_argument(
+        "--button-test-course",
+        action="store_true",
+        help=(
+            "Replace the infinite floor with an isolated flat "
+            "MobileManipulator8 button test course"
+        ),
+    )
+    course_group.add_argument(
+        "--gap-test-course",
+        action="store_true",
+        help=(
+            "Replace the infinite floor with an isolated equal-bank "
+            "Snake8 gap test course"
+        ),
+    )
     parser.add_argument(
         "--disable-staging-collision-avoidance",
         action="store_true",
@@ -273,6 +289,8 @@ def main() -> None:
                 spawn_radius_m=args.spawn_radius,
                 manual_obstacle_course=args.obstacle_course,
                 stair_test_course=args.stair_test_course,
+                button_test_course=args.button_test_course,
+                gap_test_course=args.gap_test_course,
                 stair_rise_m=stair_spec.rise_m,
                 stair_depth_m=stair_spec.tread_depth_m,
                 stair_count=stair_spec.step_count,

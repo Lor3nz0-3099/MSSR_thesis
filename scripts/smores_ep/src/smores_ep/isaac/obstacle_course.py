@@ -158,6 +158,47 @@ class StairTestCourse:
         }
 
 
+@dataclass(frozen=True)
+class ButtonTestCourse:
+    """Flat isolated fixture for MobileManipulator8 button validation."""
+
+    boxes: tuple[CourseBox, ...]
+    button_center_xyz_m: tuple[float, float, float]
+    base_standoff_xy_m: tuple[float, float]
+    base_standoff_yaw_rad: float
+
+    def to_observation(self) -> dict[str, Any]:
+        return {
+            "frame_id": "world",
+            "course_profile": "mobile_manipulator8_button_test",
+            "button": {
+                "center_xyz_m": list(self.button_center_xyz_m),
+                "base_standoff_xy_m": list(self.base_standoff_xy_m),
+                "base_standoff_yaw_rad": self.base_standoff_yaw_rad,
+            },
+        }
+
+
+@dataclass(frozen=True)
+class GapTestCourse:
+    """Flat equal-height banks separated by one isolated gap."""
+
+    boxes: tuple[CourseBox, ...]
+    gap_interval_x_m: tuple[float, float]
+
+    def to_observation(self) -> dict[str, Any]:
+        near_x_m, far_x_m = self.gap_interval_x_m
+        return {
+            "frame_id": "world",
+            "course_profile": "snake8_gap_test",
+            "gap": {
+                "near_edge_x_m": near_x_m,
+                "far_edge_x_m": far_x_m,
+                "width_m": far_x_m - near_x_m,
+            },
+        }
+
+
 def manual_obstacle_course() -> ManualObstacleCourse:
     """Return a compact +X course sized for an eight-module morphology.
 
@@ -271,6 +312,74 @@ def manual_obstacle_course() -> ManualObstacleCourse:
         stair_top_heights_m=(0.065, 0.13, 0.195),
         button_center_xyz_m=(2.65, 0.455, 0.365),
         exit_center_xyz_m=(3.55, 0.0, 0.385),
+    )
+
+
+def mobile_manipulator_button_test_course() -> ButtonTestCourse:
+    """Return a continuous floor with only the wall-mounted button."""
+
+    platform_color = (0.24, 0.27, 0.31)
+    button_center = (0.85, 0.475, 0.170)
+    return ButtonTestCourse(
+        boxes=(
+            CourseBox(
+                "TestPlatform",
+                (0.25, 0.0, -0.01),
+                (2.50, 1.80, 0.02),
+                platform_color,
+                semantic="button_test_platform",
+            ),
+            CourseBox(
+                "ButtonWall",
+                (button_center[0], 0.53, 0.150),
+                (0.18, 0.08, 0.30),
+                (0.35, 0.37, 0.40),
+                semantic="button_support",
+            ),
+            CourseBox(
+                "ButtonPlunger",
+                button_center,
+                (0.08, 0.04, 0.08),
+                (0.85, 0.08, 0.06),
+                semantic="button",
+            ),
+        ),
+        button_center_xyz_m=button_center,
+        base_standoff_xy_m=(button_center[0], button_center[1] - 0.20),
+        base_standoff_yaw_rad=0.5 * math.pi,
+    )
+
+
+def snake8_gap_test_course() -> GapTestCourse:
+    """Return a 200 mm gap with coplanar approach and landing banks."""
+
+    platform_color = (0.24, 0.27, 0.31)
+    near_x_m = 0.55
+    far_x_m = 0.75
+    approach_start_x_m = -1.00
+    landing_end_x_m = 2.00
+    return GapTestCourse(
+        boxes=(
+            CourseBox(
+                "NearBank",
+                (
+                    0.5 * (approach_start_x_m + near_x_m),
+                    0.0,
+                    -0.01,
+                ),
+                (near_x_m - approach_start_x_m, 1.20, 0.02),
+                platform_color,
+                semantic="gap_test_near_bank",
+            ),
+            CourseBox(
+                "FarBank",
+                (0.5 * (far_x_m + landing_end_x_m), 0.0, -0.01),
+                (landing_end_x_m - far_x_m, 1.20, 0.02),
+                platform_color,
+                semantic="gap_test_far_bank",
+            ),
+        ),
+        gap_interval_x_m=(near_x_m, far_x_m),
     )
 
 
@@ -401,4 +510,26 @@ def install_snake8_stair_test_course(
 
     course = snake8_stair_test_course(spec)
     _install_course_boxes(stage, "/World/Snake8StairTestCourse", course.boxes)
+    return course
+
+
+def install_mobile_manipulator_button_test_course(
+    stage: Any,
+) -> ButtonTestCourse:
+    """Replace the infinite floor with the isolated button fixture."""
+
+    course = mobile_manipulator_button_test_course()
+    _install_course_boxes(
+        stage,
+        "/World/MobileManipulatorButtonTestCourse",
+        course.boxes,
+    )
+    return course
+
+
+def install_snake8_gap_test_course(stage: Any) -> GapTestCourse:
+    """Replace the infinite floor with the isolated equal-bank gap."""
+
+    course = snake8_gap_test_course()
+    _install_course_boxes(stage, "/World/Snake8GapTestCourse", course.boxes)
     return course
