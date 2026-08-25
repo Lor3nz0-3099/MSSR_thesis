@@ -273,10 +273,12 @@ RESTORE_GAP_NEUTRAL -> LIFT_HEAD_DRAWBRIDGE
 The planner computes how many terminal modules must be lifted from the live
 gap width, wheel radius, link spacing and support margins.  It raises that
 entire segment about one hinge by 1.20 rad by default: no downstream
-counter-bend cancels the drawbridge slope.  Because the assembled TOP-BOTTOM
-chain raises its higher-index head side with negative logical TILT, the head
-pivot receives `-drawbridge_lift_angle_rad`; the later tail lift uses the
-positive spatial mirror.  The grounded pivot is then driven
+counter-bend cancels the drawbridge slope.  For the nominal 200 mm gap, `v3`
+is the fifth module from the head/right and receives positive TILT so that
+`v4..v7` form the raised drawbridge.  A small forward wheel reaction on `v2`
+keeps the rear support on the floor instead of letting the symmetric chain
+rotate about its front half; the tail lift uses the spatially mirrored sign
+and reaction.  The grounded pivot is then driven
 to the near edge before the rigid segment is lowered across the opening, with
 at least one supported module on each bank.  Once the head is down, the body
 advances until the first front anchor is safely on the far bank.  The same

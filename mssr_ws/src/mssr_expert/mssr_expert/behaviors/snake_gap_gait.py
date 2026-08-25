@@ -146,6 +146,11 @@ class SnakeGapGaitPlanner:
             )
         approach_speed = self._speed(parameters, "approach_linear_m_s", 0.050)
         crossing_speed = self._speed(parameters, "linear_m_s", 0.040)
+        fold_bias_speed = self._speed(
+            parameters,
+            "drawbridge_bias_linear_m_s",
+            0.020,
+        )
 
         lift_angle = self._number(
             parameters,
@@ -172,15 +177,16 @@ class SnakeGapGaitPlanner:
         tail_hinge_index = lifted_count - 1
         front_anchor_index = tail_hinge_index + 1
         head_lift = list(neutral)
-        # In the assembled TOP-BOTTOM Snake8 chain, negative TILT at the
-        # pivot raises the higher-index (head) side.  Positive TILT raises
-        # the lower-index tail instead, as confirmed by the live Isaac pose.
-        # Use one hinge only: no downstream counter-bend may flatten it.
-        head_lift[head_pivot_index] = -lift_angle
+        # v3 is the fifth module from the head for the nominal 200 mm gap.
+        # Its positive TILT raises the four higher-index head modules.  The
+        # immediately rearward wheel supplies a small forward reaction while
+        # the hinge moves; otherwise the nearly symmetric free chain can
+        # satisfy the same relative angle by lifting its rear half instead.
+        head_lift[head_pivot_index] = lift_angle
         tail_lift = list(neutral)
         # Spatial mirror: the already landed front segment anchors an equal
         # number of tail modules while they are carried across the opening.
-        tail_lift[tail_hinge_index] = lift_angle
+        tail_lift[tail_hinge_index] = -lift_angle
 
         pivot_at_near_edge = (
             gap.near_edge_x_m - wheel_radius - edge_clearance
@@ -205,6 +211,7 @@ class SnakeGapGaitPlanner:
                 neutral,
                 tuple(head_lift),
                 ordered,
+                pusher=(head_pivot_index - 1, fold_bias_speed),
             ),
             self._drive_to(
                 "ADVANCE_HEAD_PIVOT_TO_EDGE",
@@ -233,6 +240,7 @@ class SnakeGapGaitPlanner:
                 neutral,
                 tuple(tail_lift),
                 ordered,
+                pusher=(front_anchor_index, -fold_bias_speed),
             ),
             self._drive_to(
                 "PULL_TAIL_TO_SAFE_LANDING",
@@ -286,6 +294,7 @@ class SnakeGapGaitPlanner:
         assignments: Sequence[AssignedModule],
         *,
         all_targets: bool = False,
+        pusher: tuple[int, float] | None = None,
     ) -> BehaviorProgramStep:
         changed = tuple(
             range(len(target))
@@ -307,6 +316,14 @@ class SnakeGapGaitPlanner:
                     target_role=assignments[index].target_role,
                     tolerance_rad=0.08,
                     coordination_group=f"gap:{phase}",
+                    pusher_module_id=(
+                        assignments[pusher[0]].module_id
+                        if pusher is not None
+                        else None
+                    ),
+                    pusher_linear_m_s=(
+                        pusher[1] if pusher is not None else None
+                    ),
                     max_servo_error_rad=0.12,
                     angle_reference="captured_neutral",
                 )

@@ -135,10 +135,10 @@ def test_head_lands_before_body_advances_and_tail_is_lifted() -> None:
 
     # A 200 mm gap plus two wheel supports requires four raised modules.
     # The single v3 hinge makes a real drawbridge; there is no cancelling bend.
-    assert head["m3"] == pytest.approx(-1.20)
+    assert head["m3"] == pytest.approx(1.20)
     assert sum(abs(value) > 1e-9 for value in head.values()) == 1
     assert all(value == pytest.approx(0.0) for value in landed.values())
-    assert tail["m3"] == pytest.approx(1.20)
+    assert tail["m3"] == pytest.approx(-1.20)
     assert sum(abs(value) > 1e-9 for value in tail.values()) == 1
     assert all(value == pytest.approx(0.0) for value in lowered.values())
 
@@ -160,6 +160,16 @@ def test_head_lands_before_body_advances_and_tail_is_lifted() -> None:
     assert pull.position_goal.target_x_m == pytest.approx(
         0.75 + 4 * 0.07777 + 0.03106 + 0.006
     )
+    head_target = next(
+        step for step in program if step.phase == "LIFT_HEAD_DRAWBRIDGE"
+    ).posture_targets[0]
+    tail_target = next(
+        step for step in program if step.phase == "LIFT_TAIL_DRAWBRIDGE"
+    ).posture_targets[0]
+    assert head_target.pusher_module_id == "m2"
+    assert head_target.pusher_linear_m_s == pytest.approx(0.020)
+    assert tail_target.pusher_module_id == "m4"
+    assert tail_target.pusher_linear_m_s == pytest.approx(-0.020)
 
 
 def test_drawbridge_module_count_scales_with_gap_width() -> None:
@@ -175,8 +185,8 @@ def test_drawbridge_module_count_scales_with_gap_width() -> None:
     )
 
     # 100 mm gap plus wheel support margins requires three terminal modules.
-    assert head["m4"] == pytest.approx(-1.20)
-    assert tail["m2"] == pytest.approx(1.20)
+    assert head["m4"] == pytest.approx(1.20)
+    assert tail["m2"] == pytest.approx(-1.20)
     assert approach.position_goal.module_id == "m4"
     assert approach.active_target_roles == ROLES[:5]
 
@@ -201,10 +211,10 @@ def test_top_bottom_chain_raises_head_before_tail() -> None:
 
     assert len(head_step.posture_targets) == 1
     assert head_step.posture_targets[0].target_role == "snake_center_rear"
-    assert head_step.posture_targets[0].angle_rad < 0.0
+    assert head_step.posture_targets[0].angle_rad > 0.0
     assert len(tail_step.posture_targets) == 1
     assert tail_step.posture_targets[0].target_role == "snake_center_rear"
-    assert tail_step.posture_targets[0].angle_rad > 0.0
+    assert tail_step.posture_targets[0].angle_rad < 0.0
     assert program.index(head_step) < program.index(tail_step)
 
 
