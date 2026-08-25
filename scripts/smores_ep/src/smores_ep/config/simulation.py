@@ -325,6 +325,7 @@ class SelfAssemblySimulationConfig:
     log_interval: int = 240
     simple_visuals: bool = False
     realtime_pacing: bool = False
+    simulation_speed_factor: float = 1.0
     include_contact_candidates: bool = True
     primitive_goal_file: Path = Path("configs/smores_primitive_goal.json")
     primitive_cancel_file: Path = Path("configs/smores_primitive_cancel.json")
@@ -347,6 +348,11 @@ class SelfAssemblySimulationConfig:
     spawn_radius_m: float = 0.34
     manual_obstacle_course: bool = False
     stair_test_course: bool = False
+    stair_rise_m: float = 0.065
+    stair_depth_m: float = 0.280
+    stair_count: int = 3
+    stair_first_riser_x_m: float = 0.650
+    stair_seed: int | None = None
     staging_collision_avoidance: bool = True
     staging_center_clearance_m: float = 0.110
     staging_waypoint_margin_m: float = 0.015
@@ -396,6 +402,10 @@ class SelfAssemblySimulationConfig:
             self.center_y_m,
             self.outer_yaw_deg,
             self.spawn_radius_m,
+            self.simulation_speed_factor,
+            self.stair_rise_m,
+            self.stair_depth_m,
+            self.stair_first_riser_x_m,
             self.staging_center_clearance_m,
             self.staging_waypoint_margin_m,
             self.max_wheel_speed_rad_s,
@@ -412,8 +422,16 @@ class SelfAssemblySimulationConfig:
             or self.center_y_m <= self.outer_y_m
             or self.max_wheel_speed_rad_s <= 0.0
             or self.action_command_timeout_s <= 0.0
+            or self.simulation_speed_factor <= 0.0
         ):
             raise ValueError("Self-assembly distances and speeds are invalid")
+        if (
+            not 0.020 <= self.stair_rise_m <= 0.075
+            or not 0.150 <= self.stair_depth_m <= 0.500
+            or not 1 <= self.stair_count <= 12
+            or self.stair_first_riser_x_m <= 0.30
+        ):
+            raise ValueError("Stair-test geometry is outside supported bounds")
         if any(
             not str(path)
             for path in (

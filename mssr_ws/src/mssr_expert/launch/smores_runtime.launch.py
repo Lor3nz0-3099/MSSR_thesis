@@ -91,7 +91,23 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         str(primitive_cancel_file),
         "--primitive-status-file",
         str(primitive_status_file),
+        "--steps",
+        LaunchConfiguration("simulation_steps").perform(context),
+        "--simulation-speed-factor",
+        LaunchConfiguration("simulation_speed_factor").perform(context),
     ]
+    stair_seed = LaunchConfiguration("stair_seed").perform(context).strip()
+    if stair_seed:
+        simulation_command.extend(("--stair-seed", stair_seed))
+    for launch_name, option_name in (
+        ("stair_rise_m", "--stair-rise-m"),
+        ("stair_depth_m", "--stair-depth-m"),
+        ("stair_count", "--stair-count"),
+        ("stair_first_riser_x_m", "--stair-first-riser-x-m"),
+    ):
+        value = LaunchConfiguration(launch_name).perform(context).strip()
+        if value:
+            simulation_command.extend((option_name, value))
     if _as_bool(LaunchConfiguration("performance").perform(context)):
         simulation_command.append("--performance")
     if _as_bool(LaunchConfiguration("simple_visuals").perform(context)):
@@ -193,6 +209,57 @@ def generate_launch_description() -> LaunchDescription:
                 "headless",
                 default_value="false",
                 description="Run Isaac without its GUI.",
+            ),
+            DeclareLaunchArgument(
+                "simulation_steps",
+                default_value="0",
+                description=(
+                    "Maximum Isaac physics steps; headless batch runs should "
+                    "set an explicit episode guard."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "simulation_speed_factor",
+                default_value="1.0",
+                description=(
+                    "Simulated seconds per wall second when performance "
+                    "pacing is enabled."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "stair_seed",
+                default_value="",
+                description=(
+                    "Optional seed for the conservative uniform-stair "
+                    "generator."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "stair_rise_m",
+                default_value="",
+                description=(
+                    "Optional uniform stair rise override in metres; empty "
+                    "uses the reference or seeded value."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "stair_depth_m",
+                default_value="",
+                description=(
+                    "Optional uniform tread-depth override in metres."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "stair_count",
+                default_value="",
+                description="Optional number of uniform stair risers.",
+            ),
+            DeclareLaunchArgument(
+                "stair_first_riser_x_m",
+                default_value="",
+                description=(
+                    "Optional world-X coordinate override for the first riser."
+                ),
             ),
             DeclareLaunchArgument(
                 "ros_domain_id",

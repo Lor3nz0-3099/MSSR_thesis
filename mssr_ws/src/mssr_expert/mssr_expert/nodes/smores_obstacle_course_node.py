@@ -56,6 +56,38 @@ from mssr_expert.primitives.common import (
 from mssr_expert.utils.json_io import dict_to_string_msg, string_msg_to_dict
 
 
+def end_effector_contact_point(
+    module: Mapping[str, Any],
+) -> tuple[float, float, float]:
+    """Return the free TOP-face centre, falling back to the module centre."""
+
+    connectors = module.get("connectors", ())
+    if isinstance(connectors, list):
+        for connector in connectors:
+            if not isinstance(connector, Mapping):
+                continue
+            connector_id = str(
+                connector.get("connector_id", connector.get("face_name", ""))
+            ).upper()
+            position = connector.get("position_world")
+            if connector_id == "TOP" and isinstance(position, list | tuple):
+                if len(position) >= 3:
+                    return tuple(float(value) for value in position[:3])
+    return module_position(module)
+
+
+def button_contact_distance_m(
+    module: Mapping[str, Any],
+    button_center_xyz_m: tuple[float, float, float],
+) -> float:
+    """Measure simulated Vicon distance from end-effector face to plunger."""
+
+    return distance_3d(
+        end_effector_contact_point(module),
+        button_center_xyz_m,
+    )
+
+
 @dataclass(frozen=True)
 class _NavigationEngine:
     mode: str
@@ -130,7 +162,10 @@ class SmoresObstacleCourseNode(Node):
         self.declare_parameter("dataset_path", "logs/datasets/smores_obstacle_course_il.jsonl")
         self.declare_parameter("control_rate_hz", 20.0)
         self.declare_parameter("dataset_log_period", 5)
-        self.declare_parameter("button_contact_radius_m", 0.10)
+        self.declare_parameter("button_contact_radius_m", 0.040)
+        self.declare_parameter("button_contact_speed_m_s", 0.012)
+        self.declare_parameter("button_alignment_tolerance_m", 0.050)
+        self.declare_parameter("button_navigation_tolerance_m", 0.025)
         self.declare_parameter("goal_min_modules_past_exit", 4)
         self.declare_parameter("gap_approach_margin_m", 0.06)
         self.declare_parameter("gap_clearance_margin_m", 0.08)
@@ -175,7 +210,15 @@ class SmoresObstacleCourseNode(Node):
         course_step = self._steps[self._step_index]
         if self._awaiting_completion_event:
             if course_step.requires_button and not self._button_pressed():
-                self._publish_state(course_step, "WAITING_BUTTON_CONTACT", False, False, "End effector has not reached the button.")
+                decision = self._approach_button_contact(current_graph)
+                self._publish_actions(course_step, decision.locomotion, decision)
+                self._publish_state(
+                    course_step,
+                    decision.state,
+                    False,
+                    False,
+                    decision.message,
+                )
                 return
             if course_step.requires_goal and not self._goal_reached():
                 self._publish_state(course_step, "WAITING_EXIT", False, False, "Robot has not crossed the exit plane.")
@@ -374,8 +417,16 @@ class SmoresObstacleCourseNode(Node):
                 self._neutral_assignment_signature = assignment_signature
             neutral_tilts = self._neutral_tilt_rad_by_module
         program_override = None
-        if course_step.behavior == "crawl_stairs":
-            program_override = self._stair_gait_planner.plan(
+        if course_step.behavior in {
+            "crawl_stairs",
+            "crawl_stairs_arch_wave",
+        }:
+            planner = (
+                self._stair_gait_planner.plan_arch_wave
+                if course_step.behavior == "crawl_stairs_arch_wave"
+                else self._stair_gait_planner.plan
+            )
+            program_override = planner(
                 current_graph,
                 assignments,
                 course_step.parameters or {},
@@ -573,7 +624,18 @@ class SmoresObstacleCourseNode(Node):
                 return self._navigate_stair(current_graph, modules, landmarks, stair_index, target_x)
             if mode == "button_standoff":
                 x_m, y_m, _ = landmarks.button_center_xyz_m
-                return self._navigate_pose(current_graph, modules, (x_m, y_m - 0.20), math.pi / 2.0, "BUTTON_STANDOFF")
+                return self._navigate_pose(
+                    current_graph,
+                    modules,
+                    (x_m, y_m - 0.20),
+                    math.pi / 2.0,
+                    "BUTTON_STANDOFF",
+                    position_tolerance_m=float(
+                        self.get_parameter(
+                            "button_navigation_tolerance_m"
+                        ).value
+                    ),
+                )
             if mode == "button_retreat":
                 x_m, y_m, _ = landmarks.button_center_xyz_m
                 return self._navigate_pose(current_graph, modules, (x_m, y_m - 0.40), -math.pi / 2.0, "BUTTON_RETREAT")
@@ -628,12 +690,17 @@ class SmoresObstacleCourseNode(Node):
         target_xy_m: tuple[float, float],
         final_yaw_rad: float,
         phase: str,
+        position_tolerance_m: float | None = None,
     ) -> _NavigationDecision:
         root_position, root_yaw_rad = self._root_pose(modules)
         delta_x_m = target_xy_m[0] - root_position[0]
         delta_y_m = target_xy_m[1] - root_position[1]
         distance_m = math.hypot(delta_x_m, delta_y_m)
-        tolerance_m = float(self.get_parameter("navigation_position_tolerance_m").value)
+        tolerance_m = (
+            float(self.get_parameter("navigation_position_tolerance_m").value)
+            if position_tolerance_m is None
+            else float(position_tolerance_m)
+        )
         heading_rad = math.atan2(delta_y_m, delta_x_m) if distance_m > tolerance_m else final_yaw_rad
         heading_error_rad = _wrap_angle(heading_rad - root_yaw_rad)
         if distance_m <= tolerance_m and abs(heading_error_rad) <= 0.15:
@@ -718,7 +785,86 @@ class SmoresObstacleCourseNode(Node):
         module = extract_modules(self._latest_observation).get(end_effector)
         if module is None:
             return False
-        return distance_3d(module_position(module), center) <= float(self.get_parameter("button_contact_radius_m").value)
+        return button_contact_distance_m(module, center) <= float(
+            self.get_parameter("button_contact_radius_m").value
+        )
+
+    def _approach_button_contact(
+        self,
+        current_graph: Any,
+    ) -> _NavigationDecision:
+        """Creep with the pressed posture held until the free face contacts."""
+
+        try:
+            center = CourseLandmarks.from_observation(
+                self._latest_observation
+            ).button_center_xyz_m
+        except CourseLandmarkError as error:
+            return _NavigationDecision(
+                "WAITING_COURSE_GEOMETRY",
+                "BUTTON_CONTACT",
+                {},
+                message=str(error),
+            )
+        if self._active_target is None:
+            return _NavigationDecision(
+                "WAITING_BUTTON_ASSIGNMENT",
+                "BUTTON_CONTACT",
+                {},
+                message="Mobile-manipulator target assignment is unavailable.",
+            )
+        roles = target_roles_from_graph(self._active_target)
+        end_effector = next(
+            (
+                module_id
+                for vertex, module_id in self._assignment.items()
+                if roles[vertex]["target_role"] == "end_effector"
+            ),
+            None,
+        )
+        module = extract_modules(self._latest_observation).get(
+            end_effector or ""
+        )
+        if module is None:
+            return _NavigationDecision(
+                "WAITING_BUTTON_POSE",
+                "BUTTON_CONTACT",
+                {},
+                message="End-effector world pose is unavailable.",
+            )
+        contact = end_effector_contact_point(module)
+        distance_m = distance_3d(contact, center)
+        alignment_error_m = math.hypot(
+            contact[0] - center[0],
+            contact[2] - center[2],
+        )
+        alignment_tolerance_m = float(
+            self.get_parameter("button_alignment_tolerance_m").value
+        )
+        if alignment_error_m > alignment_tolerance_m:
+            return _NavigationDecision(
+                "WAITING_BUTTON_ALIGNMENT",
+                "BUTTON_CONTACT",
+                {},
+                message=(
+                    "End-effector cannot safely creep toward the plunger: "
+                    f"cross-axis error={alignment_error_m:.3f}m."
+                ),
+            )
+        locomotion = self._drive_locomotion(
+            current_graph,
+            float(self.get_parameter("button_contact_speed_m_s").value),
+            0.0,
+        )
+        return _NavigationDecision(
+            "RUNNING_BUTTON_CONTACT",
+            "BUTTON_CONTACT",
+            locomotion,
+            message=(
+                f"End-effector face distance={distance_m:.3f}m; "
+                "creeping toward the button."
+            ),
+        )
 
     def _goal_reached(self) -> bool:
         try:

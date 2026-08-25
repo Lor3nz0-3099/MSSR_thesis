@@ -4,7 +4,9 @@ from __future__ import annotations
 import pytest
 
 from smores_ep.isaac.obstacle_course import (
+    UniformStairSpec,
     manual_obstacle_course,
+    sample_uniform_stair_spec,
     snake8_stair_test_course,
 )
 
@@ -79,6 +81,19 @@ def test_snake8_stair_test_course_has_three_wheel_high_risers() -> None:
             course.stair_top_heights_m,
         )
     ) == pytest.approx((0.065, 0.065, 0.065))
+    boxes = {box.name: box for box in course.boxes}
+    assert boxes["StartPlatform"].center_xyz_m == pytest.approx(
+        (-0.175, 0.0, -0.01)
+    )
+    assert boxes["Stair01"].center_xyz_m == pytest.approx(
+        (0.79, 0.0, 0.0325)
+    )
+    assert boxes["Stair03"].size_xyz_m == pytest.approx(
+        (0.28, 1.20, 0.195)
+    )
+    assert boxes["UpperDeck"].center_xyz_m == pytest.approx(
+        (2.15, 0.0, 0.0975)
+    )
 
 
 def test_snake8_stair_test_observation_is_isolated_from_full_course() -> None:
@@ -87,6 +102,16 @@ def test_snake8_stair_test_observation_is_isolated_from_full_course() -> None:
     assert course.to_observation() == {
         "frame_id": "world",
         "course_profile": "snake8_stair_test",
+        "scenario": {
+            "generator": "uniform_stair_v1",
+            "seed": None,
+            "rise_m": 0.065,
+            "tread_depth_m": 0.28,
+            "step_count": 3,
+            "first_riser_x_m": 0.65,
+            "width_m": 1.2,
+            "upper_deck_length_m": 1.32,
+        },
         "stairs": {
             "top_heights_m": [0.065, 0.13, 0.195],
             "first_riser_x_m": 0.65,
@@ -98,3 +123,65 @@ def test_snake8_stair_test_observation_is_isolated_from_full_course() -> None:
         "stair_test_riser",
         "stair_test_upper_deck",
     }
+
+
+def test_seeded_uniform_stair_sampling_is_reproducible_and_conservative() -> None:
+    first = sample_uniform_stair_spec(17)
+    second = sample_uniform_stair_spec(17)
+
+    assert first == second
+    assert first.seed == 17
+    assert 0.050 <= first.rise_m <= 0.065
+    assert 0.250 <= first.tread_depth_m <= 0.320
+    assert 2 <= first.step_count <= 4
+
+
+def test_parameterized_stair_geometry_and_metadata_share_one_spec() -> None:
+    spec = UniformStairSpec(
+        rise_m=0.055,
+        tread_depth_m=0.310,
+        step_count=4,
+        first_riser_x_m=0.700,
+        seed=23,
+    )
+    course = snake8_stair_test_course(spec)
+    risers = tuple(
+        box for box in course.boxes if box.semantic == "stair_test_riser"
+    )
+
+    assert course.stair_top_heights_m == pytest.approx(
+        (0.055, 0.110, 0.165, 0.220)
+    )
+    assert len(risers) == 4
+    for index, riser in enumerate(risers):
+        assert riser.center_xyz_m[0] == pytest.approx(
+            spec.first_riser_x_m + (index + 0.5) * spec.tread_depth_m
+        )
+        assert riser.center_xyz_m[2] == pytest.approx(
+            0.5 * spec.top_heights_m[index]
+        )
+        assert riser.size_xyz_m[0] == pytest.approx(spec.tread_depth_m)
+        assert riser.size_xyz_m[2] == pytest.approx(
+            spec.top_heights_m[index]
+        )
+    observation = course.to_observation()
+    assert observation["scenario"] == {
+        "generator": "uniform_stair_v1",
+        **spec.to_dict(),
+    }
+    assert observation["stairs"]["top_heights_m"] == pytest.approx(
+        spec.top_heights_m
+    )
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    (
+        {"rise_m": 0.080},
+        {"tread_depth_m": 0.100},
+        {"step_count": 0},
+    ),
+)
+def test_uniform_stair_spec_rejects_unsupported_geometry(kwargs: dict) -> None:
+    with pytest.raises(ValueError):
+        UniformStairSpec(**kwargs)

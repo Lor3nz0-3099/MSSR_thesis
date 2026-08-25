@@ -133,7 +133,9 @@ ros2 run mssr_expert mssr_smores_morphology_behavior_node
 
 Before running the complete course, the stair gait can be validated on a
 dedicated stage without Nav2, the gap, the button, or the task-achievement
-node. It contains three 65 mm risers with 280 mm treads. Start simulation,
+node. Its reference preset contains three 65 mm risers with 280 mm treads.
+The same generator also accepts an explicit uniform rise, tread depth, count
+and first-riser position, or a reproducible conservative `stair_seed`. Start simulation,
 file bridge and the single morphology behavior node together:
 
 ```bash
@@ -144,6 +146,21 @@ ros2 launch mssr_expert smores_runtime.launch.py \
   stair_test_course:=true \
   performance:=true
 ```
+
+For example, a seeded conservative fixture is selected without changing the
+behavior:
+
+```bash
+ros2 launch mssr_expert smores_runtime.launch.py \
+  stair_test_course:=true \
+  stair_seed:=17 \
+  performance:=true
+```
+
+An explicit fixture can instead use `stair_rise_m:=0.055`,
+`stair_depth_m:=0.310`, `stair_count:=4` and
+`stair_first_riser_x_m:=0.700`.  Geometry and robot-graph metadata are built
+from the same immutable specification.
 
 The Isaac assembly executor uses 55 mm/s for collision-aware free-space
 staging and 35 mm/s for the local connector-alignment arc.  The final magnetic
@@ -216,6 +233,40 @@ embedding the coordinates of the test fixture.  Supporting variable rises,
 curved approaches or an unknown stair heading requires a more general course
 observation and is intentionally left explicit rather than hidden behind
 fixture-specific constants.
+
+The physically successful reference and its exact Git provenance are frozen
+in `docs/validated_behaviors/snake8_crawl_stairs_arch_wave.md`.
+
+### Reproducible headless robustness batch
+
+Build and source the workspace, then create a fresh output directory for each
+campaign:
+
+```bash
+cd ~/MSSR_thesis
+source /opt/ros/humble/setup.bash
+source mssr_ws/install/setup.bash
+
+python3 scripts/smores_ep/run_stair_headless_batch.py \
+  --seeds 0:3 \
+  --include-reference \
+  --continue-on-failure \
+  --output-dir logs/stair_headless_batch/campaign_001
+```
+
+Keep the default `--simulation-speed-factor 1.0` for certified rollouts.  A
+2x diagnostic run changed the coupled ROS/physics timing and lost alignment;
+headless mode still removes GUI/rendering overhead without changing simulated
+time relative to the control loops.
+
+Each episode starts Isaac without a GUI, assembles Snake8, executes the
+validated arch wave, and stores `manifest.json`, process logs, the assembly
+dataset and `result.json`.  A success requires both the terminal behavior
+status and an independent final robot-graph check: eight module poses, seven
+latched connections and all module centres at the top-deck elevation.  The
+wall-clock limits are process-stall guards only; gait transitions continue to
+use live geometric goals.  `--plan-only` generates manifests without starting
+Isaac.  Failed episodes remain diagnostics and are not positive BC samples.
 
 `crawl_stairs` reads module poses and Isaac stair landmarks from the robot
 graph. It measures the connected-module pitch and derives the bend angle from
@@ -455,11 +506,12 @@ the measured world positions rather than elapsed time:
 
 ```bash
 run_behavior snake8 stair-straight-01 straighten '{}'
-run_behavior snake8 stair-crawl-01 crawl_stairs \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"head_prelift_lookahead_m":0.080,"head_prelift_ramp_m":0.040,"head_hook_transfer_m":0.040,"head_overstep_clearance_m":0.010,"crawl_goal_tolerance_m":0.004,"upper_deck_advance_distance_m":0.080}'
+run_behavior snake8 stair-arch-01 crawl_stairs_arch_wave \
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"crawl_goal_tolerance_m":0.004}'
 ```
 
-The unified obstacle-course policy uses this same `crawl_stairs` program once;
+The unified obstacle-course policy uses this same `crawl_stairs_arch_wave`
+program once;
 it no longer repeats the timed `lift_head -> hook_step -> pull_over_step`
 sequence for each riser. Then stop the completed reconfiguration expert.
 
@@ -481,15 +533,17 @@ register the contact:
 ```bash
 run_behavior mobile_manipulator8 manip-approach-01 drive '{"linear_m_s":0.020,"yaw_rate_rad_s":0.0,"duration_s":2.0}'
 run_behavior mobile_manipulator8 manip-press-01 press_button '{}'
-# The current course exposes a collidable red plunger but no contact sensor yet.
 run_behavior mobile_manipulator8 manip-release-01 release_button '{}'
 run_behavior mobile_manipulator8 manip-retreat-01 drive '{"linear_m_s":-0.020,"yaw_rate_rad_s":0.0,"duration_s":2.0}'
 ```
 
-The press pose is open-loop and assumes the button has already been placed in
-the end-effector workspace. Contact confirmation belongs to the obstacle task
-expert, while this morphology layer provides deterministic reach/hold/release
-motions.
+The direct commands expose deterministic reach/hold/release postures.  In the
+unified obstacle-course expert the preceding `button_standoff` phase aligns
+the base to 25 mm, the press posture is held, and the grounded locomotors creep
+at 12 mm/s until the live world position of the free TOP face is within 40 mm
+of the plunger centre.  A cross-axis error above 50 mm stops the creep instead
+of pushing blindly.  Only verified contact advances to release and retreat;
+there is no locomotion timer in this closed-loop course path.
 
 Stop the completed reconfiguration expert in Terminal 3.
 

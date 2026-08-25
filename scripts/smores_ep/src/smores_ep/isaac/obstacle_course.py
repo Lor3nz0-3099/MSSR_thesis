@@ -3,7 +3,81 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
+import random
 from typing import Any
+
+
+REFERENCE_STAIR_RISE_M = 0.065
+REFERENCE_STAIR_DEPTH_M = 0.28
+REFERENCE_STAIR_COUNT = 3
+REFERENCE_FIRST_RISER_X_M = 0.65
+
+
+@dataclass(frozen=True)
+class UniformStairSpec:
+    """Reproducible geometry for one isolated uniform staircase episode."""
+
+    rise_m: float = REFERENCE_STAIR_RISE_M
+    tread_depth_m: float = REFERENCE_STAIR_DEPTH_M
+    step_count: int = REFERENCE_STAIR_COUNT
+    first_riser_x_m: float = REFERENCE_FIRST_RISER_X_M
+    seed: int | None = None
+    width_m: float = 1.20
+    upper_deck_length_m: float = 1.32
+
+    def __post_init__(self) -> None:
+        numeric = (
+            self.rise_m,
+            self.tread_depth_m,
+            self.first_riser_x_m,
+            self.width_m,
+            self.upper_deck_length_m,
+        )
+        if not all(math.isfinite(value) for value in numeric):
+            raise ValueError("Uniform stair dimensions must be finite")
+        if not 0.020 <= self.rise_m <= 0.075:
+            raise ValueError("Uniform stair rise must be between 20 and 75 mm")
+        if not 0.150 <= self.tread_depth_m <= 0.500:
+            raise ValueError(
+                "Uniform stair tread depth must be between 150 and 500 mm"
+            )
+        if not 1 <= self.step_count <= 12:
+            raise ValueError("Uniform stair count must be between 1 and 12")
+        if self.first_riser_x_m <= 0.30:
+            raise ValueError("First riser must leave an approach platform")
+        if self.width_m <= 0.40 or self.upper_deck_length_m <= 0.20:
+            raise ValueError("Uniform stair platform dimensions are invalid")
+
+    @property
+    def top_heights_m(self) -> tuple[float, ...]:
+        return tuple(
+            self.rise_m * index
+            for index in range(1, self.step_count + 1)
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "seed": self.seed,
+            "rise_m": self.rise_m,
+            "tread_depth_m": self.tread_depth_m,
+            "step_count": self.step_count,
+            "first_riser_x_m": self.first_riser_x_m,
+            "width_m": self.width_m,
+            "upper_deck_length_m": self.upper_deck_length_m,
+        }
+
+
+def sample_uniform_stair_spec(seed: int) -> UniformStairSpec:
+    """Sample the initial, deliberately conservative robustness envelope."""
+
+    generator = random.Random(seed)
+    return UniformStairSpec(
+        rise_m=round(generator.uniform(0.050, 0.065), 3),
+        tread_depth_m=round(generator.uniform(0.250, 0.320), 3),
+        step_count=generator.randint(2, 4),
+        seed=seed,
+    )
 
 
 @dataclass(frozen=True)
@@ -65,12 +139,17 @@ class StairTestCourse:
     stair_top_heights_m: tuple[float, ...]
     first_riser_x_m: float
     riser_depth_m: float
+    spec: UniformStairSpec
 
     def to_observation(self) -> dict[str, Any]:
         """Serialize only the landmarks relevant to stair testing."""
         return {
             "frame_id": "world",
             "course_profile": "snake8_stair_test",
+            "scenario": {
+                "generator": "uniform_stair_v1",
+                **self.spec.to_dict(),
+            },
             "stairs": {
                 "top_heights_m": list(self.stair_top_heights_m),
                 "first_riser_x_m": self.first_riser_x_m,
@@ -195,57 +274,75 @@ def manual_obstacle_course() -> ManualObstacleCourse:
     )
 
 
-def snake8_stair_test_course() -> StairTestCourse:
-    """Return three equal 65 mm risers preceded by an assembly platform.
+def snake8_stair_test_course(
+    spec: UniformStairSpec | None = None,
+) -> StairTestCourse:
+    """Return parameterized equal risers preceded by an assembly platform.
 
     A SMORES-EP wheel is roughly 62 mm in diameter.  Each riser is therefore
-    deliberately a little taller than one wheel, but still lower than the
-    vertical projection of one 77.77 mm serial-chain link.
+    constrained below one 77.77 mm serial-chain link.  The default preserves
+    the physically validated three-riser fixture exactly.
     """
 
+    spec = spec or UniformStairSpec()
     platform_color = (0.24, 0.27, 0.31)
     stair_color = (0.34, 0.38, 0.43)
+    approach_start_x_m = -1.0
+    approach_length_m = spec.first_riser_x_m - approach_start_x_m
+    boxes: list[CourseBox] = [
+        CourseBox(
+            "StartPlatform",
+            (
+                approach_start_x_m + 0.5 * approach_length_m,
+                0.0,
+                -0.01,
+            ),
+            (approach_length_m, spec.width_m, 0.02),
+            platform_color,
+            semantic="stair_test_start",
+        )
+    ]
+    for index, top_height_m in enumerate(spec.top_heights_m):
+        boxes.append(
+            CourseBox(
+                f"Stair{index + 1:02d}",
+                (
+                    spec.first_riser_x_m
+                    + (index + 0.5) * spec.tread_depth_m,
+                    0.0,
+                    0.5 * top_height_m,
+                ),
+                (spec.tread_depth_m, spec.width_m, top_height_m),
+                stair_color,
+                semantic="stair_test_riser",
+            )
+        )
+    upper_deck_start_x_m = (
+        spec.first_riser_x_m + spec.step_count * spec.tread_depth_m
+    )
+    boxes.append(
+        CourseBox(
+            "UpperDeck",
+            (
+                upper_deck_start_x_m + 0.5 * spec.upper_deck_length_m,
+                0.0,
+                0.5 * spec.top_heights_m[-1],
+            ),
+            (
+                spec.upper_deck_length_m,
+                spec.width_m,
+                spec.top_heights_m[-1],
+            ),
+            platform_color,
+            semantic="stair_test_upper_deck",
+        )
+    )
     return StairTestCourse(
-        boxes=(
-            CourseBox(
-                "StartPlatform",
-                (-0.175, 0.0, -0.01),
-                (1.65, 1.20, 0.02),
-                platform_color,
-                semantic="stair_test_start",
-            ),
-            CourseBox(
-                "Stair01",
-                (0.79, 0.0, 0.0325),
-                (0.28, 1.20, 0.065),
-                stair_color,
-                semantic="stair_test_riser",
-            ),
-            CourseBox(
-                "Stair02",
-                (1.07, 0.0, 0.065),
-                (0.28, 1.20, 0.13),
-                stair_color,
-                semantic="stair_test_riser",
-            ),
-            CourseBox(
-                "Stair03",
-                (1.35, 0.0, 0.0975),
-                (0.28, 1.20, 0.195),
-                stair_color,
-                semantic="stair_test_riser",
-            ),
-            CourseBox(
-                "UpperDeck",
-                (2.15, 0.0, 0.0975),
-                (1.32, 1.20, 0.195),
-                platform_color,
-                semantic="stair_test_upper_deck",
-            ),
-        ),
-        stair_top_heights_m=(0.065, 0.13, 0.195),
-        first_riser_x_m=0.65,
-        riser_depth_m=0.28,
+        boxes=tuple(boxes),
+        stair_top_heights_m=spec.top_heights_m,
+        first_riser_x_m=spec.first_riser_x_m,
+        riser_depth_m=spec.tread_depth_m,
+        spec=spec,
     )
 
 
@@ -296,9 +393,12 @@ def install_manual_obstacle_course(stage: Any) -> ManualObstacleCourse:
     return course
 
 
-def install_snake8_stair_test_course(stage: Any) -> StairTestCourse:
-    """Replace the infinite floor with the isolated three-step course."""
+def install_snake8_stair_test_course(
+    stage: Any,
+    spec: UniformStairSpec | None = None,
+) -> StairTestCourse:
+    """Replace the infinite floor with one isolated uniform stair course."""
 
-    course = snake8_stair_test_course()
+    course = snake8_stair_test_course(spec)
     _install_course_boxes(stage, "/World/Snake8StairTestCourse", course.boxes)
     return course

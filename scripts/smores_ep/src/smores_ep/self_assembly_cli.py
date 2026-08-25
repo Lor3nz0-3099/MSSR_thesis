@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 from pathlib import Path
 
 from smores_ep.config.physics import (
@@ -8,6 +9,10 @@ from smores_ep.config.physics import (
     SmoresActuatorConfig,
 )
 from smores_ep.config.simulation import SelfAssemblySimulationConfig
+from smores_ep.isaac.obstacle_course import (
+    UniformStairSpec,
+    sample_uniform_stair_spec,
+)
 
 
 def _repository_root() -> Path:
@@ -37,8 +42,17 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "--performance",
         action="store_true",
         help=(
-            "Use realtime GUI pacing, 120 Hz physics, 30 FPS rendering and "
-            "5 Hz state publication while keeping the full CAD"
+            "Use paced simulation, 240 Hz physics, 30 FPS updates and 5 Hz "
+            "state publication while keeping the full CAD"
+        ),
+    )
+    parser.add_argument(
+        "--simulation-speed-factor",
+        type=float,
+        default=1.0,
+        help=(
+            "Paced simulated seconds per wall second when --performance is "
+            "enabled; useful for ROS-coordinated headless runs"
         ),
     )
     parser.add_argument(
@@ -112,6 +126,19 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "task-achievement course"
         ),
     )
+    parser.add_argument(
+        "--stair-seed",
+        type=int,
+        default=None,
+        help=(
+            "Sample a reproducible uniform staircase from the conservative "
+            "Snake8 validation envelope"
+        ),
+    )
+    parser.add_argument("--stair-rise-m", type=float, default=None)
+    parser.add_argument("--stair-depth-m", type=float, default=None)
+    parser.add_argument("--stair-count", type=int, default=None)
+    parser.add_argument("--stair-first-riser-x-m", type=float, default=None)
     course_group.add_argument(
         "--stair-test-course",
         action="store_true",
@@ -164,6 +191,24 @@ def main() -> None:
     if args.headless and args.steps == 0:
         args.steps = 7200
 
+    stair_spec = (
+        sample_uniform_stair_spec(args.stair_seed)
+        if args.stair_seed is not None
+        else UniformStairSpec()
+    )
+    stair_overrides = {
+        field_name: value
+        for field_name, value in (
+            ("rise_m", args.stair_rise_m),
+            ("tread_depth_m", args.stair_depth_m),
+            ("step_count", args.stair_count),
+            ("first_riser_x_m", args.stair_first_riser_x_m),
+        )
+        if value is not None
+    }
+    if stair_overrides:
+        stair_spec = replace(stair_spec, **stair_overrides)
+
     physics_hz = args.physics_hz
     if physics_hz is None:
         physics_hz = 240
@@ -211,6 +256,7 @@ def main() -> None:
                 log_interval=args.log_interval,
                 simple_visuals=args.simple_visuals,
                 realtime_pacing=args.performance,
+                simulation_speed_factor=args.simulation_speed_factor,
                 include_contact_candidates=not args.performance,
                 primitive_goal_file=args.primitive_goal_file,
                 primitive_cancel_file=args.primitive_cancel_file,
@@ -227,6 +273,11 @@ def main() -> None:
                 spawn_radius_m=args.spawn_radius,
                 manual_obstacle_course=args.obstacle_course,
                 stair_test_course=args.stair_test_course,
+                stair_rise_m=stair_spec.rise_m,
+                stair_depth_m=stair_spec.tread_depth_m,
+                stair_count=stair_spec.step_count,
+                stair_first_riser_x_m=stair_spec.first_riser_x_m,
+                stair_seed=stair_spec.seed,
                 staging_collision_avoidance=(
                     not args.disable_staging_collision_avoidance
                 ),

@@ -48,3 +48,9 @@ demonstrations for behavior cloning.
 5. Randomize feasible course episodes and generate a varied IL dataset.
 6. Use behavior cloning to initialize a policy before subsequent learning or
    generalization stages.
+
+The first successful `crawl_stairs_arch_wave` baseline is frozen in
+`docs/validated_behaviors/snake8_crawl_stairs_arch_wave.md`.  Before step 2,
+the isolated uniform-stair generator and headless evaluator exercise a small
+conservative family of stairs.  This is a regression/robustness gate, not the
+full randomized obstacle-course generator planned in step 5.

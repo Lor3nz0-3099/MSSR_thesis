@@ -143,6 +143,11 @@ def test_self_assembly_cli_defaults_match_target_demonstration() -> None:
     assert args.module_prefix == "smores_"
     assert args.obstacle_course is False
     assert args.stair_test_course is False
+    assert args.stair_seed is None
+    assert args.stair_rise_m is None
+    assert args.stair_depth_m is None
+    assert args.stair_count is None
+    assert args.simulation_speed_factor == pytest.approx(1.0)
 
 
 def test_course_cli_options_are_mutually_exclusive() -> None:
@@ -153,6 +158,30 @@ def test_course_cli_options_are_mutually_exclusive() -> None:
     assert args.obstacle_course is False
     with pytest.raises(SystemExit):
         parser.parse_args(["--obstacle-course", "--stair-test-course"])
+
+
+def test_stair_cli_accepts_seed_and_explicit_geometry_overrides() -> None:
+    args = build_argument_parser().parse_args(
+        [
+            "--stair-test-course",
+            "--stair-seed",
+            "17",
+            "--stair-rise-m",
+            "0.055",
+            "--stair-depth-m",
+            "0.310",
+            "--stair-count",
+            "4",
+            "--simulation-speed-factor",
+            "2.0",
+        ]
+    )
+
+    assert args.stair_seed == 17
+    assert args.stair_rise_m == pytest.approx(0.055)
+    assert args.stair_depth_m == pytest.approx(0.310)
+    assert args.stair_count == 4
+    assert args.simulation_speed_factor == pytest.approx(2.0)
 
 
 def test_self_assembly_config_rejects_two_courses(tmp_path) -> None:

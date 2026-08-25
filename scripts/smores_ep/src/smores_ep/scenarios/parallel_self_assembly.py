@@ -215,10 +215,10 @@ def _advance_simulation(
 
 
 class _RealtimeRenderPacer:
-    """Keep rendered simulation time close to wall time without catch-up bursts."""
+    """Pace simulation time against wall time without catch-up bursts."""
 
-    def __init__(self, render_hz: int) -> None:
-        self._period_s = 1.0 / render_hz
+    def __init__(self, render_hz: int, speed_factor: float = 1.0) -> None:
+        self._period_s = 1.0 / (render_hz * speed_factor)
         self._deadline_s = time.perf_counter()
 
     def wait(self) -> None:
@@ -271,10 +271,20 @@ def run_parallel_self_assembly_scenario(
         obstacle_course = install_manual_obstacle_course(stage)
     elif config.stair_test_course:
         from smores_ep.isaac.obstacle_course import (
+            UniformStairSpec,
             install_snake8_stair_test_course,
         )
 
-        obstacle_course = install_snake8_stair_test_course(stage)
+        obstacle_course = install_snake8_stair_test_course(
+            stage,
+            UniformStairSpec(
+                rise_m=config.stair_rise_m,
+                tread_depth_m=config.stair_depth_m,
+                step_count=config.stair_count,
+                first_riser_x_m=config.stair_first_riser_x_m,
+                seed=config.stair_seed,
+            ),
+        )
     layout = self_assembly_spawn_layout(config)
     if config.manual_obstacle_course:
         layout = {
@@ -482,8 +492,11 @@ def run_parallel_self_assembly_scenario(
     )
     render_interval = max(1, config.physics_hz // config.render_hz)
     render_pacer = (
-        _RealtimeRenderPacer(config.render_hz)
-        if config.realtime_pacing and not config.headless
+        _RealtimeRenderPacer(
+            config.render_hz,
+            config.simulation_speed_factor,
+        )
+        if config.realtime_pacing
         else None
     )
     while simulation_app.is_running():

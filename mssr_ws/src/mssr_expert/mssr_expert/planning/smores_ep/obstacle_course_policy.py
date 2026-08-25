@@ -77,15 +77,14 @@ class ObstacleCoursePolicy:
             CourseStep(
                 "stairs_crawl",
                 snake,
-                "crawl_stairs",
+                "crawl_stairs_arch_wave",
                 {
                     "linear_m_s": 0.040,
                     "riser_approach_linear_m_s": 0.060,
                     "riser_approach_tolerance_m": 0.010,
                     "crawl_goal_tolerance_m": 0.004,
-                    "profile_substeps": 3,
-                    "head_overstep_clearance_m": 0.010,
-                    "upper_deck_advance_distance_m": 0.080,
+                    "profile_substeps": 6,
+                    "transition_clearance_m": 0.0065,
                 },
             ),
             CourseStep("upper_deck_clearance", snake, navigation="front_on_upper_deck"),

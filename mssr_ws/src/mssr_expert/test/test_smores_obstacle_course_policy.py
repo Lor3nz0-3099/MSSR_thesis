@@ -48,15 +48,14 @@ def test_policy_selects_one_capable_morphology_per_course_task() -> None:
         "cross_exit",
     }
     stair_crawl = next(step for step in steps if step.task == "stairs_crawl")
-    assert stair_crawl.behavior == "crawl_stairs"
+    assert stair_crawl.behavior == "crawl_stairs_arch_wave"
     assert stair_crawl.parameters == {
         "linear_m_s": 0.040,
         "riser_approach_linear_m_s": 0.060,
         "riser_approach_tolerance_m": 0.010,
         "crawl_goal_tolerance_m": 0.004,
-        "profile_substeps": 3,
-        "head_overstep_clearance_m": 0.010,
-        "upper_deck_advance_distance_m": 0.080,
+        "profile_substeps": 6,
+        "transition_clearance_m": 0.0065,
     }
 
 
@@ -70,7 +69,7 @@ def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None
     for step in policy.steps():
         if step.behavior is None:
             continue
-        if step.behavior == "crawl_stairs":
+        if step.behavior in {"crawl_stairs", "crawl_stairs_arch_wave"}:
             # This behavior is generated from live world poses and course
             # landmarks by SnakeStairGaitPlanner, rather than loaded from the
             # static morphology library.
