@@ -265,7 +265,7 @@ the robot graph.  Its closed-loop program is:
 
 ```text
 RESTORE_GAP_NEUTRAL -> PRELIFT_HEAD_DRAWBRIDGE
--> LIFT_HEAD_DRAWBRIDGE -> STRAIGHTEN_HEAD_DRAWBRIDGE
+-> (MIGRATE_HEAD_DRAWBRIDGE_VN)* -> LIFT_HEAD_DRAWBRIDGE
 -> ADVANCE_HEAD_PIVOT_TO_EDGE -> CONFORM_GAP_PROFILE_00
 -> (CONFORM_GAP_PROFILE_N -> FOLLOW_GAP_PROFILE_N)*
 -> LIFT_TAIL_DRAWBRIDGE
@@ -273,21 +273,22 @@ RESTORE_GAP_NEUTRAL -> PRELIFT_HEAD_DRAWBRIDGE
 ```
 
 The planner computes how many terminal modules must be lifted from the live
-gap width, wheel radius, link spacing and support margins.  It raises that
-entire segment about one hinge by 1.20 rad by default: no downstream
-counter-bend cancels the drawbridge slope.  For the nominal 200 mm gap, `v3`
-is the fifth module from the head/right and receives positive TILT so that
-`v4..v7` form the raised drawbridge.  A temporary positive pre-fold on `v4`
-first selects the three-module head side of the otherwise symmetric flat
-chain.  After `v3` reaches its positive drawbridge angle, `v4` returns to
-neutral, leaving the four anterior modules in one rigid raised segment.  The
-same rule is gap-parametric: narrower gaps select a more anterior pivot
-directly, while wider admissible gaps migrate the pre-fold rearward through
-as many adjacent hinges as required by the computed suspended-module count.
-The default transfer angle is divided by that migration depth and remains
-operator-overridable as `drawbridge_prelift_angle_rad`.  The tail lift uses
+gap width, wheel radius, link spacing and support margins.  It distributes a
+total bend of 1.20 rad by default without any negative counter-bend that could
+cancel the drawbridge slope.  For the nominal 200 mm gap, a positive pre-fold
+on `v4` first selects the three-module head side of the otherwise symmetric
+flat chain.  The positive `v3` bend then adds the fourth anterior module while
+the `v4` bend remains active.  The same rule is gap-parametric: narrower gaps
+select a more anterior pivot directly, while wider admissible gaps extend the
+positive bend rearward through as many adjacent hinges as required by the
+computed suspended-module count.
+The seed angle is retained while the remaining requested lift is divided
+between the hinges leading to the geometry-selected pivot; this prevents a
+central free hinge from lifting the rear half after the three front modules
+have already risen.  The seed remains operator-overridable as
+`drawbridge_prelift_angle_rad`.  The tail lift uses
 the spatially mirrored sign.  The grounded pivot is then driven
-to the near edge before the rigid segment is curved upward across the opening,
+to the near edge before the raised segment is curved upward across the opening,
 with at least one supported module on each bank.  It is not flattened while
 links remain over the opening.  Instead, a positive sine arch is fixed in the
 world interval from the safe near support to the safe far support.  Before

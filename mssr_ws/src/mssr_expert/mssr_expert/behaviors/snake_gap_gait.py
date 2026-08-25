@@ -172,9 +172,11 @@ class SnakeGapGaitPlanner:
         front_anchor_index = tail_hinge_index + 1
         # Start from v4 whenever the requested pivot is central or rearward.
         # v4 has five modules on its grounded side and only three on its head
-        # side, so its absolute fold direction is deterministic.  Wider gaps
-        # migrate that fold rearward one hinge at a time until reaching the
-        # geometry-selected pivot.
+        # side, so its absolute fold direction is deterministic.  Keep that
+        # seed bend while adding the hinges toward the geometry-selected
+        # pivot.  Moving the complete angle to a symmetric central hinge and
+        # then releasing v4 lets the free chain satisfy the same relative
+        # angle by lifting its tail instead of its head.
         head_seed_index = max(head_pivot_index, self.MODULE_COUNT // 2)
         migration_count = head_seed_index - head_pivot_index
         prelift_angle = self._number(
@@ -203,17 +205,18 @@ class SnakeGapGaitPlanner:
             )
             head_state = seeded
 
+        distributed_angle = (
+            (lift_angle - prelift_angle) / migration_count
+            if migration_count
+            else lift_angle
+        )
         for hinge_index in range(
             head_seed_index - (1 if migration_count else 0),
             head_pivot_index - 1,
             -1,
         ):
             folded = list(head_state)
-            folded[hinge_index] = (
-                lift_angle
-                if hinge_index == head_pivot_index
-                else prelift_angle
-            )
+            folded[hinge_index] = distributed_angle
             head_steps.append(
                 self._posture(
                     (
@@ -227,30 +230,11 @@ class SnakeGapGaitPlanner:
                 )
             )
             head_state = folded
-            previous_hinge = hinge_index + 1
-            if previous_hinge <= head_seed_index:
-                straightened = list(head_state)
-                straightened[previous_hinge] = 0.0
-                head_steps.append(
-                    self._posture(
-                        (
-                            "STRAIGHTEN_HEAD_DRAWBRIDGE"
-                            if hinge_index == head_pivot_index
-                            else f"RELEASE_HEAD_DRAWBRIDGE_V{previous_hinge}"
-                        ),
-                        tuple(head_state),
-                        tuple(straightened),
-                        ordered,
-                    )
-                )
-                head_state = straightened
 
         head_lift = tuple(head_state)
-        # v3 is the fifth module from the head for the nominal 200 mm gap.
-        # Its positive TILT raises the four higher-index head modules.  A
-        # temporary fold one joint toward the head breaks the 4-vs-4 static
-        # symmetry before this central hinge moves; it is then straightened
-        # again so the final drawbridge still has exactly one bent joint.
+        # For the nominal 200 mm gap, v4 retains the front-side selection and
+        # v3 adds the fourth suspended module.  Their positive angles sum to
+        # the requested drawbridge lift without exposing a symmetric hinge.
         landing_clearance = self._number(
             parameters,
             "landing_arch_clearance_m",

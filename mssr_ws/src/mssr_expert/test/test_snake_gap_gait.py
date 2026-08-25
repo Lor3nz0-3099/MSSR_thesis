@@ -120,8 +120,8 @@ def test_gap_program_has_requested_geometric_sequence_without_timers() -> None:
         "RESTORE_GAP_NEUTRAL",
         "PRELIFT_HEAD_DRAWBRIDGE",
         "LIFT_HEAD_DRAWBRIDGE",
-        "STRAIGHTEN_HEAD_DRAWBRIDGE",
         "ADVANCE_HEAD_PIVOT_TO_EDGE",
+        "CONFORM_GAP_PROFILE_00",
     )
     profile_postures = tuple(
         phase for phase in phases if phase.startswith("CONFORM_GAP_PROFILE_")
@@ -155,7 +155,6 @@ def test_head_lands_before_body_advances_and_tail_is_lifted() -> None:
     program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
     prelift = _state_at(program, "PRELIFT_HEAD_DRAWBRIDGE")
     head = _state_at(program, "LIFT_HEAD_DRAWBRIDGE")
-    straight = _state_at(program, "STRAIGHTEN_HEAD_DRAWBRIDGE")
     profile_phases = tuple(
         step.phase
         for step in program
@@ -167,13 +166,19 @@ def test_head_lands_before_body_advances_and_tail_is_lifted() -> None:
     lowered = _state_at(program, "LOWER_TAIL_ON_FAR_BANK")
 
     # A 200 mm gap plus two wheel supports requires four raised modules.
-    # v4 first selects the head side of the symmetric chain.  v3 then becomes
-    # the positive pivot and v4 is restored, leaving one real drawbridge hinge.
+    # v4 selects the head side of the symmetric chain and remains bent while
+    # v3 adds the fourth raised module.  Removing the v4 bias would allow the
+    # central v3 hinge to lift the rear half instead.
     assert prelift["m4"] == pytest.approx(0.45)
-    assert head["m3"] == pytest.approx(1.20)
+    assert head["m3"] == pytest.approx(0.75)
     assert head["m4"] == pytest.approx(0.45)
-    assert straight["m3"] == pytest.approx(1.20)
-    assert sum(abs(value) > 1e-9 for value in straight.values()) == 1
+    assert sum(head.values()) == pytest.approx(1.20)
+    head_heights = _center_heights_from_tilts(head, 0.07777)
+    assert head_heights[:4] == pytest.approx((0.0, 0.0, 0.0, 0.0))
+    assert all(
+        second > first
+        for first, second in zip(head_heights[3:], head_heights[4:])
+    )
     assert max(_center_heights_from_tilts(landed, 0.07777)) > 0.02
     assert min(_center_heights_from_tilts(landed, 0.07777)) >= -1e-9
     assert max(_center_heights_from_tilts(final_arch, 0.07777)) > 0.02
@@ -239,14 +244,16 @@ def test_wider_gap_migrates_fold_to_geometry_selected_pivot() -> None:
         "RESTORE_GAP_NEUTRAL",
         "PRELIFT_HEAD_DRAWBRIDGE",
         "MIGRATE_HEAD_DRAWBRIDGE_V3",
-        "RELEASE_HEAD_DRAWBRIDGE_V4",
         "LIFT_HEAD_DRAWBRIDGE",
-        "STRAIGHTEN_HEAD_DRAWBRIDGE",
         "ADVANCE_HEAD_PIVOT_TO_EDGE",
+        "CONFORM_GAP_PROFILE_00",
+        "CONFORM_GAP_PROFILE_01",
     )
-    final_fold = _state_at(program, "STRAIGHTEN_HEAD_DRAWBRIDGE")
-    assert final_fold["m2"] == pytest.approx(1.20)
-    assert sum(abs(value) > 1e-9 for value in final_fold.values()) == 1
+    final_fold = _state_at(program, "LIFT_HEAD_DRAWBRIDGE")
+    assert final_fold["m2"] == pytest.approx(0.40)
+    assert final_fold["m3"] == pytest.approx(0.40)
+    assert final_fold["m4"] == pytest.approx(0.40)
+    assert sum(final_fold.values()) == pytest.approx(1.20)
     approach = next(
         step for step in program if step.phase == "ADVANCE_HEAD_PIVOT_TO_EDGE"
     )
@@ -325,9 +332,6 @@ def test_top_bottom_chain_raises_head_before_tail() -> None:
     head_step = next(
         step for step in program if step.phase == "LIFT_HEAD_DRAWBRIDGE"
     )
-    straight_step = next(
-        step for step in program if step.phase == "STRAIGHTEN_HEAD_DRAWBRIDGE"
-    )
     tail_step = next(
         step for step in program if step.phase == "LIFT_TAIL_DRAWBRIDGE"
     )
@@ -335,9 +339,6 @@ def test_top_bottom_chain_raises_head_before_tail() -> None:
     assert len(head_step.posture_targets) == 1
     assert head_step.posture_targets[0].target_role == "snake_center_rear"
     assert head_step.posture_targets[0].angle_rad > 0.0
-    assert len(straight_step.posture_targets) == 1
-    assert straight_step.posture_targets[0].target_role == "snake_center_front"
-    assert straight_step.posture_targets[0].angle_rad == pytest.approx(0.0)
     tail_pivot = next(
         target
         for target in tail_step.posture_targets
