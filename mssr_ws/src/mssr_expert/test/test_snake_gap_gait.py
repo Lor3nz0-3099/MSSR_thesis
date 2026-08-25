@@ -116,12 +116,11 @@ def test_gap_program_has_requested_geometric_sequence_without_timers() -> None:
     program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
 
     phases = tuple(step.phase for step in program)
-    assert phases[:5] == (
+    assert phases[:4] == (
         "RESTORE_GAP_NEUTRAL",
-        "PRELIFT_HEAD_DRAWBRIDGE",
-        "LIFT_HEAD_DRAWBRIDGE",
-        "ADVANCE_HEAD_PIVOT_TO_EDGE",
-        "CONFORM_GAP_PROFILE_00",
+        "APPROACH_HEAD_TO_NEAR_EDGE",
+        "CONFORM_GAP_PROFILE_01",
+        "FOLLOW_GAP_PROFILE_01",
     )
     profile_postures = tuple(
         phase for phase in phases if phase.startswith("CONFORM_GAP_PROFILE_")
@@ -129,173 +128,140 @@ def test_gap_program_has_requested_geometric_sequence_without_timers() -> None:
     profile_drives = tuple(
         phase for phase in phases if phase.startswith("FOLLOW_GAP_PROFILE_")
     )
-    assert profile_postures[0] == "CONFORM_GAP_PROFILE_00"
-    assert len(profile_postures) == len(profile_drives) + 1
-    assert phases[-4:] == (
-        "LIFT_TAIL_DRAWBRIDGE",
-        "PULL_TAIL_TO_SAFE_LANDING",
-        "LOWER_TAIL_ON_FAR_BANK",
-        "CLEAR_FAR_EDGE",
-    )
+    assert profile_postures[0] == "CONFORM_GAP_PROFILE_01"
+    assert len(profile_postures) == len(profile_drives)
+    assert phases[-1] == "RESTORE_GAP_NEUTRAL_FINAL"
     drives = tuple(step for step in program if step.kind == "drive")
     assert all(step.duration_s is None for step in program)
     assert all(step.position_goal is not None for step in drives)
-    assert drives[0].phase == "ADVANCE_HEAD_PIVOT_TO_EDGE"
+    assert drives[0].phase == "APPROACH_HEAD_TO_NEAR_EDGE"
     assert all(
         step.phase.startswith("FOLLOW_GAP_PROFILE_")
-        for step in drives[1:-2]
-    )
-    assert tuple(step.phase for step in drives[-2:]) == (
-        "PULL_TAIL_TO_SAFE_LANDING",
-        "CLEAR_FAR_EDGE",
+        for step in drives[1:]
     )
 
 
-def test_head_lands_before_body_advances_and_tail_is_lifted() -> None:
+def test_backbone_wave_approaches_flat_then_carries_head_to_tail() -> None:
     program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
-    prelift = _state_at(program, "PRELIFT_HEAD_DRAWBRIDGE")
-    head = _state_at(program, "LIFT_HEAD_DRAWBRIDGE")
-    profile_phases = tuple(
-        step.phase
-        for step in program
-        if step.phase.startswith("CONFORM_GAP_PROFILE_")
-    )
-    landed = _state_at(program, profile_phases[0])
-    final_arch = _state_at(program, profile_phases[-1])
-    tail = _state_at(program, "LIFT_TAIL_DRAWBRIDGE")
-    lowered = _state_at(program, "LOWER_TAIL_ON_FAR_BANK")
-
-    # A 200 mm gap plus two wheel supports requires four raised modules.
-    # v4 selects the head side of the symmetric chain and remains bent while
-    # v3 adds the fourth raised module.  Removing the v4 bias would allow the
-    # central v3 hinge to lift the rear half instead.
-    assert prelift["m4"] == pytest.approx(0.45)
-    assert head["m3"] == pytest.approx(0.75)
-    assert head["m4"] == pytest.approx(0.45)
-    assert sum(head.values()) == pytest.approx(1.20)
-    head_heights = _center_heights_from_tilts(head, 0.07777)
-    assert head_heights[:4] == pytest.approx((0.0, 0.0, 0.0, 0.0))
-    assert all(
-        second > first
-        for first, second in zip(head_heights[3:], head_heights[4:])
-    )
-    assert max(_center_heights_from_tilts(landed, 0.07777)) > 0.02
-    assert min(_center_heights_from_tilts(landed, 0.07777)) >= -1e-9
-    assert max(_center_heights_from_tilts(final_arch, 0.07777)) > 0.02
-    assert min(_center_heights_from_tilts(final_arch, 0.07777)) >= -1e-9
-    assert tail["m3"] == pytest.approx(-1.20)
-    assert sum(abs(value) > 1e-9 for value in tail.values()) == 1
-    assert all(value == pytest.approx(0.0) for value in lowered.values())
-
     approach = next(
-        step for step in program if step.phase == "ADVANCE_HEAD_PIVOT_TO_EDGE"
+        step for step in program if step.phase == "APPROACH_HEAD_TO_NEAR_EDGE"
     )
     profile_drives = tuple(
         step
         for step in program
         if step.phase.startswith("FOLLOW_GAP_PROFILE_")
     )
-    advance = profile_drives[-1]
-    pull = next(
-        step for step in program if step.phase == "PULL_TAIL_TO_SAFE_LANDING"
+    final_neutral = _state_at(program, "RESTORE_GAP_NEUTRAL_FINAL")
+
+    near_support_x = 0.55 - 0.03106 - 0.006
+    far_support_x = 0.75 + 0.03106 + 0.006
+    assert approach.active_target_roles == ROLES
+    assert approach.position_goal.module_id == "m7"
+    assert approach.position_goal.target_x_m == pytest.approx(near_support_x)
+    assert all(step.active_target_roles == ROLES for step in profile_drives)
+    assert all(step.position_goal.module_id == "m7" for step in profile_drives)
+    assert profile_drives[-1].position_goal.target_x_m == pytest.approx(
+        far_support_x + 8 * 0.07777
     )
-    assert approach.active_target_roles == ROLES[:4]
-    assert advance.active_target_roles == ROLES
-    assert pull.active_target_roles == ROLES[4:]
-    assert approach.position_goal.module_id == "m3"
-    assert advance.position_goal.module_id == "m4"
-    assert advance.position_goal.target_x_m == pytest.approx(
-        0.75 + 0.03106 + 0.006
-    )
-    assert pull.position_goal.module_id == "m4"
-    assert pull.position_goal.target_x_m == pytest.approx(
-        0.75 + 4 * 0.07777 + 0.03106 + 0.006
+    assert all(value == pytest.approx(0.0) for value in final_neutral.values())
+    assert not any(
+        forbidden in step.phase
+        for step in program
+        for forbidden in ("DRAWBRIDGE", "PULL_TAIL", "LOWER_TAIL")
     )
 
 
-def test_drawbridge_module_count_scales_with_gap_width() -> None:
+def test_gap_width_scales_wave_travel_and_profile_count() -> None:
     narrow = SnakeGapGaitPlanner().plan(
         _graph(near=0.55, far=0.65),
         _assignments(),
         {},
     )
-    head = _state_at(narrow, "LIFT_HEAD_DRAWBRIDGE")
-    tail = _state_at(narrow, "LIFT_TAIL_DRAWBRIDGE")
-    approach = next(
-        step for step in narrow if step.phase == "ADVANCE_HEAD_PIVOT_TO_EDGE"
+    nominal = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
+    narrow_drives = tuple(
+        step
+        for step in narrow
+        if step.phase.startswith("FOLLOW_GAP_PROFILE_")
     )
+    nominal_drives = tuple(
+        step
+        for step in nominal
+        if step.phase.startswith("FOLLOW_GAP_PROFILE_")
+    )
+    assert len(nominal_drives) > len(narrow_drives)
+    assert (
+        nominal_drives[-1].position_goal.target_x_m
+        - narrow_drives[-1].position_goal.target_x_m
+    ) == pytest.approx(0.10)
 
-    # 100 mm gap plus wheel support margins requires three terminal modules.
-    assert head["m4"] == pytest.approx(1.20)
-    assert tail["m2"] == pytest.approx(-1.20)
-    assert approach.position_goal.module_id == "m4"
-    assert approach.active_target_roles == ROLES[:5]
 
-
-def test_wider_gap_migrates_fold_to_geometry_selected_pivot() -> None:
-    program = SnakeGapGaitPlanner().plan(
+def test_wider_admissible_gap_still_uses_only_the_backbone_wave() -> None:
+    wider = SnakeGapGaitPlanner().plan(
         _graph(near=0.55, far=0.82),
         _assignments(),
         {},
     )
-
-    phases = tuple(step.phase for step in program)
-    assert phases[:7] == (
-        "RESTORE_GAP_NEUTRAL",
-        "PRELIFT_HEAD_DRAWBRIDGE",
-        "MIGRATE_HEAD_DRAWBRIDGE_V3",
-        "LIFT_HEAD_DRAWBRIDGE",
-        "ADVANCE_HEAD_PIVOT_TO_EDGE",
-        "CONFORM_GAP_PROFILE_00",
-        "CONFORM_GAP_PROFILE_01",
+    nominal = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
+    wider_profiles = tuple(
+        step
+        for step in wider
+        if step.phase.startswith("CONFORM_GAP_PROFILE_")
     )
-    final_fold = _state_at(program, "LIFT_HEAD_DRAWBRIDGE")
-    assert final_fold["m2"] == pytest.approx(0.40)
-    assert final_fold["m3"] == pytest.approx(0.40)
-    assert final_fold["m4"] == pytest.approx(0.40)
-    assert sum(final_fold.values()) == pytest.approx(1.20)
-    approach = next(
-        step for step in program if step.phase == "ADVANCE_HEAD_PIVOT_TO_EDGE"
+    nominal_profiles = tuple(
+        step
+        for step in nominal
+        if step.phase.startswith("CONFORM_GAP_PROFILE_")
     )
-    assert approach.position_goal.module_id == "m2"
-    assert approach.active_target_roles == ROLES[:3]
+    assert len(wider_profiles) > len(nominal_profiles)
+    assert all("DRAWBRIDGE" not in step.phase for step in wider)
 
 
-def test_drawbridge_lift_cannot_degenerate_into_a_flat_arch() -> None:
-    with pytest.raises(SnakeGapGaitError, match="at least 0.85"):
+@pytest.mark.parametrize(
+    "parameter",
+    (
+        "drawbridge_lift_angle_rad",
+        "drawbridge_prelift_angle_rad",
+        "drawbridge_bias_linear_m_s",
+    ),
+)
+def test_removed_drawbridge_parameters_are_rejected(parameter: str) -> None:
+    with pytest.raises(
+        SnakeGapGaitError,
+        match="vertical drawbridge gait was removed",
+    ):
         SnakeGapGaitPlanner().plan(
             _graph(),
             _assignments(),
-            {"drawbridge_lift_angle_rad": 0.11},
+            {parameter: 0.11},
         )
 
 
 def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
-    landed = _state_at(program, "CONFORM_GAP_PROFILE_00")
     spacing = 0.07777
     expected_clearance = 0.03106 + 0.006
-    pivot_x = 0.55 - 0.03106 - 0.006
+    near_support_x = 0.55 - 0.03106 - 0.006
     far_support_x = 0.75 + 0.03106 + 0.006
-    nominal_x = tuple(pivot_x + (index - 3) * spacing for index in range(8))
-    expected_heights = tuple(
-        (
-            expected_clearance
-            * math.sin(
-                math.pi
-                * (x_m - pivot_x)
-                / (far_support_x - pivot_x)
-            )
-            if pivot_x < x_m < far_support_x
-            else 0.0
-        )
-        for x_m in nominal_x
+    initial_x = tuple(
+        near_support_x - (7 - index) * spacing for index in range(8)
     )
+    body_travel = far_support_x + spacing - initial_x[0]
+    step_count = math.ceil(body_travel / (spacing / 3))
+    first_x = tuple(x_m + body_travel / step_count for x_m in initial_x)
+    expected_heights = SnakeGapGaitPlanner._traveling_arch_heights(
+        first_x,
+        near_support_x,
+        far_support_x,
+        expected_clearance,
+    )
+    landed = _state_at(program, "CONFORM_GAP_PROFILE_01")
     reconstructed = _center_heights_from_tilts(landed, spacing)
 
-    assert reconstructed == pytest.approx(expected_heights)
-    assert min(reconstructed) >= -1e-9
-    assert max(reconstructed) > 0.0
+    assert reconstructed == pytest.approx(
+        tuple(height - expected_heights[0] for height in expected_heights)
+    )
+    assert min(expected_heights) >= -1e-9
+    assert max(expected_heights) > 0.0
 
     profile_phases = tuple(
         step.phase
@@ -303,9 +269,14 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
         if step.phase.startswith("CONFORM_GAP_PROFILE_")
     )
     peak_indices: list[int] = []
-    for phase in profile_phases:
-        heights = _center_heights_from_tilts(
-            _state_at(program, phase), spacing
+    for profile_index, phase in enumerate(profile_phases, start=1):
+        translation = profile_index * body_travel / step_count
+        nominal_x = tuple(x_m + translation for x_m in initial_x)
+        heights = SnakeGapGaitPlanner._traveling_arch_heights(
+            nominal_x,
+            near_support_x,
+            far_support_x,
+            expected_clearance,
         )
         assert min(heights) >= -1e-9
         assert max(heights) <= expected_clearance + 1e-9
@@ -327,25 +298,22 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
         )
 
 
-def test_top_bottom_chain_raises_head_before_tail() -> None:
+def test_wave_is_low_bidirectional_and_migrates_from_head_to_tail() -> None:
     program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
-    head_step = next(
-        step for step in program if step.phase == "LIFT_HEAD_DRAWBRIDGE"
-    )
-    tail_step = next(
-        step for step in program if step.phase == "LIFT_TAIL_DRAWBRIDGE"
+    profile_states = tuple(
+        _state_at(program, step.phase)
+        for step in program
+        if step.phase.startswith("CONFORM_GAP_PROFILE_")
     )
 
-    assert len(head_step.posture_targets) == 1
-    assert head_step.posture_targets[0].target_role == "snake_center_rear"
-    assert head_step.posture_targets[0].angle_rad > 0.0
-    tail_pivot = next(
-        target
-        for target in tail_step.posture_targets
-        if target.target_role == "snake_center_rear"
+    assert max(
+        abs(value) for state in profile_states for value in state.values()
+    ) < 0.75
+    assert any(
+        any(value > 1e-6 for value in state.values())
+        and any(value < -1e-6 for value in state.values())
+        for state in profile_states
     )
-    assert tail_pivot.angle_rad < 0.0
-    assert program.index(head_step) < program.index(tail_step)
 
 
 @pytest.mark.parametrize(

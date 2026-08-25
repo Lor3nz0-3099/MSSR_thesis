@@ -1,4 +1,4 @@
-"""Geometric head-span-land-tail gait for a Snake8 crossing a flat gap."""
+"""Geometric traveling-backbone gait for a Snake8 crossing a flat gap."""
 
 from __future__ import annotations
 
@@ -44,14 +44,19 @@ class FlatGap:
             far = float(raw["far_edge_x_m"])
         except (KeyError, TypeError, ValueError) as error:
             raise SnakeGapGaitError("Invalid gap landmarks") from error
-        if not all(math.isfinite(value) for value in (near, far)) or far <= near:
-            raise SnakeGapGaitError("Gap edges must be finite and strictly ordered")
+        finite_edges = all(math.isfinite(value) for value in (near, far))
+        if not finite_edges or far <= near:
+            raise SnakeGapGaitError(
+                "Gap edges must be finite and strictly ordered"
+            )
         declared_width = raw.get("width_m")
         if declared_width is not None:
             try:
                 width = float(declared_width)
             except (TypeError, ValueError) as error:
-                raise SnakeGapGaitError("Invalid declared gap width") from error
+                raise SnakeGapGaitError(
+                    "Invalid declared gap width"
+                ) from error
             if not math.isfinite(width) or not math.isclose(
                 width, far - near, abs_tol=1e-6
             ):
@@ -62,7 +67,7 @@ class FlatGap:
 
 
 class SnakeGapGaitPlanner:
-    """Plan lift-head, span, land, advance, lift-tail and clear phases."""
+    """Plan a low backbone wave that travels from head to tail over a gap."""
 
     MODULE_COUNT = 8
     TIMED_PARAMETER_NAMES = frozenset(
@@ -72,6 +77,13 @@ class SnakeGapGaitPlanner:
             "tail_clear_duration_s",
             "head_lift_duration_s",
             "body_advance_duration_s",
+        }
+    )
+    DEPRECATED_DRAWBRIDGE_PARAMETERS = frozenset(
+        {
+            "drawbridge_lift_angle_rad",
+            "drawbridge_prelift_angle_rad",
+            "drawbridge_bias_linear_m_s",
         }
     )
 
@@ -87,10 +99,19 @@ class SnakeGapGaitPlanner:
                 "gap_crossing uses geometric world-pose goals and does not "
                 "accept timed parameters: " + ", ".join(timed)
             )
+        deprecated = sorted(
+            self.DEPRECATED_DRAWBRIDGE_PARAMETERS.intersection(parameters)
+        )
+        if deprecated:
+            raise SnakeGapGaitError(
+                "The vertical drawbridge gait was removed; omit deprecated "
+                "parameters: " + ", ".join(deprecated)
+            )
         ordered = tuple(sorted(assignments, key=self._vertex_index))
         if len(ordered) != self.MODULE_COUNT:
             raise SnakeGapGaitError("Geometric gap gait requires Snake8")
-        if tuple(self._vertex_index(item) for item in ordered) != tuple(range(8)):
+        vertex_indices = tuple(self._vertex_index(item) for item in ordered)
+        if vertex_indices != tuple(range(8)):
             raise SnakeGapGaitError("Snake8 vertices must be exactly v0..v7")
 
         course = graph.global_attributes.get("course")
@@ -106,7 +127,9 @@ class SnakeGapGaitPlanner:
         )
         max_heading = self._number(parameters, "max_alignment_error_rad", 0.35)
         if not 0.0 < max_heading <= math.pi:
-            raise SnakeGapGaitError("max_alignment_error_rad must be in (0, pi]")
+            raise SnakeGapGaitError(
+                "max_alignment_error_rad must be in (0, pi]"
+            )
         if abs(heading) > max_heading:
             raise SnakeGapGaitError(
                 "Snake8 is not aligned with the +X gap: "
@@ -115,11 +138,19 @@ class SnakeGapGaitPlanner:
 
         edge_clearance = self._number(parameters, "edge_clearance_m", 0.006)
         landing_margin = self._number(parameters, "landing_margin_m", 0.006)
-        goal_tolerance = self._number(parameters, "gap_goal_tolerance_m", 0.004)
+        goal_tolerance = self._number(
+            parameters,
+            "gap_goal_tolerance_m",
+            0.004,
+        )
         if not 0.002 <= edge_clearance <= 0.020:
-            raise SnakeGapGaitError("edge_clearance_m must be in [0.002, 0.020]")
+            raise SnakeGapGaitError(
+                "edge_clearance_m must be in [0.002, 0.020]"
+            )
         if not 0.002 <= landing_margin <= 0.020:
-            raise SnakeGapGaitError("landing_margin_m must be in [0.002, 0.020]")
+            raise SnakeGapGaitError(
+                "landing_margin_m must be in [0.002, 0.020]"
+            )
         if not 0.001 <= goal_tolerance <= 0.010:
             raise SnakeGapGaitError(
                 "gap_goal_tolerance_m must be in [0.001, 0.010]"
@@ -131,110 +162,30 @@ class SnakeGapGaitPlanner:
             + edge_clearance
             + landing_margin
         )
-        lifted_count = max(2, math.ceil(required_span / spacing))
-        maximum_lifted_count = self.MODULE_COUNT - 3
-        if lifted_count > maximum_lifted_count:
+        unsupported_link_count = max(2, math.ceil(required_span / spacing))
+        maximum_unsupported_links = self.MODULE_COUNT - 3
+        if unsupported_link_count > maximum_unsupported_links:
             maximum_gap = (
-                maximum_lifted_count * spacing
+                maximum_unsupported_links * spacing
                 - 2.0 * wheel_radius
                 - edge_clearance
                 - landing_margin
             )
             raise SnakeGapGaitError(
                 f"Gap width {gap.width_m:.3f} m exceeds the safe Snake8 "
-                f"drawbridge span {maximum_gap:.3f} m"
+                f"backbone-wave span {maximum_gap:.3f} m"
             )
         approach_speed = self._speed(parameters, "approach_linear_m_s", 0.050)
         crossing_speed = self._speed(parameters, "linear_m_s", 0.040)
 
-        lift_angle = self._number(
-            parameters,
-            "drawbridge_lift_angle_rad",
-            1.20,
-        )
-        if lift_angle < 0.85:
-            raise SnakeGapGaitError(
-                "drawbridge_lift_angle_rad must be at least 0.85 rad"
-            )
         tilt_margin = self._number(parameters, "tilt_limit_margin_rad", 0.030)
         if not 0.0 <= tilt_margin <= 0.15:
-            raise SnakeGapGaitError("tilt_limit_margin_rad must be in [0, 0.15]")
-        usable_limit = self._symmetric_tilt_limit(graph, ordered) - tilt_margin
-        if lift_angle > usable_limit:
             raise SnakeGapGaitError(
-                f"Required gap lift {lift_angle:.3f} rad exceeds usable "
-                f"TILT limit {usable_limit:.3f} rad"
+                "tilt_limit_margin_rad must be in [0, 0.15]"
             )
+        usable_limit = self._symmetric_tilt_limit(graph, ordered) - tilt_margin
         roles = tuple(item.target_role for item in ordered)
         neutral = (0.0,) * self.MODULE_COUNT
-        head_pivot_index = self.MODULE_COUNT - lifted_count - 1
-        tail_hinge_index = lifted_count - 1
-        front_anchor_index = tail_hinge_index + 1
-        # Start from v4 whenever the requested pivot is central or rearward.
-        # v4 has five modules on its grounded side and only three on its head
-        # side, so its absolute fold direction is deterministic.  Keep that
-        # seed bend while adding the hinges toward the geometry-selected
-        # pivot.  Moving the complete angle to a symmetric central hinge and
-        # then releasing v4 lets the free chain satisfy the same relative
-        # angle by lifting its tail instead of its head.
-        head_seed_index = max(head_pivot_index, self.MODULE_COUNT // 2)
-        migration_count = head_seed_index - head_pivot_index
-        prelift_angle = self._number(
-            parameters,
-            "drawbridge_prelift_angle_rad",
-            min(0.45, lift_angle / (migration_count + 1)),
-        )
-        if not 0.15 <= prelift_angle <= min(0.65, usable_limit):
-            raise SnakeGapGaitError(
-                "drawbridge_prelift_angle_rad must be in [0.15, "
-                f"{min(0.65, usable_limit):.2f}]"
-            )
-
-        head_steps: list[BehaviorProgramStep] = []
-        head_state = list(neutral)
-        if migration_count:
-            seeded = list(head_state)
-            seeded[head_seed_index] = prelift_angle
-            head_steps.append(
-                self._posture(
-                    "PRELIFT_HEAD_DRAWBRIDGE",
-                    tuple(head_state),
-                    tuple(seeded),
-                    ordered,
-                )
-            )
-            head_state = seeded
-
-        distributed_angle = (
-            (lift_angle - prelift_angle) / migration_count
-            if migration_count
-            else lift_angle
-        )
-        for hinge_index in range(
-            head_seed_index - (1 if migration_count else 0),
-            head_pivot_index - 1,
-            -1,
-        ):
-            folded = list(head_state)
-            folded[hinge_index] = distributed_angle
-            head_steps.append(
-                self._posture(
-                    (
-                        "LIFT_HEAD_DRAWBRIDGE"
-                        if hinge_index == head_pivot_index
-                        else f"MIGRATE_HEAD_DRAWBRIDGE_V{hinge_index}"
-                    ),
-                    tuple(head_state),
-                    tuple(folded),
-                    ordered,
-                )
-            )
-            head_state = folded
-
-        head_lift = tuple(head_state)
-        # For the nominal 200 mm gap, v4 retains the front-side selection and
-        # v3 adds the fourth suspended module.  Their positive angles sum to
-        # the requested drawbridge lift without exposing a symmetric hinge.
         landing_clearance = self._number(
             parameters,
             "landing_arch_clearance_m",
@@ -258,57 +209,39 @@ class SnakeGapGaitPlanner:
                 "gap_profile_substeps must be an integer in [1, 8]"
             )
 
-        tail_lift = list(neutral)
-        # Spatial mirror: the already landed front segment anchors an equal
-        # number of tail modules while they are carried across the opening.
-        tail_lift[tail_hinge_index] = -lift_angle
-
-        pivot_at_near_edge = (
+        # The entire robot first reaches the near edge while flat.  A low,
+        # positive backbone curve is then held fixed between the two safe
+        # wheel-support points.  Translating the nominal module positions
+        # through that curve makes the bend travel from head to tail without
+        # ever exposing a symmetric 4-vs-4 lifting hinge.
+        near_support_x = (
             gap.near_edge_x_m - wheel_radius - edge_clearance
         )
-        front_anchor_on_far_bank = (
+        far_support_x = (
             gap.far_edge_x_m + wheel_radius + landing_margin
         )
-        front_anchor_for_safe_tail_landing = (
-            gap.far_edge_x_m
-            + lifted_count * spacing
-            + wheel_radius
-            + landing_margin
+        initial_nominal_x = tuple(
+            near_support_x - (self.MODULE_COUNT - 1 - index) * spacing
+            for index in range(self.MODULE_COUNT)
         )
-        tail_on_far_bank = (
-            gap.far_edge_x_m + wheel_radius + landing_margin
-        )
-        body_start_anchor_x = (
-            pivot_at_near_edge
-            + (front_anchor_index - head_pivot_index) * spacing
-        )
-        body_travel = front_anchor_on_far_bank - body_start_anchor_x
-        if body_travel <= 0.0:
-            raise SnakeGapGaitError(
-                "Live gap geometry leaves no body-transfer distance"
-            )
+        final_tail_x = far_support_x + spacing
+        body_travel = final_tail_x - initial_nominal_x[0]
         profile_step_count = max(
             1,
             math.ceil(body_travel / (spacing / profile_substeps)),
         )
-        arch_start_x = pivot_at_near_edge
-        arch_end_x = front_anchor_on_far_bank
         profile_steps: list[BehaviorProgramStep] = []
-        previous_profile = head_lift
-        for profile_index in range(profile_step_count + 1):
+        previous_profile = neutral
+        for profile_index in range(1, profile_step_count + 1):
             fraction = profile_index / profile_step_count
-            anchor_target_x = body_start_anchor_x + fraction * body_travel
-            translation = anchor_target_x - body_start_anchor_x
+            translation = fraction * body_travel
             nominal_x = tuple(
-                pivot_at_near_edge
-                + (index - head_pivot_index) * spacing
-                + translation
-                for index in range(self.MODULE_COUNT)
+                initial_x + translation for initial_x in initial_nominal_x
             )
             profile = self._traveling_arch_offsets(
                 nominal_x,
-                arch_start_x,
-                arch_end_x,
+                near_support_x,
+                far_support_x,
                 landing_clearance,
                 spacing,
             )
@@ -325,57 +258,40 @@ class SnakeGapGaitPlanner:
                 )
             )
             previous_profile = profile
-            if profile_index:
-                profile_steps.append(
-                    self._drive_to(
-                        f"FOLLOW_GAP_PROFILE_{profile_index:02d}",
-                        ordered[front_anchor_index],
-                        anchor_target_x,
-                        crossing_speed,
-                        roles,
-                        goal_tolerance,
-                    )
+            profile_steps.append(
+                self._drive_to(
+                    f"FOLLOW_GAP_PROFILE_{profile_index:02d}",
+                    ordered[-1],
+                    nominal_x[-1],
+                    crossing_speed,
+                    roles,
+                    goal_tolerance,
                 )
+            )
 
         return (
-            self._posture("RESTORE_GAP_NEUTRAL", neutral, neutral, ordered, all_targets=True),
-            *head_steps,
+            self._posture(
+                "RESTORE_GAP_NEUTRAL",
+                neutral,
+                neutral,
+                ordered,
+                all_targets=True,
+            ),
             self._drive_to(
-                "ADVANCE_HEAD_PIVOT_TO_EDGE",
-                ordered[head_pivot_index],
-                pivot_at_near_edge,
+                "APPROACH_HEAD_TO_NEAR_EDGE",
+                ordered[-1],
+                near_support_x,
                 approach_speed,
-                roles[: head_pivot_index + 1],
+                roles,
                 goal_tolerance,
             ),
             *profile_steps,
             self._posture(
-                "LIFT_TAIL_DRAWBRIDGE",
+                "RESTORE_GAP_NEUTRAL_FINAL",
                 previous_profile,
-                tuple(tail_lift),
-                ordered,
-            ),
-            self._drive_to(
-                "PULL_TAIL_TO_SAFE_LANDING",
-                ordered[front_anchor_index],
-                front_anchor_for_safe_tail_landing,
-                crossing_speed,
-                roles[front_anchor_index:],
-                goal_tolerance,
-            ),
-            self._posture(
-                "LOWER_TAIL_ON_FAR_BANK",
-                tuple(tail_lift),
                 neutral,
                 ordered,
-            ),
-            self._drive_to(
-                "CLEAR_FAR_EDGE",
-                ordered[0],
-                tail_on_far_bank + spacing,
-                crossing_speed,
-                roles,
-                goal_tolerance,
+                all_targets=True,
             ),
         )
 
@@ -445,15 +361,11 @@ class SnakeGapGaitPlanner:
     ) -> tuple[float, ...]:
         """Return TILT offsets for an upward arch fixed in the world gap."""
 
-        width = end_x_m - start_x_m
-        heights = tuple(
-            (
-                clearance_m
-                * math.sin(math.pi * (x_m - start_x_m) / width)
-                if start_x_m < x_m < end_x_m
-                else 0.0
-            )
-            for x_m in module_x_m
+        heights = SnakeGapGaitPlanner._traveling_arch_heights(
+            module_x_m,
+            start_x_m,
+            end_x_m,
+            clearance_m,
         )
         link_angles: list[float] = []
         for first_height, second_height in zip(heights, heights[1:]):
@@ -473,6 +385,28 @@ class SnakeGapGaitPlanner:
         return tuple(offsets)
 
     @staticmethod
+    def _traveling_arch_heights(
+        module_x_m: Sequence[float],
+        start_x_m: float,
+        end_x_m: float,
+        clearance_m: float,
+    ) -> tuple[float, ...]:
+        """Sample a non-negative world-frame arch at module centers."""
+
+        width = end_x_m - start_x_m
+        if width <= 0.0:
+            raise SnakeGapGaitError("Traveling gap arch has invalid supports")
+        return tuple(
+            (
+                clearance_m
+                * math.sin(math.pi * (x_m - start_x_m) / width)
+                if start_x_m < x_m < end_x_m
+                else 0.0
+            )
+            for x_m in module_x_m
+        )
+
+    @staticmethod
     def _ordered_positions(
         graph: AttributedRobotGraph,
         assignments: Sequence[AssignedModule],
@@ -484,29 +418,41 @@ class SnakeGapGaitPlanner:
                 for item in assignments
             )
         except KeyError as error:
-            raise SnakeGapGaitError(f"Missing live module pose: {error}") from error
+            raise SnakeGapGaitError(
+                f"Missing live module pose: {error}"
+            ) from error
 
     @staticmethod
-    def _link_spacing(positions: Sequence[tuple[float, float, float]]) -> float:
+    def _link_spacing(
+        positions: Sequence[tuple[float, float, float]],
+    ) -> float:
         spacing = median(
             math.dist(first, second)
             for first, second in zip(positions, positions[1:])
         )
         if not math.isfinite(spacing) or not 0.060 <= spacing <= 0.100:
-            raise SnakeGapGaitError(f"Invalid Snake8 link spacing {spacing:.4f} m")
+            raise SnakeGapGaitError(
+                f"Invalid Snake8 link spacing {spacing:.4f} m"
+            )
         return spacing
 
     @staticmethod
     def _wheel_radius(graph: AttributedRobotGraph) -> float:
         geometry = graph.global_attributes.get("module_geometry")
         if not isinstance(geometry, Mapping):
-            raise SnakeGapGaitError("Robot graph has no module geometry metadata")
+            raise SnakeGapGaitError(
+                "Robot graph has no module geometry metadata"
+            )
         try:
             radius = float(geometry["wheel_radius_m"])
         except (KeyError, TypeError, ValueError) as error:
-            raise SnakeGapGaitError("Invalid SMORES wheel radius metadata") from error
+            raise SnakeGapGaitError(
+                "Invalid SMORES wheel radius metadata"
+            ) from error
         if not math.isfinite(radius) or not 0.020 <= radius <= 0.050:
-            raise SnakeGapGaitError(f"Invalid SMORES wheel radius {radius:.4f} m")
+            raise SnakeGapGaitError(
+                f"Invalid SMORES wheel radius {radius:.4f} m"
+            )
         return radius
 
     @staticmethod
@@ -517,8 +463,15 @@ class SnakeGapGaitPlanner:
         nodes = graph.node_by_id()
         limits: list[float] = []
         for assignment in assignments:
-            actuators = nodes[assignment.module_id].attributes.get("actuators", {})
-            tilt = actuators.get("tilt") if isinstance(actuators, Mapping) else None
+            actuators = nodes[assignment.module_id].attributes.get(
+                "actuators",
+                {},
+            )
+            tilt = (
+                actuators.get("tilt")
+                if isinstance(actuators, Mapping)
+                else None
+            )
             if not isinstance(tilt, Mapping):
                 continue
             try:
@@ -530,7 +483,9 @@ class SnakeGapGaitPlanner:
                 limits.append(min(-lower, upper))
         limit = min(limits, default=0.5 * math.pi)
         if not 0.5 <= limit <= math.pi:
-            raise SnakeGapGaitError(f"Invalid SMORES TILT limit {limit:.4f} rad")
+            raise SnakeGapGaitError(
+                f"Invalid SMORES TILT limit {limit:.4f} rad"
+            )
         return limit
 
     @staticmethod
@@ -538,10 +493,16 @@ class SnakeGapGaitPlanner:
         try:
             return int(assignment.target_vertex_id.removeprefix("v"))
         except ValueError as error:
-            raise SnakeGapGaitError("Snake8 vertices must be v0..v7") from error
+            raise SnakeGapGaitError(
+                "Snake8 vertices must be v0..v7"
+            ) from error
 
     @staticmethod
-    def _number(parameters: Mapping[str, Any], name: str, default: float) -> float:
+    def _number(
+        parameters: Mapping[str, Any],
+        name: str,
+        default: float,
+    ) -> float:
         try:
             value = float(parameters.get(name, default))
         except (TypeError, ValueError) as error:
@@ -550,7 +511,12 @@ class SnakeGapGaitPlanner:
             raise SnakeGapGaitError(f"{name} must be finite")
         return value
 
-    def _speed(self, parameters: Mapping[str, Any], name: str, default: float) -> float:
+    def _speed(
+        self,
+        parameters: Mapping[str, Any],
+        name: str,
+        default: float,
+    ) -> float:
         value = self._number(parameters, name, default)
         if not 0.0 < value <= 0.060:
             raise SnakeGapGaitError(f"{name} must be in (0, 0.060]")

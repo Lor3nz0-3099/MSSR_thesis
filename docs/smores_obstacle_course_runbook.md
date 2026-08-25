@@ -256,7 +256,7 @@ Assemble Snake8 with the command in section 1 and then execute:
 
 ```bash
 run_behavior snake8 gap-crossing-01 gap_crossing \
-  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"drawbridge_lift_angle_rad":1.20,"gap_goal_tolerance_m":0.004}'
+  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"gap_goal_tolerance_m":0.004}'
 ```
 
 `gap_crossing` has no locomotion timer.  It reads the two gap edges, live
@@ -264,50 +264,38 @@ module positions, measured chain spacing, wheel radius and TILT limits from
 the robot graph.  Its closed-loop program is:
 
 ```text
-RESTORE_GAP_NEUTRAL -> PRELIFT_HEAD_DRAWBRIDGE
--> (MIGRATE_HEAD_DRAWBRIDGE_VN)* -> LIFT_HEAD_DRAWBRIDGE
--> ADVANCE_HEAD_PIVOT_TO_EDGE -> CONFORM_GAP_PROFILE_00
+RESTORE_GAP_NEUTRAL -> APPROACH_HEAD_TO_NEAR_EDGE
 -> (CONFORM_GAP_PROFILE_N -> FOLLOW_GAP_PROFILE_N)*
--> LIFT_TAIL_DRAWBRIDGE
--> PULL_TAIL_TO_SAFE_LANDING -> LOWER_TAIL_ON_FAR_BANK -> CLEAR_FAR_EDGE
+-> RESTORE_GAP_NEUTRAL_FINAL
 ```
 
-The planner computes how many terminal modules must be lifted from the live
-gap width, wheel radius, link spacing and support margins.  It distributes a
-total bend of 1.20 rad by default without any negative counter-bend that could
-cancel the drawbridge slope.  For the nominal 200 mm gap, a positive pre-fold
-on `v4` first selects the three-module head side of the otherwise symmetric
-flat chain.  The positive `v3` bend then adds the fourth anterior module while
-the `v4` bend remains active.  The same rule is gap-parametric: narrower gaps
-select a more anterior pivot directly, while wider admissible gaps extend the
-positive bend rearward through as many adjacent hinges as required by the
-computed suspended-module count.
-The seed angle is retained while the remaining requested lift is divided
-between the hinges leading to the geometry-selected pivot; this prevents a
-central free hinge from lifting the rear half after the three front modules
-have already risen.  The seed remains operator-overridable as
-`drawbridge_prelift_angle_rad`.  The tail lift uses
-the spatially mirrored sign.  The grounded pivot is then driven
-to the near edge before the raised segment is curved upward across the opening,
-with at least one supported module on each bank.  It is not flattened while
-links remain over the opening.  Instead, a positive sine arch is fixed in the
-world interval from the safe near support to the safe far support.  Before
-each short geometric advance, the planner samples that arch at the translated
-module positions and converts the non-negative center heights into distributed
-TILT differences.  The material modules therefore follow the same upward
-shape as it travels rearward through the chain.  The arch amplitude defaults
-to one measured wheel radius plus the edge margin, while the spatial sampling
-defaults to three substeps per measured link and is configurable with
-`gap_profile_substeps`.  When the first front anchor is geometrically beyond
-the far edge, the current arch transitions directly into the tail lift rather
-than flattening over the opening.  The same number of tail modules is then
-raised through the spatially mirrored hinge;
-the front anchor is pulled far enough that lowering the tail leaves its last
-wheel beyond the far edge.
-The gait rejects gaps wider than its measured three-link span, a misaligned
-chain, inconsistent world landmarks, or legacy duration parameters.  This is
-the deterministic IL expert for equal-height banks; it is not yet a learned
-general gap controller.
+The earlier central-hinge drawbridge has been retired.  In the live failure,
+the commanded support wheels were spinning while their modules were suspended,
+so the head-position error could not decrease.  The replacement first brings
+the complete flat train to the near support.  It then fixes a low, positive
+sine curve between a safe point on the near bank and a safe point on the far
+bank.  Before every short geometric advance, the planner samples that curve at
+the translated module centers and converts the resulting center-height
+differences into distributed TILT commands.  The material chain therefore
+passes through one stationary world-frame arch: the bend enters at the head,
+migrates through each module, and exits at the tail while all grounded wheels
+remain available for traction.  There is no symmetric lifting pivot and no
+separate timed tail-lift phase.
+
+The arch span comes from the measured gap width, wheel radius and support
+margins.  Its amplitude defaults to one measured wheel radius plus the edge
+clearance.  Spatial resolution defaults to three substeps per measured link
+and is configurable with `gap_profile_substeps`; it changes smoothness, not
+the physical landmark used to finish.  The final head target is chosen so the
+tail is one complete link beyond the safe far support before all TILTs return
+to captured neutral.
+
+The gait rejects gaps wider than the safe measured five-link unsupported span,
+a misaligned chain, inconsistent world landmarks, legacy duration parameters,
+and the removed `drawbridge_*` parameters.  It is a deterministic expert for
+coplanar banks and gaps within the supported Snake8 geometry, not yet a learned
+general gap controller.  Keep the previous drawbridge implementation only as
+Git history; do not mix its parameters with this program.
 
 ### Isolated MobileManipulator8 button stage with Nav2
 
