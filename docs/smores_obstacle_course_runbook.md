@@ -266,8 +266,9 @@ the robot graph.  Its closed-loop program is:
 ```text
 RESTORE_GAP_NEUTRAL -> PRELIFT_HEAD_DRAWBRIDGE
 -> LIFT_HEAD_DRAWBRIDGE -> STRAIGHTEN_HEAD_DRAWBRIDGE
--> ADVANCE_HEAD_PIVOT_TO_EDGE -> LOWER_HEAD_ACROSS_GAP
--> ADVANCE_BODY_TO_FAR_SUPPORT -> LIFT_TAIL_DRAWBRIDGE
+-> ADVANCE_HEAD_PIVOT_TO_EDGE -> CONFORM_GAP_PROFILE_00
+-> (CONFORM_GAP_PROFILE_N -> FOLLOW_GAP_PROFILE_N)*
+-> LIFT_TAIL_DRAWBRIDGE
 -> PULL_TAIL_TO_SAFE_LANDING -> LOWER_TAIL_ON_FAR_BANK -> CLEAR_FAR_EDGE
 ```
 
@@ -286,10 +287,20 @@ as many adjacent hinges as required by the computed suspended-module count.
 The default transfer angle is divided by that migration depth and remains
 operator-overridable as `drawbridge_prelift_angle_rad`.  The tail lift uses
 the spatially mirrored sign.  The grounded pivot is then driven
-to the near edge before the rigid segment is lowered across the opening, with
-at least one supported module on each bank.  Once the head is down, the body
-advances until the first front anchor is safely on the far bank.  The same
-number of tail modules is then raised through the spatially mirrored hinge;
+to the near edge before the rigid segment is curved upward across the opening,
+with at least one supported module on each bank.  It is not flattened while
+links remain over the opening.  Instead, a positive sine arch is fixed in the
+world interval from the safe near support to the safe far support.  Before
+each short geometric advance, the planner samples that arch at the translated
+module positions and converts the non-negative center heights into distributed
+TILT differences.  The material modules therefore follow the same upward
+shape as it travels rearward through the chain.  The arch amplitude defaults
+to one measured wheel radius plus the edge margin, while the spatial sampling
+defaults to three substeps per measured link and is configurable with
+`gap_profile_substeps`.  When the first front anchor is geometrically beyond
+the far edge, the current arch transitions directly into the tail lift rather
+than flattening over the opening.  The same number of tail modules is then
+raised through the spatially mirrored hinge;
 the front anchor is pulled far enough that lowering the tail leaves its last
 wheel beyond the far edge.
 The gait rejects gaps wider than its measured three-link span, a misaligned

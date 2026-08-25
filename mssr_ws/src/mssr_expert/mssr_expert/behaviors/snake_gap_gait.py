@@ -251,6 +251,29 @@ class SnakeGapGaitPlanner:
         # temporary fold one joint toward the head breaks the 4-vs-4 static
         # symmetry before this central hinge moves; it is then straightened
         # again so the final drawbridge still has exactly one bent joint.
+        landing_clearance = self._number(
+            parameters,
+            "landing_arch_clearance_m",
+            wheel_radius + edge_clearance,
+        )
+        if not 0.006 <= landing_clearance <= 0.060:
+            raise SnakeGapGaitError(
+                "landing_arch_clearance_m must be in [0.006, 0.060]"
+            )
+        profile_substeps_raw = self._number(
+            parameters,
+            "gap_profile_substeps",
+            3.0,
+        )
+        profile_substeps = int(profile_substeps_raw)
+        if (
+            profile_substeps_raw != profile_substeps
+            or not 1 <= profile_substeps <= 8
+        ):
+            raise SnakeGapGaitError(
+                "gap_profile_substeps must be an integer in [1, 8]"
+            )
+
         tail_lift = list(neutral)
         # Spatial mirror: the already landed front segment anchors an equal
         # number of tail modules while they are carried across the opening.
@@ -271,6 +294,64 @@ class SnakeGapGaitPlanner:
         tail_on_far_bank = (
             gap.far_edge_x_m + wheel_radius + landing_margin
         )
+        body_start_anchor_x = (
+            pivot_at_near_edge
+            + (front_anchor_index - head_pivot_index) * spacing
+        )
+        body_travel = front_anchor_on_far_bank - body_start_anchor_x
+        if body_travel <= 0.0:
+            raise SnakeGapGaitError(
+                "Live gap geometry leaves no body-transfer distance"
+            )
+        profile_step_count = max(
+            1,
+            math.ceil(body_travel / (spacing / profile_substeps)),
+        )
+        arch_start_x = pivot_at_near_edge
+        arch_end_x = front_anchor_on_far_bank
+        profile_steps: list[BehaviorProgramStep] = []
+        previous_profile = head_lift
+        for profile_index in range(profile_step_count + 1):
+            fraction = profile_index / profile_step_count
+            anchor_target_x = body_start_anchor_x + fraction * body_travel
+            translation = anchor_target_x - body_start_anchor_x
+            nominal_x = tuple(
+                pivot_at_near_edge
+                + (index - head_pivot_index) * spacing
+                + translation
+                for index in range(self.MODULE_COUNT)
+            )
+            profile = self._traveling_arch_offsets(
+                nominal_x,
+                arch_start_x,
+                arch_end_x,
+                landing_clearance,
+                spacing,
+            )
+            if max(abs(value) for value in profile) > usable_limit:
+                raise SnakeGapGaitError(
+                    "Traveling gap arch exceeds the live Snake8 TILT limits"
+                )
+            profile_steps.append(
+                self._posture(
+                    f"CONFORM_GAP_PROFILE_{profile_index:02d}",
+                    previous_profile,
+                    profile,
+                    ordered,
+                )
+            )
+            previous_profile = profile
+            if profile_index:
+                profile_steps.append(
+                    self._drive_to(
+                        f"FOLLOW_GAP_PROFILE_{profile_index:02d}",
+                        ordered[front_anchor_index],
+                        anchor_target_x,
+                        crossing_speed,
+                        roles,
+                        goal_tolerance,
+                    )
+                )
 
         return (
             self._posture("RESTORE_GAP_NEUTRAL", neutral, neutral, ordered, all_targets=True),
@@ -283,23 +364,10 @@ class SnakeGapGaitPlanner:
                 roles[: head_pivot_index + 1],
                 goal_tolerance,
             ),
-            self._posture(
-                "LOWER_HEAD_ACROSS_GAP",
-                head_lift,
-                neutral,
-                ordered,
-            ),
-            self._drive_to(
-                "ADVANCE_BODY_TO_FAR_SUPPORT",
-                ordered[front_anchor_index],
-                front_anchor_on_far_bank,
-                crossing_speed,
-                roles,
-                goal_tolerance,
-            ),
+            *profile_steps,
             self._posture(
                 "LIFT_TAIL_DRAWBRIDGE",
-                neutral,
+                previous_profile,
                 tuple(tail_lift),
                 ordered,
             ),
@@ -382,6 +450,43 @@ class SnakeGapGaitPlanner:
                 for index in changed
             ),
         )
+
+    @staticmethod
+    def _traveling_arch_offsets(
+        module_x_m: Sequence[float],
+        start_x_m: float,
+        end_x_m: float,
+        clearance_m: float,
+        spacing_m: float,
+    ) -> tuple[float, ...]:
+        """Return TILT offsets for an upward arch fixed in the world gap."""
+
+        width = end_x_m - start_x_m
+        heights = tuple(
+            (
+                clearance_m
+                * math.sin(math.pi * (x_m - start_x_m) / width)
+                if start_x_m < x_m < end_x_m
+                else 0.0
+            )
+            for x_m in module_x_m
+        )
+        link_angles: list[float] = []
+        for first_height, second_height in zip(heights, heights[1:]):
+            height_delta = second_height - first_height
+            ratio = height_delta / spacing_m
+            if abs(ratio) >= 1.0:
+                raise SnakeGapGaitError(
+                    "Traveling gap arch exceeds one-link vertical reach"
+                )
+            link_angles.append(math.asin(ratio))
+
+        offsets = [0.0] * len(module_x_m)
+        incoming_angle = 0.0
+        for index, outgoing_angle in enumerate(link_angles):
+            offsets[index] = outgoing_angle - incoming_angle
+            incoming_angle = outgoing_angle
+        return tuple(offsets)
 
     @staticmethod
     def _ordered_positions(
