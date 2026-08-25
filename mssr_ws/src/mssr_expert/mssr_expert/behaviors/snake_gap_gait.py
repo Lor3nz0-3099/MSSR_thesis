@@ -125,29 +125,37 @@ class SnakeGapGaitPlanner:
                 "gap_goal_tolerance_m must be in [0.001, 0.010]"
             )
 
-        # The pivot wheel may reach the near edge while the head center needs
-        # only one wheel-radius overhang on the far bank.  Three links are the
-        # hard geometric span; retain a small explicit landing margin.
-        maximum_gap = 3.0 * spacing - landing_margin
-        if gap.width_m > maximum_gap:
+        required_span = (
+            gap.width_m
+            + 2.0 * wheel_radius
+            + edge_clearance
+            + landing_margin
+        )
+        lifted_count = max(2, math.ceil(required_span / spacing))
+        maximum_lifted_count = self.MODULE_COUNT - 3
+        if lifted_count > maximum_lifted_count:
+            maximum_gap = (
+                maximum_lifted_count * spacing
+                - 2.0 * wheel_radius
+                - edge_clearance
+                - landing_margin
+            )
             raise SnakeGapGaitError(
-                f"Gap width {gap.width_m:.3f} m exceeds the three-link "
-                f"Snake8 head span {maximum_gap:.3f} m"
+                f"Gap width {gap.width_m:.3f} m exceeds the safe Snake8 "
+                f"drawbridge span {maximum_gap:.3f} m"
             )
         approach_speed = self._speed(parameters, "approach_linear_m_s", 0.050)
         crossing_speed = self._speed(parameters, "linear_m_s", 0.040)
 
-        desired_lift = self._number(
+        lift_angle = self._number(
             parameters,
-            "head_clearance_m",
-            wheel_radius + edge_clearance,
+            "drawbridge_lift_angle_rad",
+            1.20,
         )
-        if not wheel_radius <= desired_lift <= 1.5 * spacing:
+        if lift_angle < 0.85:
             raise SnakeGapGaitError(
-                "head_clearance_m must be between one wheel radius and "
-                "one-and-a-half Snake8 links"
+                "drawbridge_lift_angle_rad must be at least 0.85 rad"
             )
-        lift_angle = math.asin(min(0.95, desired_lift / (2.0 * spacing)))
         tilt_margin = self._number(parameters, "tilt_limit_margin_rad", 0.030)
         if not 0.0 <= tilt_margin <= 0.15:
             raise SnakeGapGaitError("tilt_limit_margin_rad must be in [0, 0.15]")
@@ -160,59 +168,84 @@ class SnakeGapGaitPlanner:
 
         roles = tuple(item.target_role for item in ordered)
         neutral = (0.0,) * self.MODULE_COUNT
+        head_pivot_index = self.MODULE_COUNT - lifted_count - 1
+        tail_hinge_index = lifted_count - 1
+        front_anchor_index = tail_hinge_index + 1
         head_lift = list(neutral)
-        # v4 raises the three-module head; v6 cancels its slope so the head
-        # wheel lands flat instead of striking the far edge with its body.
-        head_lift[4] = lift_angle
-        head_lift[6] = -lift_angle
+        # One large hinge angle raises the complete terminal segment as a
+        # rigid drawbridge.  No downstream counter-bend may flatten it.
+        head_lift[head_pivot_index] = lift_angle
         tail_lift = list(neutral)
-        # Spatial mirror of the head arch: the front bank becomes the anchor.
-        tail_lift[0] = -lift_angle
-        tail_lift[2] = lift_angle
+        # Spatial mirror: the already landed front segment anchors an equal
+        # number of tail modules while they are carried across the opening.
+        tail_lift[tail_hinge_index] = -lift_angle
 
-        head_before_edge = gap.near_edge_x_m - wheel_radius - edge_clearance
-        head_on_far_bank = gap.far_edge_x_m + wheel_radius + landing_margin
-        center_on_far_bank = gap.far_edge_x_m + wheel_radius + landing_margin
-        tail_on_far_bank = gap.far_edge_x_m + wheel_radius + edge_clearance
+        pivot_at_near_edge = (
+            gap.near_edge_x_m - wheel_radius - edge_clearance
+        )
+        front_anchor_on_far_bank = (
+            gap.far_edge_x_m + wheel_radius + landing_margin
+        )
+        front_anchor_for_safe_tail_landing = (
+            gap.far_edge_x_m
+            + lifted_count * spacing
+            + wheel_radius
+            + landing_margin
+        )
+        tail_on_far_bank = (
+            gap.far_edge_x_m + wheel_radius + landing_margin
+        )
 
         return (
             self._posture("RESTORE_GAP_NEUTRAL", neutral, neutral, ordered, all_targets=True),
+            self._posture(
+                "LIFT_HEAD_DRAWBRIDGE",
+                neutral,
+                tuple(head_lift),
+                ordered,
+            ),
             self._drive_to(
-                "APPROACH_NEAR_EDGE",
-                ordered[-1],
-                head_before_edge,
+                "ADVANCE_HEAD_PIVOT_TO_EDGE",
+                ordered[head_pivot_index],
+                pivot_at_near_edge,
                 approach_speed,
-                roles,
+                roles[: head_pivot_index + 1],
                 goal_tolerance,
             ),
-            self._posture("LIFT_HEAD", neutral, tuple(head_lift), ordered),
-            self._drive_to(
-                "EXTEND_HEAD_OVER_GAP",
-                ordered[-1],
-                head_on_far_bank,
-                crossing_speed,
-                roles[:5],
-                goal_tolerance,
+            self._posture(
+                "LOWER_HEAD_ACROSS_GAP",
+                tuple(head_lift),
+                neutral,
+                ordered,
             ),
-            self._posture("LOWER_HEAD_ON_FAR_BANK", tuple(head_lift), neutral, ordered),
             self._drive_to(
-                "ADVANCE_BODY",
-                ordered[4],
-                center_on_far_bank,
+                "ADVANCE_BODY_TO_FAR_SUPPORT",
+                ordered[front_anchor_index],
+                front_anchor_on_far_bank,
                 crossing_speed,
                 roles,
                 goal_tolerance,
             ),
-            self._posture("LIFT_TAIL", neutral, tuple(tail_lift), ordered),
+            self._posture(
+                "LIFT_TAIL_DRAWBRIDGE",
+                neutral,
+                tuple(tail_lift),
+                ordered,
+            ),
             self._drive_to(
-                "PULL_TAIL_OVER_GAP",
-                ordered[0],
-                tail_on_far_bank,
+                "PULL_TAIL_TO_SAFE_LANDING",
+                ordered[front_anchor_index],
+                front_anchor_for_safe_tail_landing,
                 crossing_speed,
-                roles[3:],
+                roles[front_anchor_index:],
                 goal_tolerance,
             ),
-            self._posture("LOWER_TAIL_ON_FAR_BANK", tuple(tail_lift), neutral, ordered),
+            self._posture(
+                "LOWER_TAIL_ON_FAR_BANK",
+                tuple(tail_lift),
+                neutral,
+                ordered,
+            ),
             self._drive_to(
                 "CLEAR_FAR_EDGE",
                 ordered[0],

@@ -256,7 +256,7 @@ Assemble Snake8 with the command in section 1 and then execute:
 
 ```bash
 run_behavior snake8 gap-crossing-01 gap_crossing \
-  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_goal_tolerance_m":0.004}'
+  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"drawbridge_lift_angle_rad":1.20,"gap_goal_tolerance_m":0.004}'
 ```
 
 `gap_crossing` has no locomotion timer.  It reads the two gap edges, live
@@ -264,15 +264,22 @@ module positions, measured chain spacing, wheel radius and TILT limits from
 the robot graph.  Its closed-loop program is:
 
 ```text
-RESTORE_GAP_NEUTRAL -> APPROACH_NEAR_EDGE -> LIFT_HEAD
--> EXTEND_HEAD_OVER_GAP -> LOWER_HEAD_ON_FAR_BANK -> ADVANCE_BODY
--> LIFT_TAIL -> PULL_TAIL_OVER_GAP -> LOWER_TAIL_ON_FAR_BANK
--> CLEAR_FAR_EDGE
+RESTORE_GAP_NEUTRAL -> LIFT_HEAD_DRAWBRIDGE
+-> ADVANCE_HEAD_PIVOT_TO_EDGE -> LOWER_HEAD_ACROSS_GAP
+-> ADVANCE_BODY_TO_FAR_SUPPORT -> LIFT_TAIL_DRAWBRIDGE
+-> PULL_TAIL_TO_SAFE_LANDING -> LOWER_TAIL_ON_FAR_BANK -> CLEAR_FAR_EDGE
 ```
 
-The three-module head arch is levelled before extension so the terminal wheel
-lands on the far bank instead of striking its edge.  Once the head is down,
-the whole body advances before the spatially mirrored tail arch is admitted.
+The planner computes how many terminal modules must be lifted from the live
+gap width, wheel radius, link spacing and support margins.  It raises that
+entire segment about one hinge by 1.20 rad by default: no downstream
+counter-bend cancels the drawbridge slope.  The grounded pivot is then driven
+to the near edge before the rigid segment is lowered across the opening, with
+at least one supported module on each bank.  Once the head is down, the body
+advances until the first front anchor is safely on the far bank.  The same
+number of tail modules is then raised through the spatially mirrored hinge;
+the front anchor is pulled far enough that lowering the tail leaves its last
+wheel beyond the far edge.
 The gait rejects gaps wider than its measured three-link span, a misaligned
 chain, inconsistent world landmarks, or legacy duration parameters.  This is
 the deterministic IL expert for equal-height banks; it is not yet a learned

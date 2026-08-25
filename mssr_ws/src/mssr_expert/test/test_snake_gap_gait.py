@@ -106,13 +106,12 @@ def test_gap_program_has_requested_geometric_sequence_without_timers() -> None:
 
     assert tuple(step.phase for step in program) == (
         "RESTORE_GAP_NEUTRAL",
-        "APPROACH_NEAR_EDGE",
-        "LIFT_HEAD",
-        "EXTEND_HEAD_OVER_GAP",
-        "LOWER_HEAD_ON_FAR_BANK",
-        "ADVANCE_BODY",
-        "LIFT_TAIL",
-        "PULL_TAIL_OVER_GAP",
+        "LIFT_HEAD_DRAWBRIDGE",
+        "ADVANCE_HEAD_PIVOT_TO_EDGE",
+        "LOWER_HEAD_ACROSS_GAP",
+        "ADVANCE_BODY_TO_FAR_SUPPORT",
+        "LIFT_TAIL_DRAWBRIDGE",
+        "PULL_TAIL_TO_SAFE_LANDING",
         "LOWER_TAIL_ON_FAR_BANK",
         "CLEAR_FAR_EDGE",
     )
@@ -120,37 +119,75 @@ def test_gap_program_has_requested_geometric_sequence_without_timers() -> None:
     assert all(step.duration_s is None for step in program)
     assert all(step.position_goal is not None for step in drives)
     assert tuple(step.phase for step in drives) == (
-        "APPROACH_NEAR_EDGE",
-        "EXTEND_HEAD_OVER_GAP",
-        "ADVANCE_BODY",
-        "PULL_TAIL_OVER_GAP",
+        "ADVANCE_HEAD_PIVOT_TO_EDGE",
+        "ADVANCE_BODY_TO_FAR_SUPPORT",
+        "PULL_TAIL_TO_SAFE_LANDING",
         "CLEAR_FAR_EDGE",
     )
 
 
 def test_head_lands_before_body_advances_and_tail_is_lifted() -> None:
     program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
-    head = _state_at(program, "LIFT_HEAD")
-    landed = _state_at(program, "LOWER_HEAD_ON_FAR_BANK")
-    tail = _state_at(program, "LIFT_TAIL")
+    head = _state_at(program, "LIFT_HEAD_DRAWBRIDGE")
+    landed = _state_at(program, "LOWER_HEAD_ACROSS_GAP")
+    tail = _state_at(program, "LIFT_TAIL_DRAWBRIDGE")
     lowered = _state_at(program, "LOWER_TAIL_ON_FAR_BANK")
 
-    assert head["m4"] > 0.0
-    assert head["m6"] == pytest.approx(-head["m4"])
+    # A 200 mm gap plus two wheel supports requires four raised modules.
+    # The single v3 hinge makes a real drawbridge; there is no cancelling bend.
+    assert head["m3"] == pytest.approx(1.20)
+    assert sum(abs(value) > 1e-9 for value in head.values()) == 1
     assert all(value == pytest.approx(0.0) for value in landed.values())
-    assert tail["m0"] < 0.0
-    assert tail["m2"] == pytest.approx(-tail["m0"])
+    assert tail["m3"] == pytest.approx(-1.20)
+    assert sum(abs(value) > 1e-9 for value in tail.values()) == 1
     assert all(value == pytest.approx(0.0) for value in lowered.values())
 
-    extend = next(step for step in program if step.phase == "EXTEND_HEAD_OVER_GAP")
-    advance = next(step for step in program if step.phase == "ADVANCE_BODY")
-    pull = next(step for step in program if step.phase == "PULL_TAIL_OVER_GAP")
-    assert extend.active_target_roles == ROLES[:5]
+    approach = next(
+        step for step in program if step.phase == "ADVANCE_HEAD_PIVOT_TO_EDGE"
+    )
+    advance = next(
+        step for step in program if step.phase == "ADVANCE_BODY_TO_FAR_SUPPORT"
+    )
+    pull = next(
+        step for step in program if step.phase == "PULL_TAIL_TO_SAFE_LANDING"
+    )
+    assert approach.active_target_roles == ROLES[:4]
     assert advance.active_target_roles == ROLES
-    assert pull.active_target_roles == ROLES[3:]
-    assert extend.position_goal.module_id == "m7"
+    assert pull.active_target_roles == ROLES[4:]
+    assert approach.position_goal.module_id == "m3"
     assert advance.position_goal.module_id == "m4"
-    assert pull.position_goal.module_id == "m0"
+    assert pull.position_goal.module_id == "m4"
+    assert pull.position_goal.target_x_m == pytest.approx(
+        0.75 + 4 * 0.07777 + 0.03106 + 0.006
+    )
+
+
+def test_drawbridge_module_count_scales_with_gap_width() -> None:
+    narrow = SnakeGapGaitPlanner().plan(
+        _graph(near=0.55, far=0.65),
+        _assignments(),
+        {},
+    )
+    head = _state_at(narrow, "LIFT_HEAD_DRAWBRIDGE")
+    tail = _state_at(narrow, "LIFT_TAIL_DRAWBRIDGE")
+    approach = next(
+        step for step in narrow if step.phase == "ADVANCE_HEAD_PIVOT_TO_EDGE"
+    )
+
+    # 100 mm gap plus wheel support margins requires three terminal modules.
+    assert head["m4"] == pytest.approx(1.20)
+    assert tail["m2"] == pytest.approx(-1.20)
+    assert approach.position_goal.module_id == "m4"
+    assert approach.active_target_roles == ROLES[:5]
+
+
+def test_drawbridge_lift_cannot_degenerate_into_a_flat_arch() -> None:
+    with pytest.raises(SnakeGapGaitError, match="at least 0.85"):
+        SnakeGapGaitPlanner().plan(
+            _graph(),
+            _assignments(),
+            {"drawbridge_lift_angle_rad": 0.11},
+        )
 
 
 @pytest.mark.parametrize(
