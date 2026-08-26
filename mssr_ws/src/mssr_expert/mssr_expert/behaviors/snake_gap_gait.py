@@ -164,14 +164,23 @@ class SnakeGapGaitPlanner:
             raise SnakeGapGaitError(
                 "far_bank_transition_links must be in [0.5, 2.0]"
             )
+        near_transition_links = self._number(
+            parameters,
+            "near_bank_transition_links",
+            1.0,
+        )
+        if not 0.5 <= near_transition_links <= 2.0:
+            raise SnakeGapGaitError(
+                "near_bank_transition_links must be in [0.5, 2.0]"
+            )
         far_transition_m = far_transition_links * spacing
+        near_transition_m = near_transition_links * spacing
 
         required_span = (
             gap.width_m
             + 2.0 * wheel_radius
             + edge_clearance
             + landing_margin
-            + far_transition_m
         )
         unsupported_link_count = max(2, math.ceil(required_span / spacing))
         maximum_unsupported_links = self.MODULE_COUNT - 3
@@ -181,7 +190,6 @@ class SnakeGapGaitPlanner:
                 - 2.0 * wheel_radius
                 - edge_clearance
                 - landing_margin
-                - far_transition_m
             )
             raise SnakeGapGaitError(
                 f"Gap width {gap.width_m:.3f} m exceeds the safe Snake8 "
@@ -231,19 +239,20 @@ class SnakeGapGaitPlanner:
             )
 
         # The entire robot first reaches the near edge while flat.  A low,
-        # positive backbone curve starts at the safe near support and remains
-        # high through the far edge.  Its descending branch ends one measured
-        # link beyond the safe far support by default, so a module cannot
-        # descend into the vertical far-bank face before its wheel clears the
-        # corner.  Translating the nominal module positions through that curve
-        # makes the bend travel from head to tail without ever exposing a
-        # symmetric 4-vs-4 lifting hinge.
+        # positive backbone curve starts one measured link before the safe
+        # near support and ends one measured link beyond the safe far support
+        # by default.  The head therefore stays high until its wheel clears
+        # the far-bank corner, while the tail starts rising before it rolls
+        # off the near-bank lip.  Translating the nominal module positions
+        # through that curve makes the bend travel from head to tail without
+        # ever exposing a symmetric 4-vs-4 lifting hinge.
         near_support_x = (
             gap.near_edge_x_m - wheel_radius - edge_clearance
         )
         far_support_x = (
             gap.far_edge_x_m + wheel_radius + landing_margin
         )
+        near_arch_x = near_support_x - near_transition_m
         far_arch_x = far_support_x + far_transition_m
         initial_nominal_x = tuple(
             near_support_x - (self.MODULE_COUNT - 1 - index) * spacing
@@ -265,7 +274,7 @@ class SnakeGapGaitPlanner:
             )
             profile = self._traveling_arch_offsets(
                 nominal_x,
-                near_support_x,
+                near_arch_x,
                 far_arch_x,
                 landing_clearance,
                 spacing,

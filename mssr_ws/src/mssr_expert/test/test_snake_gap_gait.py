@@ -242,6 +242,7 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     expected_clearance = 2.0 * 0.03106 + 0.006
     near_support_x = 0.55 - 0.03106 - 0.006
     far_support_x = 0.75 + 0.03106 + 0.006
+    near_arch_x = near_support_x - spacing
     far_arch_x = far_support_x + spacing
     initial_x = tuple(
         near_support_x - (7 - index) * spacing for index in range(8)
@@ -251,7 +252,7 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     first_x = tuple(x_m + body_travel / step_count for x_m in initial_x)
     expected_heights = SnakeGapGaitPlanner._traveling_arch_heights(
         first_x,
-        near_support_x,
+        near_arch_x,
         far_arch_x,
         expected_clearance,
     )
@@ -275,7 +276,7 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
         nominal_x = tuple(x_m + translation for x_m in initial_x)
         heights = SnakeGapGaitPlanner._traveling_arch_heights(
             nominal_x,
-            near_support_x,
+            near_arch_x,
             far_arch_x,
             expected_clearance,
         )
@@ -309,18 +310,31 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
             _assignments(),
             {"far_bank_transition_links": 0.25},
         )
+    with pytest.raises(SnakeGapGaitError, match="near_bank_transition_links"):
+        SnakeGapGaitPlanner().plan(
+            _graph(),
+            _assignments(),
+            {"near_bank_transition_links": 2.5},
+        )
 
 
-def test_far_bank_transition_keeps_the_head_high_past_the_edge() -> None:
+def test_bank_transitions_keep_head_and_tail_high_at_both_edges() -> None:
     spacing = 0.07777
     wheel_radius = 0.03106
     near_support_x = 0.55 - wheel_radius - 0.006
     far_support_x = 0.75 + wheel_radius + 0.006
+    near_arch_x = near_support_x - spacing
     far_arch_x = far_support_x + spacing
 
+    near_edge_height = SnakeGapGaitPlanner._traveling_arch_heights(
+        (0.55,),
+        near_arch_x,
+        far_arch_x,
+        2.0 * wheel_radius + 0.006,
+    )[0]
     far_edge_height = SnakeGapGaitPlanner._traveling_arch_heights(
         (0.75,),
-        near_support_x,
+        near_arch_x,
         far_arch_x,
         2.0 * wheel_radius + 0.006,
     )[0]
@@ -331,7 +345,9 @@ def test_far_bank_transition_keeps_the_head_high_past_the_edge() -> None:
         2.0 * wheel_radius + 0.006,
     )[0]
 
-    assert far_edge_height > wheel_radius + 0.020
+    assert near_edge_height > wheel_radius + 0.015
+    assert far_edge_height > wheel_radius + 0.019
+    assert near_edge_height == pytest.approx(far_edge_height)
     assert far_edge_height > old_far_edge_height
 
 
