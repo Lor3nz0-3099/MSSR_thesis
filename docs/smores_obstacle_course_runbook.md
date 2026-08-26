@@ -256,7 +256,7 @@ Assemble Snake8 with the command in section 1 and then execute:
 
 ```bash
 run_behavior snake8 gap-crossing-01 gap_crossing \
-  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"landing_release_support_modules":3,"landing_release_ramp_links":1.0,"gap_goal_tolerance_m":0.004}'
+  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"landing_release_support_modules":3,"landing_release_ramp_links":1.0,"far_bank_traction_preload_wheel_radii":0.25,"gap_goal_tolerance_m":0.004}'
 ```
 
 `gap_crossing` has no locomotion timer.  It reads the two gap edges, live
@@ -301,6 +301,16 @@ supported count and release distance are dimensionless parameters named
 `landing_release_support_modules` (integer `[2, 4]`) and
 `landing_release_ramp_links` (`[0.5, 2.0]`). Their defaults are three modules
 and one measured link respectively.
+
+Once that landing release starts, the already landed section receives a
+shallow concave traction preload. The first far-bank support and the head stay
+on the nominal plane, while the intervening centers request a downward bow of
+up to one quarter of the measured wheel radius. The rigid bank prevents the
+virtual penetration and turns it into wheel normal force, counteracting the
+few millimetres of unloading observed in the compliant connected chain. This
+does not modify friction, contact material or actuator effort. The default is
+`far_bank_traction_preload_wheel_radii=0.25`, configurable in `[0, 0.4]`, and
+is multiplied by the same progressive landing-release fraction.
 
 The arch span comes from the measured gap width, wheel radius, link spacing
 and support margins. Its ascending branch starts at the safe near-bank

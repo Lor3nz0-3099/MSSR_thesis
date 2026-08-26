@@ -374,6 +374,15 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
             _assignments(),
             {"landing_release_ramp_links": 0.25},
         )
+    with pytest.raises(
+        SnakeGapGaitError,
+        match="far_bank_traction_preload_wheel_radii",
+    ):
+        SnakeGapGaitPlanner().plan(
+            _graph(),
+            _assignments(),
+            {"far_bank_traction_preload_wheel_radii": 0.5},
+        )
 
 
 def test_far_bank_transition_keeps_the_head_high_past_the_edge() -> None:
@@ -514,6 +523,68 @@ def test_landing_release_seats_next_module_and_raises_gap_section() -> None:
     assert full_heights[landing_index] > 0.020
     assert released_heights[landing_index] == pytest.approx(0.0)
     assert released_heights[0] > full_heights[0]
+
+
+def test_far_bank_preload_bows_only_landed_interior_modules_down() -> None:
+    spacing = 0.07777
+    wheel_radius = 0.03106
+    near_support_x = 0.55 - wheel_radius - 0.006
+    far_support_x = 0.75 + wheel_radius + 0.006
+    clearance = 2.0 * wheel_radius + 0.006
+    tail_x = near_support_x + 0.070
+    module_x, active_end_x = _released_profile_geometry(
+        tail_x,
+        near_support_x,
+        far_support_x,
+        spacing,
+        clearance,
+    )
+    preload_m = 0.25 * wheel_radius
+    preload_heights = (
+        SnakeGapGaitPlanner._far_bank_traction_preload_heights(
+            module_x,
+            active_end_x,
+            preload_m,
+        )
+    )
+    supported_indices = tuple(
+        index for index, x_m in enumerate(module_x) if x_m >= active_end_x
+    )
+
+    assert supported_indices == (3, 4, 5, 6, 7)
+    assert preload_heights[supported_indices[0]] == pytest.approx(0.0)
+    assert preload_heights[-1] == pytest.approx(0.0)
+    assert all(
+        preload_heights[index] < 0.0
+        for index in supported_indices[1:-1]
+    )
+    assert min(preload_heights) < -0.9 * preload_m
+
+    arch_heights = SnakeGapGaitPlanner._traveling_arch_heights(
+        module_x,
+        near_support_x,
+        active_end_x,
+        clearance,
+    )
+    expected_heights = tuple(
+        arch + preload
+        for arch, preload in zip(arch_heights, preload_heights)
+    )
+    offsets = SnakeGapGaitPlanner._traveling_arch_offsets(
+        module_x,
+        near_support_x,
+        active_end_x,
+        clearance,
+        spacing,
+        far_bank_preload_m=preload_m,
+    )
+    reconstructed = _center_heights_from_tilts(
+        {f"m{index}": value for index, value in enumerate(offsets)},
+        spacing,
+    )
+    assert reconstructed == pytest.approx(
+        tuple(height - expected_heights[0] for height in expected_heights)
+    )
 
 
 def test_wave_is_low_bidirectional_and_migrates_from_head_to_tail() -> None:

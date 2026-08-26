@@ -238,6 +238,16 @@ class SnakeGapGaitPlanner:
             raise SnakeGapGaitError(
                 "landing_arch_clearance_m must be in [0.006, 0.110]"
             )
+        traction_preload_wheel_radii = self._number(
+            parameters,
+            "far_bank_traction_preload_wheel_radii",
+            0.25,
+        )
+        if not 0.0 <= traction_preload_wheel_radii <= 0.40:
+            raise SnakeGapGaitError(
+                "far_bank_traction_preload_wheel_radii must be in [0, 0.4]"
+            )
+        traction_preload_m = traction_preload_wheel_radii * wheel_radius
         profile_substeps_raw = self._number(
             parameters,
             "gap_profile_substeps",
@@ -315,6 +325,9 @@ class SnakeGapGaitPlanner:
                 active_arch_end_x,
                 landing_clearance,
                 spacing,
+                far_bank_preload_m=(
+                    landing_release * traction_preload_m
+                ),
             )
             if max(abs(value) for value in profile) > usable_limit:
                 raise SnakeGapGaitError(
@@ -429,14 +442,27 @@ class SnakeGapGaitPlanner:
         end_x_m: float,
         clearance_m: float,
         spacing_m: float,
+        *,
+        far_bank_preload_m: float = 0.0,
     ) -> tuple[float, ...]:
         """Return TILT offsets for an upward arch fixed in the world gap."""
 
-        heights = SnakeGapGaitPlanner._traveling_arch_heights(
-            module_x_m,
-            start_x_m,
-            end_x_m,
-            clearance_m,
+        arch_heights = SnakeGapGaitPlanner._traveling_arch_heights(
+            module_x_m, start_x_m, end_x_m, clearance_m
+        )
+        preload_heights = (
+            SnakeGapGaitPlanner._far_bank_traction_preload_heights(
+                module_x_m,
+                end_x_m,
+                far_bank_preload_m,
+            )
+        )
+        heights = tuple(
+            arch_height + preload_height
+            for arch_height, preload_height in zip(
+                arch_heights,
+                preload_heights,
+            )
         )
         link_angles: list[float] = []
         for first_height, second_height in zip(heights, heights[1:]):
@@ -454,6 +480,40 @@ class SnakeGapGaitPlanner:
             offsets[index] = outgoing_angle - incoming_angle
             incoming_angle = outgoing_angle
         return tuple(offsets)
+
+    @staticmethod
+    def _far_bank_traction_preload_heights(
+        module_x_m: Sequence[float],
+        arch_end_x_m: float,
+        preload_m: float,
+    ) -> tuple[float, ...]:
+        """Create a shallow downward bow over the landed traction section.
+
+        The first module beyond the arch and the head remain on the nominal
+        bank plane. Intermediate landed modules request a small virtual
+        penetration; contact compliance turns it into wheel normal force.
+        """
+
+        heights = [0.0] * len(module_x_m)
+        if preload_m <= 0.0 or len(module_x_m) < 3:
+            return tuple(heights)
+        supported_indices = tuple(
+            index
+            for index, x_m in enumerate(module_x_m)
+            if x_m >= arch_end_x_m
+        )
+        if len(supported_indices) < 3:
+            return tuple(heights)
+        first_index = supported_indices[0]
+        start_x = module_x_m[first_index]
+        end_x = module_x_m[-1]
+        span = end_x - start_x
+        if span <= 0.0:
+            return tuple(heights)
+        for index in supported_indices:
+            fraction = (module_x_m[index] - start_x) / span
+            heights[index] = -preload_m * math.sin(math.pi * fraction)
+        return tuple(heights)
 
     @staticmethod
     def _module_x_positions_on_arch(
