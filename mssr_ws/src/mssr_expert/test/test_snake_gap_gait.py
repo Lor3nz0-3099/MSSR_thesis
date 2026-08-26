@@ -239,7 +239,7 @@ def test_removed_drawbridge_parameters_are_rejected(parameter: str) -> None:
 def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
     spacing = 0.07777
-    expected_clearance = 0.03106 + 0.006
+    expected_clearance = 2.0 * 0.03106 + 0.006
     near_support_x = 0.55 - 0.03106 - 0.006
     far_support_x = 0.75 + 0.03106 + 0.006
     far_arch_x = far_support_x + spacing
@@ -291,6 +291,12 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
             _assignments(),
             {"landing_arch_clearance_m": 0.001},
         )
+    with pytest.raises(SnakeGapGaitError, match="arch_clearance_wheel_radii"):
+        SnakeGapGaitPlanner().plan(
+            _graph(),
+            _assignments(),
+            {"arch_clearance_wheel_radii": 0.5},
+        )
     with pytest.raises(SnakeGapGaitError, match="gap_profile_substeps"):
         SnakeGapGaitPlanner().plan(
             _graph(),
@@ -316,16 +322,16 @@ def test_far_bank_transition_keeps_the_head_high_past_the_edge() -> None:
         (0.75,),
         near_support_x,
         far_arch_x,
-        wheel_radius + 0.006,
+        2.0 * wheel_radius + 0.006,
     )[0]
     old_far_edge_height = SnakeGapGaitPlanner._traveling_arch_heights(
         (0.75,),
         near_support_x,
         far_support_x,
-        wheel_radius + 0.006,
+        2.0 * wheel_radius + 0.006,
     )[0]
 
-    assert far_edge_height > wheel_radius
+    assert far_edge_height > wheel_radius + 0.020
     assert far_edge_height > old_far_edge_height
 
 

@@ -198,14 +198,23 @@ class SnakeGapGaitPlanner:
         usable_limit = self._symmetric_tilt_limit(graph, ordered) - tilt_margin
         roles = tuple(item.target_role for item in ordered)
         neutral = (0.0,) * self.MODULE_COUNT
+        clearance_wheel_radii = self._number(
+            parameters,
+            "arch_clearance_wheel_radii",
+            2.0,
+        )
+        if not 1.0 <= clearance_wheel_radii <= 3.0:
+            raise SnakeGapGaitError(
+                "arch_clearance_wheel_radii must be in [1.0, 3.0]"
+            )
         landing_clearance = self._number(
             parameters,
             "landing_arch_clearance_m",
-            wheel_radius + edge_clearance,
+            clearance_wheel_radii * wheel_radius + edge_clearance,
         )
-        if not 0.006 <= landing_clearance <= 0.060:
+        if not 0.006 <= landing_clearance <= 0.110:
             raise SnakeGapGaitError(
-                "landing_arch_clearance_m must be in [0.006, 0.060]"
+                "landing_arch_clearance_m must be in [0.006, 0.110]"
             )
         profile_substeps_raw = self._number(
             parameters,
