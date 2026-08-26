@@ -145,6 +145,9 @@ def test_self_assembly_cli_defaults_match_target_demonstration() -> None:
     assert args.stair_test_course is False
     assert args.button_test_course is False
     assert args.gap_test_course is False
+    assert args.gap_seed is None
+    assert args.gap_width_m is None
+    assert args.gap_near_edge_x_m is None
     assert args.stair_seed is None
     assert args.stair_rise_m is None
     assert args.stair_depth_m is None
@@ -193,6 +196,24 @@ def test_stair_cli_accepts_seed_and_explicit_geometry_overrides() -> None:
     assert args.stair_depth_m == pytest.approx(0.310)
     assert args.stair_count == 4
     assert args.simulation_speed_factor == pytest.approx(2.0)
+
+
+def test_gap_cli_accepts_seed_and_explicit_geometry_overrides() -> None:
+    args = build_argument_parser().parse_args(
+        [
+            "--gap-test-course",
+            "--gap-seed",
+            "17",
+            "--gap-width-m",
+            "0.185",
+            "--gap-near-edge-x-m",
+            "0.590",
+        ]
+    )
+
+    assert args.gap_seed == 17
+    assert args.gap_width_m == pytest.approx(0.185)
+    assert args.gap_near_edge_x_m == pytest.approx(0.590)
 
 
 def test_self_assembly_config_rejects_two_courses(tmp_path) -> None:

@@ -293,10 +293,18 @@ def run_parallel_self_assembly_scenario(
         obstacle_course = install_mobile_manipulator_button_test_course(stage)
     elif config.gap_test_course:
         from smores_ep.isaac.obstacle_course import (
+            CoplanarGapSpec,
             install_snake8_gap_test_course,
         )
 
-        obstacle_course = install_snake8_gap_test_course(stage)
+        obstacle_course = install_snake8_gap_test_course(
+            stage,
+            CoplanarGapSpec(
+                width_m=config.gap_width_m,
+                near_edge_x_m=config.gap_near_edge_x_m,
+                seed=config.gap_seed,
+            ),
+        )
     layout = self_assembly_spawn_layout(config)
     if config.manual_obstacle_course:
         layout = {

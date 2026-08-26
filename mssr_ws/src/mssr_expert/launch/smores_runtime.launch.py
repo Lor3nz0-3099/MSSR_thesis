@@ -108,6 +108,16 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         value = LaunchConfiguration(launch_name).perform(context).strip()
         if value:
             simulation_command.extend((option_name, value))
+    gap_seed = LaunchConfiguration("gap_seed").perform(context).strip()
+    if gap_seed:
+        simulation_command.extend(("--gap-seed", gap_seed))
+    for launch_name, option_name in (
+        ("gap_width_m", "--gap-width-m"),
+        ("gap_near_edge_x_m", "--gap-near-edge-x-m"),
+    ):
+        value = LaunchConfiguration(launch_name).perform(context).strip()
+        if value:
+            simulation_command.extend((option_name, value))
     if _as_bool(LaunchConfiguration("performance").perform(context)):
         simulation_command.append("--performance")
     if _as_bool(LaunchConfiguration("simple_visuals").perform(context)):
@@ -275,6 +285,28 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="",
                 description=(
                     "Optional world-X coordinate override for the first riser."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "gap_seed",
+                default_value="",
+                description=(
+                    "Optional seed for the conservative coplanar-gap "
+                    "generator."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "gap_width_m",
+                default_value="",
+                description=(
+                    "Optional isolated gap width override in metres."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "gap_near_edge_x_m",
+                default_value="",
+                description=(
+                    "Optional world-X coordinate of the near gap edge."
                 ),
             ),
             DeclareLaunchArgument(

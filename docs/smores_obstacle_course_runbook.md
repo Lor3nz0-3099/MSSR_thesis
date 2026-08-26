@@ -239,9 +239,12 @@ in `docs/validated_behaviors/snake8_crawl_stairs_arch_wave.md`.
 
 ### Isolated Snake8 gap stage
 
-The isolated gap fixture has two coplanar banks separated by a real 200 mm
-opening in world +X.  It is deliberately independent from the older Bridge8
-timed behavior.  Start the complete GUI runtime with:
+The isolated gap fixture has two coplanar banks separated by a real opening
+in world +X.  The default remains the physically validated 200 mm fixture. A
+reproducible conservative generator can vary the opening from 160 to 210 mm
+and the near edge from world X 0.520 to 0.620 m without changing the behavior
+implementation. It is deliberately independent from the older Bridge8 timed
+behavior. Start the default complete GUI runtime with:
 
 ```bash
 cd ~/MSSR_thesis/mssr_ws
@@ -251,6 +254,21 @@ ros2 launch mssr_expert smores_runtime.launch.py \
   gap_test_course:=true \
   performance:=true
 ```
+
+A generated GUI fixture uses a retained integer seed:
+
+```bash
+ros2 launch mssr_expert smores_runtime.launch.py \
+  gap_test_course:=true \
+  gap_seed:=17 \
+  performance:=true
+```
+
+For a controlled geometry, use `gap_width_m:=0.185` and optionally
+`gap_near_edge_x_m:=0.590` instead of `gap_seed`. If a seed and explicit
+values are supplied together, the explicit values override the corresponding
+sampled values. Isaac publishes the exact `coplanar_gap_v1` specification in
+the live course metadata, including seed and both edge coordinates.
 
 Assemble Snake8 with the command in section 1 and then execute:
 
@@ -341,6 +359,52 @@ Git history; do not mix its parameters with this program.
 The first physically successful complete crossing, its exact parameters and
 its explicit generalization limits are frozen in
 `docs/validated_behaviors/snake8_gap_crossing.md`.
+
+#### Reproducible headless gap campaign
+
+The batch runner creates one isolated runtime directory per episode and saves
+the exact gap specification, behavior parameters, baseline commit, assembly
+dataset, runtime logs and terminal result. Inspect a campaign before starting
+Isaac with the zero-cost planning mode:
+
+```bash
+cd ~/MSSR_thesis
+PYTHONPATH=scripts/smores_ep/src python3 \
+  scripts/smores_ep/run_gap_headless_batch.py \
+  --include-reference \
+  --seeds 0:4 \
+  --plan-only \
+  --output-dir logs/gap_headless_batch/plan_001
+```
+
+After sourcing ROS and the workspace, remove only `--plan-only` and choose a
+new empty output directory to execute the five seeded cases plus the reference:
+
+```bash
+source /opt/ros/humble/setup.bash
+source mssr_ws/install/setup.bash
+export ROS_DOMAIN_ID=0
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+PYTHONPATH=scripts/smores_ep/src python3 \
+  scripts/smores_ep/run_gap_headless_batch.py \
+  --include-reference \
+  --seeds 0:4 \
+  --continue-on-failure \
+  --output-dir logs/gap_headless_batch/campaign_001
+```
+
+This command schedules six episodes. The runner uses wall-clock limits only
+as failure guards; `gap_crossing` still terminates from geometry. In addition
+to the command return code, success independently requires eight modules,
+seven connections, every module centre beyond the generated far edge, wheel
+height compatible with the far bank and a near-neutral final TILT profile.
+
+This first generator intentionally varies only supported isolated geometry.
+It does not yet randomize bank height, gap heading, initial Snake8 pose,
+obstacle order or obstacle presence. Those dimensions belong to the later
+multi-obstacle course generator and must not be confused with demonstrated
+generalization of the current gait.
 
 ### Isolated MobileManipulator8 button stage with Nav2
 

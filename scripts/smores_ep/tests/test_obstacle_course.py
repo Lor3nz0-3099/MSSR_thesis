@@ -4,9 +4,11 @@ from __future__ import annotations
 import pytest
 
 from smores_ep.isaac.obstacle_course import (
+    CoplanarGapSpec,
     UniformStairSpec,
     manual_obstacle_course,
     mobile_manipulator_button_test_course,
+    sample_coplanar_gap_spec,
     sample_uniform_stair_spec,
     snake8_gap_test_course,
     snake8_stair_test_course,
@@ -105,11 +107,73 @@ def test_gap_test_course_has_no_collider_across_open_interval() -> None:
         "far_edge_x_m": pytest.approx(0.75),
         "width_m": pytest.approx(0.20),
     }
+    assert course.to_observation()["scenario"] == {
+        "generator": "coplanar_gap_v1",
+        "seed": None,
+        "width_m": pytest.approx(0.20),
+        "near_edge_x_m": pytest.approx(0.55),
+        "far_edge_x_m": pytest.approx(0.75),
+        "bank_width_m": pytest.approx(1.20),
+        "approach_start_x_m": pytest.approx(-1.00),
+        "landing_length_m": pytest.approx(1.25),
+        "bank_thickness_m": pytest.approx(0.02),
+    }
     for box in course.boxes:
         half_x_m = 0.5 * box.size_xyz_m[0]
         start_x_m = box.center_xyz_m[0] - half_x_m
         end_x_m = box.center_xyz_m[0] + half_x_m
         assert end_x_m <= near_x_m or start_x_m >= far_x_m
+
+
+def test_seeded_gap_sampling_is_reproducible_and_conservative() -> None:
+    first = sample_coplanar_gap_spec(17)
+    second = sample_coplanar_gap_spec(17)
+
+    assert first == second
+    assert first.seed == 17
+    assert 0.160 <= first.width_m <= 0.210
+    assert 0.520 <= first.near_edge_x_m <= 0.620
+
+
+def test_parameterized_gap_geometry_and_metadata_share_one_spec() -> None:
+    spec = CoplanarGapSpec(
+        width_m=0.175,
+        near_edge_x_m=0.610,
+        seed=23,
+        bank_width_m=1.10,
+        landing_length_m=1.40,
+    )
+    course = snake8_gap_test_course(spec)
+    boxes = {box.name: box for box in course.boxes}
+
+    assert course.gap_interval_x_m == pytest.approx((0.610, 0.785))
+    assert boxes["NearBank"].size_xyz_m == pytest.approx((1.610, 1.10, 0.02))
+    assert boxes["FarBank"].size_xyz_m == pytest.approx((1.40, 1.10, 0.02))
+    assert boxes["FarBank"].center_xyz_m[0] == pytest.approx(1.485)
+    observation = course.to_observation()
+    assert observation["scenario"] == {
+        "generator": "coplanar_gap_v1",
+        **spec.to_dict(),
+    }
+    assert observation["gap"] == {
+        "near_edge_x_m": pytest.approx(0.610),
+        "far_edge_x_m": pytest.approx(0.785),
+        "width_m": pytest.approx(0.175),
+    }
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    (
+        {"width_m": 0.050},
+        {"near_edge_x_m": -0.10},
+        {"landing_length_m": 0.50},
+        {"bank_width_m": 0.50},
+    ),
+)
+def test_gap_spec_rejects_unsupported_geometry(kwargs: dict) -> None:
+    with pytest.raises(ValueError):
+        CoplanarGapSpec(**kwargs)
 
 
 def test_snake8_stair_test_course_has_three_wheel_high_risers() -> None:

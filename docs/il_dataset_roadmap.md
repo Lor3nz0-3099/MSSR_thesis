@@ -54,3 +54,11 @@ The first successful `crawl_stairs_arch_wave` baseline is frozen in
 the isolated uniform-stair generator and headless evaluator exercise a small
 conservative family of stairs.  This is a regression/robustness gate, not the
 full randomized obstacle-course generator planned in step 5.
+
+The same separation now applies to Snake8 `gap_crossing`. The isolated
+`coplanar_gap_v1` generator samples a reproducible conservative family of
+equal-height, world-+X gaps and the headless evaluator records exact manifests
+plus an independent terminal geometry check. These per-obstacle campaigns are
+the first dataset stratum. A later course generator will compose variable
+obstacle presence and order into complete task-achievement trajectories while
+retaining every component seed and feasibility decision.

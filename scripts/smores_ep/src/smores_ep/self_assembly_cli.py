@@ -10,7 +10,9 @@ from smores_ep.config.physics import (
 )
 from smores_ep.config.simulation import SelfAssemblySimulationConfig
 from smores_ep.isaac.obstacle_course import (
+    CoplanarGapSpec,
     UniformStairSpec,
+    sample_coplanar_gap_spec,
     sample_uniform_stair_spec,
 )
 
@@ -164,6 +166,17 @@ def build_argument_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--gap-seed",
+        type=int,
+        default=None,
+        help=(
+            "Sample a reproducible coplanar gap from the conservative "
+            "Snake8 validation envelope"
+        ),
+    )
+    parser.add_argument("--gap-width-m", type=float, default=None)
+    parser.add_argument("--gap-near-edge-x-m", type=float, default=None)
+    parser.add_argument(
         "--disable-staging-collision-avoidance",
         action="store_true",
         help="Disable assembly-only planar obstacle avoidance",
@@ -224,6 +237,22 @@ def main() -> None:
     }
     if stair_overrides:
         stair_spec = replace(stair_spec, **stair_overrides)
+
+    gap_spec = (
+        sample_coplanar_gap_spec(args.gap_seed)
+        if args.gap_seed is not None
+        else CoplanarGapSpec()
+    )
+    gap_overrides = {
+        field_name: value
+        for field_name, value in (
+            ("width_m", args.gap_width_m),
+            ("near_edge_x_m", args.gap_near_edge_x_m),
+        )
+        if value is not None
+    }
+    if gap_overrides:
+        gap_spec = replace(gap_spec, **gap_overrides)
 
     physics_hz = args.physics_hz
     if physics_hz is None:
@@ -296,6 +325,9 @@ def main() -> None:
                 stair_count=stair_spec.step_count,
                 stair_first_riser_x_m=stair_spec.first_riser_x_m,
                 stair_seed=stair_spec.seed,
+                gap_width_m=gap_spec.width_m,
+                gap_near_edge_x_m=gap_spec.near_edge_x_m,
+                gap_seed=gap_spec.seed,
                 staging_collision_avoidance=(
                     not args.disable_staging_collision_avoidance
                 ),

@@ -12,6 +12,8 @@ REFERENCE_STAIR_RISE_M = 0.065
 REFERENCE_STAIR_DEPTH_M = 0.28
 REFERENCE_STAIR_COUNT = 3
 REFERENCE_FIRST_RISER_X_M = 0.65
+REFERENCE_GAP_WIDTH_M = 0.20
+REFERENCE_GAP_NEAR_EDGE_X_M = 0.55
 
 
 @dataclass(frozen=True)
@@ -76,6 +78,72 @@ def sample_uniform_stair_spec(seed: int) -> UniformStairSpec:
         rise_m=round(generator.uniform(0.050, 0.065), 3),
         tread_depth_m=round(generator.uniform(0.250, 0.320), 3),
         step_count=generator.randint(2, 4),
+        seed=seed,
+    )
+
+
+@dataclass(frozen=True)
+class CoplanarGapSpec:
+    """Reproducible geometry for one isolated equal-height gap episode."""
+
+    width_m: float = REFERENCE_GAP_WIDTH_M
+    near_edge_x_m: float = REFERENCE_GAP_NEAR_EDGE_X_M
+    seed: int | None = None
+    bank_width_m: float = 1.20
+    approach_start_x_m: float = -1.00
+    landing_length_m: float = 1.25
+    bank_thickness_m: float = 0.02
+
+    def __post_init__(self) -> None:
+        numeric = (
+            self.width_m,
+            self.near_edge_x_m,
+            self.bank_width_m,
+            self.approach_start_x_m,
+            self.landing_length_m,
+            self.bank_thickness_m,
+        )
+        if not all(math.isfinite(value) for value in numeric):
+            raise ValueError("Coplanar gap dimensions must be finite")
+        if not 0.080 <= self.width_m <= 0.400:
+            raise ValueError("Gap width must be between 80 and 400 mm")
+        if self.near_edge_x_m - self.approach_start_x_m < 1.0:
+            raise ValueError("Gap must leave at least 1 m of approach bank")
+        if self.landing_length_m < 0.80:
+            raise ValueError("Gap must leave at least 0.8 m of landing bank")
+        if self.bank_width_m < 0.80:
+            raise ValueError("Gap banks must be at least 0.8 m wide")
+        if not 0.005 <= self.bank_thickness_m <= 0.20:
+            raise ValueError("Gap bank thickness must be between 5 and 200 mm")
+
+    @property
+    def far_edge_x_m(self) -> float:
+        return self.near_edge_x_m + self.width_m
+
+    @property
+    def landing_end_x_m(self) -> float:
+        return self.far_edge_x_m + self.landing_length_m
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "seed": self.seed,
+            "width_m": self.width_m,
+            "near_edge_x_m": self.near_edge_x_m,
+            "far_edge_x_m": self.far_edge_x_m,
+            "bank_width_m": self.bank_width_m,
+            "approach_start_x_m": self.approach_start_x_m,
+            "landing_length_m": self.landing_length_m,
+            "bank_thickness_m": self.bank_thickness_m,
+        }
+
+
+def sample_coplanar_gap_spec(seed: int) -> CoplanarGapSpec:
+    """Sample the initial conservative Snake8 gap robustness envelope."""
+
+    generator = random.Random(seed)
+    return CoplanarGapSpec(
+        width_m=round(generator.uniform(0.160, 0.210), 3),
+        near_edge_x_m=round(generator.uniform(0.520, 0.620), 3),
         seed=seed,
     )
 
@@ -185,12 +253,17 @@ class GapTestCourse:
 
     boxes: tuple[CourseBox, ...]
     gap_interval_x_m: tuple[float, float]
+    spec: CoplanarGapSpec
 
     def to_observation(self) -> dict[str, Any]:
         near_x_m, far_x_m = self.gap_interval_x_m
         return {
             "frame_id": "world",
             "course_profile": "snake8_gap_test",
+            "scenario": {
+                "generator": "coplanar_gap_v1",
+                **self.spec.to_dict(),
+            },
             "gap": {
                 "near_edge_x_m": near_x_m,
                 "far_edge_x_m": far_x_m,
@@ -350,14 +423,17 @@ def mobile_manipulator_button_test_course() -> ButtonTestCourse:
     )
 
 
-def snake8_gap_test_course() -> GapTestCourse:
-    """Return a 200 mm gap with coplanar approach and landing banks."""
+def snake8_gap_test_course(
+    spec: CoplanarGapSpec | None = None,
+) -> GapTestCourse:
+    """Return a parameterized gap with coplanar approach and landing banks."""
 
+    spec = spec or CoplanarGapSpec()
     platform_color = (0.24, 0.27, 0.31)
-    near_x_m = 0.55
-    far_x_m = 0.75
-    approach_start_x_m = -1.00
-    landing_end_x_m = 2.00
+    near_x_m = spec.near_edge_x_m
+    far_x_m = spec.far_edge_x_m
+    approach_start_x_m = spec.approach_start_x_m
+    landing_end_x_m = spec.landing_end_x_m
     return GapTestCourse(
         boxes=(
             CourseBox(
@@ -365,21 +441,34 @@ def snake8_gap_test_course() -> GapTestCourse:
                 (
                     0.5 * (approach_start_x_m + near_x_m),
                     0.0,
-                    -0.01,
+                    -0.5 * spec.bank_thickness_m,
                 ),
-                (near_x_m - approach_start_x_m, 1.20, 0.02),
+                (
+                    near_x_m - approach_start_x_m,
+                    spec.bank_width_m,
+                    spec.bank_thickness_m,
+                ),
                 platform_color,
                 semantic="gap_test_near_bank",
             ),
             CourseBox(
                 "FarBank",
-                (0.5 * (far_x_m + landing_end_x_m), 0.0, -0.01),
-                (landing_end_x_m - far_x_m, 1.20, 0.02),
+                (
+                    0.5 * (far_x_m + landing_end_x_m),
+                    0.0,
+                    -0.5 * spec.bank_thickness_m,
+                ),
+                (
+                    landing_end_x_m - far_x_m,
+                    spec.bank_width_m,
+                    spec.bank_thickness_m,
+                ),
                 platform_color,
                 semantic="gap_test_far_bank",
             ),
         ),
         gap_interval_x_m=(near_x_m, far_x_m),
+        spec=spec,
     )
 
 
@@ -527,9 +616,12 @@ def install_mobile_manipulator_button_test_course(
     return course
 
 
-def install_snake8_gap_test_course(stage: Any) -> GapTestCourse:
+def install_snake8_gap_test_course(
+    stage: Any,
+    spec: CoplanarGapSpec | None = None,
+) -> GapTestCourse:
     """Replace the infinite floor with the isolated equal-bank gap."""
 
-    course = snake8_gap_test_course()
+    course = snake8_gap_test_course(spec)
     _install_course_boxes(stage, "/World/Snake8GapTestCourse", course.boxes)
     return course
