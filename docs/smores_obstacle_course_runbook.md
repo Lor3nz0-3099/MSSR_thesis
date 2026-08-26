@@ -256,7 +256,7 @@ Assemble Snake8 with the command in section 1 and then execute:
 
 ```bash
 run_behavior snake8 gap-crossing-01 gap_crossing \
-  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"gap_goal_tolerance_m":0.004}'
+  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"landing_release_support_modules":3,"landing_release_ramp_links":1.0,"gap_goal_tolerance_m":0.004}'
 ```
 
 `gap_crossing` has no locomotion timer.  It reads the two gap edges, live
@@ -289,6 +289,18 @@ link spacing. This accounts for the horizontal contraction introduced by the
 height changes. Consequently every head-position goal is reachable by the
 curved chain instead of remaining ahead by the accumulated contraction while
 the wheels spin against a chassis contact.
+
+The arch does not retain its full far-bank extension during the tail exit.
+After the head and two preceding modules have passed the extended far support,
+the planner moves the descending endpoint back to the safe bank support over
+one measured link of forward travel. The next module is therefore selected by
+its geometric order and settles onto the bank; no `snake_center_*` role or
+fixture coordinate is hard-coded. At the same time the shorter arch moves its
+peak rearward and raises the modules still crossing the opening. The required
+supported count and release distance are dimensionless parameters named
+`landing_release_support_modules` (integer `[2, 4]`) and
+`landing_release_ramp_links` (`[0.5, 2.0]`). Their defaults are three modules
+and one measured link respectively.
 
 The arch span comes from the measured gap width, wheel radius, link spacing
 and support margins. Its ascending branch starts at the safe near-bank

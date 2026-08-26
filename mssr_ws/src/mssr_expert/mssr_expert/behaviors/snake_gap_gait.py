@@ -165,6 +165,28 @@ class SnakeGapGaitPlanner:
                 "far_bank_transition_links must be in [0.5, 2.0]"
             )
         far_transition_m = far_transition_links * spacing
+        landing_support_modules_raw = self._number(
+            parameters,
+            "landing_release_support_modules",
+            3.0,
+        )
+        landing_support_modules = int(landing_support_modules_raw)
+        if (
+            landing_support_modules_raw != landing_support_modules
+            or not 2 <= landing_support_modules <= 4
+        ):
+            raise SnakeGapGaitError(
+                "landing_release_support_modules must be an integer in [2, 4]"
+            )
+        landing_release_ramp_links = self._number(
+            parameters,
+            "landing_release_ramp_links",
+            1.0,
+        )
+        if not 0.5 <= landing_release_ramp_links <= 2.0:
+            raise SnakeGapGaitError(
+                "landing_release_ramp_links must be in [0.5, 2.0]"
+            )
 
         required_span = (
             gap.width_m
@@ -261,7 +283,7 @@ class SnakeGapGaitPlanner:
             fraction = profile_index / profile_step_count
             translation = fraction * body_travel
             tail_x = initial_nominal_x[0] + translation
-            module_x = self._module_x_positions_on_arch(
+            provisional_x = self._module_x_positions_on_arch(
                 tail_x,
                 self.MODULE_COUNT,
                 near_support_x,
@@ -269,10 +291,28 @@ class SnakeGapGaitPlanner:
                 landing_clearance,
                 spacing,
             )
+            landing_release = self._landing_release_fraction(
+                provisional_x[-1],
+                far_arch_x,
+                spacing,
+                landing_support_modules,
+                landing_release_ramp_links,
+            )
+            active_arch_end_x = (
+                far_arch_x - landing_release * far_transition_m
+            )
+            module_x = self._module_x_positions_on_arch(
+                tail_x,
+                self.MODULE_COUNT,
+                near_support_x,
+                active_arch_end_x,
+                landing_clearance,
+                spacing,
+            )
             profile = self._traveling_arch_offsets(
                 module_x,
                 near_support_x,
-                far_arch_x,
+                active_arch_end_x,
                 landing_clearance,
                 spacing,
             )
@@ -469,6 +509,40 @@ class SnakeGapGaitPlanner:
                     upper = candidate
             positions.append(0.5 * (lower + upper))
         return tuple(positions)
+
+    @staticmethod
+    def _landing_release_fraction(
+        provisional_head_x_m: float,
+        far_arch_x_m: float,
+        spacing_m: float,
+        supported_module_count: int,
+        ramp_links: float,
+    ) -> float:
+        """Return how far the far branch may collapse onto its bank support.
+
+        The head and the requested number of preceding modules must first be
+        beyond the extended arch.  Over the following measured link span the
+        far endpoint then moves back to the safe bank support.  This makes the
+        next module in the chain settle onto the bank while the remaining
+        suspended section forms a shorter, higher arch.
+        """
+
+        release_start_x = (
+            far_arch_x_m + (supported_module_count - 1) * spacing_m
+        )
+        release_distance = ramp_links * spacing_m
+        if release_distance <= 0.0:
+            raise SnakeGapGaitError(
+                "Landing release has invalid transition distance"
+            )
+        return max(
+            0.0,
+            min(
+                1.0,
+                (provisional_head_x_m - release_start_x)
+                / release_distance,
+            ),
+        )
 
     @staticmethod
     def _traveling_arch_heights(

@@ -104,6 +104,41 @@ def _center_heights_from_tilts(
     return tuple(heights)
 
 
+def _released_profile_geometry(
+    tail_x: float,
+    near_support_x: float,
+    far_support_x: float,
+    spacing: float,
+    clearance: float,
+) -> tuple[tuple[float, ...], float]:
+    far_arch_x = far_support_x + spacing
+    provisional_x = SnakeGapGaitPlanner._module_x_positions_on_arch(
+        tail_x,
+        8,
+        near_support_x,
+        far_arch_x,
+        clearance,
+        spacing,
+    )
+    release = SnakeGapGaitPlanner._landing_release_fraction(
+        provisional_x[-1],
+        far_arch_x,
+        spacing,
+        3,
+        1.0,
+    )
+    active_end_x = far_arch_x - release * spacing
+    module_x = SnakeGapGaitPlanner._module_x_positions_on_arch(
+        tail_x,
+        8,
+        near_support_x,
+        active_end_x,
+        clearance,
+        spacing,
+    )
+    return module_x, active_end_x
+
+
 def test_flat_gap_recognizes_consistent_world_landmarks() -> None:
     gap = FlatGap.from_course(_course())
 
@@ -248,18 +283,17 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     )
     body_travel = far_arch_x - initial_x[0]
     step_count = math.ceil(body_travel / (spacing / 3))
-    first_x = SnakeGapGaitPlanner._module_x_positions_on_arch(
+    first_x, first_arch_end_x = _released_profile_geometry(
         initial_x[0] + body_travel / step_count,
-        8,
         near_support_x,
-        far_arch_x,
-        expected_clearance,
+        far_support_x,
         spacing,
+        expected_clearance,
     )
     expected_heights = SnakeGapGaitPlanner._traveling_arch_heights(
         first_x,
         near_support_x,
-        far_arch_x,
+        first_arch_end_x,
         expected_clearance,
     )
     landed = _state_at(program, "CONFORM_GAP_PROFILE_01")
@@ -279,18 +313,17 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     peak_indices: list[int] = []
     for profile_index, phase in enumerate(profile_phases, start=1):
         translation = profile_index * body_travel / step_count
-        nominal_x = SnakeGapGaitPlanner._module_x_positions_on_arch(
+        nominal_x, active_arch_end_x = _released_profile_geometry(
             initial_x[0] + translation,
-            8,
             near_support_x,
-            far_arch_x,
-            expected_clearance,
+            far_support_x,
             spacing,
+            expected_clearance,
         )
         heights = SnakeGapGaitPlanner._traveling_arch_heights(
             nominal_x,
             near_support_x,
-            far_arch_x,
+            active_arch_end_x,
             expected_clearance,
         )
         assert min(heights) >= -1e-9
@@ -322,6 +355,24 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
             _graph(),
             _assignments(),
             {"far_bank_transition_links": 0.25},
+        )
+    with pytest.raises(
+        SnakeGapGaitError,
+        match="landing_release_support_modules",
+    ):
+        SnakeGapGaitPlanner().plan(
+            _graph(),
+            _assignments(),
+            {"landing_release_support_modules": 2.5},
+        )
+    with pytest.raises(
+        SnakeGapGaitError,
+        match="landing_release_ramp_links",
+    ):
+        SnakeGapGaitPlanner().plan(
+            _graph(),
+            _assignments(),
+            {"landing_release_ramp_links": 0.25},
         )
 
 
@@ -372,18 +423,17 @@ def test_profile_chords_and_head_goals_are_physically_reachable() -> None:
     assert len(profile_drives) == step_count
     for profile_number, drive in enumerate(profile_drives, start=1):
         translation = profile_number * body_travel / step_count
-        module_x = SnakeGapGaitPlanner._module_x_positions_on_arch(
+        module_x, active_arch_end_x = _released_profile_geometry(
             initial_x[0] + translation,
-            8,
             near_support_x,
-            far_arch_x,
-            clearance,
+            far_support_x,
             spacing,
+            clearance,
         )
         heights = SnakeGapGaitPlanner._traveling_arch_heights(
             module_x,
             near_support_x,
-            far_arch_x,
+            active_arch_end_x,
             clearance,
         )
         for first_x, second_x, first_z, second_z in zip(
@@ -407,6 +457,63 @@ def test_profile_chords_and_head_goals_are_physically_reachable() -> None:
         )
 
     assert max(contractions) > 0.010
+
+
+def test_landing_release_seats_next_module_and_raises_gap_section() -> None:
+    spacing = 0.07777
+    wheel_radius = 0.03106
+    near_support_x = 0.55 - wheel_radius - 0.006
+    far_support_x = 0.75 + wheel_radius + 0.006
+    far_arch_x = far_support_x + spacing
+    clearance = 2.0 * wheel_radius + 0.006
+    tail_x = near_support_x + 0.070
+
+    full_x = SnakeGapGaitPlanner._module_x_positions_on_arch(
+        tail_x,
+        8,
+        near_support_x,
+        far_arch_x,
+        clearance,
+        spacing,
+    )
+    release = SnakeGapGaitPlanner._landing_release_fraction(
+        full_x[-1],
+        far_arch_x,
+        spacing,
+        3,
+        1.0,
+    )
+    released_x, released_end_x = _released_profile_geometry(
+        tail_x,
+        near_support_x,
+        far_support_x,
+        spacing,
+        clearance,
+    )
+    full_heights = SnakeGapGaitPlanner._traveling_arch_heights(
+        full_x,
+        near_support_x,
+        far_arch_x,
+        clearance,
+    )
+    released_heights = SnakeGapGaitPlanner._traveling_arch_heights(
+        released_x,
+        near_support_x,
+        released_end_x,
+        clearance,
+    )
+
+    assert release == pytest.approx(1.0)
+    assert released_end_x == pytest.approx(far_support_x)
+    landing_index = next(
+        index
+        for index, x_m in enumerate(released_x)
+        if x_m >= far_support_x
+    )
+    assert landing_index == 3
+    assert full_heights[landing_index] > 0.020
+    assert released_heights[landing_index] == pytest.approx(0.0)
+    assert released_heights[0] > full_heights[0]
 
 
 def test_wave_is_low_bidirectional_and_migrates_from_head_to_tail() -> None:
