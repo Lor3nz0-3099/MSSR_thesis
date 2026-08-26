@@ -164,23 +164,14 @@ class SnakeGapGaitPlanner:
             raise SnakeGapGaitError(
                 "far_bank_transition_links must be in [0.5, 2.0]"
             )
-        near_transition_links = self._number(
-            parameters,
-            "near_bank_transition_links",
-            1.0,
-        )
-        if not 0.5 <= near_transition_links <= 2.0:
-            raise SnakeGapGaitError(
-                "near_bank_transition_links must be in [0.5, 2.0]"
-            )
         far_transition_m = far_transition_links * spacing
-        near_transition_m = near_transition_links * spacing
 
         required_span = (
             gap.width_m
             + 2.0 * wheel_radius
             + edge_clearance
             + landing_margin
+            + far_transition_m
         )
         unsupported_link_count = max(2, math.ceil(required_span / spacing))
         maximum_unsupported_links = self.MODULE_COUNT - 3
@@ -190,6 +181,7 @@ class SnakeGapGaitPlanner:
                 - 2.0 * wheel_radius
                 - edge_clearance
                 - landing_margin
+                - far_transition_m
             )
             raise SnakeGapGaitError(
                 f"Gap width {gap.width_m:.3f} m exceeds the safe Snake8 "
@@ -224,6 +216,24 @@ class SnakeGapGaitPlanner:
             raise SnakeGapGaitError(
                 "landing_arch_clearance_m must be in [0.006, 0.110]"
             )
+        tail_pickup_wheel_radii = self._number(
+            parameters,
+            "tail_pickup_wheel_radii",
+            1.0,
+        )
+        if not 0.5 <= tail_pickup_wheel_radii <= 1.5:
+            raise SnakeGapGaitError(
+                "tail_pickup_wheel_radii must be in [0.5, 1.5]"
+            )
+        tail_pickup_clearance = (
+            tail_pickup_wheel_radii * wheel_radius + edge_clearance
+        )
+        tail_pickup_ratio = tail_pickup_clearance / spacing
+        if not 0.0 < tail_pickup_ratio < 1.0:
+            raise SnakeGapGaitError(
+                "Tail pickup exceeds one-link vertical reach"
+            )
+        tail_pickup_angle = math.asin(tail_pickup_ratio)
         profile_substeps_raw = self._number(
             parameters,
             "gap_profile_substeps",
@@ -239,20 +249,19 @@ class SnakeGapGaitPlanner:
             )
 
         # The entire robot first reaches the near edge while flat.  A low,
-        # positive backbone curve starts one measured link before the safe
-        # near support and ends one measured link beyond the safe far support
-        # by default.  The head therefore stays high until its wheel clears
-        # the far-bank corner, while the tail starts rising before it rolls
-        # off the near-bank lip.  Translating the nominal module positions
-        # through that curve makes the bend travel from head to tail without
-        # ever exposing a symmetric 4-vs-4 lifting hinge.
+        # positive backbone curve starts at the safe near support and remains
+        # high through the far edge.  Its descending branch ends one measured
+        # link beyond the safe far support by default, so a module cannot
+        # descend into the vertical far-bank face before its wheel clears the
+        # corner.  Translating the nominal module positions through that curve
+        # makes the bend travel from head to tail without ever exposing a
+        # symmetric 4-vs-4 lifting hinge.
         near_support_x = (
             gap.near_edge_x_m - wheel_radius - edge_clearance
         )
         far_support_x = (
             gap.far_edge_x_m + wheel_radius + landing_margin
         )
-        near_arch_x = near_support_x - near_transition_m
         far_arch_x = far_support_x + far_transition_m
         initial_nominal_x = tuple(
             near_support_x - (self.MODULE_COUNT - 1 - index) * spacing
@@ -274,11 +283,27 @@ class SnakeGapGaitPlanner:
             )
             profile = self._traveling_arch_offsets(
                 nominal_x,
-                near_arch_x,
+                near_support_x,
                 far_arch_x,
                 landing_clearance,
                 spacing,
             )
+            active_roles = roles
+            if nominal_x[0] >= near_support_x:
+                # Once the tail is the last module left at the near edge,
+                # pick up only that module.  Compensating the following TILT
+                # preserves the cumulative heading from v2 onward, so the
+                # already validated traveling arch is not reshaped.  The
+                # suspended tail wheels are excluded while the other seven
+                # modules pull it across.
+                adjusted_profile = list(profile)
+                preserved_heading = profile[0] + profile[1]
+                adjusted_profile[0] = -tail_pickup_angle
+                adjusted_profile[1] = (
+                    preserved_heading + tail_pickup_angle
+                )
+                profile = tuple(adjusted_profile)
+                active_roles = roles[1:]
             if max(abs(value) for value in profile) > usable_limit:
                 raise SnakeGapGaitError(
                     "Traveling gap arch exceeds the live Snake8 TILT limits"
@@ -298,7 +323,7 @@ class SnakeGapGaitPlanner:
                     ordered[-1],
                     nominal_x[-1],
                     crossing_speed,
-                    roles,
+                    active_roles,
                     goal_tolerance,
                 )
             )

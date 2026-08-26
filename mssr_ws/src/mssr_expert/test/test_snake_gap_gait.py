@@ -158,7 +158,20 @@ def test_backbone_wave_approaches_flat_then_carries_head_to_tail() -> None:
     assert approach.active_target_roles == ROLES
     assert approach.position_goal.module_id == "m7"
     assert approach.position_goal.target_x_m == pytest.approx(near_support_x)
-    assert all(step.active_target_roles == ROLES for step in profile_drives)
+    pickup_index = next(
+        index
+        for index, step in enumerate(profile_drives)
+        if step.active_target_roles == ROLES[1:]
+    )
+    assert pickup_index > 0
+    assert all(
+        step.active_target_roles == ROLES
+        for step in profile_drives[:pickup_index]
+    )
+    assert all(
+        step.active_target_roles == ROLES[1:]
+        for step in profile_drives[pickup_index:]
+    )
     assert all(step.position_goal.module_id == "m7" for step in profile_drives)
     assert profile_drives[-1].position_goal.target_x_m == pytest.approx(
         far_support_x + 8 * 0.07777
@@ -242,7 +255,6 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     expected_clearance = 2.0 * 0.03106 + 0.006
     near_support_x = 0.55 - 0.03106 - 0.006
     far_support_x = 0.75 + 0.03106 + 0.006
-    near_arch_x = near_support_x - spacing
     far_arch_x = far_support_x + spacing
     initial_x = tuple(
         near_support_x - (7 - index) * spacing for index in range(8)
@@ -252,7 +264,7 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     first_x = tuple(x_m + body_travel / step_count for x_m in initial_x)
     expected_heights = SnakeGapGaitPlanner._traveling_arch_heights(
         first_x,
-        near_arch_x,
+        near_support_x,
         far_arch_x,
         expected_clearance,
     )
@@ -276,7 +288,7 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
         nominal_x = tuple(x_m + translation for x_m in initial_x)
         heights = SnakeGapGaitPlanner._traveling_arch_heights(
             nominal_x,
-            near_arch_x,
+            near_support_x,
             far_arch_x,
             expected_clearance,
         )
@@ -310,31 +322,24 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
             _assignments(),
             {"far_bank_transition_links": 0.25},
         )
-    with pytest.raises(SnakeGapGaitError, match="near_bank_transition_links"):
+    with pytest.raises(SnakeGapGaitError, match="tail_pickup_wheel_radii"):
         SnakeGapGaitPlanner().plan(
             _graph(),
             _assignments(),
-            {"near_bank_transition_links": 2.5},
+            {"tail_pickup_wheel_radii": 2.0},
         )
 
 
-def test_bank_transitions_keep_head_and_tail_high_at_both_edges() -> None:
+def test_far_bank_transition_keeps_the_head_high_past_the_edge() -> None:
     spacing = 0.07777
     wheel_radius = 0.03106
     near_support_x = 0.55 - wheel_radius - 0.006
     far_support_x = 0.75 + wheel_radius + 0.006
-    near_arch_x = near_support_x - spacing
     far_arch_x = far_support_x + spacing
 
-    near_edge_height = SnakeGapGaitPlanner._traveling_arch_heights(
-        (0.55,),
-        near_arch_x,
-        far_arch_x,
-        2.0 * wheel_radius + 0.006,
-    )[0]
     far_edge_height = SnakeGapGaitPlanner._traveling_arch_heights(
         (0.75,),
-        near_arch_x,
+        near_support_x,
         far_arch_x,
         2.0 * wheel_radius + 0.006,
     )[0]
@@ -345,10 +350,65 @@ def test_bank_transitions_keep_head_and_tail_high_at_both_edges() -> None:
         2.0 * wheel_radius + 0.006,
     )[0]
 
-    assert near_edge_height > wheel_radius + 0.015
-    assert far_edge_height > wheel_radius + 0.019
-    assert near_edge_height == pytest.approx(far_edge_height)
+    assert far_edge_height > wheel_radius + 0.020
     assert far_edge_height > old_far_edge_height
+
+
+def test_terminal_tail_pickup_preserves_the_downstream_arch() -> None:
+    spacing = 0.07777
+    wheel_radius = 0.03106
+    near_support_x = 0.55 - wheel_radius - 0.006
+    far_support_x = 0.75 + wheel_radius + 0.006
+    far_arch_x = far_support_x + spacing
+    program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
+    profile_drives = tuple(
+        step
+        for step in program
+        if step.phase.startswith("FOLLOW_GAP_PROFILE_")
+    )
+    pickup_index = next(
+        index
+        for index, step in enumerate(profile_drives)
+        if step.active_target_roles == ROLES[1:]
+    )
+    pickup_drive = profile_drives[pickup_index]
+    profile_number = int(pickup_drive.phase.rsplit("_", 1)[1])
+    pickup_state = _state_at(
+        program,
+        f"CONFORM_GAP_PROFILE_{profile_number:02d}",
+    )
+
+    initial_x = tuple(
+        near_support_x - (7 - index) * spacing for index in range(8)
+    )
+    body_travel = far_arch_x - initial_x[0]
+    step_count = math.ceil(body_travel / (spacing / 3))
+    translation = profile_number * body_travel / step_count
+    nominal_x = tuple(x_m + translation for x_m in initial_x)
+    base_profile = SnakeGapGaitPlanner._traveling_arch_offsets(
+        nominal_x,
+        near_support_x,
+        far_arch_x,
+        2.0 * wheel_radius + 0.006,
+        spacing,
+    )
+    pickup_angle = math.asin((wheel_radius + 0.006) / spacing)
+
+    assert nominal_x[0] >= near_support_x
+    if profile_number > 1:
+        previous_translation = (
+            (profile_number - 1) * body_travel / step_count
+        )
+        assert initial_x[0] + previous_translation < near_support_x
+    assert pickup_state["m0"] == pytest.approx(-pickup_angle)
+    assert pickup_state["m0"] + pickup_state["m1"] == pytest.approx(
+        base_profile[0] + base_profile[1]
+    )
+    assert pickup_drive.active_target_roles == ROLES[1:]
+    assert all(
+        step.active_target_roles == ROLES[1:]
+        for step in profile_drives[pickup_index:]
+    )
 
 
 def test_wave_is_low_bidirectional_and_migrates_from_head_to_tail() -> None:

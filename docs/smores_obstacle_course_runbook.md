@@ -256,7 +256,7 @@ Assemble Snake8 with the command in section 1 and then execute:
 
 ```bash
 run_behavior snake8 gap-crossing-01 gap_crossing \
-  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"near_bank_transition_links":1.0,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"gap_goal_tolerance_m":0.004}'
+  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"tail_pickup_wheel_radii":1.0,"gap_goal_tolerance_m":0.004}'
 ```
 
 `gap_crossing` has no locomotion timer.  It reads the two gap edges, live
@@ -283,16 +283,14 @@ remain available for traction.  There is no symmetric lifting pivot and no
 separate timed tail-lift phase.
 
 The arch span comes from the measured gap width, wheel radius, link spacing
-and support margins. Its ascending branch starts one measured link before the
-safe near-bank support, and its descending branch ends one measured link past
-the safe far-bank support. The head therefore descends only after entering the
-landing tread, while the tail rises before rolling off the near-bank lip. The
-two extensions are configurable as dimensionless
-`near_bank_transition_links` and `far_bank_transition_links` values in
-`[0.5, 2.0]`, so they scale with the live chain rather than with this fixture.
-Their supported-bank transitions do not increase the physical unsupported
-gap used by the safety bound. The arch amplitude defaults to two measured
-wheel radii plus the edge clearance. The dimensionless multiplier is
+and support margins. Its ascending branch starts at the safe near-bank
+support, preserving the head-entry geometry validated before the experimental
+near-bank extension. Its descending branch ends one measured link past the
+safe far-bank support. The head therefore descends only after entering the
+landing tread. The far extension is configurable as the dimensionless
+`far_bank_transition_links` value in `[0.5, 2.0]`, so it scales with the live
+chain rather than with this fixture. The arch amplitude defaults to two
+measured wheel radii plus the edge clearance. The dimensionless multiplier is
 configurable with `arch_clearance_wheel_radii` in `[1.0, 3.0]`; an explicit
 `landing_arch_clearance_m` remains available for controlled experiments. The
 two-radius default compensates for the measured compliance of the connected
@@ -302,6 +300,18 @@ defaults to three substeps per measured link and is configurable with
 `gap_profile_substeps`; it changes smoothness, not the physical landmark used
 to finish. The final head target is chosen so the tail reaches the end of that
 transition before all TILTs return to captured neutral.
+
+When the nominal world-X position shows that only `snake_tail` remains at the
+near edge, the planner performs a local terminal pickup instead of extending
+the whole arch backwards. It raises only the tail by one wheel radius plus the
+measured edge clearance; `tail_pickup_wheel_radii` configures the wheel-radius
+part in `[0.5, 1.5]`. The following TILT receives the exact compensating angle,
+so the cumulative heading from the third module onward and the validated gap
+arch remain unchanged. During this terminal part the suspended tail wheels
+are stopped and the other seven module pairs pull. The pickup is held until
+the tail is safely beyond the far transition, then the final neutral posture
+lowers it onto the landing bank. This termination is geometric and introduces
+no timeout.
 
 The gait rejects gaps wider than the safe measured five-link unsupported span,
 a misaligned chain, inconsistent world landmarks, legacy duration parameters,
