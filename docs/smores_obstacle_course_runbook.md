@@ -338,6 +338,10 @@ coplanar banks and gaps within the supported Snake8 geometry, not yet a learned
 general gap controller.  Keep the previous drawbridge implementation only as
 Git history; do not mix its parameters with this program.
 
+The first physically successful complete crossing, its exact parameters and
+its explicit generalization limits are frozen in
+`docs/validated_behaviors/snake8_gap_crossing.md`.
+
 ### Isolated MobileManipulator8 button stage with Nav2
 
 This fixture contains only a continuous flat platform, a wall and its button.
