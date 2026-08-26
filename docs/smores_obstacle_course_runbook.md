@@ -256,7 +256,7 @@ Assemble Snake8 with the command in section 1 and then execute:
 
 ```bash
 run_behavior snake8 gap-crossing-01 gap_crossing \
-  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"tail_pickup_wheel_radii":1.0,"gap_goal_tolerance_m":0.004}'
+  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"gap_goal_tolerance_m":0.004}'
 ```
 
 `gap_crossing` has no locomotion timer.  It reads the two gap edges, live
@@ -282,6 +282,14 @@ migrates through each module, and exits at the tail while all grounded wheels
 remain available for traction.  There is no symmetric lifting pivot and no
 separate timed tail-lift phase.
 
+The sampled module X positions are not separated by a fixed horizontal link
+length. For every profile the planner solves the next center position so its
+two-dimensional chord to the preceding center equals the measured physical
+link spacing. This accounts for the horizontal contraction introduced by the
+height changes. Consequently every head-position goal is reachable by the
+curved chain instead of remaining ahead by the accumulated contraction while
+the wheels spin against a chassis contact.
+
 The arch span comes from the measured gap width, wheel radius, link spacing
 and support margins. Its ascending branch starts at the safe near-bank
 support, preserving the head-entry geometry validated before the experimental
@@ -300,18 +308,6 @@ defaults to three substeps per measured link and is configurable with
 `gap_profile_substeps`; it changes smoothness, not the physical landmark used
 to finish. The final head target is chosen so the tail reaches the end of that
 transition before all TILTs return to captured neutral.
-
-When the nominal world-X position shows that only `snake_tail` remains at the
-near edge, the planner performs a local terminal pickup instead of extending
-the whole arch backwards. It raises only the tail by one wheel radius plus the
-measured edge clearance; `tail_pickup_wheel_radii` configures the wheel-radius
-part in `[0.5, 1.5]`. The following TILT receives the exact compensating angle,
-so the cumulative heading from the third module onward and the validated gap
-arch remain unchanged. During this terminal part the suspended tail wheels
-are stopped and the other seven module pairs pull. The pickup is held until
-the tail is safely beyond the far transition, then the final neutral posture
-lowers it onto the landing bank. This termination is geometric and introduces
-no timeout.
 
 The gait rejects gaps wider than the safe measured five-link unsupported span,
 a misaligned chain, inconsistent world landmarks, legacy duration parameters,

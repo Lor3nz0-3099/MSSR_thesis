@@ -216,24 +216,6 @@ class SnakeGapGaitPlanner:
             raise SnakeGapGaitError(
                 "landing_arch_clearance_m must be in [0.006, 0.110]"
             )
-        tail_pickup_wheel_radii = self._number(
-            parameters,
-            "tail_pickup_wheel_radii",
-            1.0,
-        )
-        if not 0.5 <= tail_pickup_wheel_radii <= 1.5:
-            raise SnakeGapGaitError(
-                "tail_pickup_wheel_radii must be in [0.5, 1.5]"
-            )
-        tail_pickup_clearance = (
-            tail_pickup_wheel_radii * wheel_radius + edge_clearance
-        )
-        tail_pickup_ratio = tail_pickup_clearance / spacing
-        if not 0.0 < tail_pickup_ratio < 1.0:
-            raise SnakeGapGaitError(
-                "Tail pickup exceeds one-link vertical reach"
-            )
-        tail_pickup_angle = math.asin(tail_pickup_ratio)
         profile_substeps_raw = self._number(
             parameters,
             "gap_profile_substeps",
@@ -278,32 +260,22 @@ class SnakeGapGaitPlanner:
         for profile_index in range(1, profile_step_count + 1):
             fraction = profile_index / profile_step_count
             translation = fraction * body_travel
-            nominal_x = tuple(
-                initial_x + translation for initial_x in initial_nominal_x
-            )
-            profile = self._traveling_arch_offsets(
-                nominal_x,
+            tail_x = initial_nominal_x[0] + translation
+            module_x = self._module_x_positions_on_arch(
+                tail_x,
+                self.MODULE_COUNT,
                 near_support_x,
                 far_arch_x,
                 landing_clearance,
                 spacing,
             )
-            active_roles = roles
-            if nominal_x[0] >= near_support_x:
-                # Once the tail is the last module left at the near edge,
-                # pick up only that module.  Compensating the following TILT
-                # preserves the cumulative heading from v2 onward, so the
-                # already validated traveling arch is not reshaped.  The
-                # suspended tail wheels are excluded while the other seven
-                # modules pull it across.
-                adjusted_profile = list(profile)
-                preserved_heading = profile[0] + profile[1]
-                adjusted_profile[0] = -tail_pickup_angle
-                adjusted_profile[1] = (
-                    preserved_heading + tail_pickup_angle
-                )
-                profile = tuple(adjusted_profile)
-                active_roles = roles[1:]
+            profile = self._traveling_arch_offsets(
+                module_x,
+                near_support_x,
+                far_arch_x,
+                landing_clearance,
+                spacing,
+            )
             if max(abs(value) for value in profile) > usable_limit:
                 raise SnakeGapGaitError(
                     "Traveling gap arch exceeds the live Snake8 TILT limits"
@@ -321,9 +293,9 @@ class SnakeGapGaitPlanner:
                 self._drive_to(
                     f"FOLLOW_GAP_PROFILE_{profile_index:02d}",
                     ordered[-1],
-                    nominal_x[-1],
+                    module_x[-1],
                     crossing_speed,
-                    active_roles,
+                    roles,
                     goal_tolerance,
                 )
             )
@@ -442,6 +414,61 @@ class SnakeGapGaitPlanner:
             offsets[index] = outgoing_angle - incoming_angle
             incoming_angle = outgoing_angle
         return tuple(offsets)
+
+    @staticmethod
+    def _module_x_positions_on_arch(
+        tail_x_m: float,
+        module_count: int,
+        start_x_m: float,
+        end_x_m: float,
+        clearance_m: float,
+        spacing_m: float,
+    ) -> tuple[float, ...]:
+        """Place linked module centers on the arch at their true chord length.
+
+        A curved link cannot span ``spacing_m`` in X while also changing
+        height: its horizontal projection must be shorter.  Solving each
+        successive chord prevents the head-position goal from asking the
+        physical chain to stretch by the accumulated curve contraction.
+        """
+
+        if module_count < 1:
+            raise SnakeGapGaitError("Gap arch requires at least one module")
+        if not math.isfinite(spacing_m) or spacing_m <= 0.0:
+            raise SnakeGapGaitError("Gap arch has invalid link spacing")
+
+        positions = [tail_x_m]
+        for _ in range(module_count - 1):
+            first_x = positions[-1]
+            first_height = SnakeGapGaitPlanner._traveling_arch_heights(
+                (first_x,),
+                start_x_m,
+                end_x_m,
+                clearance_m,
+            )[0]
+            lower = first_x
+            upper = first_x + spacing_m
+            for _ in range(64):
+                candidate = 0.5 * (lower + upper)
+                candidate_height = (
+                    SnakeGapGaitPlanner._traveling_arch_heights(
+                        (candidate,),
+                        start_x_m,
+                        end_x_m,
+                        clearance_m,
+                    )[0]
+                )
+                chord_error = (
+                    (candidate - first_x) ** 2
+                    + (candidate_height - first_height) ** 2
+                    - spacing_m**2
+                )
+                if chord_error < 0.0:
+                    lower = candidate
+                else:
+                    upper = candidate
+            positions.append(0.5 * (lower + upper))
+        return tuple(positions)
 
     @staticmethod
     def _traveling_arch_heights(
