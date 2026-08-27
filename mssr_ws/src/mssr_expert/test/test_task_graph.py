@@ -256,6 +256,7 @@ def test_dataset_record_keeps_current_target_assignment_and_next_graph(
         target_graph=target_graph,
         assignment=assignment,
         next_graph=next_graph,
+        next_observation={"modules": {"m0": {"x": 0.1}}},
     )
 
     record = json.loads(path.read_text(encoding="utf-8"))
@@ -270,3 +271,8 @@ def test_dataset_record_keeps_current_target_assignment_and_next_graph(
         "task_conditioned"
     )
     assert record["graph_t_plus_1"]["stamp"] == 4.0
+    assert record["observation_t_plus_1"]["modules"]["m0"]["x"] == 0.1
+    assert record["is_first"] is True
+    assert record["is_last"] is False
+    assert record["action_valid"] is True
+    assert record["supervision"]["label_source"] == "deterministic_expert"

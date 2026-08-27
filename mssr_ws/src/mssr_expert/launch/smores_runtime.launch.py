@@ -162,6 +162,25 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
             name="smores_morphology_behavior_node",
             output="screen",
             emulate_tty=True,
+            parameters=[
+                {
+                    "behavior_dataset_path": LaunchConfiguration(
+                        "behavior_dataset_path"
+                    ),
+                    "behavior_dataset_episode_id": LaunchConfiguration(
+                        "behavior_dataset_episode_id"
+                    ),
+                    "behavior_dataset_stage_name": LaunchConfiguration(
+                        "behavior_dataset_stage_name"
+                    ),
+                    "behavior_dataset_difficulty": LaunchConfiguration(
+                        "behavior_dataset_difficulty"
+                    ),
+                    "behavior_dataset_log_period": LaunchConfiguration(
+                        "behavior_dataset_log_period"
+                    ),
+                }
+            ],
         ),
         ExecuteProcess(
             cmd=simulation_command,
@@ -308,6 +327,34 @@ def generate_launch_description() -> LaunchDescription:
                 description=(
                     "Optional world-X coordinate of the near gap edge."
                 ),
+            ),
+            DeclareLaunchArgument(
+                "behavior_dataset_path",
+                default_value="",
+                description=(
+                    "Optional JSONL path for graph-conditioned morphology "
+                    "behavior transitions; empty disables recording."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "behavior_dataset_episode_id",
+                default_value="",
+                description="Episode ID written into behavior transitions.",
+            ),
+            DeclareLaunchArgument(
+                "behavior_dataset_stage_name",
+                default_value="morphology_behavior",
+                description="Stage label written into behavior transitions.",
+            ),
+            DeclareLaunchArgument(
+                "behavior_dataset_difficulty",
+                default_value="0.0",
+                description="Numeric curriculum difficulty stored in JSONL.",
+            ),
+            DeclareLaunchArgument(
+                "behavior_dataset_log_period",
+                default_value="1",
+                description="Record one behavior transition every N ticks.",
             ),
             DeclareLaunchArgument(
                 "ros_domain_id",

@@ -12,12 +12,23 @@ from mssr_expert.behaviors.morphology_library import (
     MorphologyLibrary,
     MorphologyLibraryError,
 )
+from mssr_expert.behaviors.morphology_dof_model import (
+    ModuleDofInventory,
+    MorphologyDofInventory,
+    OperationalDof,
+)
 from mssr_expert.execution.morphology_behavior_executor import (
+    MorphologyBehaviorDecision,
     MorphologyBehaviorExecutor,
     MorphologyCommand,
 )
+from mssr_expert.graph.attributed_robot_graph import AttributedRobotGraph
 from mssr_expert.nodes.smores_morphology_behavior_node import (
     assembly_readiness,
+    behavior_environment_observation,
+    behavior_expert_output,
+    behavior_task_context,
+    dof_inventory_observation,
     load_behavior_morphology_catalog,
     neutral_tilt_override,
 )
@@ -167,6 +178,111 @@ def _angles_by_module(goals) -> dict[str, float]:
         goal.module_ids[0]: float(goal.parameters["angle_rad"])
         for goal in goals
     }
+
+
+def test_behavior_dataset_helpers_preserve_roles_actions_and_dofs() -> None:
+    assignments = _assignments(("snake_tail",))
+    decision = MorphologyBehaviorDecision(
+        command_id="episode-gap",
+        morphology="snake8",
+        behavior="gap_crossing",
+        state="RUNNING_PROGRAM_DRIVE",
+        phase="FOLLOW_GAP_PROFILE",
+        locomotion={"m0": {"vx": 0.04}},
+        progress=0.5,
+    )
+    output = behavior_expert_output(
+        decision,
+        {"m0": {"vx": 0.04}},
+        assignments,
+    )
+    inventory = MorphologyDofInventory(
+        (
+            ModuleDofInventory(
+                module_id="m0",
+                target_role="snake_tail",
+                connected_faces=frozenset({"TOP"}),
+                body_is_directly_attached=False,
+                ground_support_anchor=False,
+                dofs=(
+                    OperationalDof(
+                        module_id="m0",
+                        name="tilt",
+                        joint_kind="shape",
+                        affected_face="TOP",
+                        mode="load_bearing",
+                        connected=True,
+                        position_rad=0.25,
+                        shape_capable=True,
+                    ),
+                ),
+            ),
+        )
+    )
+
+    assert output.locomotion["m0"]["vx"] == pytest.approx(0.04)
+    assert output.module_roles == {"m0": "snake_tail"}
+    observation = dof_inventory_observation(inventory)
+    assert observation[0]["connected_faces"] == ["TOP"]
+    assert observation[0]["dofs"][0]["position_rad"] == pytest.approx(0.25)
+    assert observation[0]["dofs"][0]["mode"] == "load_bearing"
+
+
+def test_behavior_environment_contains_exact_isaac_course_geometry() -> None:
+    graph = AttributedRobotGraph(
+        global_attributes={
+            "course": {
+                "frame_id": "world",
+                "course_profile": "snake8_gap_test",
+                "scenario": {"seed": 17, "width_m": 0.186},
+                "gap": {
+                    "near_edge_x_m": 0.601,
+                    "far_edge_x_m": 0.787,
+                    "width_m": 0.186,
+                },
+            },
+            "module_geometry": {"wheel_radius_m": 0.03106},
+        }
+    )
+
+    environment = behavior_environment_observation(
+        graph,
+        stage_name="snake8_gap_robust",
+        difficulty=0.0,
+    )
+
+    assert environment["source"] == "isaac_world_ground_truth"
+    assert environment["course"]["scenario"]["seed"] == 17
+    assert environment["course"]["gap"]["width_m"] == pytest.approx(0.186)
+    assert environment["module_geometry"]["wheel_radius_m"] == pytest.approx(
+        0.03106
+    )
+
+
+def test_behavior_task_context_explains_gap_action_goal() -> None:
+    graph = AttributedRobotGraph(
+        global_attributes={
+            "course": {
+                "gap": {
+                    "near_edge_x_m": 0.60,
+                    "far_edge_x_m": 0.79,
+                }
+            }
+        }
+    )
+    decision = MorphologyBehaviorDecision(
+        command_id="gap-1",
+        morphology="snake8",
+        behavior="gap_crossing",
+        state="RUNNING_PROGRAM_DRIVE",
+        phase="FOLLOW_GAP_PROFILE",
+    )
+
+    context = behavior_task_context(decision, graph)
+
+    assert "far gap bank" in context["instruction"]
+    assert context["success_criteria"]["far_edge_x_m"] == pytest.approx(0.79)
+    assert context["success_criteria"]["preserve_connection_count"] == 7
 
 
 def test_reference_morphology_library_contains_all_profiles() -> None:

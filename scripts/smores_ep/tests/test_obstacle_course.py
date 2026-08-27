@@ -5,6 +5,8 @@ import pytest
 
 from smores_ep.isaac.obstacle_course import (
     CoplanarGapSpec,
+    GAP_CURRICULUM_RANGES,
+    STAIR_CURRICULUM_RANGES,
     UniformStairSpec,
     manual_obstacle_course,
     mobile_manipulator_button_test_course,
@@ -244,6 +246,52 @@ def test_seeded_uniform_stair_sampling_is_reproducible_and_conservative() -> Non
     assert 0.050 <= first.rise_m <= 0.065
     assert 0.250 <= first.tread_depth_m <= 0.320
     assert 2 <= first.step_count <= 4
+
+
+@pytest.mark.parametrize(
+    "level", ("robust", "intermediate", "challenging")
+)
+def test_stair_curriculum_sampling_stays_inside_declared_level(
+    level: str,
+) -> None:
+    spec = sample_uniform_stair_spec(91, level)
+    ranges = STAIR_CURRICULUM_RANGES[level]
+
+    assert ranges["rise_m"][0] <= spec.rise_m <= ranges["rise_m"][1]
+    assert (
+        ranges["tread_depth_m"][0]
+        <= spec.tread_depth_m
+        <= ranges["tread_depth_m"][1]
+    )
+    assert (
+        ranges["step_count"][0]
+        <= spec.step_count
+        <= ranges["step_count"][1]
+    )
+
+
+@pytest.mark.parametrize(
+    "level", ("robust", "intermediate", "challenging")
+)
+def test_gap_curriculum_sampling_stays_inside_declared_level(
+    level: str,
+) -> None:
+    spec = sample_coplanar_gap_spec(92, level)
+    ranges = GAP_CURRICULUM_RANGES[level]
+
+    assert ranges["width_m"][0] <= spec.width_m <= ranges["width_m"][1]
+    assert (
+        ranges["near_edge_x_m"][0]
+        <= spec.near_edge_x_m
+        <= ranges["near_edge_x_m"][1]
+    )
+
+
+def test_curriculum_sampling_rejects_unknown_levels() -> None:
+    with pytest.raises(ValueError, match="curriculum level"):
+        sample_uniform_stair_spec(1, "impossible")
+    with pytest.raises(ValueError, match="curriculum level"):
+        sample_coplanar_gap_spec(1, "impossible")
 
 
 def test_parameterized_stair_geometry_and_metadata_share_one_spec() -> None:

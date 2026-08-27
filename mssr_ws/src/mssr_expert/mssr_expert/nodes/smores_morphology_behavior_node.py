@@ -34,10 +34,13 @@ from mssr_expert.behaviors.morphology_dof_model import (
     MorphologyDofInventory,
     SmoresMorphologyDofAnalyzer,
 )
+from mssr_expert.dataset.dataset_logger import DatasetLogger
 from mssr_expert.execution.morphology_behavior_executor import (
     MorphologyBehaviorExecutor,
     MorphologyCommand,
+    MorphologyBehaviorDecision,
 )
+from mssr_expert.experts.expert_output import ExpertOutput
 from mssr_expert.graph.attributed_robot_graph import AttributedRobotGraph
 from mssr_expert.graph.serialization import (
     attributed_graph_from_dict,
@@ -127,6 +130,162 @@ def neutral_tilt_override(
     return result
 
 
+def dof_inventory_observation(
+    inventory: MorphologyDofInventory,
+) -> list[dict[str, Any]]:
+    """Serialize the morphology-level DoF interpretation for learning."""
+
+    result: list[dict[str, Any]] = []
+    for module in inventory.modules:
+        result.append(
+            {
+                "module_id": module.module_id,
+                "target_role": module.target_role,
+                "connected_faces": sorted(module.connected_faces),
+                "body_is_directly_attached": (
+                    module.body_is_directly_attached
+                ),
+                "ground_support_anchor": module.ground_support_anchor,
+                "dofs": [
+                    {
+                        "name": dof.name,
+                        "joint_kind": dof.joint_kind,
+                        "affected_face": dof.affected_face,
+                        "mode": dof.mode,
+                        "connected": dof.connected,
+                        "position_rad": dof.position_rad,
+                        "lower_limit_rad": dof.lower_limit_rad,
+                        "upper_limit_rad": dof.upper_limit_rad,
+                        "max_effort_nm": dof.max_effort_nm,
+                        "motor_mix": [list(item) for item in dof.motor_mix],
+                        "locomotion_capable": dof.locomotion_capable,
+                        "shape_capable": dof.shape_capable,
+                    }
+                    for dof in module.dofs
+                ],
+            }
+        )
+    return result
+
+
+def behavior_expert_output(
+    decision: MorphologyBehaviorDecision,
+    locomotion: Mapping[str, Mapping[str, float]],
+    assignments: tuple[AssignedModule, ...],
+) -> ExpertOutput:
+    """Convert one morphology decision to the common IL action record."""
+
+    primitive_goal = (
+        decision.primitive_goal.to_dict()
+        if decision.primitive_goal is not None
+        else None
+    )
+    return ExpertOutput(
+        locomotion=locomotion,
+        fsm_state=decision.state,
+        active_primitive=(
+            decision.primitive_goal.primitive
+            if decision.primitive_goal is not None
+            else decision.behavior
+        ),
+        primitive_params=(
+            dict(decision.primitive_goal.parameters)
+            if decision.primitive_goal is not None
+            else {}
+        ),
+        primitive_goal=primitive_goal,
+        module_roles={
+            item.module_id: item.target_role for item in assignments
+        },
+        task_metrics={
+            "progress": float(decision.progress),
+            "phase": decision.phase,
+        },
+        success=decision.success,
+        done=decision.done,
+        debug={
+            "message": decision.message,
+            "command_id": decision.command_id,
+            "morphology": decision.morphology,
+            "behavior": decision.behavior,
+        },
+    )
+
+
+def behavior_environment_observation(
+    graph: AttributedRobotGraph,
+    *,
+    stage_name: str,
+    difficulty: float,
+) -> dict[str, Any]:
+    """Return the Isaac world information conditioned on by the expert."""
+
+    course = graph.global_attributes.get("course", {})
+    if not isinstance(course, Mapping):
+        course = {}
+    module_geometry = graph.global_attributes.get("module_geometry", {})
+    if not isinstance(module_geometry, Mapping):
+        module_geometry = {}
+    return {
+        "schema_version": "mssr.environment_observation.v1",
+        "source": "isaac_world_ground_truth",
+        "frame_id": str(course.get("frame_id", "world")),
+        "stage_name": stage_name,
+        "difficulty": float(difficulty),
+        "course": dict(course),
+        "module_geometry": dict(module_geometry),
+    }
+
+
+def behavior_task_context(
+    decision: MorphologyBehaviorDecision,
+    graph: AttributedRobotGraph,
+) -> dict[str, Any]:
+    """Describe the goal that explains the expert's local action."""
+
+    course = graph.global_attributes.get("course", {})
+    if not isinstance(course, Mapping):
+        course = {}
+    success_criteria: dict[str, Any]
+    if decision.behavior in {"crawl_stairs", "crawl_stairs_arch_wave"}:
+        stairs = course.get("stairs", {})
+        if not isinstance(stairs, Mapping):
+            stairs = {}
+        heights = stairs.get("top_heights_m", ())
+        top_height = (
+            float(heights[-1])
+            if isinstance(heights, list | tuple) and heights
+            else None
+        )
+        instruction = "Move the complete Snake8 chain onto the top deck."
+        success_criteria = {
+            "all_modules_on_top_deck": True,
+            "top_deck_height_m": top_height,
+            "preserve_connection_count": 7,
+        }
+    elif decision.behavior == "gap_crossing":
+        gap = course.get("gap", {})
+        if not isinstance(gap, Mapping):
+            gap = {}
+        instruction = "Move the complete Snake8 chain onto the far gap bank."
+        success_criteria = {
+            "all_modules_on_far_bank": True,
+            "far_edge_x_m": gap.get("far_edge_x_m"),
+            "preserve_connection_count": 7,
+            "finish_near_neutral": True,
+        }
+    else:
+        instruction = f"Execute the {decision.behavior} behavior."
+        success_criteria = {"behavior_terminal_success": True}
+    return {
+        "schema_version": "mssr.behavior_task_context.v1",
+        "instruction": instruction,
+        "morphology": decision.morphology,
+        "behavior": decision.behavior,
+        "success_criteria": success_criteria,
+    }
+
+
 class SmoresMorphologyBehaviorNode(Node):
     """Map high-level morphology commands to posture and cluster motion."""
 
@@ -164,6 +323,13 @@ class SmoresMorphologyBehaviorNode(Node):
         self.declare_parameter("odom_topic", "/odom")
         self.declare_parameter("odom_frame", "odom")
         self.declare_parameter("base_frame", "base_link")
+        self.declare_parameter("behavior_dataset_path", "")
+        self.declare_parameter("behavior_dataset_episode_id", "")
+        self.declare_parameter(
+            "behavior_dataset_stage_name", "morphology_behavior"
+        )
+        self.declare_parameter("behavior_dataset_difficulty", 0.0)
+        self.declare_parameter("behavior_dataset_log_period", 1)
 
         library = MorphologyLibrary.load(
             Path(str(self.get_parameter("library_path").value))
@@ -199,6 +365,21 @@ class SmoresMorphologyBehaviorNode(Node):
         self._neutral_tilt_rad_by_module: dict[str, float] = {}
         self._neutral_assignment_signature: tuple[
             str, tuple[tuple[str, str], ...]
+        ] | None = None
+        dataset_path = str(
+            self.get_parameter("behavior_dataset_path").value
+        ).strip()
+        self._behavior_dataset_logger = (
+            DatasetLogger(Path(dataset_path)) if dataset_path else None
+        )
+        self._behavior_dataset_timestep = 0
+        self._behavior_dataset_tick = 0
+        self._behavior_dataset_pending: tuple[
+            Mapping[str, Any],
+            AttributedRobotGraph,
+            ExpertOutput,
+            AttributedRobotGraph | None,
+            Mapping[str, str],
         ] | None = None
 
         self._odom_publisher = self.create_publisher(
@@ -271,6 +452,11 @@ class SmoresMorphologyBehaviorNode(Node):
         self.get_logger().info(
             "SMORES morphology behavior node ready; waiting for assignment."
         )
+        if self._behavior_dataset_logger is not None:
+            self.get_logger().info(
+                "Recording morphology behavior transitions to "
+                f"{self._behavior_dataset_logger.path}."
+            )
 
     def _on_task_graph(self, message: String) -> None:
         payload = string_msg_to_dict(message)
@@ -669,6 +855,7 @@ class SmoresMorphologyBehaviorNode(Node):
             and decision.command_id == self._last_terminal_command_id
         ):
             return
+        self._record_behavior_transition(decision, locomotion)
         self._publish_status(
             decision.command_id,
             decision.morphology,
@@ -682,6 +869,133 @@ class SmoresMorphologyBehaviorNode(Node):
         )
         if decision.done:
             self._last_terminal_command_id = decision.command_id
+
+    def _record_behavior_transition(
+        self,
+        decision: MorphologyBehaviorDecision,
+        locomotion: Mapping[str, Mapping[str, float]],
+    ) -> None:
+        """Record graph-conditioned expert transitions for obstacle IL."""
+
+        logger = self._behavior_dataset_logger
+        if logger is None:
+            return
+        current_graph = self._latest_robot_graph
+        episode_id = str(
+            self.get_parameter("behavior_dataset_episode_id").value
+        ).strip() or decision.command_id
+        stage_name = str(
+            self.get_parameter("behavior_dataset_stage_name").value
+        )
+        difficulty = float(
+            self.get_parameter("behavior_dataset_difficulty").value
+        )
+
+        period = max(
+            1,
+            int(self.get_parameter("behavior_dataset_log_period").value),
+        )
+        should_sample = (
+            self._behavior_dataset_tick % period == 0 or decision.done
+        )
+        self._behavior_dataset_tick += 1
+
+        target_graph = self._morphology_catalog.get(decision.morphology)
+        assignment = {
+            item.target_vertex_id: item.module_id
+            for item in self._assignments
+        }
+        positions: dict[str, list[float]] = {}
+        for node in current_graph.nodes:
+            try:
+                positions[node.module_id] = list(
+                    module_position(node.attributes)
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+        observation = {
+            "schema_version": (
+                "mssr.morphology_behavior_observation.v1"
+            ),
+            "command_id": decision.command_id,
+            "morphology": decision.morphology,
+            "behavior": decision.behavior,
+            "task_context": behavior_task_context(
+                decision,
+                current_graph,
+            ),
+            "environment": behavior_environment_observation(
+                current_graph,
+                stage_name=stage_name,
+                difficulty=difficulty,
+            ),
+            # Retained as a direct alias for consumers of early datasets.
+            "course": current_graph.global_attributes.get("course", {}),
+            "module_positions_world_m": positions,
+            "operational_dofs": dof_inventory_observation(
+                self._dof_inventory
+            ),
+        }
+
+        if self._behavior_dataset_pending is not None:
+            (
+                previous_observation,
+                graph,
+                previous_output,
+                previous_target_graph,
+                previous_assignment,
+            ) = self._behavior_dataset_pending
+            logger.log_step(
+                episode_id=episode_id,
+                timestep=self._behavior_dataset_timestep,
+                observation=previous_observation,
+                graph=graph,
+                expert_output=previous_output,
+                stage_name=stage_name,
+                stage_id=self._behavior_dataset_timestep,
+                task_type=decision.behavior,
+                difficulty=difficulty,
+                target_graph=previous_target_graph,
+                assignment=previous_assignment,
+                next_graph=current_graph,
+                next_observation=observation,
+            )
+            self._behavior_dataset_timestep += 1
+            self._behavior_dataset_pending = None
+
+        if not should_sample:
+            return
+
+        output = behavior_expert_output(
+            decision,
+            locomotion,
+            self._assignments,
+        )
+        if decision.done:
+            logger.log_step(
+                episode_id=episode_id,
+                timestep=self._behavior_dataset_timestep,
+                observation=observation,
+                graph=current_graph,
+                expert_output=output,
+                stage_name=stage_name,
+                stage_id=self._behavior_dataset_timestep,
+                task_type=decision.behavior,
+                difficulty=difficulty,
+                target_graph=target_graph,
+                assignment=assignment,
+                next_graph=current_graph,
+                next_observation=observation,
+            )
+            self._behavior_dataset_timestep += 1
+            return
+        self._behavior_dataset_pending = (
+            observation,
+            current_graph,
+            output,
+            target_graph,
+            assignment,
+        )
 
     def _step_cmd_vel(self) -> bool:
         """Forward a fresh Nav2-style body twist through the morphology map."""

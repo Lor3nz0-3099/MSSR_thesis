@@ -35,6 +35,7 @@ class DatasetLogger:
         target_graph: AttributedRobotGraph | None = None,
         assignment: Mapping[str, str] | None = None,
         next_graph: AttributedRobotGraph | None = None,
+        next_observation: Mapping[str, Any] | None = None,
     ) -> None:
         """Log one expert transition with current, target and task graphs.
 
@@ -55,7 +56,22 @@ class DatasetLogger:
             "task_type": task_type,
             "difficulty": float(difficulty),
             "fsm_state": expert_output.fsm_state,
+            "is_first": int(timestep) == 0,
+            "is_last": bool(expert_output.done),
+            "is_terminal": bool(expert_output.done),
+            "action_valid": not bool(expert_output.done),
+            "reward": (
+                1.0
+                if expert_output.done and expert_output.success
+                else 0.0
+            ),
+            "discount": 0.0 if expert_output.done else 1.0,
             "observation": dict(observation),
+            "observation_t_plus_1": (
+                dict(next_observation)
+                if next_observation is not None
+                else None
+            ),
             "graph_t": graph.to_dict(),
             "target_graph": (
                 target_graph.to_dict()
@@ -83,6 +99,21 @@ class DatasetLogger:
                     if expert_output.primitive_goal is not None
                     else None
                 ),
+            },
+            "supervision": {
+                "label_source": "deterministic_expert",
+                "executed_action_source": "deterministic_expert",
+                "expert_intervention": False,
+                "valid_for_behavior_cloning": not bool(
+                    expert_output.done
+                ),
+            },
+            "expert_annotation": {
+                "fsm_state": expert_output.fsm_state,
+                "active_primitive": expert_output.active_primitive,
+                "primitive_params": dict(expert_output.primitive_params),
+                "task_metrics": dict(expert_output.task_metrics),
+                "debug": dict(expert_output.debug),
             },
             "active_primitive": expert_output.active_primitive,
             "primitive_params": dict(expert_output.primitive_params),

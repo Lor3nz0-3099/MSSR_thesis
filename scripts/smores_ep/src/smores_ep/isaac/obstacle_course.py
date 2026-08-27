@@ -70,14 +70,47 @@ class UniformStairSpec:
         }
 
 
-def sample_uniform_stair_spec(seed: int) -> UniformStairSpec:
-    """Sample the initial, deliberately conservative robustness envelope."""
+STAIR_CURRICULUM_RANGES = {
+    "robust": {
+        "rise_m": (0.050, 0.065),
+        "tread_depth_m": (0.250, 0.320),
+        "step_count": (2, 4),
+    },
+    "intermediate": {
+        "rise_m": (0.055, 0.070),
+        "tread_depth_m": (0.220, 0.300),
+        "step_count": (3, 4),
+    },
+    "challenging": {
+        "rise_m": (0.060, 0.075),
+        "tread_depth_m": (0.180, 0.270),
+        "step_count": (3, 5),
+    },
+}
 
+
+def sample_uniform_stair_spec(
+    seed: int,
+    curriculum_level: str = "robust",
+) -> UniformStairSpec:
+    """Sample a reproducible uniform stair from a curriculum envelope."""
+
+    try:
+        ranges = STAIR_CURRICULUM_RANGES[curriculum_level]
+    except KeyError as error:
+        raise ValueError(
+            f"Unknown stair curriculum level: {curriculum_level!r}"
+        ) from error
     generator = random.Random(seed)
+    rise_min, rise_max = ranges["rise_m"]
+    depth_min, depth_max = ranges["tread_depth_m"]
+    count_min, count_max = ranges["step_count"]
     return UniformStairSpec(
-        rise_m=round(generator.uniform(0.050, 0.065), 3),
-        tread_depth_m=round(generator.uniform(0.250, 0.320), 3),
-        step_count=generator.randint(2, 4),
+        rise_m=round(generator.uniform(rise_min, rise_max), 3),
+        tread_depth_m=round(
+            generator.uniform(depth_min, depth_max), 3
+        ),
+        step_count=generator.randint(count_min, count_max),
         seed=seed,
     )
 
@@ -137,13 +170,40 @@ class CoplanarGapSpec:
         }
 
 
-def sample_coplanar_gap_spec(seed: int) -> CoplanarGapSpec:
-    """Sample the initial conservative Snake8 gap robustness envelope."""
+GAP_CURRICULUM_RANGES = {
+    "robust": {
+        "width_m": (0.160, 0.210),
+        "near_edge_x_m": (0.520, 0.620),
+    },
+    "intermediate": {
+        "width_m": (0.190, 0.235),
+        "near_edge_x_m": (0.500, 0.640),
+    },
+    "challenging": {
+        "width_m": (0.220, 0.260),
+        "near_edge_x_m": (0.480, 0.660),
+    },
+}
 
+
+def sample_coplanar_gap_spec(
+    seed: int,
+    curriculum_level: str = "robust",
+) -> CoplanarGapSpec:
+    """Sample a reproducible coplanar gap from a curriculum envelope."""
+
+    try:
+        ranges = GAP_CURRICULUM_RANGES[curriculum_level]
+    except KeyError as error:
+        raise ValueError(
+            f"Unknown gap curriculum level: {curriculum_level!r}"
+        ) from error
     generator = random.Random(seed)
+    width_min, width_max = ranges["width_m"]
+    edge_min, edge_max = ranges["near_edge_x_m"]
     return CoplanarGapSpec(
-        width_m=round(generator.uniform(0.160, 0.210), 3),
-        near_edge_x_m=round(generator.uniform(0.520, 0.620), 3),
+        width_m=round(generator.uniform(width_min, width_max), 3),
+        near_edge_x_m=round(generator.uniform(edge_min, edge_max), 3),
         seed=seed,
     )
 

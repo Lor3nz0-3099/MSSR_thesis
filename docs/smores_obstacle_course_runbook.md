@@ -406,6 +406,92 @@ obstacle order or obstacle presence. Those dimensions belong to the later
 multi-obstacle course generator and must not be confused with demonstrated
 generalization of the current gait.
 
+#### Adaptive headless dataset campaign: stairs, then gap
+
+The combined runner keeps the two learning problems separate and always
+executes the stair curriculum before the gap curriculum.  Each obstacle has
+three ordered envelopes:
+
+- `robust`: the conservative family around the physically validated cases;
+- `intermediate`: moderately taller/shorter-tread stairs or wider gaps;
+- `challenging`: the widest supported generator envelope, where failures are
+  expected to expose the deterministic expert's current boundary.
+
+All episodes in one level run before the gate is evaluated.  The default gate
+requires at least 80% success; if it fails, harder levels for that obstacle are
+not scheduled.  The gap curriculum remains independent and starts after the
+stair curriculum even if stairs stopped early.  Preview a small campaign
+without starting Isaac:
+
+```bash
+cd ~/MSSR_thesis
+PYTHONPATH=scripts/smores_ep/src python3 \
+  scripts/smores_ep/run_snake_obstacle_dataset_campaign.py \
+  --episodes-per-level 3 \
+  --minimum-success-rate 0.80 \
+  --plan-only \
+  --output-dir logs/snake_obstacle_dataset_campaign/plan_001
+```
+
+Execute it headlessly from a freshly sourced shell and a new empty output
+directory:
+
+```bash
+cd ~/MSSR_thesis
+source /opt/ros/humble/setup.bash
+source mssr_ws/install/setup.bash
+export ROS_DOMAIN_ID=0
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+
+PYTHONPATH=scripts/smores_ep/src python3 \
+  scripts/smores_ep/run_snake_obstacle_dataset_campaign.py \
+  --episodes-per-level 5 \
+  --minimum-success-rate 0.80 \
+  --levels robust,intermediate,challenging \
+  --base-seed 1000 \
+  --output-dir logs/snake_obstacle_dataset_campaign/campaign_001
+```
+
+At five episodes per level the campaign schedules at most 15 stair and 15 gap
+episodes, but a failed gate prevents the harder cases from running.  Start
+with three episodes per level for a short pipeline check; use more episodes
+and disjoint seed ranges for the actual train/validation/test collection.
+Keep `simulation_speed_factor=1.0`; headless mode removes rendering overhead
+without changing controller-to-physics timing.
+
+The output has independent `stairs/` and `gap/` trees.  Every episode retains
+its manifest, result, logs, assembly dataset and `behavior_dataset.jsonl`.
+Each obstacle also contains:
+
+- `all_transitions.jsonl`, including successful and failed diagnostic
+  rollouts;
+- `successful_transitions.jsonl`, containing only geometrically verified
+  positive demonstrations for behavior cloning;
+- per-level and obstacle `summary.json` files with seeds, exact geometry,
+  success rate and curriculum-gate decision.
+
+Each behavior record uses `mssr.expert_transition.v3`.  It contains the full
+attributed robot graph at time `t` and, for sampled consecutive controller
+steps, `graph_t_plus_1`: module world poses, actuator state and limits,
+contacts/rigid connector edges and global course landmarks therefore evolve
+with time.  The observation additionally stores the morphology-level DoF
+classification per module (connected faces, load-bearing/shape/locomotion
+mode and motor mix), assigned roles, command/phase/progress and exact expert
+locomotion or primitive action.  `target_graph` and
+`assignment_target_to_module` preserve the intended Snake8 topology and the
+physical-module-to-role binding.  These isolated datasets intentionally keep
+the morphology fixed; morphology selection and topology changes will be an
+additional decision variable in the later complete-course dataset.
+
+The `observation.environment` object makes the environment conditioning
+explicit in every transition rather than relying only on the episode
+manifest.  It records `isaac_world_ground_truth`, the world frame, curriculum
+stage/difficulty, scenario generator and seed, exact stair or gap landmarks
+and module geometry.  This is the deterministic expert's oracle observation;
+future camera/depth/Vicon-derived observations can be added alongside it and
+used to train the deployable policy without losing the generating ground
+truth.
+
 ### Isolated MobileManipulator8 button stage with Nav2
 
 This fixture contains only a continuous flat platform, a wall and its button.

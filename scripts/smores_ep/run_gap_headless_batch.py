@@ -249,12 +249,18 @@ def run_episode(
 ) -> dict[str, Any]:
     runtime_dir = args.output_dir / episode_id
     runtime_dir.mkdir(parents=True, exist_ok=False)
+    curriculum_level = str(getattr(args, "curriculum_level", "robust"))
+    curriculum_difficulty = float(
+        getattr(args, "curriculum_difficulty", 0.0)
+    )
     manifest = {
         "schema_version": "mssr.gap_headless_episode.v1",
         "episode_id": episode_id,
         "gap": spec.to_dict(),
         "behavior": "gap_crossing",
         "behavior_parameters": DEFAULT_BEHAVIOR_PARAMETERS,
+        "curriculum_level": curriculum_level,
+        "curriculum_difficulty": curriculum_difficulty,
         "validated_baseline_commit": "eb7836e",
     }
     (runtime_dir / "manifest.json").write_text(
@@ -283,6 +289,13 @@ def run_episode(
         f"simulation_speed_factor:={args.simulation_speed_factor}",
         f"gap_width_m:={spec.width_m}",
         f"gap_near_edge_x_m:={spec.near_edge_x_m}",
+        "behavior_dataset_path:="
+        + str(runtime_dir / "behavior_dataset.jsonl"),
+        f"behavior_dataset_episode_id:={episode_id}",
+        "behavior_dataset_stage_name:="
+        + f"snake8_gap_{curriculum_level}",
+        f"behavior_dataset_difficulty:={curriculum_difficulty}",
+        "behavior_dataset_log_period:=1",
         f"ros_domain_id:={ros_domain_id}",
         f"rmw_implementation:={rmw_implementation}",
     ]

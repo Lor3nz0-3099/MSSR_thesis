@@ -62,3 +62,55 @@ plus an independent terminal geometry check. These per-obstacle campaigns are
 the first dataset stratum. A later course generator will compose variable
 obstacle presence and order into complete task-achievement trajectories while
 retaining every component seed and feasibility decision.
+
+The first per-obstacle collection is curriculum gated and headless.  Stairs
+and gaps each begin with the physically supported `robust` envelope, advance
+to `intermediate` and then `challenging` only when the completed level reaches
+the configured success-rate threshold, and write separate datasets.  Failed
+rollouts remain in `all_transitions.jsonl`; only independently verified
+successes are copied to `successful_transitions.jsonl` for BC/DAgger.
+
+These records are graph trajectories, not pose-only trajectories.  Every
+transition includes the attributed dynamic robot graph, the following graph
+snapshot when available, complete current and target topology, connector
+relations, module roles and assignment, per-module actuator state and
+operational DoF interpretation, course geometry, behavior phase and expert
+action.  The isolated stair and gap strata deliberately hold morphology
+constant at Snake8.  The later complete-task stratum will add morphology
+choice and reconfiguration-induced topology changes to the same graph-based
+representation.
+
+Environment conditioning is part of each transition as
+`observation.environment`, not only a campaign-side manifest.  For the
+isolated generators it contains Isaac world ground truth: coordinate frame,
+scenario profile and seed, exact obstacle landmarks/dimensions, curriculum
+difficulty and module geometry.  Later perception tensors or extracted
+features should be stored alongside this oracle description so train-time
+inputs can be selected without making the demonstrations irreproducible.
+
+## Dataset-format design basis
+
+The transition layout follows established robotics-learning conventions while
+remaining JSONL and graph native:
+
+- [DAgger (Ross, Gordon and Bagnell, 2011)](https://proceedings.mlr.press/v15/ross11a.html)
+  motivates retaining expert labels on the state distribution that later
+  learner rollouts actually visit, including recovery states;
+- [RLDS](https://github.com/google-research/rlds) motivates explicit episode
+  IDs and `is_first`/`is_last`/`is_terminal` step semantics plus environment
+  configuration metadata;
+- [robomimic](https://robomimic.github.io/docs/datasets/overview.html)
+  motivates paired current and next observations instead of action-only logs;
+- [Open X-Embodiment](https://robotics-transformer-x.github.io/) motivates
+  task/instruction conditioning alongside multimodal observations;
+- [Learning Modular Robot Control Policies](https://arxiv.org/abs/2105.10049)
+  motivates preserving the module connection graph and local module state as
+  first-class policy inputs rather than flattening one fixed morphology.
+
+`task_context` and `environment` are policy-conditioning candidates.
+`expert_annotation` is deliberately separate privileged supervision: it
+contains FSM phase, active primitive and deterministic rationale and must not
+silently become a deployment input unless an upstream task estimator can
+produce the same signal.  `supervision` records label/execution source now so
+future DAgger rollouts can distinguish learner actions, expert labels and
+interventions.

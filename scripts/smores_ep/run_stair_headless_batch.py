@@ -225,12 +225,18 @@ def run_episode(
 ) -> dict[str, Any]:
     runtime_dir = args.output_dir / episode_id
     runtime_dir.mkdir(parents=True, exist_ok=False)
+    curriculum_level = str(getattr(args, "curriculum_level", "robust"))
+    curriculum_difficulty = float(
+        getattr(args, "curriculum_difficulty", 0.0)
+    )
     manifest = {
         "schema_version": "mssr.stair_headless_episode.v1",
         "episode_id": episode_id,
         "stair": spec.to_dict(),
         "behavior": "crawl_stairs_arch_wave",
         "behavior_parameters": DEFAULT_BEHAVIOR_PARAMETERS,
+        "curriculum_level": curriculum_level,
+        "curriculum_difficulty": curriculum_difficulty,
         "validated_baseline_commit": "70a3bdc",
     }
     (runtime_dir / "manifest.json").write_text(
@@ -261,6 +267,13 @@ def run_episode(
         f"stair_depth_m:={spec.tread_depth_m}",
         f"stair_count:={spec.step_count}",
         f"stair_first_riser_x_m:={spec.first_riser_x_m}",
+        "behavior_dataset_path:="
+        + str(runtime_dir / "behavior_dataset.jsonl"),
+        f"behavior_dataset_episode_id:={episode_id}",
+        "behavior_dataset_stage_name:="
+        + f"snake8_stairs_{curriculum_level}",
+        f"behavior_dataset_difficulty:={curriculum_difficulty}",
+        "behavior_dataset_log_period:=1",
         f"ros_domain_id:={ros_domain_id}",
         f"rmw_implementation:={rmw_implementation}",
     ]
