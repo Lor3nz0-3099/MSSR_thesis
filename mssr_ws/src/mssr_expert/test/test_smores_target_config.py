@@ -100,15 +100,33 @@ def test_eight_module_manipulator_has_grounded_first_arm_module() -> None:
     assert len(tree.edges) == 7
     assert roles["v0"]["is_target_root"] is True
     assert roles["v4"]["target_role"] == "arm_ground_drive"
-    assert graph.global_attributes["post_assembly_tilt_rad_by_vertex"][
-        "v4"
-    ] == pytest.approx(0.0)
+    tilt_targets = graph.global_attributes[
+        "post_assembly_tilt_rad_by_vertex"
+    ]
+    assert tilt_targets["v0"] == pytest.approx(-0.25)
+    assert tilt_targets["v1"] == pytest.approx(-0.40)
+    assert tilt_targets["v2"] == pytest.approx(0.0)
+    assert tilt_targets["v3"] == pytest.approx(-0.40)
+    assert tilt_targets["v4"] == pytest.approx(0.20)
     assert graph.global_attributes["post_assembly_tilt_rad_by_vertex"][
         "v5"
     ] == pytest.approx(0.75)
     assert graph.global_attributes["post_assembly_tilt_rad_by_vertex"][
         "v6"
     ] == pytest.approx(0.65)
+    assert graph.global_attributes[
+        "post_assembly_tilt_groups_by_vertex"
+    ] == [
+        ["v2"],
+        ["v0"],
+        ["v4"],
+        ["v6"],
+        ["v5"],
+        ["v1", "v3"],
+    ]
+    assert graph.global_attributes[
+        "post_assembly_tilt_tolerance_rad"
+    ] == pytest.approx(0.10)
 
 
 def test_eight_module_rc_car_has_four_module_centerline() -> None:

@@ -125,13 +125,15 @@ send_manip arm-forward-01 reach_forward '{}'
 send_manip arm-down-01 lower_arm '{}'
 ```
 
-Forward and backward translation do not change the arm posture. Four modules
-form the longitudinal arm: `arm_ground_drive`, directly connected to the
-central module, remains at `TILT=0` on the floor; `arm_lift`, `arm_link` and the
-end effector form the raised part. Straight translation energizes only the
-LEFT/RIGHT wheels of `front_support` and `arm_ground_drive`, with the same local
-sign. It does not steer or drive the two lateral PAN joints and there is no
-automatic lower/raise cycle:
+Forward and backward translation do not change the arm posture. After the last
+docking, the final fold lowers `front_support` through the central TILT
+(`-0.25 rad`), raises and balances the root through `arm_ground_drive`
+(`+0.20 rad`), and brings both transverse TOP faces to the floor with
+synchronized `-0.40 rad` TILTs. This creates an arched longitudinal base with
+lateral PAN-ready supports. `arm_lift`, `arm_link` and the end effector form
+the raised part. Straight translation currently energizes only the LEFT/RIGHT
+wheels of `front_support` and `arm_ground_drive`, with the same local sign; PAN
+traction remains disabled until the support posture is physically validated:
 
 ```bash
 send_manip forward-01 drive '{"linear_m_s":0.03,"yaw_rate_rad_s":0.0,"duration_s":5.0}'

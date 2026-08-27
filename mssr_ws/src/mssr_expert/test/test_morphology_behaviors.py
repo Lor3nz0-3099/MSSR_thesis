@@ -544,7 +544,7 @@ def test_mobile_manipulator_button_press_holds_until_release() -> None:
     assert release_lift_angles == pytest.approx([0.45, 0.75])
 
 
-def test_mobile_ready_posture_leaves_transverse_drives_at_neutral_tilt() -> None:
+def test_mobile_ready_posture_deploys_arched_pan_support_base() -> None:
     targets = _library().ready_joint_targets(
         "mobile_manipulator8",
         _assignments(MANIPULATOR8_ROLES),
@@ -555,19 +555,25 @@ def test_mobile_ready_posture_leaves_transverse_drives_at_neutral_tilt() -> None
         for target in targets
     }
     assert by_role == {
-        ("chassis_center", "tilt"): pytest.approx(0.0),
-        ("left_drive", "tilt"): pytest.approx(-0.20),
-        ("right_drive", "tilt"): pytest.approx(-0.20),
+        ("chassis_center", "tilt"): pytest.approx(-0.25),
+        ("left_drive", "tilt"): pytest.approx(-0.40),
+        ("right_drive", "tilt"): pytest.approx(-0.40),
         ("front_support", "tilt"): pytest.approx(0.0),
-        ("arm_ground_drive", "tilt"): pytest.approx(0.0),
+        ("arm_ground_drive", "tilt"): pytest.approx(0.20),
         ("arm_lift", "tilt"): pytest.approx(0.75),
         ("arm_link", "tilt"): pytest.approx(0.65),
         ("end_effector", "pan"): pytest.approx(0.0),
     }
     assert all(
-        target.tolerance_rad == pytest.approx(0.2)
+        target.tolerance_rad == pytest.approx(0.10)
         for target in targets
-        if target.joint == "tilt"
+        if target.target_role in {
+            "chassis_center",
+            "left_drive",
+            "right_drive",
+            "front_support",
+            "arm_ground_drive",
+        }
     )
 
 

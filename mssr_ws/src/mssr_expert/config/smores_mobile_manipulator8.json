@@ -9,11 +9,14 @@
     "module_count": 8,
     "requires_helping_module": false,
     "assembly_strategy": "progressive_planar_waves_then_fold",
-    "post_assembly_tilt_tolerance_rad": 0.2,
+    "post_assembly_tilt_tolerance_rad": 0.10,
     "post_assembly_tilt_groups_by_vertex": [
-      ["v0", "v1", "v2", "v3", "v4"],
+      ["v2"],
+      ["v0"],
+      ["v4"],
       ["v6"],
-      ["v5"]
+      ["v5"],
+      ["v1", "v3"]
     ],
     "pre_reconfiguration_tilt_rad_by_vertex": {
       "v1": 0.0,
@@ -24,11 +27,11 @@
       "v6": 0.0
     },
     "post_assembly_tilt_rad_by_vertex": {
-      "v0": 0.0,
-      "v1": -0.20,
+      "v0": -0.25,
+      "v1": -0.40,
       "v2": 0.0,
-      "v3": -0.20,
-      "v4": 0.0,
+      "v3": -0.40,
+      "v4": 0.20,
       "v5": 0.75,
       "v6": 0.65
     },
@@ -37,7 +40,7 @@
     },
     "capabilities": ["flat_locomotion", "high_reach", "manipulation"],
     "source_reference": "SMORES-EP Parallel Self-Assembly conference demonstration",
-    "description": "Eight-module mobile manipulator. Four serial modules form the longitudinal arm: the first remains grounded as a locomotor attached to the central root, while the following three are carried in the raised section. Non-actuated joints remain structurally held during and after folding."
+    "description": "Eight-module mobile manipulator with a post-docking arched base. The central TILT lowers the front longitudinal wheel module, the grounded arm-base TILT raises and balances the root, and the two synchronized transverse TILTs load their TOP faces as lateral PAN-driven supports. The following three serial modules form the raised arm. Non-actuated joints remain structurally held during and after folding."
   },
   "nodes": [
     {"node_id": "v0", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v0", "target_role": "chassis_center", "is_target_root": true}},
