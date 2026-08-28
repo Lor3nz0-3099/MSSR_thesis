@@ -56,6 +56,7 @@ def test_policy_selects_one_capable_morphology_per_course_task() -> None:
         "crawl_goal_tolerance_m": 0.004,
         "profile_substeps": 6,
         "transition_clearance_m": 0.0065,
+	"arch_clearance_m": 0.010,
     }
     gap_crossing = next(
         step for step in steps if step.task == "snake_gap_crossing"

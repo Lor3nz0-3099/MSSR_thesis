@@ -617,13 +617,445 @@ class SnakeStairGaitPlanner:
         assignments: Sequence[AssignedModule],
         parameters: Mapping[str, Any],
     ) -> tuple[BehaviorProgramStep, ...]:
-        """Plan the experimental broad arch gait without changing legacy gait."""
-        return self.plan(
-            graph,
-            assignments,
-            parameters,
-            arch_wave=True,
+        """Plan the geometric four-module-cell stair gait.
+
+        The legacy ``crawl_stairs`` program remains available through
+        :meth:`plan`.  ``crawl_stairs_arch_wave`` instead uses one analytical
+        climbing cell for *every* riser, including the first one.  A cell is
+        the SMORES-style ``+a, 0, -a`` arch: two consecutive links share the
+        vertical rise while the modules behind them provide traction.  The
+        cell is translated rearward one link at a time; for a tread whose
+        geometry corresponds to four links, a second identical cell naturally
+        enters at the head four phases later.
+
+        The bend angle is an inverse-kinematics solution of
+        ``2 * spacing * sin(a) = rise``.  During each transfer a geometric
+        clearance is added smoothly, so bodies pass above the stair edge
+        rather than conforming exactly to it.  Drive phases terminate on live
+        world-X goals, therefore wheel slip cannot advance the program.
+        """
+        return self._plan_geometric_cell_wave(
+            graph, assignments, parameters
         )
+
+    def _plan_geometric_cell_wave(
+        self,
+        graph: AttributedRobotGraph,
+        assignments: Sequence[AssignedModule],
+        parameters: Mapping[str, Any],
+    ) -> tuple[BehaviorProgramStep, ...]:
+        timed_parameters = sorted(
+            self.TIMED_PARAMETER_NAMES.intersection(parameters)
+        )
+        if timed_parameters:
+            raise SnakeStairGaitError(
+                "crawl_stairs_arch_wave uses geometric world-pose goals and "
+                "does not accept timed parameters: "
+                + ", ".join(timed_parameters)
+            )
+
+        ordered = tuple(sorted(assignments, key=self._vertex_index))
+        if len(ordered) != self.MODULE_COUNT:
+            raise SnakeStairGaitError(
+                "Geometric stair gait requires Snake8"
+            )
+        course = graph.global_attributes.get("course")
+        if not isinstance(course, Mapping):
+            raise SnakeStairGaitError(
+                "Robot graph has no course metadata"
+            )
+        staircase = UniformStaircase.from_course(course)
+        positions = self._ordered_positions(graph, ordered)
+        spacing = self._link_spacing(positions)
+        wheel_radius = self._wheel_radius(graph)
+
+        heading = math.atan2(
+            positions[-1][1] - positions[0][1],
+            positions[-1][0] - positions[0][0],
+        )
+        max_heading = self._number(
+            parameters, "max_alignment_error_rad", 0.35
+        )
+        if max_heading <= 0.0 or max_heading > math.pi:
+            raise SnakeStairGaitError(
+                "max_alignment_error_rad must be in (0, pi]"
+            )
+        if abs(heading) > max_heading:
+            raise SnakeStairGaitError(
+                "Snake8 is not aligned with +X stairs: "
+                f"heading={heading:.3f} rad"
+            )
+
+        tilt_limit_margin = self._number(
+            parameters, "tilt_limit_margin_rad", 0.030
+        )
+        if not 0.0 <= tilt_limit_margin <= 0.15:
+            raise SnakeStairGaitError(
+                "tilt_limit_margin_rad must be in [0.0, 0.15]"
+            )
+        usable_tilt_limit = (
+            self._symmetric_tilt_limit(graph, ordered)
+            - tilt_limit_margin
+        )
+        if usable_tilt_limit <= 0.0:
+            raise SnakeStairGaitError(
+                "SMORES TILT limits leave no usable stair range"
+            )
+
+        if staircase.rise_m >= spacing:
+            raise SnakeStairGaitError(
+                "Stair rise exceeds one Snake8 link at the tail boundary"
+            )
+
+        # Analytical IK for the two-link climbing arch.
+        nominal_angle = self._distributed_rise_angle(
+            staircase.rise_m, spacing
+        )
+        sharp_tail_angle = math.asin(staircase.rise_m / spacing)
+        arch_clearance = self._number(
+            parameters, "arch_clearance_m", 0.40 * wheel_radius
+        )
+        if not 0.004 <= arch_clearance <= 0.020:
+            raise SnakeStairGaitError(
+                "arch_clearance_m must be in [0.004, 0.020]"
+            )
+        if staircase.rise_m + arch_clearance >= 2.0 * spacing:
+            raise SnakeStairGaitError(
+                "rise plus arch_clearance_m exceeds two Snake8 links"
+            )
+        clearance_angle = self._distributed_rise_angle(
+            staircase.rise_m + arch_clearance, spacing
+        )
+        if max(clearance_angle, sharp_tail_angle) > usable_tilt_limit:
+            raise SnakeStairGaitError(
+                "Stair geometry requires a TILT angle above the live "
+                "SMORES safety limit"
+            )
+
+        # Two sloped links form the climbing cell.  The remaining tread is
+        # represented by horizontal link phases.  This gives stride=4 for the
+        # SMORES stairs used in the experiments, but is derived from geometry.
+        arch_horizontal_run = (
+            2.0 * spacing * math.cos(nominal_angle)
+        )
+        flat_run = max(0.0, staircase.tread_depth_m - arch_horizontal_run)
+        stride = max(2, 2 + round(flat_run / spacing))
+
+        substeps = self._integer(
+            parameters, "profile_substeps", 6, 1, 6
+        )
+        approach_speed = self._speed(
+            parameters, "riser_approach_linear_m_s", 0.060
+        )
+        crawl_speed = self._speed(
+            parameters, "linear_m_s", 0.040
+        )
+        crawl_tolerance = self._number(
+            parameters, "crawl_goal_tolerance_m", 0.004
+        )
+        if not 0.001 <= crawl_tolerance <= 0.010:
+            raise SnakeStairGaitError(
+                "crawl_goal_tolerance_m must be in [0.001, 0.010]"
+            )
+        approach_tolerance = self._number(
+            parameters, "riser_approach_tolerance_m", 0.010
+        )
+        if not 0.003 <= approach_tolerance <= 0.030:
+            raise SnakeStairGaitError(
+                "riser_approach_tolerance_m must be in [0.003, 0.030]"
+            )
+        transition_clearance = self._number(
+            parameters, "transition_clearance_m", 0.10 * staircase.rise_m
+        )
+        if not 0.0 <= transition_clearance <= 0.015:
+            raise SnakeStairGaitError(
+                "transition_clearance_m must be in [0.0, 0.015]"
+            )
+        # Build the complete front climbing cell while the head is still a
+        # full link plus one wheel radius away from the vertical edge.  The
+        # old 2*r heuristic let the cell start too close to tall risers, so
+        # the head could contact the wall before the two-link arch was fully
+        # established.
+        default_prelift_lookahead = min(
+            0.150,
+            spacing + wheel_radius + transition_clearance,
+        )
+        first_riser_lookahead = self._number(
+            parameters,
+            "head_prelift_lookahead_m",
+            default_prelift_lookahead,
+        )
+        if not 0.040 <= first_riser_lookahead <= 0.150:
+            raise SnakeStairGaitError(
+                "head_prelift_lookahead_m must be in [0.040, 0.150]"
+            )
+
+        all_roles = tuple(item.target_role for item in ordered)
+        zero = (0.0,) * self.MODULE_COUNT
+        steps: list[BehaviorProgramStep] = []
+
+        # Unlike the old gait, approach the first riser while completely flat.
+        # The same two-link cell used on every later riser is then erected at
+        # the head before any wheel reaches the edge.
+        head = ordered[-1]
+        steps.append(
+            BehaviorProgramStep(
+                phase="GEOM_APPROACH_FIRST_RISER",
+                linear_m_s=approach_speed,
+                active_target_roles=all_roles,
+                position_goal=LongitudinalPositionGoal(
+                    module_id=head.module_id,
+                    target_x_m=(
+                        staircase.first_riser_x_m - first_riser_lookahead
+                    ),
+                    tolerance_m=approach_tolerance,
+                ),
+            )
+        )
+
+        prelift = self._geometric_cell_offsets(
+            phase=0,
+            stair_count=len(staircase.top_heights_m),
+            stride=stride,
+            nominal_bend_angle=nominal_angle,
+            clearance_bend_angle=clearance_angle,
+            sharp_tail_angle=sharp_tail_angle,
+        )
+        self._validate_tilt_vector(prelift, usable_tilt_limit)
+        steps.append(
+            self._posture(
+                "GEOM_PRELIFT_FIRST_CELL", zero, prelift, ordered
+            )
+        )
+        current = prelift
+
+        # The first cell starts at the terminal three TILT targets (v5/v6/v7).
+        # Every link-length of translation moves it one vertex rearward.  New
+        # cells enter at the head according to the tread-derived stride.
+        final_phase = (
+            (self.MODULE_COUNT - 2)
+            + stride * (len(staircase.top_heights_m) - 1)
+            + 1
+        )
+        micro_distance = spacing / substeps
+        if crawl_tolerance >= 0.5 * micro_distance:
+            raise SnakeStairGaitError(
+                "crawl_goal_tolerance_m must be less than half one "
+                "geometric substep distance"
+            )
+
+        # A cell must not migrate rearward as soon as its reference wheel
+        # starts moving.  Hold the full arch until that wheel centre reaches
+        # the riser plane, then transfer the bend smoothly while the wheel
+        # rolls onto the upper tread.  With the phase origin at x=riser-r,
+        # these fractions follow directly from wheel/link geometry.
+        migration_start_fraction = self._clamp01(wheel_radius / spacing)
+        migration_end_fraction = self._clamp01(
+            (2.0 * wheel_radius + transition_clearance) / spacing
+        )
+        if migration_end_fraction <= migration_start_fraction + 1e-6:
+            migration_end_fraction = min(
+                1.0, migration_start_fraction + 1e-3
+            )
+
+        for phase in range(final_phase):
+            reference, riser_x_m = self._geometric_cell_reference(
+                phase,
+                len(staircase.top_heights_m),
+                stride,
+                staircase,
+                ordered,
+            )
+            for substep in range(1, substeps + 1):
+                fraction = substep / substeps
+                if fraction <= migration_start_fraction:
+                    migration_fraction = 0.0
+                elif fraction >= migration_end_fraction:
+                    migration_fraction = 1.0
+                else:
+                    migration_fraction = self._smoothstep(
+                        (fraction - migration_start_fraction)
+                        / (
+                            migration_end_fraction
+                            - migration_start_fraction
+                        )
+                    )
+                start = self._geometric_cell_offsets(
+                    phase=phase,
+                    stair_count=len(staircase.top_heights_m),
+                    stride=stride,
+                    nominal_bend_angle=nominal_angle,
+                    clearance_bend_angle=clearance_angle,
+                    sharp_tail_angle=sharp_tail_angle,
+                )
+                end = self._geometric_cell_offsets(
+                    phase=phase + 1,
+                    stair_count=len(staircase.top_heights_m),
+                    stride=stride,
+                    nominal_bend_angle=nominal_angle,
+                    clearance_bend_angle=clearance_angle,
+                    sharp_tail_angle=sharp_tail_angle,
+                )
+                target = tuple(
+                    first + migration_fraction * (second - first)
+                    for first, second in zip(start, end)
+                )
+                self._validate_tilt_vector(target, usable_tilt_limit)
+                label = f"GEOM_CELL_{phase:02d}_{substep:02d}"
+                steps.append(
+                    self._posture(label, current, target, ordered)
+                )
+
+                edge_lead_m = transition_clearance * math.sin(
+                    math.pi * fraction
+                )
+                target_x_m = (
+                    riser_x_m
+                    - wheel_radius
+                    + fraction * spacing
+                    - edge_lead_m
+                )
+                drive_phase = (
+                    f"GEOM_DRIVE_{phase:02d}_{substep:02d}"
+                )
+                drive_reference = reference
+                if phase == final_phase - 1 and substep == substeps:
+                    # At the tail boundary the two-link cell can no longer be
+                    # represented.  The final sharp pair has already lifted
+                    # the tail; stop as soon as its adjacent wheel is safely
+                    # beyond the last riser.
+                    drive_reference = ordered[1]
+                    final_riser_x_m = (
+                        staircase.first_riser_x_m
+                        + (len(staircase.top_heights_m) - 1)
+                        * staircase.tread_depth_m
+                    )
+                    target_x_m = final_riser_x_m + wheel_radius
+                    drive_phase = "GEOM_TAIL_LIFT_COMPLETE"
+                steps.append(
+                    BehaviorProgramStep(
+                        phase=drive_phase,
+                        linear_m_s=crawl_speed,
+                        active_target_roles=all_roles,
+                        position_goal=LongitudinalPositionGoal(
+                            module_id=drive_reference.module_id,
+                            target_x_m=target_x_m,
+                            tolerance_m=crawl_tolerance,
+                        ),
+                    )
+                )
+                current = target
+
+        upper_deck_distance = self._number(
+            parameters, "upper_deck_advance_distance_m", 0.0
+        )
+        if not 0.0 <= upper_deck_distance <= staircase.tread_depth_m:
+            raise SnakeStairGaitError(
+                "upper_deck_advance_distance_m must be in [0.0, one "
+                "tread depth] for crawl_stairs_arch_wave"
+            )
+        if upper_deck_distance > 0.0:
+            steps.append(
+                BehaviorProgramStep(
+                    phase="UPPER_DECK_ADVANCE",
+                    linear_m_s=crawl_speed,
+                    active_target_roles=all_roles,
+                    displacement_goal=LongitudinalDisplacementGoal(
+                        module_ids=tuple(
+                            item.module_id for item in ordered
+                        ),
+                        distance_m=upper_deck_distance,
+                        tolerance_m=crawl_tolerance,
+                    ),
+                )
+            )
+        return tuple(steps)
+
+    def _geometric_cell_offsets(
+        self,
+        *,
+        phase: int,
+        stair_count: int,
+        stride: int,
+        nominal_bend_angle: float,
+        clearance_bend_angle: float,
+        sharp_tail_angle: float,
+    ) -> tuple[float, ...]:
+        """Return the analytical SMORES four-module climbing cells.
+
+        ``edge`` is the middle vertex of a two-link rise.  ``+a, 0, -a``
+        gives two parallel sloped links, hence a vertical displacement
+        ``2*L*sin(a)``.  Cells are separated by ``stride`` phases and may be
+        active simultaneously on different risers.
+        """
+        offsets = [0.0] * self.MODULE_COUNT
+        front_edge = self.MODULE_COUNT - 2
+        for stair_index in range(stair_count):
+            edge = front_edge + stride * stair_index - phase
+            if 1 <= edge <= self.MODULE_COUNT - 2:
+                # Keep the two-link cell over-lifted while it occupies the
+                # terminal head/neck region.  This is the moment in which a
+                # module body can strike the vertical stair edge.  Once the
+                # cell has migrated behind the shoulder, settle to the exact
+                # IK angle for the tread height.
+                bend_angle = (
+                    clearance_bend_angle
+                    if edge >= self.MODULE_COUNT - 3
+                    else nominal_bend_angle
+                )
+                offsets[edge - 1] += bend_angle
+                offsets[edge + 1] -= bend_angle
+            elif edge == 0:
+                # Only one lower link remains at the tail, so close the final
+                # transfer with the exact one-link IK solution.
+                offsets[0] += sharp_tail_angle
+                offsets[1] -= sharp_tail_angle
+        return tuple(offsets)
+
+    def _geometric_cell_reference(
+        self,
+        phase: int,
+        stair_count: int,
+        stride: int,
+        staircase: UniformStaircase,
+        assignments: Sequence[AssignedModule],
+    ) -> tuple[AssignedModule, float]:
+        """Pick the foremost cell whose next live world-X goal matters."""
+        front_edge = self.MODULE_COUNT - 2
+        candidates: list[tuple[int, int]] = []
+        for stair_index in range(stair_count):
+            edge = front_edge + stride * stair_index - phase
+            if 0 <= edge <= self.MODULE_COUNT - 2:
+                reference_index = min(
+                    self.MODULE_COUNT - 1, max(0, edge + 1)
+                )
+                candidates.append((stair_index, reference_index))
+        if not candidates:
+            raise SnakeStairGaitError(
+                "No geometric stair-cell reference during transfer"
+            )
+        stair_index, reference_index = max(candidates)
+        return (
+            assignments[reference_index],
+            staircase.first_riser_x_m
+            + stair_index * staircase.tread_depth_m,
+        )
+
+    @staticmethod
+    def _smoothstep(value: float) -> float:
+        value = min(1.0, max(0.0, value))
+        return value * value * (3.0 - 2.0 * value)
+
+    @staticmethod
+    def _validate_tilt_vector(
+        targets: Sequence[float], usable_tilt_limit: float
+    ) -> None:
+        maximum = max((abs(value) for value in targets), default=0.0)
+        if maximum > usable_tilt_limit + 1e-9:
+            raise SnakeStairGaitError(
+                "Generated geometric stair posture exceeds live TILT "
+                f"limit: {maximum:.3f} > {usable_tilt_limit:.3f} rad"
+            )
 
     def _head_preview_angles(
         self,

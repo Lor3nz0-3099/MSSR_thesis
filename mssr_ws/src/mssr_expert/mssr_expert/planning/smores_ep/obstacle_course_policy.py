@@ -85,6 +85,7 @@ class ObstacleCoursePolicy:
                     "crawl_goal_tolerance_m": 0.004,
                     "profile_substeps": 6,
                     "transition_clearance_m": 0.0065,
+    "arch_clearance_m": 0.010,
                 },
             ),
             CourseStep("upper_deck_clearance", snake, navigation="front_on_upper_deck"),

@@ -31,6 +31,7 @@ DEFAULT_BEHAVIOR_PARAMETERS = {
     "linear_m_s": 0.040,
     "profile_substeps": 6,
     "transition_clearance_m": 0.0065,
+    "arch_clearance_m": 0.010,
     "crawl_goal_tolerance_m": 0.004,
 }
 
