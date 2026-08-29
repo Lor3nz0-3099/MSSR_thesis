@@ -500,6 +500,15 @@ def test_first_riser_uses_a_broad_clearance_arch() -> None:
     assert 2.0 * spacing * math.sin(expected) == pytest.approx(
         rise + clearance
     )
+    assert lift.position_goal is not None
+    assert lift.position_goal.module_id == "m7"
+    assert lift.position_goal.target_x_m == pytest.approx(
+        0.65 - wheel_radius
+    )
+    # Build/admit the first clearance arch before locomotion.  Later rail
+    # transfers remain concurrent with drive.
+    assert lift.hold_locomotion_until_admitted
+    assert not lift.continuous_with_next
 
 
 def test_arch_rail_passes_the_broad_cell_one_module_toward_the_tail() -> None:
@@ -519,7 +528,7 @@ def test_arch_rail_passes_the_broad_cell_one_module_toward_the_tail() -> None:
     assert second["m1"] == pytest.approx(third["m0"])
 
 
-def test_arch_rail_moves_the_rigid_support_partition_with_the_cell() -> None:
+def test_arch_rail_releases_the_remote_tail_behind_the_wave() -> None:
     assignments = _assignments()
     program = SnakeStairGaitPlanner().plan_arch_wave(
         _graph(),
@@ -529,22 +538,29 @@ def test_arch_rail_moves_the_rigid_support_partition_with_the_cell() -> None:
     expected = {
         "APPROACH_FIRST_RISER": (
             {"m3", "m5"},
-            {"m0", "m1", "m2", "m4", "m6", "m7"},
+            {"m2", "m4", "m6", "m7"},
+            {"m0", "m1"},
         ),
         "ARCH_DRIVE_00_03": (
             {"m2", "m3", "m4", "m5"},
-            {"m0", "m1", "m6", "m7"},
+            {"m1", "m6", "m7"},
+            {"m0"},
         ),
         "ARCH_DRIVE_01_03": (
             {"m1", "m2", "m3", "m4", "m5", "m6", "m7"},
             {"m0"},
+            set(),
         ),
     }
 
-    for phase, (moving_ids, support_ids) in expected.items():
+    for phase, (moving_ids, support_ids, passive_ids) in expected.items():
         step = next(item for item in program if item.phase == phase)
         assert {target.module_id for target in step.posture_targets} == (
             moving_ids
+        )
+        assert all(
+            set(target.passive_module_ids or ()) == passive_ids
+            for target in step.posture_targets
         )
         executor = MorphologyBehaviorExecutor(
             MorphologyLibrary.load(
@@ -568,10 +584,31 @@ def test_arch_rail_moves_the_rigid_support_partition_with_the_cell() -> None:
         )
         assert decision.primitive_goal is not None
         assert set(
-            decision.primitive_goal.parameters[
-                "structural_hold_module_ids"
-            ]
+            decision.primitive_goal.parameters.get(
+                "structural_hold_module_ids", ()
+            )
         ) == support_ids
+        assert set(
+            decision.primitive_goal.parameters["passive_module_ids"]
+        ) == passive_ids
+
+
+def test_arch_wave_trailing_support_depth_is_configurable() -> None:
+    program = SnakeStairGaitPlanner().plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "trailing_support_modules": 2},
+    )
+    first_lift = next(
+        step for step in program if step.phase == "APPROACH_FIRST_RISER"
+    )
+
+    assert all(
+        target.passive_module_ids == ("m0",)
+        for target in first_lift.posture_targets
+    )
+
+
 
 
 def test_arch_wave_only_overlays_concurrent_drive_on_validated_shape() -> None:

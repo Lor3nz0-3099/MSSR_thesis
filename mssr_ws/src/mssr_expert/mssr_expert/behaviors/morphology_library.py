@@ -34,6 +34,10 @@ class JointTarget:
     max_servo_error_rad: float | None = None
     max_servo_speed_rad_s: float | None = None
     structural_hold_module_ids: tuple[str, ...] = ()
+    # None preserves the legacy implicit hold policy.  A tuple makes the
+    # internal-motion policy explicit for this posture group; modules listed
+    # here stay backdrivable while wheel locomotion remains available.
+    passive_module_ids: tuple[str, ...] | None = None
     angle_reference: str = "absolute"
 
 

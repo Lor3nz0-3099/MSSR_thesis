@@ -2012,6 +2012,90 @@ def test_operational_drive_holds_connected_modules_but_not_reserves() -> None:
     assert composed["frame"].tilt_target_rad == pytest.approx(-0.7)
 
 
+def test_explicit_passive_policy_survives_joint_completion_during_drive() -> None:
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    class _ConnectedDocking:
+        module_ids = ("tail", "support", "head")
+        connections = (
+            SimpleNamespace(
+                first_face=SimpleNamespace(module_id="tail"),
+                second_face=SimpleNamespace(module_id="support"),
+            ),
+            SimpleNamespace(
+                first_face=SimpleNamespace(module_id="support"),
+                second_face=SimpleNamespace(module_id="head"),
+            ),
+        )
+
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={
+            "tail": "/Tail",
+            "support": "/Support",
+            "head": "/Head",
+        },
+        states={
+            "tail": _MutableStateReader(tilt_rad=0.25),
+            "support": _MutableStateReader(tilt_rad=-0.15),
+            "head": _MutableStateReader(tilt_rad=0.0),
+        },
+        docking=_ConnectedDocking(),  # type: ignore[arg-type]
+    )
+    goal = _goal(
+        "compliant-wave",
+        PrimitiveName.SET_TILT,
+        ("head",),
+        {
+            "angle_rad": 0.0,
+            "structural_hold_module_ids": ["support"],
+            "passive_module_ids": ["tail"],
+        },
+    )
+    assert executor.submit(goal, 0.0).state is PrimitiveState.ACCEPTED
+    assert executor.step(0.1).statuses[0].code == "JOINT_TARGET_REACHED"
+
+    composed = executor.compose_with_baseline(
+        {
+            module_id: SmoresCommand(linear_x_m_s=0.02)
+            for module_id in ("tail", "support", "head")
+        },
+        {},
+    )
+
+    assert composed["tail"].linear_x_m_s == pytest.approx(0.02)
+    assert composed["tail"].internal_motion is InternalMotionMode.PASSIVE
+    assert (
+        composed["support"].internal_motion
+        is InternalMotionMode.STRUCTURAL_HOLD
+    )
+    assert (
+        composed["head"].internal_motion
+        is InternalMotionMode.STRUCTURAL_HOLD
+    )
+
+    clear = _goal(
+        "clear-compliance",
+        PrimitiveName.SET_TILT,
+        ("head",),
+        {"angle_rad": 0.0, "passive_module_ids": []},
+    )
+    assert executor.submit(clear, 0.2).state is PrimitiveState.ACCEPTED
+    assert executor.step(0.3).statuses[0].code == "JOINT_TARGET_REACHED"
+    rigid = executor.compose_with_baseline(
+        {
+            module_id: SmoresCommand(linear_x_m_s=0.02)
+            for module_id in ("tail", "support", "head")
+        },
+        {},
+    )
+    assert all(
+        command.internal_motion is InternalMotionMode.STRUCTURAL_HOLD
+        for command in rigid.values()
+    )
+
+
+
 def test_fold_preserves_an_earlier_retained_target() -> None:
     from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
 

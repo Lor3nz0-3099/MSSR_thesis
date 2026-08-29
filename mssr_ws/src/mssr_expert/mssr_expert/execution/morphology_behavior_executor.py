@@ -401,11 +401,10 @@ class MorphologyBehaviorExecutor:
             parameters["max_servo_speed_rad_s"] = (
                 target.max_servo_speed_rad_s
             )
-        # A posture command moves exactly one declared joint. Modules outside
-        # the same coordinated posture group retain their complete PAN/TILT
-        # state while that joint moves. Peers in the same group are excluded:
-        # they are about to receive their own target and must not be held by
-        # the other members of the barrier.
+        # A posture command moves one declared joint.  Legacy postures keep
+        # every module outside the coordinated group rigid.  Gaits that need
+        # compliance can opt into an explicit passive partition: those
+        # modules keep their wheels available but PAN/TILT remain backdrivable.
         coordinated_module_ids = {target.module_id}
         if target.coordination_group is not None:
             coordinated_module_ids = {
@@ -413,13 +412,34 @@ class MorphologyBehaviorExecutor:
                 for candidate in self._joint_targets
                 if candidate.coordination_group == target.coordination_group
             }
+        passive_module_ids = (
+            None
+            if target.passive_module_ids is None
+            else set(target.passive_module_ids)
+        )
+        if passive_module_ids is not None:
+            invalid_passive = passive_module_ids.intersection(
+                coordinated_module_ids
+            )
+            if invalid_passive:
+                raise RuntimeError(
+                    "A coordinated posture module cannot also be passive: "
+                    + ", ".join(sorted(invalid_passive))
+                )
         structural_holds = {
             assignment.module_id
             for assignment in self._assignments
             if assignment.module_id not in coordinated_module_ids
+            and (
+                passive_module_ids is None
+                or assignment.module_id not in passive_module_ids
+            )
         }
         structural_holds.update(target.structural_hold_module_ids)
         structural_holds.difference_update(coordinated_module_ids)
+        if passive_module_ids is not None:
+            structural_holds.difference_update(passive_module_ids)
+            parameters["passive_module_ids"] = sorted(passive_module_ids)
         if structural_holds:
             parameters["structural_hold_module_ids"] = sorted(
                 structural_holds

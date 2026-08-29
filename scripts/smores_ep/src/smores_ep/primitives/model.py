@@ -271,6 +271,29 @@ class PrimitiveGoal:
                         "non-empty module IDs"
                     )
                 parameters["structural_hold_module_ids"] = list(hold_ids)
+            if "passive_module_ids" in parameters:
+                raw_ids = parameters["passive_module_ids"]
+                if not isinstance(raw_ids, list | tuple):
+                    raise ValueError(
+                        "passive_module_ids must be an array"
+                    )
+                passive_ids = tuple(str(item).strip() for item in raw_ids)
+                if (
+                    any(not item for item in passive_ids)
+                    or len(set(passive_ids)) != len(passive_ids)
+                ):
+                    raise ValueError(
+                        "passive_module_ids must contain distinct, non-empty "
+                        "module IDs"
+                    )
+                hold_set = set(parameters.get("structural_hold_module_ids", ()))
+                overlap = hold_set.intersection(passive_ids)
+                if overlap:
+                    raise ValueError(
+                        "passive_module_ids and structural_hold_module_ids "
+                        "must be disjoint"
+                    )
+                parameters["passive_module_ids"] = list(passive_ids)
             if "coordination_group" in parameters:
                 group = str(parameters["coordination_group"]).strip()
                 if not group:

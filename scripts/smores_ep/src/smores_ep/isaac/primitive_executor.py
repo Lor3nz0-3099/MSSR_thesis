@@ -219,6 +219,11 @@ class IsaacPrimitiveExecutor:
         # Only joints which have explicitly reached a PAN/TILT target are
         # retained. Every other module remains backdrivable.
         self._retained_internal_commands: dict[str, SmoresCommand] = {}
+        # Explicit compliance policy latched by operational posture goals.
+        # It survives after a coordinated TILT group reaches its target so a
+        # following geometric drive can keep the tail backdrivable.  A later
+        # posture carrying an empty passive_module_ids list clears the policy.
+        self._passive_internal_module_ids: set[str] = set()
         self._pan_trackers = {
             module_id: ContinuousAngleTracker()
             for module_id in module_roots
@@ -255,14 +260,27 @@ class IsaacPrimitiveExecutor:
         while a concurrent action goal moves TILT.
         """
 
+        if (
+            not baseline
+            and not primitive_commands
+            and not self._active
+            and self._passive_internal_module_ids
+        ):
+            # Do not leak a stair-compliance policy into a later behavior if
+            # the current command aborts before its final rigid posture.
+            self._passive_internal_module_ids.clear()
+
         if baseline:
-            # Locomotion marks the assembled component as operational.  From
-            # this point its unselected PAN/TILT joints are structural, not
-            # assembly-time passive joints.  Isolated reserve modules are
-            # deliberately excluded by the connection traversal.
-            self._retain_structure_targets(
-                self._connected_component_module_ids(baseline)
+            # Locomotion normally makes the connected component structural.
+            # A gait may explicitly release selected internal joints while
+            # retaining wheel drive; never recreate structural targets for
+            # those backdrivable modules.
+            connected = set(self._connected_component_module_ids(baseline))
+            self._release_structure_targets(
+                self._passive_internal_module_ids
             )
+            connected.difference_update(self._passive_internal_module_ids)
+            self._retain_structure_targets(connected)
         result = dict(baseline)
         for module_id in (
             set(baseline)
@@ -365,6 +383,10 @@ class IsaacPrimitiveExecutor:
                 for item in goal.parameters.get(
                     "structural_hold_module_ids", ()
                 )
+            )
+            referenced_modules.update(
+                str(item)
+                for item in goal.parameters.get("passive_module_ids", ())
             )
         if goal.primitive is PrimitiveName.SET_TILT:
             pusher_module_id = goal.parameters.get("pusher_module_id")
@@ -2122,6 +2144,7 @@ class IsaacPrimitiveExecutor:
             PrimitiveName.ROTATE_PAN_BY,
         }
         current = current_pan if is_pan else current_tilt
+        self._apply_passive_structure_policy(goal.parameters)
         self._retain_structure_targets(
             goal.parameters.get("structural_hold_module_ids", ())
         )
@@ -2390,6 +2413,23 @@ class IsaacPrimitiveExecutor:
                 InternalMotionMode.PAN if is_pan else InternalMotionMode.TILT
             ),
         )
+
+    def _apply_passive_structure_policy(
+        self, parameters: Mapping[str, Any]
+    ) -> None:
+        """Latch an explicit backdrivable subset for operational motion."""
+
+        if "passive_module_ids" not in parameters:
+            return
+        passive = {str(item) for item in parameters["passive_module_ids"]}
+        self._passive_internal_module_ids = passive
+        self._release_structure_targets(passive)
+
+    def _release_structure_targets(self, module_ids: Any) -> None:
+        """Forget retained internal targets for explicitly passive modules."""
+
+        for raw_module_id in module_ids:
+            self._retained_internal_commands.pop(str(raw_module_id), None)
 
     def _retain_structure_targets(self, module_ids: Any) -> None:
         """Latch missing operational holds without overwriting fold targets."""
