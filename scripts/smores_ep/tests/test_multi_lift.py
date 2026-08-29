@@ -14,7 +14,7 @@ def test_default_lift_scenario_builds_a_five_module_chain(tmp_path) -> None:
         physics_usd=tmp_path / "physics.usd",
     )
     assert config.chain_module_count == 5
-    assert config.active_actuators.tilt_max_effort_nm == pytest.approx(13.8)
+    assert config.active_actuators.tilt_max_effort_nm == pytest.approx(18.4)
     assert chain_module_ids("chain", 5) == (
         "chain_01",
         "chain_02",

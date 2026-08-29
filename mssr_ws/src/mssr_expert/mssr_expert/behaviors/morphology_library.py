@@ -32,6 +32,7 @@ class JointTarget:
     pusher_module_id: str | None = None
     pusher_linear_m_s: float | None = None
     max_servo_error_rad: float | None = None
+    max_servo_speed_rad_s: float | None = None
     structural_hold_module_ids: tuple[str, ...] = ()
     angle_reference: str = "absolute"
 
@@ -67,16 +68,22 @@ class BehaviorProgramStep:
     active_target_roles: tuple[str, ...] = ()
     position_goal: LongitudinalPositionGoal | None = None
     displacement_goal: LongitudinalDisplacementGoal | None = None
+    continuous_with_next: bool = False
+    hold_locomotion_until_admitted: bool = True
+    posture_reached_linear_m_s: float | None = None
 
     @property
     def kind(self) -> str:
+        has_stop_condition = (
+            self.duration_s is not None
+            or self.position_goal is not None
+            or self.displacement_goal is not None
+        )
+        if self.posture_targets and has_stop_condition:
+            return "posture_drive"
         return (
             "drive"
-            if (
-                self.duration_s is not None
-                or self.position_goal is not None
-                or self.displacement_goal is not None
-            )
+            if has_stop_condition
             else "posture"
         )
 
@@ -602,6 +609,19 @@ class MorphologyLibrary:
                 raise MorphologyLibraryError(
                     "Joint max_servo_error_rad must be positive and finite"
                 )
+            raw_max_servo_speed = raw_target.get("max_servo_speed_rad_s")
+            max_servo_speed = (
+                None
+                if raw_max_servo_speed is None
+                else float(raw_max_servo_speed)
+            )
+            if max_servo_speed is not None and (
+                not math.isfinite(max_servo_speed)
+                or max_servo_speed <= 0.0
+            ):
+                raise MorphologyLibraryError(
+                    "Joint max_servo_speed_rad_s must be positive and finite"
+                )
             raw_group = raw_target.get("coordination_group")
             coordination_group = None
             if raw_group is not None:
@@ -667,6 +687,7 @@ class MorphologyLibrary:
                         pusher_module_id=pusher_module_id,
                         pusher_linear_m_s=pusher_speed,
                         max_servo_error_rad=max_servo_error,
+                        max_servo_speed_rad_s=max_servo_speed,
                         angle_reference=angle_reference,
                     )
                 )

@@ -38,6 +38,7 @@ def test_payload_overdrive_scales_effort_and_stiffens_holding_drives() -> None:
     payload = SmoresActuatorConfig.payload_overdrive(
         3.0,
         wheel_max_speed_rad_s=5.0,
+        tilt_effort_scale=3.0,
     )
     assert payload.wheel_max_effort_nm == pytest.approx(
         3.0 * nominal.wheel_max_effort_nm
@@ -69,8 +70,30 @@ def test_payload_overdrive_can_exaggerate_only_the_tilt_payload() -> None:
     assert payload.wheel_max_effort_nm == pytest.approx(4.8)
     assert payload.pan_max_effort_nm == pytest.approx(5.6)
     assert payload.tilt_max_effort_nm == pytest.approx(18.4)
-    assert payload.tilt_stiffness_nm_per_rad == pytest.approx(96.0)
-    assert payload.hold_stiffness_nm_per_rad == pytest.approx(96.0)
+    assert payload.tilt_stiffness_nm_per_rad == pytest.approx(512.0)
+    assert payload.hold_stiffness_nm_per_rad == pytest.approx(512.0)
+
+
+def test_default_payload_can_lift_the_other_seven_snake_modules() -> None:
+    geometry = SmoresGeometry()
+    payload = SmoresActuatorConfig.payload_overdrive()
+    gravity_m_s2 = 9.81
+    # Conservative horizontal cantilever: seven complete modules represented
+    # at consecutive TOP-to-BOTTOM spacings from the supporting hinge.
+    seven_module_torque_nm = sum(
+        geometry.module_mass_kg
+        * gravity_m_s2
+        * geometry.top_to_bottom_spacing_m
+        * link_index
+        for link_index in range(1, 8)
+    )
+
+    assert payload.wheel_max_effort_nm == pytest.approx(4.8)
+    assert payload.tilt_max_effort_nm == pytest.approx(18.4)
+    assert payload.tilt_max_effort_nm >= 1.5 * seven_module_torque_nm
+    assert 0.025 * payload.tilt_stiffness_nm_per_rad >= (
+        1.25 * seven_module_torque_nm
+    )
 
 
 def test_reference_land_speed_is_converted_through_cad_wheel_radius() -> None:

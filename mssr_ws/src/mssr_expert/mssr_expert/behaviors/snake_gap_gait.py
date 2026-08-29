@@ -211,6 +211,16 @@ class SnakeGapGaitPlanner:
             )
         approach_speed = self._speed(parameters, "approach_linear_m_s", 0.050)
         crossing_speed = self._speed(parameters, "linear_m_s", 0.040)
+        minimum_traction_speed = self._number(
+            parameters, "minimum_traction_linear_m_s", 0.020
+        )
+        if not 0.018 <= minimum_traction_speed <= 0.050:
+            raise SnakeGapGaitError(
+                "minimum_traction_linear_m_s must be in [0.018, 0.050]"
+            )
+        settled_traction_speed = max(
+            crossing_speed, minimum_traction_speed
+        )
 
         tilt_margin = self._number(parameters, "tilt_limit_margin_rad", 0.030)
         if not 0.0 <= tilt_margin <= 0.15:
@@ -261,6 +271,34 @@ class SnakeGapGaitPlanner:
             raise SnakeGapGaitError(
                 "gap_profile_substeps must be an integer in [1, 8]"
             )
+        max_gap_tilt_speed = self._number(
+            parameters, "max_gap_tilt_speed_rad_s", 0.45
+        )
+        if not 0.15 <= max_gap_tilt_speed <= 1.0:
+            raise SnakeGapGaitError(
+                "max_gap_tilt_speed_rad_s must be in [0.15, 1.0]"
+            )
+        admission_guard_s = self._number(
+            parameters, "joint_admission_guard_s", 0.35
+        )
+        if not 0.10 <= admission_guard_s <= 1.0:
+            raise SnakeGapGaitError(
+                "joint_admission_guard_s must be in [0.10, 1.0]"
+            )
+        tilt_completion_fraction = self._number(
+            parameters, "tilt_completion_fraction", 0.65
+        )
+        if not 0.40 <= tilt_completion_fraction <= 0.85:
+            raise SnakeGapGaitError(
+                "tilt_completion_fraction must be in [0.40, 0.85]"
+            )
+        loaded_tilt_tolerance = self._number(
+            parameters, "loaded_tilt_tolerance_rad", 0.025
+        )
+        if not 0.015 <= loaded_tilt_tolerance <= 0.040:
+            raise SnakeGapGaitError(
+                "loaded_tilt_tolerance_rad must be in [0.015, 0.040]"
+            )
 
         # The entire robot first reaches the near edge while flat.  A low,
         # positive backbone curve starts at the safe near support and remains
@@ -289,6 +327,7 @@ class SnakeGapGaitPlanner:
         )
         profile_steps: list[BehaviorProgramStep] = []
         previous_profile = neutral
+        previous_head_target_x = near_support_x
         for profile_index in range(1, profile_step_count + 1):
             fraction = profile_index / profile_step_count
             translation = fraction * body_travel
@@ -333,25 +372,58 @@ class SnakeGapGaitPlanner:
                 raise SnakeGapGaitError(
                     "Traveling gap arch exceeds the live Snake8 TILT limits"
                 )
-            profile_steps.append(
-                self._posture(
-                    f"CONFORM_GAP_PROFILE_{profile_index:02d}",
-                    previous_profile,
-                    profile,
-                    ordered,
+            phase = f"FOLLOW_GAP_PROFILE_{profile_index:02d}"
+            segment_distance = module_x[-1] - previous_head_target_x
+            if segment_distance <= goal_tolerance:
+                raise SnakeGapGaitError(
+                    "Gap profile does not advance its geometric head barrier"
                 )
+            maximum_delta = max(
+                abs(target - previous)
+                for previous, target in zip(previous_profile, profile)
+            )
+            servo_at_limit_s = maximum_delta / max_gap_tilt_speed
+            segment_duration = max(
+                segment_distance / crossing_speed,
+                (
+                    servo_at_limit_s + admission_guard_s
+                ) / tilt_completion_fraction
+                if maximum_delta > 1e-6
+                else 0.0,
+            )
+            synchronized_speed = segment_distance / segment_duration
+            posture = self._posture(
+                phase,
+                previous_profile,
+                profile,
+                ordered,
+                motion_duration_s=(
+                    None
+                    if maximum_delta <= 1e-6
+                    else max(0.05, servo_at_limit_s)
+                ),
+                motion_tolerance_rad=loaded_tilt_tolerance,
             )
             previous_profile = profile
             profile_steps.append(
-                self._drive_to(
-                    f"FOLLOW_GAP_PROFILE_{profile_index:02d}",
-                    ordered[-1],
-                    module_x[-1],
-                    crossing_speed,
-                    roles,
-                    goal_tolerance,
+                BehaviorProgramStep(
+                    phase=phase,
+                    posture_targets=posture.posture_targets,
+                    linear_m_s=synchronized_speed,
+                    active_target_roles=roles,
+                    position_goal=LongitudinalPositionGoal(
+                        module_id=ordered[-1].module_id,
+                        target_x_m=module_x[-1],
+                        tolerance_m=goal_tolerance,
+                    ),
+                    continuous_with_next=(
+                        profile_index < profile_step_count
+                    ),
+                    hold_locomotion_until_admitted=False,
+                    posture_reached_linear_m_s=settled_traction_speed,
                 )
             )
+            previous_head_target_x = module_x[-1]
 
         return (
             self._posture(
@@ -407,6 +479,8 @@ class SnakeGapGaitPlanner:
         assignments: Sequence[AssignedModule],
         *,
         all_targets: bool = False,
+        motion_duration_s: float | None = None,
+        motion_tolerance_rad: float = 0.025,
     ) -> BehaviorProgramStep:
         changed = tuple(
             range(len(target))
@@ -426,9 +500,21 @@ class SnakeGapGaitPlanner:
                     angle_rad=target[index],
                     target_vertex_id=assignments[index].target_vertex_id,
                     target_role=assignments[index].target_role,
-                    tolerance_rad=0.08,
+                    tolerance_rad=(
+                        motion_tolerance_rad
+                        if motion_duration_s is not None
+                        else 0.08
+                    ),
                     coordination_group=f"gap:{phase}",
-                    max_servo_error_rad=0.12,
+                    max_servo_error_rad=(
+                        0.06 if motion_duration_s is not None else 0.12
+                    ),
+                    max_servo_speed_rad_s=(
+                        None
+                        if motion_duration_s is None
+                        else abs(target[index] - previous[index])
+                        / motion_duration_s
+                    ),
                     angle_reference="captured_neutral",
                 )
                 for index in changed

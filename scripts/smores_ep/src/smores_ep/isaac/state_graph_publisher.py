@@ -168,6 +168,10 @@ class SmoresStateGraphPublisher:
                 "module_count": len(modules),
                 "module_geometry": {
                     "wheel_radius_m": self._geometry.wheel_radius_m,
+                    "forward_collision_extent_m": (
+                        self._geometry.top_face_x_m
+                    ),
+                    "pan_face_radius_m": self._geometry.pan_face_radius_m,
                 },
                 "latched_connection_count": len(attachments),
                 "contact_candidate_count": len(contacts),

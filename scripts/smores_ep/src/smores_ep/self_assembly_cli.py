@@ -199,17 +199,26 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default=SMORES_EP_MAX_WHEEL_SPEED_RAD_S,
     )
     parser.add_argument(
+        "--wheel-friction-scale",
+        type=float,
+        default=1.50,
+        help=(
+            "Scale wheel-only static and dynamic friction at runtime; "
+            "body and passive-skid friction are unchanged"
+        ),
+    )
+    parser.add_argument(
         "--actuator-effort-scale",
         type=float,
-        default=3.0,
+        default=4.0,
     )
     parser.add_argument(
         "--tilt-effort-scale",
         type=float,
-        default=None,
+        default=8.0,
         help=(
-            "Optional TILT-only effort scale for cantilevered chains; "
-            "defaults to --actuator-effort-scale"
+            "TILT-only effort scale for cantilevered chains; defaults to "
+            "the Snake8 single-hinge payload profile (8.0)"
         ),
     )
     return parser
@@ -333,6 +342,7 @@ def main() -> None:
                 ),
                 staging_center_clearance_m=args.staging_center_clearance,
                 staging_waypoint_margin_m=args.staging_waypoint_margin,
+                wheel_friction_scale=args.wheel_friction_scale,
                 max_wheel_speed_rad_s=args.max_wheel_speed,
                 actuators=SmoresActuatorConfig.payload_overdrive(
                     args.actuator_effort_scale,

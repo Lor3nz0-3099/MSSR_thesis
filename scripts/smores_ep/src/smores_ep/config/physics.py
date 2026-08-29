@@ -46,16 +46,15 @@ class SmoresActuatorConfig:
     @classmethod
     def payload_overdrive(
         cls,
-        effort_scale: float = 3.0,
+        effort_scale: float = 4.0,
         wheel_max_speed_rad_s: float = SMORES_EP_MAX_WHEEL_SPEED_RAD_S,
-        tilt_effort_scale: float | None = None,
+        tilt_effort_scale: float | None = 8.0,
     ) -> "SmoresActuatorConfig":
         """Return the intentionally exaggerated multi-module lift profile.
 
-        ``tilt_effort_scale`` can exceed the locomotion effort scale when a
-        serial morphology has to cantilever several connected modules.  This
-        keeps the wheels and PAN actuator controllable while giving the TILT
-        joint the deliberately non-physical reserve used by the simulation.
+        The defaults deliberately let one TILT hinge lift the other seven
+        Snake8 modules. ``tilt_effort_scale=None`` remains available when a
+        caller explicitly wants TILT to use the common locomotion scale.
         """
 
         if not math.isfinite(effort_scale) or effort_scale <= 0.0:
@@ -84,19 +83,22 @@ class SmoresActuatorConfig:
             # control stays compliant across the uneven support loads of an
             # assembled snake.
             wheel_damping_nm_s_per_rad=cls().wheel_damping_nm_s_per_rad,
-            # PhysX implicit PD remains stable with a stiff payload drive.
+            # The spring must also hold a cantilever close to its commanded
+            # angle.  Effort alone only prevents torque saturation: the old
+            # 12* gain left a reproducible 0.019 rad static error and could
+            # deadlock a coordinated gait at its posture barrier.
             tilt_stiffness_nm_per_rad=max(
-                24.0, 12.0 * resolved_tilt_scale
+                24.0, 64.0 * resolved_tilt_scale
             ),
             tilt_damping_nm_s_per_rad=max(
-                1.2, 0.30 * resolved_tilt_scale
+                1.2, 1.60 * resolved_tilt_scale
             ),
             pan_damping_nm_s_per_rad=0.58 * effort_scale,
             hold_stiffness_nm_per_rad=max(
-                24.0, 12.0 * resolved_tilt_scale
+                24.0, 64.0 * resolved_tilt_scale
             ),
             hold_damping_nm_s_per_rad=max(
-                1.2, 0.30 * resolved_tilt_scale
+                1.2, 1.60 * resolved_tilt_scale
             ),
             wheel_max_speed_rad_s=wheel_max_speed_rad_s,
             internal_max_speed_rad_s=SMORES_DOF_NO_LOAD_SPEED_RAD_S,

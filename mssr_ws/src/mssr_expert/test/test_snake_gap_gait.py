@@ -154,19 +154,34 @@ def test_gap_program_has_requested_geometric_sequence_without_timers() -> None:
     assert phases[:4] == (
         "RESTORE_GAP_NEUTRAL",
         "APPROACH_HEAD_TO_NEAR_EDGE",
-        "CONFORM_GAP_PROFILE_01",
         "FOLLOW_GAP_PROFILE_01",
+        "FOLLOW_GAP_PROFILE_02",
     )
-    profile_postures = tuple(
-        phase for phase in phases if phase.startswith("CONFORM_GAP_PROFILE_")
+    profiles = tuple(
+        step
+        for step in program
+        if step.phase.startswith("FOLLOW_GAP_PROFILE_")
     )
-    profile_drives = tuple(
-        phase for phase in phases if phase.startswith("FOLLOW_GAP_PROFILE_")
+    assert profiles[0].phase == "FOLLOW_GAP_PROFILE_01"
+    assert all(step.kind in {"posture_drive", "drive"} for step in profiles)
+    assert any(step.kind == "posture_drive" for step in profiles)
+    assert all(0.0 < step.linear_m_s <= 0.040 for step in profiles)
+    assert any(step.linear_m_s < 0.040 for step in profiles)
+    assert all(not step.hold_locomotion_until_admitted for step in profiles)
+    assert all(
+        step.posture_reached_linear_m_s == pytest.approx(0.040)
+        for step in profiles
     )
-    assert profile_postures[0] == "CONFORM_GAP_PROFILE_01"
-    assert len(profile_postures) == len(profile_drives)
+    assert all(step.continuous_with_next for step in profiles[:-1])
+    assert not profiles[-1].continuous_with_next
+    assert all(
+        target.max_servo_speed_rad_s is not None
+        and target.tolerance_rad == pytest.approx(0.025)
+        for step in profiles
+        for target in step.posture_targets
+    )
     assert phases[-1] == "RESTORE_GAP_NEUTRAL_FINAL"
-    drives = tuple(step for step in program if step.kind == "drive")
+    drives = tuple(step for step in program if step.position_goal is not None)
     assert all(step.duration_s is None for step in program)
     assert all(step.position_goal is not None for step in drives)
     assert drives[0].phase == "APPROACH_HEAD_TO_NEAR_EDGE"
@@ -240,12 +255,12 @@ def test_wider_admissible_gap_still_uses_only_the_backbone_wave() -> None:
     wider_profiles = tuple(
         step
         for step in wider
-        if step.phase.startswith("CONFORM_GAP_PROFILE_")
+        if step.phase.startswith("FOLLOW_GAP_PROFILE_")
     )
     nominal_profiles = tuple(
         step
         for step in nominal
-        if step.phase.startswith("CONFORM_GAP_PROFILE_")
+        if step.phase.startswith("FOLLOW_GAP_PROFILE_")
     )
     assert len(wider_profiles) > len(nominal_profiles)
     assert all("DRAWBRIDGE" not in step.phase for step in wider)
@@ -296,7 +311,7 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
         first_arch_end_x,
         expected_clearance,
     )
-    landed = _state_at(program, "CONFORM_GAP_PROFILE_01")
+    landed = _state_at(program, "FOLLOW_GAP_PROFILE_01")
     reconstructed = _center_heights_from_tilts(landed, spacing)
 
     assert reconstructed == pytest.approx(
@@ -308,7 +323,7 @@ def test_landing_arch_clearance_is_geometry_derived_and_bounded() -> None:
     profile_phases = tuple(
         step.phase
         for step in program
-        if step.phase.startswith("CONFORM_GAP_PROFILE_")
+        if step.phase.startswith("FOLLOW_GAP_PROFILE_")
     )
     peak_indices: list[int] = []
     for profile_index, phase in enumerate(profile_phases, start=1):
@@ -592,7 +607,7 @@ def test_wave_is_low_bidirectional_and_migrates_from_head_to_tail() -> None:
     profile_states = tuple(
         _state_at(program, step.phase)
         for step in program
-        if step.phase.startswith("CONFORM_GAP_PROFILE_")
+        if step.phase.startswith("FOLLOW_GAP_PROFILE_")
     )
 
     assert max(

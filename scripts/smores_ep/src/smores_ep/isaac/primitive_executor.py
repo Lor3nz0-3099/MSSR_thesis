@@ -55,6 +55,8 @@ class _ActiveGoal:
     resources: frozenset[str]
     resource_modes: Mapping[str, str]
     resolved_target_rad: float | None = None
+    joint_commanded_target_rad: float | None = None
+    joint_commanded_at_s: float | None = None
     initial_metric: float | None = None
     alignment_staging_position_reached: bool = False
     alignment_staging_drive_direction: float | None = None
@@ -192,7 +194,7 @@ class IsaacPrimitiveExecutor:
             self._pose_controller,
             max_linear_speed_m_s=min(
                 self._pose_controller.max_linear_speed_m_s,
-                0.055,
+                0.070,
             ),
             position_tolerance_m=0.002,
             yaw_tolerance_rad=face_alignment_staging_yaw_tolerance_rad,
@@ -1822,8 +1824,10 @@ class IsaacPrimitiveExecutor:
 
         if mode == "curve":
             # Keep the local correction slower than free-space staging, but
-            # avoid spending most of an assembly wave on a long 25 mm/s arc.
-            translation_speed_m_s = 0.035
+            # avoid spending most of an assembly wave on a long alignment arc.
+            # The final straight magnetic approach remains independently
+            # capped at 25 mm/s.
+            translation_speed_m_s = 0.045
             # Eq. (4)-(5) in Liu et al. controls y' and theta' in the target
             # connector frame with K=diag(2, 1). The helper below is the
             # bounded, nonsingular realization of that law: at the requested
@@ -2213,13 +2217,34 @@ class IsaacPrimitiveExecutor:
                 message=f"{'pan' if is_pan else 'tilt'} target reached",
             )
         commanded_target = target
+        servo_speed_limited = False
+        if "max_servo_speed_rad_s" in goal.parameters:
+            max_servo_speed = float(
+                goal.parameters["max_servo_speed_rad_s"]
+            )
+            previous_target = runtime.joint_commanded_target_rad
+            previous_time = runtime.joint_commanded_at_s
+            if previous_target is None or previous_time is None:
+                previous_target = current
+                previous_time = now_s
+            max_delta = max_servo_speed * max(0.0, now_s - previous_time)
+            remaining = target - previous_target
+            commanded_target = previous_target + max(
+                -max_delta,
+                min(max_delta, remaining),
+            )
+            servo_speed_limited = (
+                abs(commanded_target - target) > 1.0e-9
+            )
+            runtime.joint_commanded_target_rad = commanded_target
+            runtime.joint_commanded_at_s = now_s
         if "max_servo_error_rad" in goal.parameters:
             max_servo_error = float(
                 goal.parameters["max_servo_error_rad"]
             )
             commanded_target = current + max(
                 -max_servo_error,
-                min(max_servo_error, error),
+                min(max_servo_error, commanded_target - current),
             )
         coordination_lead_limited = False
         if (
@@ -2275,6 +2300,7 @@ class IsaacPrimitiveExecutor:
                 "target_rad": target,
                 "commanded_target_rad": commanded_target,
                 "error_rad": error,
+                "servo_speed_limited": servo_speed_limited,
                 "coordination_lead_limited": coordination_lead_limited,
             },
         )

@@ -1205,7 +1205,7 @@ def test_face_approach_only_recovers_from_material_axis_error() -> None:
     )
     assert (
         executor._face_staging_pose_controller.max_linear_speed_m_s
-        == pytest.approx(0.055)
+        == pytest.approx(0.070)
     )
     assert executor._face_staging_pose_controller.yaw_tolerance_rad == (
         pytest.approx(math.radians(1.5))
@@ -1280,7 +1280,7 @@ def test_axial_face_pose_adjustment_translates_while_steering() -> None:
     assert subphase == "axial_pose_adjustment"
     assert not ready
     assert runtime.alignment_staging_drive_direction == -1.0
-    assert step.linear_x_m_s == pytest.approx(-0.035)
+    assert step.linear_x_m_s == pytest.approx(-0.045)
     assert step.angular_z_rad_s > 0.0
     # In the target frame, the signed lateral velocity must oppose the
     # positive 7.2 mm error instead of rotating at a fixed position.
@@ -1738,6 +1738,44 @@ def test_tilt_servo_error_limit_softens_a_large_fold_target() -> None:
     assert first.statuses[0].feedback["commanded_target_rad"] == pytest.approx(
         -0.35
     )
+
+
+def test_tilt_servo_speed_limit_generates_a_continuous_target_ramp() -> None:
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    state = _MutableStateReader(tilt_rad=0.0, pan_rad=0.2)
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={"module_a": "/A", "module_b": "/B"},
+        states={
+            "module_a": state,
+            "module_b": _MutableStateReader(),
+        },
+        docking=_FakeDocking(),  # type: ignore[arg-type]
+    )
+    goal = _goal(
+        "ramped-fold",
+        PrimitiveName.SET_TILT,
+        ("module_a",),
+        {
+            "angle_rad": 1.0,
+            "max_servo_speed_rad_s": 0.5,
+        },
+    )
+    assert executor.submit(goal, 0.0).state is PrimitiveState.ACCEPTED
+
+    admitted = executor.step(0.1)
+    assert admitted.commands["module_a"].tilt_target_rad == pytest.approx(0.0)
+    first_ramp = executor.step(0.2)
+    second_ramp = executor.step(0.3)
+
+    assert first_ramp.commands["module_a"].tilt_target_rad == pytest.approx(
+        0.05
+    )
+    assert second_ramp.commands["module_a"].tilt_target_rad == pytest.approx(
+        0.10
+    )
+    assert first_ramp.statuses[0].feedback["servo_speed_limited"] is True
 
 
 def test_coordinated_tilt_holds_fast_member_for_slower_support() -> None:

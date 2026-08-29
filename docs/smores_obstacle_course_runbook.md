@@ -88,7 +88,9 @@ cd ..
 
 Terminal 1 — start one eight-module Isaac episode. Locomotion remains at
 `4.0x`, while the deliberately exaggerated `8.0x` TILT profile supplies
-18.4 Nm and a 96 Nm/rad hold for cantilevering the connected chain. Wheel
+18.4 Nm and a 512 Nm/rad hold for cantilevering the connected chain. These
+are now the runtime defaults, sized so one hinge has at least 1.5 times the
+conservative gravitational torque of the other seven modules. Wheel
 damping remains nominal and the `240 Hz` physics step keeps wheel-ground
 contact stable during train locomotion:
 
@@ -100,7 +102,8 @@ bash scripts/smores_ep/run_self_assembly.sh \
   --performance \
   --physics-hz 240 \
   --actuator-effort-scale 4.0 \
-  --tilt-effort-scale 8.0
+  --tilt-effort-scale 8.0 \
+  --wheel-friction-scale 1.50
 ```
 
 Terminal 2 — keep the file bridge alive for the entire route:
@@ -144,6 +147,9 @@ source /opt/ros/humble/setup.bash
 source install/setup.bash
 ros2 launch mssr_expert smores_runtime.launch.py \
   stair_test_course:=true \
+  actuator_effort_scale:=4.0 \
+  tilt_effort_scale:=8.0 \
+  wheel_friction_scale:=1.50 \
   performance:=true
 ```
 
@@ -154,19 +160,40 @@ behavior:
 ros2 launch mssr_expert smores_runtime.launch.py \
   stair_test_course:=true \
   stair_seed:=17 \
+  actuator_effort_scale:=4.0 \
+  tilt_effort_scale:=8.0 \
+  wheel_friction_scale:=1.50 \
   performance:=true
 ```
+
+For a faster interactive preview, add
+`simulation_speed_factor:=1.25`.  This changes wall-clock pacing, not the
+physical wheel or TILT trajectory.  Keep `simulation_speed_factor:=1.0` for
+recorded validation runs; 2x pacing has previously disturbed the coupled
+ROS/Isaac alignment timing.
 
 An explicit fixture can instead use `stair_rise_m:=0.055`,
 `stair_depth_m:=0.310`, `stair_count:=4` and
 `stair_first_riser_x_m:=0.700`.  Geometry and robot-graph metadata are built
 from the same immutable specification.
 
-The Isaac assembly executor uses 55 mm/s for collision-aware free-space
-staging and 35 mm/s for the local connector-alignment arc.  The final magnetic
+The Isaac assembly executor uses 70 mm/s for collision-aware free-space
+staging and 45 mm/s for the local connector-alignment arc.  The final magnetic
 approach remains limited to 25 mm/s, preserving the validated contact gate.
-These are command-speed changes only; actuator effort, damping, contact
-material and physics frequency are unchanged.
+These assembly speeds do not alter actuator effort, damping or physics
+frequency.
+
+The runtime additionally applies `wheel_friction_scale` only to each module's
+wheel material.  Its conservative default `1.50` changes wheel static/dynamic
+friction from 1.20/1.00 to 1.80/1.50; chassis friction remains 0.15/0.12 and
+the passive skid remains 0.03/0.02.  This distinction matters on stairs:
+increasing chassis friction would make an edge contact harder to release.
+The configured wheel torque is already 4.8 N m per wheel at
+`actuator_effort_scale:=4.0`, so visible wheel rotation without body motion is
+treated first as loss of traction rather than torque saturation.  A full
+Isaac restart is required when changing the friction scale.  If the default
+still produces clear wheel slip, retest with `wheel_friction_scale:=1.75`;
+the supported guard range is `[1.0, 3.0]`.
 
 Do not also pass `obstacle_course:=true`; the two physical stages are
 mutually exclusive. Start only the Snake8 self-assembly expert in another
@@ -189,37 +216,37 @@ without replacing the known baseline:
 
 ```bash
 run_behavior snake8 stair-arch-01 crawl_stairs_arch_wave \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"crawl_goal_tolerance_m":0.004}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"arch_clearance_m":0.018,"synchronized_linear_m_s":0.020,"max_wave_tilt_speed_rad_s":0.45,"loaded_tilt_tolerance_rad":0.025,"crawl_goal_tolerance_m":0.004}'
 ```
 
-`crawl_stairs_arch_wave` preserves `ARCH_00_*` at exactly the same TILT
-targets as the validated first-riser `PROFILE_00_*` wave.  Starting with the
-second riser it distributes one rise over two links, rather than concentrating
-it in one nearly vertical link.  Halfway through every transfer it adds the
-temporary vertical margin `arch_clearance_m`, then returns
-to the geometry-derived settled angle at the endpoint.  Before each upper
-riser, the terminal module is raised by a recurring v6/v7 hook and the hook is
-then cross-faded into the broad v5/v7 arch.  The default lookahead is one
-measured chain link plus the transition margin; its ramp is half a measured
-link and its temporary arch clearance is 40% of the wheel radius.  These
-defaults therefore scale with live module and stair metadata; each may still
-be overridden for an experiment.  `ARCH_HEAD_GATE_01`, then `_02`, stop from
-the live world-X pose of `snake_head` at each upcoming riser minus that
-lookahead; the prelift is therefore not inferred from a timer or from the pose
-of an internal edge module.  Once that head goal has crossed the riser, the
-temporary v5/v7 preview is released: the ordinary arch migrates its descending
-bend rearward, returns the head TILT to neutral and lowers its wheels onto the
-new tread.  This landing release is repeated at every upper riser and prevents
-the preview arch from accumulating on top of the moving chain profile.
-Combined broad-arch and terminal-hook
-targets are bounded by the smallest live TILT actuator limit, with a 0.03 rad
-default safety margin, instead of relying on Isaac-side saturation.  All eight
-wheel pairs remain commanded and every drive phase still terminates from a
-live world-X goal; the arch wave introduces no locomotion timer.
+`crawl_stairs_arch_wave` retains the world-X barriers and repetition stride
+of the geometric baseline, but replaces its localized first-riser bend with
+the same broad two-link clearance arch used on upper risers.  The default
+clearance is 0.58 wheel radii (about 18 mm on the current model), and
+`arch_clearance_m` is bounded to `[0.008, 0.025]`.  Rise angles and repetition
+stride are derived from live rise, link spacing and tread depth.  The planner
+also verifies that the stair landmarks agree with Isaac's collision boxes
+before producing a program.
 
-The final `ARCH_TAIL_LIFT_COMPLETE` phase stops when the module adjacent to
+`GEOM_APPROACH_FIRST_RISER` actively holds the captured assembled neutral and
+stops while the chain is still flat.  `APPROACH_FIRST_RISER` then builds the
+broad first-riser arch while advancing.  Across successive rail samples all
+eight TILT roles participate in the climb, but only the joints changing the
+current cell are released into coordinated TILT motion in one microphase.  Every other
+module remains in the full `STRUCTURAL_HOLD`; this support set changes as the
+three-joint arch cell is interpolated and passed one module toward the tail.
+The chain therefore never becomes globally passive or soft.  During TILT
+motion the wheels run at `synchronized_linear_m_s`, then return to
+`linear_m_s` after the posture succeeds.  `continuous_with_next` prevents wheel-command gaps
+between samples.  Targets remain relative to captured nonzero neutral and are
+checked against the live physical joint limits.
+
+All eight wheel pairs remain commanded and every phase terminates from live
+world-X geometry rather than a locomotion timer.  The final
+`ARCH_TAIL_LIFT_COMPLETE` phase stops when the module adjacent to
 the tail is one measured wheel radius beyond the last riser.  At that point
-the final posture has already lifted the tail onto the top-deck elevation, so
+the validated transfer has placed the tail on the top deck and returned the
+relative TILT profile to neutral, so
 the arch-wave completes without an extra traction-only run.  An optional
 `upper_deck_advance_distance_m` greater than zero remains available for
 experiments, but is deliberately disabled by default; ordinary train/Nav2
@@ -234,8 +261,10 @@ curved approaches or an unknown stair heading requires a more general course
 observation and is intentionally left explicit rather than hidden behind
 fixture-specific constants.
 
-The physically successful reference and its exact Git provenance are frozen
-in `docs/validated_behaviors/snake8_crawl_stairs_arch_wave.md`.
+The earlier physically successful reference and its exact Git provenance
+remain frozen in `docs/validated_behaviors/snake8_crawl_stairs_arch_wave.md`;
+the active rail is the documented clearance/compliance generalization of that
+reference.
 
 ### Isolated Snake8 gap stage
 
@@ -274,7 +303,7 @@ Assemble Snake8 with the command in section 1 and then execute:
 
 ```bash
 run_behavior snake8 gap-crossing-01 gap_crossing \
-  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"gap_profile_substeps":3,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"landing_release_support_modules":3,"landing_release_ramp_links":1.0,"far_bank_traction_preload_wheel_radii":0.25,"gap_goal_tolerance_m":0.004}'
+  '{"approach_linear_m_s":0.050,"linear_m_s":0.040,"minimum_traction_linear_m_s":0.020,"gap_profile_substeps":3,"max_gap_tilt_speed_rad_s":0.45,"joint_admission_guard_s":0.35,"tilt_completion_fraction":0.65,"loaded_tilt_tolerance_rad":0.025,"far_bank_transition_links":1.0,"arch_clearance_wheel_radii":2.0,"landing_release_support_modules":3,"landing_release_ramp_links":1.0,"far_bank_traction_preload_wheel_radii":0.25,"gap_goal_tolerance_m":0.004}'
 ```
 
 `gap_crossing` has no locomotion timer.  It reads the two gap edges, live
@@ -283,7 +312,7 @@ the robot graph.  Its closed-loop program is:
 
 ```text
 RESTORE_GAP_NEUTRAL -> APPROACH_HEAD_TO_NEAR_EDGE
--> (CONFORM_GAP_PROFILE_N -> FOLLOW_GAP_PROFILE_N)*
+-> FOLLOW_GAP_PROFILE_N(posture + drive)*
 -> RESTORE_GAP_NEUTRAL_FINAL
 ```
 
@@ -294,7 +323,12 @@ the complete flat train to the near support.  It then fixes a low, positive
 sine curve between a safe point on the near bank and a safe point on the far
 bank.  Before every short geometric advance, the planner samples that curve at
 the translated module centers and converts the resulting center-height
-differences into distributed TILT commands.  The material chain therefore
+differences into distributed TILT commands. Each short profile now applies
+that TILT ramp while its geometry-limited wheel advance is already active;
+the wheel speed is reduced automatically when a larger angle change needs
+more time. The loaded completion tolerance is 0.025 rad, so a physically
+settled hinge cannot hold the entire gait forever just outside an unrealistically
+strict servo threshold. The material chain therefore
 passes through one stationary world-frame arch: the bend enters at the head,
 migrates through each module, and exits at the tail while all grounded wheels
 remain available for traction.  There is no symmetric lifting pivot and no
@@ -825,7 +859,7 @@ the measured world positions rather than elapsed time:
 ```bash
 run_behavior snake8 stair-straight-01 straighten '{}'
 run_behavior snake8 stair-arch-01 crawl_stairs_arch_wave \
-  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"crawl_goal_tolerance_m":0.004}'
+  '{"riser_approach_linear_m_s":0.060,"riser_approach_tolerance_m":0.010,"linear_m_s":0.040,"profile_substeps":6,"transition_clearance_m":0.0065,"arch_clearance_m":0.018,"synchronized_linear_m_s":0.020,"max_wave_tilt_speed_rad_s":0.45,"loaded_tilt_tolerance_rad":0.025,"crawl_goal_tolerance_m":0.004}'
 ```
 
 The unified obstacle-course policy uses this same `crawl_stairs_arch_wave`

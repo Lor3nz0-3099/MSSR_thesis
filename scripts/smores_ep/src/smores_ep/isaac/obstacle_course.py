@@ -221,6 +221,24 @@ class CourseBox:
     pitch_deg: float = 0.0
 
 
+def _collision_box_observations(
+    boxes: tuple[CourseBox, ...],
+) -> list[dict[str, Any]]:
+    """Serialize the actual collidable world boxes used by Isaac."""
+
+    return [
+        {
+            "name": box.name,
+            "center_xyz_m": list(box.center_xyz_m),
+            "size_xyz_m": list(box.size_xyz_m),
+            "semantic": box.semantic,
+            "pitch_deg": box.pitch_deg,
+        }
+        for box in boxes
+        if box.collidable
+    ]
+
+
 @dataclass(frozen=True)
 class ManualObstacleCourse:
     """Geometry plus landmarks needed by the future task-level planner."""
@@ -270,7 +288,7 @@ class StairTestCourse:
     spec: UniformStairSpec
 
     def to_observation(self) -> dict[str, Any]:
-        """Serialize only the landmarks relevant to stair testing."""
+        """Serialize stair landmarks and their Isaac collision boxes."""
         return {
             "frame_id": "world",
             "course_profile": "snake8_stair_test",
@@ -283,6 +301,7 @@ class StairTestCourse:
                 "first_riser_x_m": self.first_riser_x_m,
                 "riser_depth_m": self.riser_depth_m,
             },
+            "collision_boxes": _collision_box_observations(self.boxes),
         }
 
 

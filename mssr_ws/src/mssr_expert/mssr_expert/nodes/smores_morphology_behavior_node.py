@@ -493,7 +493,10 @@ class SmoresMorphologyBehaviorNode(Node):
                     continue
                 vertex = attributes.get("target_vertex_id")
                 role = attributes.get("target_role")
-                module_id = raw_node.get("module_id") or raw_node.get("node_id")
+                module_id = (
+                    raw_node.get("module_id")
+                    or raw_node.get("node_id")
+                )
                 if module_id is None or vertex is None or role is None:
                     continue
                 assignments.append(
@@ -688,7 +691,8 @@ class SmoresMorphologyBehaviorNode(Node):
                 )
             if command.morphology != self._morphology_name:
                 raise ValueError(
-                    f"Command requests {command.morphology}, but the assembled "
+                    f"Command requests {command.morphology}, but the "
+                    "assembled "
                     f"target is {self._morphology_name}"
                 )
             if self._executor.active and command.behavior != "stop":
@@ -768,11 +772,19 @@ class SmoresMorphologyBehaviorNode(Node):
                         if command.behavior == "crawl_stairs_arch_wave"
                         else self._stair_gait_planner.plan
                     )
-                program_override = planner(
-                    self._latest_robot_graph,
-                    self._assignments,
-                    command.parameters,
-                )
+                if command.behavior == "crawl_stairs_arch_wave":
+                    program_override = planner(
+                        self._latest_robot_graph,
+                        self._assignments,
+                        command.parameters,
+                        neutral_tilts,
+                    )
+                else:
+                    program_override = planner(
+                        self._latest_robot_graph,
+                        self._assignments,
+                        command.parameters,
+                    )
             self._executor.start(
                 command,
                 self._assignments,

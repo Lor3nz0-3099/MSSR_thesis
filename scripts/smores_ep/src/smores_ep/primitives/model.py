@@ -244,6 +244,16 @@ class PrimitiveGoal:
                         "Primitive parameter 'max_servo_error_rad' must be "
                         "positive"
                     )
+            if "max_servo_speed_rad_s" in parameters:
+                servo_speed = self._finite_parameter(
+                    parameters,
+                    "max_servo_speed_rad_s",
+                )
+                if servo_speed <= 0.0:
+                    raise ValueError(
+                        "Primitive parameter 'max_servo_speed_rad_s' must be "
+                        "positive"
+                    )
             if "structural_hold_module_ids" in parameters:
                 raw_ids = parameters["structural_hold_module_ids"]
                 if not isinstance(raw_ids, list | tuple):

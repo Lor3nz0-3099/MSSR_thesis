@@ -34,7 +34,9 @@ class MorphologyCommand:
             "schema_version", "mssr.morphology_command.v1"
         )
         if schema != "mssr.morphology_command.v1":
-            raise ValueError(f"Unsupported morphology command schema: {schema}")
+            raise ValueError(
+                f"Unsupported morphology command schema: {schema}"
+            )
         parameters = payload.get("parameters", {})
         if not isinstance(parameters, Mapping):
             raise ValueError("Morphology command parameters must be an object")
@@ -233,6 +235,11 @@ class MorphologyBehaviorExecutor:
                     self._state = "WAITING_JOINT_ADMISSION"
                     return self._decision(
                         phase=self._active_posture_phase(),
+                        locomotion=(
+                            self._active_posture_drive_locomotion(
+                                module_positions
+                            )
+                        ),
                         progress=self._active_progress(now_s),
                         message=f"Waiting for admission of {awaiting}.",
                     )
@@ -390,6 +397,10 @@ class MorphologyBehaviorExecutor:
             parameters["tolerance_rad"] = target.tolerance_rad
         if target.max_servo_error_rad is not None:
             parameters["max_servo_error_rad"] = target.max_servo_error_rad
+        if target.max_servo_speed_rad_s is not None:
+            parameters["max_servo_speed_rad_s"] = (
+                target.max_servo_speed_rad_s
+            )
         # A posture command moves exactly one declared joint. Modules outside
         # the same coordinated posture group retain their complete PAN/TILT
         # state while that joint moves. Peers in the same group are excluded:
@@ -465,7 +476,7 @@ class MorphologyBehaviorExecutor:
             str, tuple[float, float, float]
         ] | None,
     ) -> MorphologyBehaviorDecision:
-        """Execute a posture/locomotion program with a stop at each barrier."""
+        """Execute a posture/locomotion program and its declared barriers."""
 
         if self._program_step_index >= len(self._program_steps):
             self._state = "SUCCEEDED"
@@ -479,6 +490,10 @@ class MorphologyBehaviorExecutor:
         step = self._program_steps[self._program_step_index]
         if step.kind == "posture":
             return self._step_program_posture(step, now_s)
+        if step.kind == "posture_drive":
+            return self._step_program_posture_drive(
+                step, now_s, module_positions
+            )
         return self._step_program_drive(step, now_s, module_positions)
 
     def _step_program_posture(
@@ -542,6 +557,190 @@ class MorphologyBehaviorExecutor:
             message=f"{completed_phase} posture reached; locomotion stopped.",
         )
 
+    def _step_program_posture_drive(
+        self,
+        step: BehaviorProgramStep,
+        now_s: float,
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ] | None,
+    ) -> MorphologyBehaviorDecision:
+        """Reach one posture and one world-X barrier concurrently."""
+
+        if (
+            step.position_goal is None
+            or step.duration_s is not None
+            or step.displacement_goal is not None
+        ):
+            raise RuntimeError(
+                "A posture-drive step requires exactly one position goal"
+            )
+        if self._program_loaded_posture_index != self._program_step_index:
+            self._joint_targets = step.posture_targets
+            self._next_joint_index = 0
+            self._completed_joint_indices = set()
+            self._active_goal_ids = {}
+            self._awaiting_admission_goal_id = None
+            self._program_loaded_posture_index = self._program_step_index
+
+        pose_available = (
+            module_positions is not None
+            and step.position_goal.module_id in module_positions
+        )
+        reached = False
+        goal_message = (
+            f"waiting for pose of {step.position_goal.module_id}"
+        )
+        if pose_available:
+            reached, goal_message = self._position_goal_reached(
+                step.position_goal,
+                step.linear_m_s,
+                module_positions,
+            )
+        posture_reached = (
+            self._next_joint_index >= len(self._joint_targets)
+            and not self._active_goal_ids
+            and self._awaiting_admission_goal_id is None
+        )
+        drive_speed = (
+            step.posture_reached_linear_m_s
+            if posture_reached
+            and step.posture_reached_linear_m_s is not None
+            else step.linear_m_s
+        )
+        locomotion = (
+            {}
+            if reached or not pose_available
+            else self._program_step_locomotion(
+                step, linear_m_s=drive_speed
+            )
+        )
+
+        if self._next_joint_index < len(self._joint_targets):
+            target = self._joint_targets[self._next_joint_index]
+            active_groups = {
+                self._joint_targets[index].coordination_group
+                for index in self._active_goal_ids.values()
+            }
+            may_dispatch = not self._active_goal_ids or (
+                target.coordination_group is not None
+                and active_groups == {target.coordination_group}
+            )
+            if may_dispatch:
+                target_index = self._next_joint_index
+                self._next_joint_index += 1
+                decision = self._dispatch_joint_target(
+                    self._command_or_raise(), target, target_index
+                )
+                return replace(
+                    decision,
+                    locomotion=(
+                        {}
+                        if step.hold_locomotion_until_admitted
+                        else locomotion
+                    ),
+                    message=(
+                        f"{decision.message} "
+                        + (
+                            "Holding wheels until the whole coordinated TILT "
+                            "group is admitted; "
+                            if step.hold_locomotion_until_admitted
+                            else "Continuing the admitted rail motion; "
+                        )
+                        + f"{goal_message}."
+                    ),
+                )
+
+        if self._active_goal_ids:
+            self._state = "WAITING_JOINT"
+            group_ready = (
+                self._next_joint_index >= len(self._joint_targets)
+                and self._awaiting_admission_goal_id is None
+            )
+            return self._decision(
+                phase=step.phase,
+                locomotion=(
+                    locomotion
+                    if group_ready or not step.hold_locomotion_until_admitted
+                    else {}
+                ),
+                progress=self._active_progress(now_s),
+                message=(
+                    (
+                        f"{step.phase} position barrier reached; holding "
+                        "wheels while waiting for TILT goals: "
+                        if reached
+                        else f"Waiting for {step.phase} posture goals while "
+                        "advancing: "
+                    )
+                    + f"{', '.join(sorted(self._active_goal_ids))}; "
+                    + f"{goal_message}."
+                ),
+            )
+
+        if self._next_joint_index < len(self._joint_targets):
+            raise RuntimeError(
+                "Posture-drive dispatcher reached an invalid state"
+            )
+        if not pose_available:
+            self._state = "WAITING_PROGRAM_POSITION"
+            return self._decision(
+                phase=step.phase,
+                progress=self._active_progress(now_s),
+                message=f"{goal_message}; locomotion stopped.",
+            )
+        if not reached:
+            self._state = "RUNNING_PROGRAM_DRIVE"
+            return self._decision(
+                phase=step.phase,
+                locomotion=locomotion,
+                progress=self._active_progress(now_s),
+                message=(
+                    f"{step.phase} posture reached; continuing to its "
+                    "geometric barrier"
+                    + (
+                        f" at settled traction speed {drive_speed:.3f}m/s"
+                        if drive_speed != step.linear_m_s
+                        else ""
+                    )
+                    + f"; {goal_message}."
+                ),
+            )
+
+        completed_phase = step.phase
+        self._program_step_index += 1
+        self._program_loaded_posture_index = None
+        self._joint_targets = ()
+        self._next_joint_index = 0
+        self._completed_joint_indices = set()
+        self._program_drive_started_s = None
+        self._program_drive_origin_x_m = None
+        if (
+            step.continuous_with_next
+            and self._program_step_index < len(self._program_steps)
+        ):
+            self._state = "RUNNING_PROGRAM"
+            continued = self._step_composite_program(
+                now_s, module_positions
+            )
+            return replace(
+                continued,
+                message=(
+                    f"{completed_phase} posture and position reached; "
+                    "continuing without a wheel-command barrier. "
+                    f"{continued.message}"
+                ),
+            )
+        self._state = "PROGRAM_BARRIER"
+        return self._decision(
+            phase=f"{completed_phase}_GOAL_REACHED",
+            progress=self._active_progress(now_s),
+            message=(
+                f"{completed_phase} posture and position goal reached; "
+                f"{goal_message}; locomotion stopped."
+            ),
+        )
+
     def _step_program_drive(
         self,
         step: BehaviorProgramStep,
@@ -590,6 +789,22 @@ class MorphologyBehaviorExecutor:
                 self._program_step_index += 1
                 self._program_drive_started_s = None
                 self._program_drive_origin_x_m = None
+                if (
+                    step.continuous_with_next
+                    and self._program_step_index < len(self._program_steps)
+                ):
+                    self._state = "RUNNING_PROGRAM"
+                    continued = self._step_composite_program(
+                        now_s, module_positions
+                    )
+                    return replace(
+                        continued,
+                        message=(
+                            f"{completed_phase} position reached; continuing "
+                            "without a wheel-command barrier. "
+                            f"{continued.message}"
+                        ),
+                    )
                 self._state = "PROGRAM_BARRIER"
                 return self._decision(
                     phase=f"{completed_phase}_GOAL_REACHED",
@@ -677,6 +892,82 @@ class MorphologyBehaviorExecutor:
                 + (f"; {goal_message}." if goal_message else ".")
             ),
         )
+
+    def _program_step_locomotion(
+        self,
+        step: BehaviorProgramStep,
+        *,
+        linear_m_s: float | None = None,
+    ) -> dict[str, Mapping[str, float]]:
+        resolved_linear_m_s = (
+            step.linear_m_s if linear_m_s is None else linear_m_s
+        )
+        if (
+            not math.isfinite(resolved_linear_m_s)
+            or resolved_linear_m_s == 0.0
+            or resolved_linear_m_s * step.linear_m_s <= 0.0
+        ):
+            raise MorphologyLibraryError(
+                "Posture-drive traction speed must be finite, non-zero, "
+                "and preserve the planned direction"
+            )
+        locomotion = self._library.drive_commands(
+            self._command_or_raise().morphology,
+            self._assignments,
+            resolved_linear_m_s,
+            step.yaw_rate_rad_s,
+            step.lateral_m_s,
+        )
+        allowed_module_ids = {
+            assignment.module_id
+            for assignment in self._assignments
+            if assignment.target_role in step.active_target_roles
+        }
+        filtered = {
+            module_id: command
+            for module_id, command in locomotion.items()
+            if module_id in allowed_module_ids
+        }
+        if not filtered:
+            raise MorphologyLibraryError(
+                f"Composite phase {step.phase!r} selected no locomotor"
+            )
+        return filtered
+
+    def _active_posture_drive_locomotion(
+        self,
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ] | None,
+    ) -> dict[str, Mapping[str, float]]:
+        """Hold wheels until every member of a mixed TILT group is admitted."""
+
+        if self._program_step_index >= len(self._program_steps):
+            return {}
+        step = self._program_steps[self._program_step_index]
+        if step.kind != "posture_drive" or step.position_goal is None:
+            return {}
+        if (
+            step.hold_locomotion_until_admitted
+            and self._awaiting_admission_goal_id is not None
+        ):
+            return {}
+        if (
+            step.hold_locomotion_until_admitted
+            and self._next_joint_index < len(self._joint_targets)
+        ):
+            return {}
+        if (
+            module_positions is None
+            or step.position_goal.module_id not in module_positions
+        ):
+            return {}
+        reached, _ = self._position_goal_reached(
+            step.position_goal,
+            step.linear_m_s,
+            module_positions,
+        )
+        return {} if reached else self._program_step_locomotion(step)
 
     @staticmethod
     def _position_goal_reached(
@@ -819,7 +1110,7 @@ class MorphologyBehaviorExecutor:
         if self._program_step_index >= step_count:
             return 1.0
         step = self._program_steps[self._program_step_index]
-        if step.kind == "posture":
+        if step.kind in {"posture", "posture_drive"}:
             local_progress = self._posture_progress()
         elif (
             step.duration_s is not None
@@ -905,7 +1196,8 @@ class MorphologyBehaviorExecutor:
                 ) from error
             if not math.isfinite(neutral):
                 raise MorphologyLibraryError(
-                    f"Captured neutral tilt for {target.module_id} is not finite"
+                    "Captured neutral tilt for "
+                    f"{target.module_id} is not finite"
                 )
             resolved.append(
                 replace(target, angle_rad=neutral + target.angle_rad)

@@ -361,6 +361,7 @@ class SelfAssemblySimulationConfig:
     staging_collision_avoidance: bool = True
     staging_center_clearance_m: float = 0.110
     staging_waypoint_margin_m: float = 0.015
+    wheel_friction_scale: float = 1.50
     max_wheel_speed_rad_s: float = SMORES_EP_MAX_WHEEL_SPEED_RAD_S
     actuators: SmoresActuatorConfig = field(
         default_factory=SmoresActuatorConfig.payload_overdrive
@@ -420,6 +421,7 @@ class SelfAssemblySimulationConfig:
             self.stair_first_riser_x_m,
             self.staging_center_clearance_m,
             self.staging_waypoint_margin_m,
+            self.wheel_friction_scale,
             self.max_wheel_speed_rad_s,
             self.action_command_timeout_s,
         )
@@ -431,6 +433,7 @@ class SelfAssemblySimulationConfig:
             or self.spawn_radius_m <= 0.0
             or self.staging_center_clearance_m <= 0.0
             or self.staging_waypoint_margin_m <= 0.0
+            or not 1.0 <= self.wheel_friction_scale <= 3.0
             or self.center_y_m <= self.outer_y_m
             or self.max_wheel_speed_rad_s <= 0.0
             or self.action_command_timeout_s <= 0.0

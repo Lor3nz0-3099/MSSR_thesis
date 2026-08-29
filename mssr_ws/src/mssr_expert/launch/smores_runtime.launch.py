@@ -29,6 +29,12 @@ _CURRENT_STATE_FILES = (
     "primitive_status.json",
 )
 
+_REPOSITORY_SENTINELS = (
+    Path("configs/idle_actions.json"),
+    Path("scripts/smores_ep/run_self_assembly.sh"),
+    Path("ros2_bridge/mssr_file_bridge.py"),
+)
+
 
 def _as_bool(value: str) -> bool:
     normalized = value.strip().lower()
@@ -37,6 +43,20 @@ def _as_bool(value: str) -> bool:
     if normalized in {"0", "false", "no", "off"}:
         return False
     raise ValueError(f"Expected a boolean launch value, got {value!r}")
+
+
+def _default_repository_root() -> Path:
+    """Locate the checkout from either source or an installed launch file."""
+
+    launch_file = Path(__file__).resolve()
+    candidates = (*launch_file.parents, Path.cwd().resolve())
+    for candidate in candidates:
+        if all((candidate / path).is_file() for path in _REPOSITORY_SENTINELS):
+            return candidate
+
+    # Preserve the previous source-tree fallback so an explicit
+    # ``repository_root:=...`` launch override remains usable.
+    return launch_file.parents[4]
 
 
 def _runtime_path(repository_root: Path, value: str) -> Path:
@@ -95,7 +115,18 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         LaunchConfiguration("simulation_steps").perform(context),
         "--simulation-speed-factor",
         LaunchConfiguration("simulation_speed_factor").perform(context),
+        "--actuator-effort-scale",
+        LaunchConfiguration("actuator_effort_scale").perform(context),
+        "--wheel-friction-scale",
+        LaunchConfiguration("wheel_friction_scale").perform(context),
     ]
+    tilt_effort_scale = LaunchConfiguration(
+        "tilt_effort_scale"
+    ).perform(context).strip()
+    if tilt_effort_scale:
+        simulation_command.extend(
+            ("--tilt-effort-scale", tilt_effort_scale)
+        )
     stair_seed = LaunchConfiguration("stair_seed").perform(context).strip()
     if stair_seed:
         simulation_command.extend(("--stair-seed", stair_seed))
@@ -195,7 +226,7 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
 def generate_launch_description() -> LaunchDescription:
     """Create the pre-assembly SMORES runtime launch description."""
 
-    repository_root = Path(__file__).resolve().parents[4]
+    repository_root = _default_repository_root()
     return LaunchDescription(
         [
             DeclareLaunchArgument(
@@ -269,6 +300,30 @@ def generate_launch_description() -> LaunchDescription:
                 description=(
                     "Simulated seconds per wall second when performance "
                     "pacing is enabled."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "actuator_effort_scale",
+                default_value="4.0",
+                description=(
+                    "Common Isaac actuator effort multiplier."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "wheel_friction_scale",
+                default_value="1.50",
+                description=(
+                    "Wheel-only runtime friction multiplier; chassis and "
+                    "passive-skid friction remain unchanged."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "tilt_effort_scale",
+                default_value="8.0",
+                description=(
+                    "TILT-only effort multiplier. The default supports the "
+                    "other seven modules from one Snake8 hinge; empty uses "
+                    "the common actuator scale."
                 ),
             ),
             DeclareLaunchArgument(

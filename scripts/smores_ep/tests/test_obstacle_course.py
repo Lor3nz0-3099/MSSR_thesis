@@ -211,7 +211,9 @@ def test_snake8_stair_test_course_has_three_wheel_high_risers() -> None:
 def test_snake8_stair_test_observation_is_isolated_from_full_course() -> None:
     course = snake8_stair_test_course()
 
-    assert course.to_observation() == {
+    observation = course.to_observation()
+    collision_boxes = observation.pop("collision_boxes")
+    assert observation == {
         "frame_id": "world",
         "course_profile": "snake8_stair_test",
         "scenario": {
@@ -230,6 +232,22 @@ def test_snake8_stair_test_observation_is_isolated_from_full_course() -> None:
             "riser_depth_m": 0.28,
         },
     }
+    assert len(collision_boxes) == 5
+    first_riser = next(
+        box
+        for box in collision_boxes
+        if box["semantic"] == "stair_test_riser"
+    )
+    assert first_riser["center_xyz_m"] == pytest.approx(
+        [0.79, 0.0, 0.0325]
+    )
+    assert first_riser["size_xyz_m"] == pytest.approx(
+        [0.28, 1.2, 0.065]
+    )
+    assert (
+        first_riser["center_xyz_m"][0]
+        - 0.5 * first_riser["size_xyz_m"][0]
+    ) == pytest.approx(0.65)
     assert {box.semantic for box in course.boxes} == {
         "stair_test_start",
         "stair_test_riser",

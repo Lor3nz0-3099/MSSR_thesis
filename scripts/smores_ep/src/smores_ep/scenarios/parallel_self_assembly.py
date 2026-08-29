@@ -51,6 +51,36 @@ def self_assembly_module_roots(
     }
 
 
+def _scale_wheel_friction(
+    stage: Any,
+    module_roots: Mapping[str, str],
+    scale: float,
+) -> None:
+    """Increase rolling traction without making chassis contacts sticky."""
+
+    from pxr import UsdPhysics
+
+    for module_id, module_root in module_roots.items():
+        material_path = f"{module_root}/materials/wheel"
+        material_prim = stage.GetPrimAtPath(material_path)
+        if not material_prim:
+            raise RuntimeError(
+                f"Wheel material is missing for {module_id}: {material_path}"
+            )
+        material = UsdPhysics.MaterialAPI(material_prim)
+        static_attr = material.GetStaticFrictionAttr()
+        dynamic_attr = material.GetDynamicFrictionAttr()
+        static_friction = static_attr.Get()
+        dynamic_friction = dynamic_attr.Get()
+        if static_friction is None or dynamic_friction is None:
+            raise RuntimeError(
+                f"Wheel friction is not authored for {module_id}: "
+                f"{material_path}"
+            )
+        static_attr.Set(float(static_friction) * scale)
+        dynamic_attr.Set(float(dynamic_friction) * scale)
+
+
 def triangular_spawn_layout(
     config: SelfAssemblySimulationConfig,
 ) -> dict[str, tuple[float, float, float, float]]:
@@ -255,6 +285,11 @@ def run_parallel_self_assembly_scenario(
     module_roots = self_assembly_module_roots(config.module_ids)
     for module_root in tuple(module_roots.values())[1:]:
         clone_module(stage, PHYSICS_ROOT, module_root)
+    _scale_wheel_friction(
+        stage,
+        module_roots,
+        config.wheel_friction_scale,
+    )
 
     configure_dynamic_stage(
         stage,
