@@ -29,6 +29,10 @@ from mssr_expert.behaviors.morphology_locomotion import (
     validate_locomotion_dofs,
 )
 from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitPlanner
+from mssr_expert.behaviors.snake_stair_registry import STAIR_GAIT_BEHAVIORS
+from mssr_expert.behaviors.snake_stair_concertina import (
+    SnakeStairConcertinaPlanner,
+)
 from mssr_expert.behaviors.snake_gap_gait import SnakeGapGaitPlanner
 from mssr_expert.behaviors.morphology_dof_model import (
     MorphologyDofInventory,
@@ -247,7 +251,7 @@ def behavior_task_context(
     if not isinstance(course, Mapping):
         course = {}
     success_criteria: dict[str, Any]
-    if decision.behavior in {"crawl_stairs", "crawl_stairs_arch_wave"}:
+    if decision.behavior in STAIR_GAIT_BEHAVIORS:
         stairs = course.get("stairs", {})
         if not isinstance(stairs, Mapping):
             stairs = {}
@@ -346,6 +350,7 @@ class SmoresMorphologyBehaviorNode(Node):
         )
         self._topology_matcher = SmoresSelfReconfigurationPlanner()
         self._stair_gait_planner = SnakeStairGaitPlanner()
+        self._stair_concertina_planner = SnakeStairConcertinaPlanner()
         self._gap_gait_planner = SnakeGapGaitPlanner()
         self._morphology_name = ""
         self._assignments: tuple[AssignedModule, ...] = ()
@@ -755,24 +760,18 @@ class SmoresMorphologyBehaviorNode(Node):
                     )
                 neutral_tilts = self._neutral_tilt_rad_by_module
             program_override = None
-            if command.behavior in {
-                "crawl_stairs",
-                "crawl_stairs_arch_wave",
-                "gap_crossing",
-            }:
+            if command.behavior in STAIR_GAIT_BEHAVIORS | {"gap_crossing"}:
                 if command.morphology != "snake8":
                     raise ValueError(
                         f"{command.behavior} requires snake8"
                     )
                 if command.behavior == "gap_crossing":
                     planner = self._gap_gait_planner.plan
-                else:
-                    planner = (
-                        self._stair_gait_planner.plan_arch_wave
-                        if command.behavior == "crawl_stairs_arch_wave"
-                        else self._stair_gait_planner.plan
-                    )
-                if command.behavior == "crawl_stairs_arch_wave":
+                elif command.behavior == "crawl_stairs_arch_wave":
+                    planner = self._stair_gait_planner.plan_arch_wave
+                elif command.behavior == "crawl_stairs_spatial_concertina":
+                    planner = self._stair_concertina_planner.plan
+                if command.behavior == "crawl_stairs_spatial_concertina":
                     program_override = planner(
                         self._latest_robot_graph,
                         self._assignments,
@@ -780,6 +779,9 @@ class SmoresMorphologyBehaviorNode(Node):
                         neutral_tilts,
                     )
                 else:
+                    # ``crawl_stairs_arch_wave`` is intentionally the exact
+                    # 70a3bdc validated planner interface.  Do not layer later
+                    # neutral/compliance arguments onto the historical gait.
                     program_override = planner(
                         self._latest_robot_graph,
                         self._assignments,

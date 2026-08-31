@@ -589,7 +589,6 @@ def run_parallel_self_assembly_scenario(
                     now_s,
                 )
                 admission_statuses.append(accepted)
-                primitive_channel.publish(accepted)
                 print(
                     f"[primitive] {accepted.state.value.upper()} "
                     f"{accepted.goal_id}: {accepted.message}"
@@ -602,7 +601,6 @@ def run_parallel_self_assembly_scenario(
                 )
                 if canceled is not None:
                     admission_statuses.append(canceled)
-                    primitive_channel.publish(canceled)
                     print(
                         f"[primitive] CANCELED {cancel_goal_id}: "
                         f"{canceled.message}"

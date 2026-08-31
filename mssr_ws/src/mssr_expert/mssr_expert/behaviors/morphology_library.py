@@ -75,6 +75,12 @@ class BehaviorProgramStep:
     continuous_with_next: bool = False
     hold_locomotion_until_admitted: bool = True
     posture_reached_linear_m_s: float | None = None
+    # Optional closed-loop longitudinal tracking for world-X position goals.
+    # ``linear_m_s`` remains the signed speed limit; the controller reduces
+    # it as the tracked module approaches its next geometric waypoint.
+    position_tracking_kp_s_inv: float | None = None
+    position_tracking_kd: float = 0.0
+    minimum_tracking_linear_m_s: float = 0.0
 
     @property
     def kind(self) -> str:

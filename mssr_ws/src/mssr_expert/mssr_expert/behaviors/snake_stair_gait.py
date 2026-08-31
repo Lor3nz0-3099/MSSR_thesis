@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 import math
 from statistics import median
 from typing import Any, Mapping, Sequence
@@ -13,9 +13,6 @@ from mssr_expert.behaviors.morphology_library import (
     JointTarget,
     LongitudinalDisplacementGoal,
     LongitudinalPositionGoal,
-)
-from mssr_expert.behaviors.snake_stair_support import (
-    apply_trailing_compliance,
 )
 from mssr_expert.graph.attributed_robot_graph import AttributedRobotGraph
 from mssr_expert.primitives.common import module_position
@@ -66,49 +63,6 @@ class UniformStaircase:
             raise SnakeStairGaitError(
                 "Snake8 gait requires uniform stair rises"
             )
-        collision_boxes = course.get("collision_boxes")
-        if collision_boxes is not None:
-            if not isinstance(collision_boxes, list | tuple):
-                raise SnakeStairGaitError(
-                    "Course collision_boxes must be a sequence"
-                )
-            try:
-                riser_boxes = sorted(
-                    (
-                        box for box in collision_boxes
-                        if isinstance(box, Mapping)
-                        and box.get("semantic") == "stair_test_riser"
-                    ),
-                    key=lambda box: float(box["center_xyz_m"][0]),
-                )
-                if len(riser_boxes) != len(heights):
-                    raise SnakeStairGaitError(
-                        "Stair landmarks disagree with world collision boxes"
-                    )
-                for index, (box, top_height) in enumerate(
-                    zip(riser_boxes, heights)
-                ):
-                    center = tuple(
-                        float(value) for value in box["center_xyz_m"]
-                    )
-                    size = tuple(float(value) for value in box["size_xyz_m"])
-                    front_x = center[0] - 0.5 * size[0]
-                    top_z = center[2] + 0.5 * size[2]
-                    expected_front = first + index * depth
-                    if (
-                        abs(front_x - expected_front) > 0.001
-                        or abs(top_z - top_height) > 0.001
-                    ):
-                        raise SnakeStairGaitError(
-                            "Stair landmarks disagree with world collision "
-                            "boxes"
-                        )
-            except SnakeStairGaitError:
-                raise
-            except (KeyError, TypeError, ValueError, IndexError) as error:
-                raise SnakeStairGaitError(
-                    "Invalid stair collision-box geometry"
-                ) from error
         return cls(first, depth, heights, rise)
 
 
@@ -199,11 +153,11 @@ class SnakeStairGaitPlanner:
             arch_clearance = self._number(
                 parameters,
                 "arch_clearance_m",
-                0.58 * wheel_radius,
+                0.40 * wheel_radius,
             )
-            if not 0.008 <= arch_clearance <= 0.025:
+            if not 0.004 <= arch_clearance <= 0.020:
                 raise SnakeStairGaitError(
-                    "arch_clearance_m must be in [0.008, 0.025]"
+                    "arch_clearance_m must be in [0.004, 0.020]"
                 )
             if staircase.rise_m + arch_clearance >= 2.0 * spacing:
                 raise SnakeStairGaitError(
@@ -300,6 +254,18 @@ class SnakeStairGaitPlanner:
         head_lift_angle = math.asin(
             (staircase.rise_m + head_overstep_clearance) / spacing
         )
+
+        steps: list[BehaviorProgramStep] = []
+        zero = (0.0,) * self.MODULE_COUNT
+        lifted = list(zero)
+        lifted[self.INITIAL_RISER_EDGE] = bend_angle
+        steps.append(
+            self._posture("LIFT_FIRST_RISER", zero, tuple(lifted), ordered)
+        )
+
+        desired_elevated_center_x = (
+            staircase.first_riser_x_m - wheel_radius
+        )
         approach_tolerance = self._number(
             parameters,
             "riser_approach_tolerance_m",
@@ -309,102 +275,13 @@ class SnakeStairGaitPlanner:
             raise SnakeStairGaitError(
                 "riser_approach_tolerance_m must be in [0.003, 0.030]"
             )
-
-        steps: list[BehaviorProgramStep] = []
-        zero = (0.0,) * self.MODULE_COUNT
-        if arch_wave:
-            # Keep the assembled ground posture actively energized throughout
-            # the initial approach.  These zero offsets are relative to the
-            # captured post-assembly neutral values, never physical TILT zero.
-            steps.append(
-                BehaviorProgramStep(
-                    phase="GEOM_LOCK_GROUND_NEUTRAL",
-                    posture_targets=tuple(
-                        JointTarget(
-                            module_id=item.module_id,
-                            joint="tilt",
-                            angle_rad=0.0,
-                            target_vertex_id=item.target_vertex_id,
-                            target_role=item.target_role,
-                            tolerance_rad=0.08,
-                            coordination_group=(
-                                "stair:GEOM_LOCK_GROUND_NEUTRAL"
-                            ),
-                            max_servo_error_rad=0.12,
-                            angle_reference="captured_neutral",
-                        )
-                        for item in ordered
-                    ),
-                )
-            )
-            # Stop the flat head before the first riser.  Only after this
-            # geometric barrier may the broad compliant rail begin lifting.
-            first_riser_flat_lookahead = min(
-                0.150,
-                head_prelift_lookahead + wheel_radius,
-            )
-            steps.append(
-                BehaviorProgramStep(
-                    phase="GEOM_APPROACH_FIRST_RISER",
-                    linear_m_s=approach_speed,
-                    active_target_roles=tuple(
-                        item.target_role for item in ordered
-                    ),
-                    position_goal=LongitudinalPositionGoal(
-                        module_id=ordered[-1].module_id,
-                        target_x_m=(
-                            staircase.first_riser_x_m
-                            - first_riser_flat_lookahead
-                        ),
-                        tolerance_m=approach_tolerance,
-                    ),
-                )
-            )
-        lifted = list(zero)
-        if arch_wave:
-            # Begin the rail with the same broad three-joint cell used on
-            # every later riser.  The old one-link first lift reproduced the
-            # validated gait but placed the underside of one cube directly
-            # on the corner.  Two inclined links now share the requested rise
-            # plus clearance before forward motion reaches the riser.
-            first_arch_angle = self._distributed_rise_angle(
-                staircase.rise_m + arch_clearance,
-                spacing,
-            )
-            lifted[self.INITIAL_RISER_EDGE - 1] = first_arch_angle
-            lifted[self.INITIAL_RISER_EDGE + 1] = -first_arch_angle
-        else:
-            lifted[self.INITIAL_RISER_EDGE] = bend_angle
-        steps.append(
-            self._posture(
-                "LIFT_FIRST_RISER",
-                zero,
-                tuple(lifted),
-                ordered,
-            )
-        )
-
-        desired_elevated_center_x = (
-            staircase.first_riser_x_m - wheel_radius
-        )
-        # In the compliant arch gait, use the actual head as the first-riser
-        # geometric reference.  The legacy shoulder reference forces the
-        # already-lifted cell to travel roughly three link lengths while
-        # unsupported on flat ground and can self-jam before the stair.
-        first_elevated = (
-            ordered[-1]
-            if arch_wave
-            else ordered[self.INITIAL_RISER_EDGE + 1]
-        )
+        first_elevated = ordered[self.INITIAL_RISER_EDGE + 1]
         steps.append(
             BehaviorProgramStep(
                 phase="APPROACH_FIRST_RISER",
                 linear_m_s=approach_speed,
                 active_target_roles=tuple(
-                    item.target_role
-                    for item in (
-                        ordered if arch_wave else ordered[:5]
-                    )
+                    item.target_role for item in ordered[:5]
                 ),
                 position_goal=LongitudinalPositionGoal(
                     module_id=first_elevated.module_id,
@@ -426,16 +303,15 @@ class SnakeStairGaitPlanner:
                 spacing,
             ),
         )
-        if not arch_wave:
-            steps.append(
-                self._posture(
-                    "CONFORM_PROFILE_00",
-                    current,
-                    hooked,
-                    ordered,
-                )
+        steps.append(
+            self._posture(
+                "CONFORM_ARCH_00" if arch_wave else "CONFORM_PROFILE_00",
+                current,
+                hooked,
+                ordered,
             )
-            current = hooked
+        )
+        current = hooked
         base_current = hooked
 
         final_phase = self.INITIAL_RISER_EDGE + stride * (
@@ -473,6 +349,7 @@ class SnakeStairGaitPlanner:
             segment_start = base_current
             for substep in range(1, substeps + 1):
                 fraction = substep / substeps
+                wave_progress = phase + fraction
                 settled_wave_progress = phase + (substep - 1) / substeps
                 edge_lead_m = transition_clearance * math.sin(
                     math.pi * fraction
@@ -587,7 +464,7 @@ class SnakeStairGaitPlanner:
                                 broad,
                                 max(0.0, usable_tilt_limit - terminal),
                             )
-                            target[self.MODULE_COUNT - 3:] = [
+                            target[self.MODULE_COUNT - 3 :] = [
                                 broad,
                                 terminal,
                                 -(broad + terminal),
@@ -623,12 +500,7 @@ class SnakeStairGaitPlanner:
                 prefix = "ARCH" if arch_wave else "PROFILE"
                 label = f"{prefix}_{phase:02d}_{substep:02d}"
                 steps.append(
-                    self._posture(
-                        label,
-                        current,
-                        target_tuple,
-                        ordered,
-                    )
+                    self._posture(label, current, target_tuple, ordered)
                 )
                 reference, riser_x_m = self._edge_reference(
                     phase,
@@ -744,224 +616,14 @@ class SnakeStairGaitPlanner:
         graph: AttributedRobotGraph,
         assignments: Sequence[AssignedModule],
         parameters: Mapping[str, Any],
-        neutral_tilt_rad_by_module: Mapping[str, float] | None = None,
     ) -> tuple[BehaviorProgramStep, ...]:
-        """Run a geometry-scaled compliant arch rail with concurrent drive.
-
-        World-X barriers and the phase stride retain the validated geometric
-        gait, while every riser now uses a clearance arch distributed over
-        two links.  The moving TILT group passes the cell toward the tail.
-        A short structural support remains immediately behind the cell while
-        the remote tail stays backdrivable to permit load transfer.
-        """
-
-        synchronized_speed = self._number(
-            parameters,
-            "synchronized_linear_m_s",
-            self._number(
-                parameters,
-                "minimum_traction_linear_m_s",
-                0.020,
-            ),
-        )
-        if not 0.010 <= synchronized_speed <= 0.040:
-            raise SnakeStairGaitError(
-                "synchronized_linear_m_s must be in [0.010, 0.040]"
-            )
-        max_wave_tilt_speed = self._number(
-            parameters, "max_wave_tilt_speed_rad_s", 0.45
-        )
-        if not 0.15 <= max_wave_tilt_speed <= 1.0:
-            raise SnakeStairGaitError(
-                "max_wave_tilt_speed_rad_s must be in [0.15, 1.0]"
-            )
-        loaded_tilt_tolerance = self._number(
-            parameters, "loaded_tilt_tolerance_rad", 0.025
-        )
-        if not 0.015 <= loaded_tilt_tolerance <= 0.040:
-            raise SnakeStairGaitError(
-                "loaded_tilt_tolerance_rad must be in [0.015, 0.040]"
-            )
-
-        rail_program = self.plan(
+        """Plan the experimental broad arch gait without changing legacy gait."""
+        return self.plan(
             graph,
             assignments,
             parameters,
             arch_wave=True,
         )
-        self._validate_program_neutral_limits(
-            graph,
-            assignments,
-            rail_program,
-            neutral_tilt_rad_by_module,
-            self._number(parameters, "tilt_limit_margin_rad", 0.030),
-        )
-        synchronized = self._synchronize_arch_rail_program(
-            rail_program,
-            synchronized_speed_m_s=synchronized_speed,
-            max_tilt_speed_rad_s=max_wave_tilt_speed,
-            tilt_tolerance_rad=loaded_tilt_tolerance,
-        )
-        trailing_support_modules = self._integer(
-            parameters, "trailing_support_modules", 1, 0, 3
-        )
-        return apply_trailing_compliance(
-            synchronized,
-            assignments,
-            trailing_support_modules=trailing_support_modules,
-        )
-
-    @staticmethod
-    def _synchronize_arch_rail_program(
-        program: Sequence[BehaviorProgramStep],
-        *,
-        synchronized_speed_m_s: float,
-        max_tilt_speed_rad_s: float,
-        tilt_tolerance_rad: float,
-    ) -> tuple[BehaviorProgramStep, ...]:
-        """Pair each rail posture with its following geometric drive."""
-
-        synchronized: list[BehaviorProgramStep] = []
-        index = 0
-        while index < len(program):
-            posture = program[index]
-            if (
-                posture.kind == "posture"
-                and index + 1 < len(program)
-                and program[index + 1].kind == "drive"
-            ):
-                drive = program[index + 1]
-                rail_motion = drive.phase not in {
-                    "GEOM_APPROACH_FIRST_RISER",
-                    "APPROACH_FIRST_RISER",
-                }
-                targets = tuple(
-                    replace(
-                        target,
-                        tolerance_rad=tilt_tolerance_rad,
-                        max_servo_error_rad=0.06,
-                        max_servo_speed_rad_s=(
-                            max_tilt_speed_rad_s
-                            if target.max_servo_speed_rad_s is None
-                            else min(
-                                target.max_servo_speed_rad_s,
-                                max_tilt_speed_rad_s,
-                            )
-                        ),
-                    )
-                    for target in posture.posture_targets
-                )
-                synchronized.append(
-                    replace(
-                        drive,
-                        posture_targets=targets,
-                        linear_m_s=min(
-                            drive.linear_m_s,
-                            synchronized_speed_m_s,
-                        ),
-                        continuous_with_next=(
-                            rail_motion
-                            and drive.phase != "ARCH_TAIL_LIFT_COMPLETE"
-                        ),
-                        hold_locomotion_until_admitted=not rail_motion,
-                        posture_reached_linear_m_s=drive.linear_m_s,
-                    )
-                )
-                index += 2
-                continue
-            synchronized.append(posture)
-            index += 1
-        return tuple(synchronized)
-
-    def _validate_program_neutral_limits(
-        self,
-        graph: AttributedRobotGraph,
-        assignments: Sequence[AssignedModule],
-        program: Sequence[BehaviorProgramStep],
-        neutral_tilt_rad_by_module: Mapping[str, float] | None,
-        tilt_limit_margin_rad: float,
-    ) -> None:
-        ordered = tuple(sorted(assignments, key=self._vertex_index))
-        bounds = self._tilt_offset_bounds(
-            graph,
-            ordered,
-            neutral_tilt_rad_by_module,
-            tilt_limit_margin_rad,
-        )
-        bounds_by_module = {
-            assignment.module_id: bound
-            for assignment, bound in zip(ordered, bounds)
-        }
-        for step in program:
-            for target in step.posture_targets:
-                lower, upper = bounds_by_module[target.module_id]
-                if not lower - 1e-9 <= target.angle_rad <= upper + 1e-9:
-                    raise SnakeStairGaitError(
-                        f"{step.phase} exceeds the captured-neutral TILT "
-                        f"range for {target.module_id}"
-                    )
-
-    def _tilt_offset_bounds(
-        self,
-        graph: AttributedRobotGraph,
-        assignments: Sequence[AssignedModule],
-        neutral_tilt_rad_by_module: Mapping[str, float] | None,
-        margin_rad: float,
-    ) -> tuple[tuple[float, float], ...]:
-        """Return safe relative limits around the captured physical neutral."""
-
-        nodes = graph.node_by_id()
-        fallback_limit = self._symmetric_tilt_limit(graph, assignments)
-        neutrals = neutral_tilt_rad_by_module or {}
-        bounds: list[tuple[float, float]] = []
-        for assignment in assignments:
-            node = nodes.get(assignment.module_id)
-            tilt: Mapping[str, Any] | None = None
-            if node is not None:
-                actuators = node.attributes.get("actuators")
-                if isinstance(actuators, Mapping):
-                    raw_tilt = actuators.get("tilt")
-                    if isinstance(raw_tilt, Mapping):
-                        tilt = raw_tilt
-            try:
-                lower = float(
-                    tilt["lower_limit_rad"]
-                    if tilt is not None
-                    else -fallback_limit
-                )
-                upper = float(
-                    tilt["upper_limit_rad"]
-                    if tilt is not None
-                    else fallback_limit
-                )
-                neutral = float(
-                    neutrals.get(
-                        assignment.module_id,
-                        tilt.get("position_rad", 0.0)
-                        if tilt is not None
-                        else 0.0,
-                    )
-                )
-            except (KeyError, TypeError, ValueError) as error:
-                raise SnakeStairGaitError(
-                    "Invalid live TILT limits or captured neutral"
-                ) from error
-            if not all(
-                math.isfinite(value)
-                for value in (lower, upper, neutral)
-            ):
-                raise SnakeStairGaitError(
-                    "Non-finite live TILT limits or captured neutral"
-                )
-            relative_lower = lower + margin_rad - neutral
-            relative_upper = upper - margin_rad - neutral
-            if relative_lower > 0.0 or relative_upper < 0.0:
-                raise SnakeStairGaitError(
-                    "Captured neutral posture is outside the safe TILT "
-                    f"range for {assignment.module_id}"
-                )
-            bounds.append((relative_lower, relative_upper))
-        return tuple(bounds)
 
     def _head_preview_angles(
         self,
@@ -1172,29 +834,33 @@ class SnakeStairGaitPlanner:
         phase: int,
         stair_count: int,
         stride: int,
+        legacy_bend_angle: float,
         upper_bend_angle: float,
     ) -> tuple[float, ...]:
-        """Return a broad moving arch passed rearward like a rail baton.
+        """Return a moving two-link arch while preserving the first riser.
 
-        Every riser uses ``+angle, 0, -angle``, distributing the height over
-        two links and three consecutive TILT targets.  Incrementing ``phase``
-        moves that cell one module toward the tail.  At the final tail
-        boundary the cell shifts half a link forward, retaining the two-link
-        rise instead of collapsing into a near-vertical tail hinge.
+        The original profile concentrates one complete stair rise between two
+        consecutive TILT joints.  For upper risers this gait distributes the
+        same rise over two links: ``+angle, 0, -angle``.  During a transfer the
+        caller temporarily increases ``upper_bend_angle`` to carry module
+        bodies over the edge rather than conforming tightly to it.
         """
         offsets = [0.0] * self.MODULE_COUNT
         for stair_index in range(stair_count):
             edge = self.INITIAL_RISER_EDGE + stride * stair_index - phase
+            if stair_index == 0:
+                if 0 <= edge <= self.MODULE_COUNT - 3:
+                    offsets[edge] += legacy_bend_angle
+                    offsets[edge + 1] -= legacy_bend_angle
+                continue
             if 1 <= edge <= self.MODULE_COUNT - 2:
                 offsets[edge - 1] += upper_bend_angle
                 offsets[edge + 1] -= upper_bend_angle
             elif edge == 0:
-                # Shift the last cell half a link forward instead of
-                # collapsing it into the old near-vertical tail hinge.  The
-                # last two links therefore share the rise while the rail
-                # baton exits the chain and the tail settles onto the deck.
-                offsets[0] += upper_bend_angle
-                offsets[2] -= upper_bend_angle
+                # At the tail boundary there is no second lower link left.
+                # Finish the transfer with the already validated sharp pair.
+                offsets[0] += legacy_bend_angle
+                offsets[1] -= legacy_bend_angle
         return tuple(offsets)
 
     def _gait_offsets(
@@ -1212,6 +878,7 @@ class SnakeStairGaitPlanner:
                 phase=phase,
                 stair_count=stair_count,
                 stride=stride,
+                legacy_bend_angle=bend_angle,
                 upper_bend_angle=upper_bend_angle,
             )
         return self.profile_offsets(
@@ -1236,9 +903,6 @@ class SnakeStairGaitPlanner:
         previous: tuple[float, ...],
         target: tuple[float, ...],
         assignments: Sequence[AssignedModule],
-        *,
-        motion_duration_s: float | None = None,
-        motion_tolerance_rad: float = 0.025,
     ) -> BehaviorProgramStep:
         changed = [
             index
@@ -1252,21 +916,9 @@ class SnakeStairGaitPlanner:
                 angle_rad=target[index],
                 target_vertex_id=assignments[index].target_vertex_id,
                 target_role=assignments[index].target_role,
-                tolerance_rad=(
-                    motion_tolerance_rad
-                    if motion_duration_s is not None
-                    else 0.08
-                ),
+                tolerance_rad=0.08,
                 coordination_group=f"stair:{phase}",
-                max_servo_error_rad=(
-                    0.06 if motion_duration_s is not None else 0.12
-                ),
-                max_servo_speed_rad_s=(
-                    None
-                    if motion_duration_s is None
-                    else abs(target[index] - previous[index])
-                    / motion_duration_s
-                ),
+                max_servo_error_rad=0.12,
                 angle_reference="captured_neutral",
             )
             for index in changed

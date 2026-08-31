@@ -51,7 +51,7 @@ def test_command_client_waits_indefinitely_by_default() -> None:
             "--morphology",
             "snake8",
             "--behavior",
-            "crawl_stairs",
+            "crawl_stairs_arch_wave",
             "--command-id",
             "stair-test",
         ]
@@ -66,7 +66,7 @@ def test_command_client_accepts_an_explicit_finite_timeout() -> None:
             "--morphology",
             "snake8",
             "--behavior",
-            "crawl_stairs",
+            "crawl_stairs_arch_wave",
             "--command-id",
             "stair-test",
             "--timeout-s",

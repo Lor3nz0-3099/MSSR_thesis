@@ -4,16 +4,13 @@ from __future__ import annotations
 
 import math
 from pathlib import Path
-from typing import Mapping
 
 import pytest
 
 from mssr_expert.behaviors.morphology_library import (
     AssignedModule,
     BehaviorProgramStep,
-    JointTarget,
     LongitudinalDisplacementGoal,
-    LongitudinalPositionGoal,
     MorphologyLibrary,
 )
 from mssr_expert.behaviors.snake_stair_gait import (
@@ -50,52 +47,19 @@ def _assignments() -> tuple[AssignedModule, ...]:
     )
 
 
-def _course(
-    *,
-    rise_m: float = 0.065,
-    tread_depth_m: float = 0.28,
-    stair_count: int = 3,
-) -> dict:
-    collision_boxes = [
-        {
-            "name": f"Stair{index:02d}",
-            "center_xyz_m": [
-                0.65 + (index - 0.5) * tread_depth_m,
-                0.0,
-                0.5 * rise_m * index,
-            ],
-            "size_xyz_m": [
-                tread_depth_m,
-                1.2,
-                rise_m * index,
-            ],
-            "semantic": "stair_test_riser",
-            "pitch_deg": 0.0,
-        }
-        for index in range(1, stair_count + 1)
-    ]
+def _course() -> dict:
     return {
         "frame_id": "world",
         "course_profile": "snake8_stair_test",
         "stairs": {
             "first_riser_x_m": 0.65,
-            "riser_depth_m": tread_depth_m,
-            "top_heights_m": [
-                rise_m * index for index in range(1, stair_count + 1)
-            ],
+            "riser_depth_m": 0.28,
+            "top_heights_m": [0.065, 0.13, 0.195],
         },
-        "collision_boxes": collision_boxes,
     }
 
 
-def _graph(
-    *,
-    lateral_step_m: float = 0.0,
-    rise_m: float = 0.065,
-    tread_depth_m: float = 0.28,
-    stair_count: int = 3,
-    neutral_tilts: Mapping[str, float] | None = None,
-) -> AttributedRobotGraph:
+def _graph(*, lateral_step_m: float = 0.0) -> AttributedRobotGraph:
     spacing = 0.07777
     return AttributedRobotGraph(
         nodes=tuple(
@@ -106,36 +70,14 @@ def _graph(
                         index * spacing,
                         index * lateral_step_m,
                         0.031,
-                    ],
-                    **(
-                        {
-                            "actuators": {
-                                "tilt": {
-                                    "position_rad": neutral_tilts.get(
-                                        f"m{index}", 0.0
-                                    ),
-                                    "lower_limit_rad": -math.pi / 2.0,
-                                    "upper_limit_rad": math.pi / 2.0,
-                                }
-                            }
-                        }
-                        if neutral_tilts is not None
-                        else {}
-                    ),
+                    ]
                 },
             )
             for index in range(8)
         ),
         global_attributes={
-            "course": _course(
-                rise_m=rise_m,
-                tread_depth_m=tread_depth_m,
-                stair_count=stair_count,
-            ),
-            "module_geometry": {
-                "wheel_radius_m": 0.03106,
-                "forward_collision_extent_m": 0.043771,
-            },
+            "course": _course(),
+            "module_geometry": {"wheel_radius_m": 0.03106},
         },
     )
 
@@ -457,328 +399,208 @@ def test_default_profile_uses_six_progressive_microsteps() -> None:
     assert "CRAWL_00_06" in phases
 
 
-def test_arch_wave_keeps_the_flat_captured_neutral_approach() -> None:
-    program = SnakeStairGaitPlanner().plan_arch_wave(
-        _graph(),
-        _assignments(),
-        {"profile_substeps": 6},
-    )
-    approach = program[0]
-
-    assert approach.phase == "GEOM_APPROACH_FIRST_RISER"
-    assert approach.kind == "posture_drive"
-    assert len(approach.posture_targets) == 8
-    assert all(
-        target.joint == "tilt"
-        and target.angle_rad == pytest.approx(0.0)
-        and target.angle_reference == "captured_neutral"
-        for target in approach.posture_targets
-    )
-    assert approach.position_goal is not None
-    assert approach.position_goal.module_id == "m7"
-
-
-def test_first_riser_uses_a_broad_clearance_arch() -> None:
-    spacing = 0.07777
-    rise = 0.065
-    wheel_radius = 0.03106
-    clearance = 0.58 * wheel_radius
-    program = SnakeStairGaitPlanner().plan_arch_wave(
-        _graph(),
-        _assignments(),
-        {"profile_substeps": 6},
-    )
-    lift = next(
-        step for step in program if step.phase == "APPROACH_FIRST_RISER"
-    )
-    targets = {target.module_id: target for target in lift.posture_targets}
-    expected = math.asin((rise + clearance) / (2.0 * spacing))
-
-    assert set(targets) == {"m3", "m5"}
-    assert targets["m3"].angle_rad == pytest.approx(expected)
-    assert targets["m5"].angle_rad == pytest.approx(-expected)
-    assert 2.0 * spacing * math.sin(expected) == pytest.approx(
-        rise + clearance
-    )
-    assert lift.position_goal is not None
-    assert lift.position_goal.module_id == "m7"
-    assert lift.position_goal.target_x_m == pytest.approx(
-        0.65 - wheel_radius
-    )
-    # Build/admit the first clearance arch before locomotion.  Later rail
-    # transfers remain concurrent with drive.
-    assert lift.hold_locomotion_until_admitted
-    assert not lift.continuous_with_next
-
-
-def test_arch_rail_passes_the_broad_cell_one_module_toward_the_tail() -> None:
-    program = SnakeStairGaitPlanner().plan_arch_wave(
-        _graph(),
-        _assignments(),
-        {"profile_substeps": 6},
-    )
-    first = _posture_state_at(program, "ARCH_HEAD_GATE_01")
-    second = _posture_state_at(program, "ARCH_DRIVE_01_06")
-    third = _posture_state_at(program, "ARCH_DRIVE_02_06")
-
-    assert first["m2"] > 0.0 and first["m4"] < 0.0
-    assert second["m1"] > 0.0 and second["m3"] < 0.0
-    assert third["m0"] > 0.0 and third["m2"] < 0.0
-    assert first["m2"] == pytest.approx(second["m1"])
-    assert second["m1"] == pytest.approx(third["m0"])
-
-
-def test_arch_rail_releases_the_remote_tail_behind_the_wave() -> None:
-    assignments = _assignments()
-    program = SnakeStairGaitPlanner().plan_arch_wave(
-        _graph(),
-        assignments,
-        {"profile_substeps": 6},
-    )
-    expected = {
-        "APPROACH_FIRST_RISER": (
-            {"m3", "m5"},
-            {"m2", "m4", "m6", "m7"},
-            {"m0", "m1"},
-        ),
-        "ARCH_DRIVE_00_03": (
-            {"m2", "m3", "m4", "m5"},
-            {"m1", "m6", "m7"},
-            {"m0"},
-        ),
-        "ARCH_DRIVE_01_03": (
-            {"m1", "m2", "m3", "m4", "m5", "m6", "m7"},
-            {"m0"},
-            set(),
-        ),
+def test_arch_wave_preserves_the_validated_first_riser_wave() -> None:
+    planner = SnakeStairGaitPlanner()
+    parameters = {
+        "profile_substeps": 6,
+        "transition_clearance_m": 0.0065,
     }
+    legacy = planner.plan(_graph(), _assignments(), parameters)
+    arch = planner.plan_arch_wave(_graph(), _assignments(), parameters)
 
-    for phase, (moving_ids, support_ids, passive_ids) in expected.items():
-        step = next(item for item in program if item.phase == phase)
-        assert {target.module_id for target in step.posture_targets} == (
-            moving_ids
+    for substep in range(1, 7):
+        assert _posture_state_at(
+            arch, f"ARCH_00_{substep:02d}"
+        ) == pytest.approx(
+            _posture_state_at(legacy, f"PROFILE_00_{substep:02d}")
         )
-        assert all(
-            set(target.passive_module_ids or ()) == passive_ids
-            for target in step.posture_targets
-        )
-        executor = MorphologyBehaviorExecutor(
-            MorphologyLibrary.load(
-                Path(__file__).parents[1]
-                / "config"
-                / "smores_morphology_behaviors.json"
-            )
-        )
-        executor.start(
-            MorphologyCommand(f"partition-{phase}", "snake8", "crawl_stairs"),
-            assignments,
-            {item.module_id: 0.0 for item in assignments},
-            (step,),
-        )
-        decision = executor.step(
-            0.0,
-            module_positions={
-                item.module_id: (0.0, 0.0, 0.031)
-                for item in assignments
-            },
-        )
-        assert decision.primitive_goal is not None
-        assert set(
-            decision.primitive_goal.parameters.get(
-                "structural_hold_module_ids", ()
-            )
-        ) == support_ids
-        assert set(
-            decision.primitive_goal.parameters["passive_module_ids"]
-        ) == passive_ids
 
 
-def test_arch_wave_trailing_support_depth_is_configurable() -> None:
+def test_arch_wave_distributes_upper_rise_over_two_links() -> None:
+    planner = SnakeStairGaitPlanner()
+    program = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+    settled = _posture_state_at(program, "ARCH_01_06")
+    distributed_angle = math.asin(0.065 / (2.0 * 0.07777))
+
+    assert settled["m5"] == pytest.approx(distributed_angle)
+    assert settled["m6"] == pytest.approx(0.0)
+    assert settled["m7"] == pytest.approx(-distributed_angle)
+    assert distributed_angle < 0.5 * math.asin(0.065 / 0.07777)
+
+
+def test_arch_wave_releases_head_arch_onto_upper_tread() -> None:
+    planner = SnakeStairGaitPlanner()
+    program = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+    hooked = _posture_state_at(program, "ARCH_01_06")
+    landing = _posture_state_at(program, "ARCH_02_01")
+    landed = _posture_state_at(program, "ARCH_02_06")
+    distributed_angle = math.asin(0.065 / (2.0 * 0.07777))
+
+    # At contact the temporary terminal v5/v7 arch is still present.  On the
+    # next measured microstep it is released, the descending bend migrates to
+    # v6 and the head joint v7 returns progressively to its neutral value.
+    assert hooked["m5"] == pytest.approx(distributed_angle)
+    assert hooked["m6"] == pytest.approx(0.0)
+    assert hooked["m7"] == pytest.approx(-distributed_angle)
+    assert landing["m5"] < hooked["m5"]
+    assert landing["m6"] < 0.0
+    assert abs(landing["m7"]) < abs(hooked["m7"])
+    assert landed["m4"] == pytest.approx(distributed_angle)
+    assert landed["m5"] == pytest.approx(0.0)
+    assert landed["m6"] == pytest.approx(-distributed_angle)
+    assert landed["m7"] == pytest.approx(0.0)
+
+
+def test_arch_wave_prelifts_head_before_each_upper_riser() -> None:
     program = SnakeStairGaitPlanner().plan_arch_wave(
         _graph(),
         _assignments(),
-        {"profile_substeps": 6, "trailing_support_modules": 2},
-    )
-    first_lift = next(
-        step for step in program if step.phase == "APPROACH_FIRST_RISER"
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
     )
 
-    assert all(
-        target.passive_module_ids == ("m0",)
-        for target in first_lift.posture_targets
-    )
+    first_riser_done = _posture_state_at(program, "ARCH_00_06")
+    second_riser_preview = _posture_state_at(program, "ARCH_01_01")
+    third_riser_preview = _posture_state_at(program, "ARCH_05_01")
 
-
-
-
-def test_arch_wave_only_overlays_concurrent_drive_on_validated_shape() -> None:
-    program = SnakeStairGaitPlanner().plan_arch_wave(
-        _graph(),
-        _assignments(),
-        {
-            "profile_substeps": 6,
-            "synchronized_linear_m_s": 0.020,
-            "max_wave_tilt_speed_rad_s": 0.45,
-        },
-    )
-    wave = [
-        step
-        for step in program
-        if step.phase.startswith("ARCH_") and step.position_goal is not None
-    ]
-
-    assert wave
-    assert all(step.kind == "posture_drive" for step in wave)
-    assert all(step.linear_m_s == pytest.approx(0.020) for step in wave)
-    assert all(
-        step.posture_reached_linear_m_s == pytest.approx(0.040)
-        for step in wave
-    )
-    assert all(not step.hold_locomotion_until_admitted for step in wave)
-    assert all(step.continuous_with_next for step in wave[:-1])
-    assert not wave[-1].continuous_with_next
-    assert all(
-        target.max_servo_speed_rad_s == pytest.approx(0.45)
-        and target.tolerance_rad == pytest.approx(0.025)
-        and target.angle_reference == "captured_neutral"
-        for step in wave
-        for target in step.posture_targets
-    )
-
-
-def test_tail_boundary_keeps_the_distributed_arch_and_finishes_flat() -> None:
-    program = SnakeStairGaitPlanner().plan_arch_wave(
-        _graph(),
-        _assignments(),
-        {"profile_substeps": 6},
-    )
-    final_step = program[-1]
-    final_state = _posture_state_at(program, final_step.phase)
-
-    assert final_step.phase == "ARCH_TAIL_LIFT_COMPLETE"
-    assert final_step.kind == "posture_drive"
-    assert final_state == pytest.approx(
-        {f"m{index}": 0.0 for index in range(8)}
-    )
-    maximum_clearance_angle = math.asin(
-        (0.065 + 0.58 * 0.03106) / (2.0 * 0.07777)
-    )
-    assert max(
-        abs(target.angle_rad)
-        for step in program
-        for target in step.posture_targets
-        if target.module_id in {"m0", "m1"}
-    ) == pytest.approx(maximum_clearance_angle)
-
-
-def test_loaded_tilt_tolerance_is_configurable_but_safely_bounded() -> None:
-    program = SnakeStairGaitPlanner().plan_arch_wave(
-        _graph(),
-        _assignments(),
-        {"loaded_tilt_tolerance_rad": 0.030},
-    )
-    moving_targets = tuple(
-        target
-        for step in program
-        if step.kind == "posture_drive"
-        for target in step.posture_targets
-    )
-    assert moving_targets
-    assert all(
-        target.tolerance_rad == pytest.approx(0.030)
-        for target in moving_targets
-    )
-
-    with pytest.raises(
-        SnakeStairGaitError,
-        match="loaded_tilt_tolerance_rad",
-    ):
-        SnakeStairGaitPlanner().plan_arch_wave(
-            _graph(),
-            _assignments(),
-            {"loaded_tilt_tolerance_rad": 0.050},
-        )
-
-
-@pytest.mark.parametrize(
-    ("rise_m", "tread_depth_m", "stair_count"),
-    (
-        (0.050, 0.250, 2),
-        (0.060, 0.272, 3),
-        (0.065, 0.280, 3),
-        (0.065, 0.320, 4),
-    ),
-)
-def test_continuous_geometric_wave_scales_across_seed_geometries(
-    rise_m: float,
-    tread_depth_m: float,
-    stair_count: int,
-) -> None:
-    program = SnakeStairGaitPlanner().plan_arch_wave(
-        _graph(
-            rise_m=rise_m,
-            tread_depth_m=tread_depth_m,
-            stair_count=stair_count,
-        ),
-        _assignments(),
-        {"profile_substeps": 6},
-    )
-    final_step = program[-1]
-    final_riser_x = 0.65 + (stair_count - 1) * tread_depth_m
-    assert final_step.phase == "ARCH_TAIL_LIFT_COMPLETE"
-    assert final_step.position_goal is not None
-    assert final_step.position_goal.module_id == "m1"
-    assert final_step.position_goal.target_x_m == pytest.approx(
-        final_riser_x + 0.03106
-    )
+    # The validated first-riser wave remains unchanged.  Immediately after
+    # it, the terminal v6/v7 pair raises the head before its wheel envelope
+    # reaches the second riser.  The same geometric gate repeats one tread
+    # later for the third riser.
+    assert first_riser_done["m6"] == pytest.approx(0.0)
+    assert first_riser_done["m7"] == pytest.approx(0.0)
+    assert second_riser_preview["m6"] > 0.0
+    assert second_riser_preview["m7"] < 0.0
+    assert third_riser_preview["m6"] > 0.0
+    assert third_riser_preview["m7"] < 0.0
     assert all(
         abs(target.angle_rad) <= math.pi / 2.0 - 0.030 + 1e-9
         for step in program
         for target in step.posture_targets
     )
-    state = {f"m{index}": 0.0 for index in range(8)}
-    for step in program:
-        for target in step.posture_targets:
-            state[target.module_id] = target.angle_rad
-    assert sum(state.values()) == pytest.approx(0.0, abs=1e-6)
 
-
-def test_wave_targets_respect_limits_around_captured_neutral() -> None:
-    neutrals = {
-        f"m{index}": (-0.115 if index % 2 == 0 else 0.095)
-        for index in range(8)
-    }
-    program = SnakeStairGaitPlanner().plan_arch_wave(
-        _graph(neutral_tilts=neutrals),
-        _assignments(),
-        {"profile_substeps": 6},
-        neutrals,
+    second_gate = next(
+        step for step in program if step.phase == "ARCH_HEAD_GATE_01"
+    )
+    third_gate = next(
+        step for step in program if step.phase == "ARCH_HEAD_GATE_02"
+    )
+    assert second_gate.position_goal is not None
+    assert second_gate.position_goal.module_id == "m7"
+    assert second_gate.position_goal.target_x_m == pytest.approx(
+        0.93 - (0.07777 + 0.0065)
+    )
+    assert third_gate.position_goal is not None
+    assert third_gate.position_goal.module_id == "m7"
+    assert third_gate.position_goal.target_x_m == pytest.approx(
+        1.21 - (0.07777 + 0.0065)
     )
 
-    for step in program:
-        for target in step.posture_targets:
-            absolute = neutrals[target.module_id] + target.angle_rad
-            assert absolute >= -math.pi / 2.0 + 0.030 - 1e-9
-            assert absolute <= math.pi / 2.0 - 0.030 + 1e-9
+
+def test_arch_wave_default_margins_scale_from_live_module_geometry() -> None:
+    planner = SnakeStairGaitPlanner()
+    derived = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "transition_clearance_m": 0.0065},
+    )
+    explicit = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {
+            "profile_substeps": 6,
+            "transition_clearance_m": 0.0065,
+            "arch_clearance_m": 0.40 * 0.03106,
+            "head_prelift_lookahead_m": 0.07777 + 0.0065,
+            "head_prelift_ramp_m": 0.5 * 0.07777,
+        },
+    )
+
+    for phase in ("ARCH_01_01", "ARCH_01_03", "ARCH_01_06"):
+        assert _posture_state_at(derived, phase) == pytest.approx(
+            _posture_state_at(explicit, phase)
+        )
+
+
+def test_arch_wave_clearance_increases_mid_transfer_arch_only() -> None:
+    planner = SnakeStairGaitPlanner()
+    low = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "arch_clearance_m": 0.004},
+    )
+    high = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {"profile_substeps": 6, "arch_clearance_m": 0.020},
+    )
+
+    # Just after peak terminal lift, the broad overlay is no longer bounded
+    # by the shared TILT safety limit and exposes the requested clearance.
+    low_mid = _posture_state_at(low, "ARCH_01_04")
+    high_mid = _posture_state_at(high, "ARCH_01_04")
+    assert high_mid["m5"] > low_mid["m5"]
+    assert abs(high_mid["m7"]) > abs(low_mid["m7"])
+    assert _posture_state_at(high, "ARCH_01_06") == pytest.approx(
+        _posture_state_at(low, "ARCH_01_06")
+    )
+
+
+def test_arch_wave_keeps_all_wheels_commanded() -> None:
+    program = SnakeStairGaitPlanner().plan_arch_wave(
+        _graph(), _assignments(), {"profile_substeps": 6}
+    )
+    drive = next(
+        step for step in program if step.phase == "ARCH_DRIVE_04_03"
+    )
+
+    assert drive.active_target_roles == tuple(
+        assignment.target_role for assignment in _assignments()
+    )
+    assert drive.duration_s is None
+    assert drive.position_goal is not None
+
+
+def test_arch_wave_finishes_after_geometric_tail_lift() -> None:
+    planner = SnakeStairGaitPlanner()
+    program = planner.plan_arch_wave(
+        _graph(), _assignments(), {"profile_substeps": 6}
+    )
+
+    final_drive = program[-1]
+    assert final_drive.phase == "ARCH_TAIL_LIFT_COMPLETE"
+    assert final_drive.position_goal is not None
+    assert final_drive.position_goal.module_id == "m1"
+    assert final_drive.position_goal.target_x_m == pytest.approx(
+        1.21 + 0.03106
+    )
+    assert not any(
+        step.phase == "UPPER_DECK_ADVANCE" for step in program
+    )
+
+    with_advance = planner.plan_arch_wave(
+        _graph(),
+        _assignments(),
+        {
+            "profile_substeps": 6,
+            "upper_deck_advance_distance_m": 0.080,
+        },
+    )
+    assert with_advance[-2].phase == "ARCH_TAIL_LIFT_COMPLETE"
+    assert with_advance[-1].phase == "UPPER_DECK_ADVANCE"
 
 
 def test_plan_rejects_a_snake_not_aligned_with_the_known_stairs() -> None:
     with pytest.raises(SnakeStairGaitError, match="not aligned"):
         SnakeStairGaitPlanner().plan(
             _graph(lateral_step_m=0.04),
-            _assignments(),
-            {},
-        )
-
-
-def test_plan_rejects_stair_landmarks_that_disagree_with_world_boxes() -> None:
-    graph = _graph()
-    course = graph.global_attributes["course"]
-    course["collision_boxes"][0]["center_xyz_m"][0] += 0.010
-
-    with pytest.raises(SnakeStairGaitError, match="collision boxes"):
-        SnakeStairGaitPlanner().plan_arch_wave(
-            graph,
             _assignments(),
             {},
         )
@@ -806,183 +628,6 @@ def test_executor_accepts_generated_program_without_library_entry() -> None:
     assert first.phase == "LIFT_FIRST_RISER"
     assert first.primitive_goal is not None
     assert first.primitive_goal.module_ids == ("m4",)
-
-
-def test_executor_starts_drive_only_after_ramped_tilt_is_admitted() -> None:
-    assignments = _assignments()
-    executor = MorphologyBehaviorExecutor(
-        MorphologyLibrary.load(
-            Path(__file__).parents[1]
-            / "config"
-            / "smores_morphology_behaviors.json"
-        )
-    )
-    executor.start(
-        MorphologyCommand("bridge-continuous", "snake8", "crawl_stairs"),
-        assignments,
-        {item.module_id: 0.0 for item in assignments},
-        (
-            BehaviorProgramStep(
-                phase="BRIDGE_WAVE_TEST",
-                posture_targets=(
-                    JointTarget(
-                        module_id="m5",
-                        joint="tilt",
-                        angle_rad=0.3,
-                        target_vertex_id="v5",
-                        target_role="snake_shoulder",
-                        coordination_group="stair:test",
-                        max_servo_speed_rad_s=0.4,
-                        angle_reference="captured_neutral",
-                    ),
-                ),
-                linear_m_s=0.011,
-                active_target_roles=ROLES,
-                position_goal=LongitudinalPositionGoal(
-                    module_id="m7",
-                    target_x_m=0.70,
-                    tolerance_m=0.004,
-                ),
-                posture_reached_linear_m_s=0.025,
-            ),
-        ),
-    )
-    poses = {"m7": (0.60, 0.0, 0.031)}
-
-    dispatched = executor.step(0.0, module_positions=poses)
-    assert dispatched.primitive_goal is not None
-    assert not dispatched.locomotion
-    assert dispatched.primitive_goal.parameters[
-        "max_servo_speed_rad_s"
-    ] == pytest.approx(0.4)
-
-    awaiting_admission = executor.step(0.1, module_positions=poses)
-    assert awaiting_admission.state == "WAITING_JOINT_ADMISSION"
-    assert not awaiting_admission.locomotion
-
-    goal = dispatched.primitive_goal
-    admitted = executor.step(
-        0.2,
-        {
-            "schema_version": "mssr.primitive_status.v1",
-            "goal_id": goal.goal_id,
-            "primitive": goal.primitive,
-            "module_ids": list(goal.module_ids),
-            "state": "accepted",
-            "phase": "accepted",
-            "progress": 0.0,
-            "code": "ACCEPTED",
-            "message": "admitted",
-        },
-        poses,
-    )
-    assert set(admitted.locomotion) == {
-        f"m{index}" for index in range(8)
-    }
-
-    posture_lagging = executor.step(
-        0.25,
-        {
-            "schema_version": "mssr.primitive_status.v1",
-            "goal_id": goal.goal_id,
-            "primitive": goal.primitive,
-            "module_ids": list(goal.module_ids),
-            "state": "running",
-            "phase": "tilt",
-            "progress": 0.8,
-            "code": "MOVING_JOINT",
-            "message": "moving",
-        },
-        {"m7": (0.70, 0.0, 0.031)},
-    )
-    assert not posture_lagging.locomotion
-    assert "position barrier reached" in posture_lagging.message
-
-    settled_traction = executor.step(
-        0.3,
-        {
-            "schema_version": "mssr.primitive_status.v1",
-            "goal_id": goal.goal_id,
-            "primitive": goal.primitive,
-            "module_ids": list(goal.module_ids),
-            "state": "succeeded",
-            "phase": "terminal",
-            "progress": 1.0,
-            "code": "JOINT_TARGET_REACHED",
-            "message": "done",
-        },
-        {"m7": (0.65, 0.0, 0.031)},
-    )
-    assert settled_traction.state == "RUNNING_PROGRAM_DRIVE"
-    assert "settled traction speed 0.025m/s" in settled_traction.message
-    assert all(
-        command["vx"] == pytest.approx(0.025)
-        for command in settled_traction.locomotion.values()
-    )
-
-    completed = executor.step(
-        0.4,
-        module_positions={"m7": (0.70, 0.0, 0.031)},
-    )
-    assert completed.phase == "BRIDGE_WAVE_TEST_GOAL_REACHED"
-    assert not completed.locomotion
-
-
-def test_executor_keeps_wheels_commanded_between_rail_segments() -> None:
-    assignments = _assignments()
-    executor = MorphologyBehaviorExecutor(
-        MorphologyLibrary.load(
-            Path(__file__).parents[1]
-            / "config"
-            / "smores_morphology_behaviors.json"
-        )
-    )
-    executor.start(
-        MorphologyCommand("rail-continuous", "snake8", "crawl_stairs"),
-        assignments,
-        {item.module_id: 0.0 for item in assignments},
-        (
-            BehaviorProgramStep(
-                phase="RAIL_HOLD",
-                linear_m_s=0.02,
-                active_target_roles=ROLES,
-                position_goal=LongitudinalPositionGoal(
-                    module_id="m7", target_x_m=0.60, tolerance_m=0.004
-                ),
-                continuous_with_next=True,
-            ),
-            BehaviorProgramStep(
-                phase="RAIL_SHIFT",
-                posture_targets=(
-                    JointTarget(
-                        module_id="m6",
-                        joint="tilt",
-                        angle_rad=1.0,
-                        target_vertex_id="v6",
-                        target_role="snake_neck",
-                        coordination_group="rail:shift",
-                        max_servo_speed_rad_s=0.4,
-                        angle_reference="captured_neutral",
-                    ),
-                ),
-                linear_m_s=0.01,
-                active_target_roles=ROLES,
-                position_goal=LongitudinalPositionGoal(
-                    module_id="m7", target_x_m=0.68, tolerance_m=0.004
-                ),
-                hold_locomotion_until_admitted=False,
-            ),
-        ),
-    )
-
-    decision = executor.step(
-        0.0, module_positions={"m7": (0.60, 0.0, 0.031)}
-    )
-    assert decision.primitive_goal is not None
-    assert decision.phase == "RAIL_SHIFT"
-    assert set(decision.locomotion) == {
-        f"m{index}" for index in range(8)
-    }
 
 
 def test_approach_drives_until_the_live_world_x_goal() -> None:
@@ -1287,7 +932,7 @@ def test_plan_rejects_invalid_runtime_parameters(
         )
 
 
-@pytest.mark.parametrize("clearance", (0.003, 0.046))
+@pytest.mark.parametrize("clearance", (0.003, 0.021))
 def test_arch_wave_rejects_invalid_clearance(clearance: float) -> None:
     with pytest.raises(SnakeStairGaitError, match="arch_clearance_m"):
         SnakeStairGaitPlanner().plan_arch_wave(

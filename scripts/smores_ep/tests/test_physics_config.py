@@ -12,6 +12,10 @@ from smores_ep.config.physics import (
     SmoresMassConfig,
 )
 from smores_ep.config.simulation import DynamicSimulationConfig
+from smores_ep.isaac.physics_asset import (
+    CHASSIS_PROXY_CENTER_M,
+    CHASSIS_PROXY_SIZE_M,
+)
 
 
 def test_link_mass_budget_matches_paper_total() -> None:
@@ -31,6 +35,20 @@ def test_passive_skid_has_less_friction_than_wheels_and_chassis() -> None:
     assert contacts.skid_static_friction < contacts.body_static_friction
     assert contacts.skid_dynamic_friction < contacts.body_dynamic_friction
     assert contacts.skid_dynamic_friction < contacts.wheel_dynamic_friction
+
+
+def test_chassis_proxy_stays_well_inside_wheel_envelope_at_every_pitch() -> None:
+    geometry = SmoresGeometry()
+    half_x = 0.5 * CHASSIS_PROXY_SIZE_M[0]
+    half_z = 0.5 * CHASSIS_PROXY_SIZE_M[2]
+    radial_extent = (
+        (abs(CHASSIS_PROXY_CENTER_M[0]) + half_x) ** 2
+        + (abs(CHASSIS_PROXY_CENTER_M[2]) + half_z) ** 2
+    ) ** 0.5
+
+    # An eight-millimetre minimum gap remains larger than the collision skin
+    # observed at the seed-3000 stair edge.
+    assert geometry.wheel_radius_m - radial_extent >= 0.008
 
 
 def test_payload_overdrive_scales_effort_and_stiffens_holding_drives() -> None:

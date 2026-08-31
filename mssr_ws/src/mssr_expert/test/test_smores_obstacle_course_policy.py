@@ -6,6 +6,7 @@ from mssr_expert.behaviors.morphology_library import (
     AssignedModule,
     MorphologyLibrary,
 )
+from mssr_expert.behaviors.snake_stair_registry import STAIR_GAIT_BEHAVIORS
 from mssr_expert.execution.morphology_behavior_executor import (
     MorphologyBehaviorExecutor,
     MorphologyCommand,
@@ -56,7 +57,6 @@ def test_policy_selects_one_capable_morphology_per_course_task() -> None:
         "crawl_goal_tolerance_m": 0.004,
         "profile_substeps": 6,
         "transition_clearance_m": 0.0065,
-	"arch_clearance_m": 0.010,
     }
     gap_crossing = next(
         step for step in steps if step.task == "snake_gap_crossing"
@@ -67,6 +67,14 @@ def test_policy_selects_one_capable_morphology_per_course_task() -> None:
         "approach_linear_m_s": 0.050,
         "gap_goal_tolerance_m": 0.004,
     }
+
+
+def test_only_requested_stair_gaits_are_public() -> None:
+    assert STAIR_GAIT_BEHAVIORS == {
+        "crawl_stairs_arch_wave",
+        "crawl_stairs_spatial_concertina",
+    }
+    assert "crawl_stairs" not in STAIR_GAIT_BEHAVIORS
 
 
 def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None:
@@ -80,8 +88,8 @@ def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None
         if step.behavior is None:
             continue
         if step.behavior in {
-            "crawl_stairs",
             "crawl_stairs_arch_wave",
+            "crawl_stairs_spatial_concertina",
             "gap_crossing",
         }:
             # This behavior is generated from live world poses and course

@@ -22,6 +22,10 @@ from std_msgs.msg import String
 from mssr_expert.behaviors.morphology_library import AssignedModule, MorphologyLibrary
 from mssr_expert.behaviors.snake_gap_gait import SnakeGapGaitPlanner
 from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitPlanner
+from mssr_expert.behaviors.snake_stair_registry import STAIR_GAIT_BEHAVIORS
+from mssr_expert.behaviors.snake_stair_concertina import (
+    SnakeStairConcertinaPlanner,
+)
 from mssr_expert.behaviors.morphology_locomotion import coherent_planar_train_commands
 from mssr_expert.dataset.dataset_logger import DatasetLogger
 from mssr_expert.execution.assembly_policy import DEFAULT_ASSEMBLY_EXECUTION_POLICY
@@ -117,6 +121,7 @@ class SmoresObstacleCourseNode(Node):
         )
         self._gap_gait_planner = SnakeGapGaitPlanner()
         self._stair_gait_planner = SnakeStairGaitPlanner()
+        self._stair_concertina_planner = SnakeStairConcertinaPlanner()
         self._policy = ObstacleCoursePolicy()
         self._steps = self._policy.steps()
         self._assembly_planner = ParallelSelfAssemblyPlanner()
@@ -419,24 +424,28 @@ class SmoresObstacleCourseNode(Node):
                 self._neutral_assignment_signature = assignment_signature
             neutral_tilts = self._neutral_tilt_rad_by_module
         program_override = None
-        if course_step.behavior in {
-            "crawl_stairs",
-            "crawl_stairs_arch_wave",
-            "gap_crossing",
-        }:
+        if course_step.behavior in STAIR_GAIT_BEHAVIORS | {"gap_crossing"}:
             if course_step.behavior == "gap_crossing":
                 planner = self._gap_gait_planner.plan
-            else:
-                planner = (
-                    self._stair_gait_planner.plan_arch_wave
-                    if course_step.behavior == "crawl_stairs_arch_wave"
-                    else self._stair_gait_planner.plan
+            elif course_step.behavior == "crawl_stairs_arch_wave":
+                planner = self._stair_gait_planner.plan_arch_wave
+            elif course_step.behavior == "crawl_stairs_spatial_concertina":
+                planner = self._stair_concertina_planner.plan
+            if course_step.behavior == "crawl_stairs_spatial_concertina":
+                program_override = planner(
+                    current_graph,
+                    assignments,
+                    course_step.parameters or {},
+                    neutral_tilts,
                 )
-            program_override = planner(
-                current_graph,
-                assignments,
-                course_step.parameters or {},
-            )
+            else:
+                # Keep the historical arch-wave call exactly at its validated
+                # three-argument interface; only concertina consumes neutrals.
+                program_override = planner(
+                    current_graph,
+                    assignments,
+                    course_step.parameters or {},
+                )
         executor.start(
             MorphologyCommand(
                 execution_id,

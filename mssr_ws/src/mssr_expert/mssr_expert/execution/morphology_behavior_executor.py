@@ -94,6 +94,8 @@ class MorphologyBehaviorExecutor:
         self._program_loaded_posture_index: int | None = None
         self._program_drive_started_s: float | None = None
         self._program_drive_origin_x_m: float | None = None
+        self._position_tracking_sample: tuple[int, float, float] | None = None
+        self._position_tracking_velocity_m_s = 0.0
         self._state = "IDLE"
         self._failure_message = ""
         self._neutral_tilt_rad_by_module: dict[str, float] = {}
@@ -183,6 +185,8 @@ class MorphologyBehaviorExecutor:
         self._program_loaded_posture_index = None
         self._program_drive_started_s = None
         self._program_drive_origin_x_m = None
+        self._position_tracking_sample = None
+        self._position_tracking_velocity_m_s = 0.0
         self._state = "READY"
         self._failure_message = ""
         self._neutral_tilt_rad_by_module = neutral_tilts
@@ -237,7 +241,7 @@ class MorphologyBehaviorExecutor:
                         phase=self._active_posture_phase(),
                         locomotion=(
                             self._active_posture_drive_locomotion(
-                                module_positions
+                                now_s, module_positions
                             )
                         ),
                         progress=self._active_progress(now_s),
@@ -587,13 +591,15 @@ class MorphologyBehaviorExecutor:
     ) -> MorphologyBehaviorDecision:
         """Reach one posture and one world-X barrier concurrently."""
 
+        has_position_goal = step.position_goal is not None
+        has_displacement_goal = step.displacement_goal is not None
         if (
-            step.position_goal is None
-            or step.duration_s is not None
-            or step.displacement_goal is not None
+            step.duration_s is not None
+            or has_position_goal == has_displacement_goal
         ):
             raise RuntimeError(
-                "A posture-drive step requires exactly one position goal"
+                "A posture-drive step requires exactly one position or "
+                "displacement goal"
             )
         if self._program_loaded_posture_index != self._program_step_index:
             self._joint_targets = step.posture_targets
@@ -603,17 +609,34 @@ class MorphologyBehaviorExecutor:
             self._awaiting_admission_goal_id = None
             self._program_loaded_posture_index = self._program_step_index
 
-        pose_available = (
-            module_positions is not None
-            and step.position_goal.module_id in module_positions
-        )
+        goal_available = False
         reached = False
-        goal_message = (
-            f"waiting for pose of {step.position_goal.module_id}"
-        )
-        if pose_available:
+        if step.position_goal is not None:
+            goal_available = (
+                module_positions is not None
+                and step.position_goal.module_id in module_positions
+            )
+            goal_message = (
+                f"waiting for pose of {step.position_goal.module_id}"
+            )
+        else:
+            assert step.displacement_goal is not None
+            missing = self._missing_goal_positions(
+                step.displacement_goal.module_ids,
+                module_positions,
+            )
+            goal_available = not missing
+            goal_message = f"waiting for poses of {list(missing)}"
+
+        if goal_available and step.position_goal is not None:
             reached, goal_message = self._position_goal_reached(
                 step.position_goal,
+                step.linear_m_s,
+                module_positions,
+            )
+        elif goal_available and step.displacement_goal is not None:
+            reached, goal_message = self._displacement_goal_reached(
+                step.displacement_goal,
                 step.linear_m_s,
                 module_positions,
             )
@@ -628,9 +651,16 @@ class MorphologyBehaviorExecutor:
             and step.posture_reached_linear_m_s is not None
             else step.linear_m_s
         )
+        if step.position_goal is not None and goal_available and not reached:
+            drive_speed = self._position_tracking_speed(
+                step,
+                now_s,
+                module_positions,
+                speed_limit_m_s=drive_speed,
+            )
         locomotion = (
             {}
-            if reached or not pose_available
+            if reached or not goal_available
             else self._program_step_locomotion(
                 step, linear_m_s=drive_speed
             )
@@ -687,7 +717,7 @@ class MorphologyBehaviorExecutor:
                 progress=self._active_progress(now_s),
                 message=(
                     (
-                        f"{step.phase} position barrier reached; holding "
+                        f"{step.phase} geometric barrier reached; holding "
                         "wheels while waiting for TILT goals: "
                         if reached
                         else f"Waiting for {step.phase} posture goals while "
@@ -702,7 +732,7 @@ class MorphologyBehaviorExecutor:
             raise RuntimeError(
                 "Posture-drive dispatcher reached an invalid state"
             )
-        if not pose_available:
+        if not goal_available:
             self._state = "WAITING_PROGRAM_POSITION"
             return self._decision(
                 phase=step.phase,
@@ -746,7 +776,7 @@ class MorphologyBehaviorExecutor:
             return replace(
                 continued,
                 message=(
-                    f"{completed_phase} posture and position reached; "
+                    f"{completed_phase} posture and geometric goal reached; "
                     "continuing without a wheel-command barrier. "
                     f"{continued.message}"
                 ),
@@ -756,7 +786,7 @@ class MorphologyBehaviorExecutor:
             phase=f"{completed_phase}_GOAL_REACHED",
             progress=self._active_progress(now_s),
             message=(
-                f"{completed_phase} posture and position goal reached; "
+                f"{completed_phase} posture and geometric goal reached; "
                 f"{goal_message}; locomotion stopped."
             ),
         )
@@ -956,6 +986,7 @@ class MorphologyBehaviorExecutor:
 
     def _active_posture_drive_locomotion(
         self,
+        now_s: float,
         module_positions: Mapping[
             str, tuple[float, float, float]
         ] | None,
@@ -965,7 +996,7 @@ class MorphologyBehaviorExecutor:
         if self._program_step_index >= len(self._program_steps):
             return {}
         step = self._program_steps[self._program_step_index]
-        if step.kind != "posture_drive" or step.position_goal is None:
+        if step.kind != "posture_drive":
             return {}
         if (
             step.hold_locomotion_until_admitted
@@ -977,17 +1008,111 @@ class MorphologyBehaviorExecutor:
             and self._next_joint_index < len(self._joint_targets)
         ):
             return {}
-        if (
-            module_positions is None
-            or step.position_goal.module_id not in module_positions
-        ):
+        if step.position_goal is not None:
+            if (
+                module_positions is None
+                or step.position_goal.module_id not in module_positions
+            ):
+                return {}
+            reached, _ = self._position_goal_reached(
+                step.position_goal,
+                step.linear_m_s,
+                module_positions,
+            )
+        elif step.displacement_goal is not None:
+            if self._missing_goal_positions(
+                step.displacement_goal.module_ids,
+                module_positions,
+            ):
+                return {}
+            reached, _ = self._displacement_goal_reached(
+                step.displacement_goal,
+                step.linear_m_s,
+                module_positions,
+            )
+        else:  # guarded by BehaviorProgramStep.kind
             return {}
-        reached, _ = self._position_goal_reached(
-            step.position_goal,
-            step.linear_m_s,
+        if reached:
+            return {}
+        drive_speed = self._position_tracking_speed(
+            step,
+            now_s,
             module_positions,
+            speed_limit_m_s=step.linear_m_s,
         )
-        return {} if reached else self._program_step_locomotion(step)
+        return self._program_step_locomotion(
+            step, linear_m_s=drive_speed
+        )
+
+    def _position_tracking_speed(
+        self,
+        step: BehaviorProgramStep,
+        now_s: float,
+        module_positions: Mapping[
+            str, tuple[float, float, float]
+        ] | None,
+        *,
+        speed_limit_m_s: float,
+    ) -> float:
+        """Return a saturated PD speed for a world-X waypoint."""
+
+        gain = step.position_tracking_kp_s_inv
+        if gain is None:
+            return speed_limit_m_s
+        goal = step.position_goal
+        if (
+            goal is None
+            or module_positions is None
+            or goal.module_id not in module_positions
+        ):
+            return speed_limit_m_s
+        derivative_gain = step.position_tracking_kd
+        minimum_speed = step.minimum_tracking_linear_m_s
+        if (
+            not math.isfinite(gain)
+            or gain <= 0.0
+            or not math.isfinite(derivative_gain)
+            or derivative_gain < 0.0
+            or not math.isfinite(minimum_speed)
+            or minimum_speed < 0.0
+            or minimum_speed > abs(speed_limit_m_s)
+        ):
+            raise MorphologyLibraryError(
+                "Position tracking gains or speed limits are invalid"
+            )
+        current_x_m = float(module_positions[goal.module_id][0])
+        sample = self._position_tracking_sample
+        if sample is None or sample[0] != self._program_step_index:
+            measured_velocity_m_s = 0.0
+        else:
+            _, previous_time_s, previous_x_m = sample
+            elapsed_s = now_s - previous_time_s
+            measured_velocity_m_s = self._position_tracking_velocity_m_s
+            if elapsed_s > 1.0e-6:
+                raw_velocity_m_s = (current_x_m - previous_x_m) / elapsed_s
+                # Pose estimates contain contact jitter. A modest low-pass
+                # keeps the D term from chattering the wheel command.
+                measured_velocity_m_s = (
+                    0.35 * raw_velocity_m_s
+                    + 0.65 * self._position_tracking_velocity_m_s
+                )
+        self._position_tracking_sample = (
+            self._program_step_index,
+            now_s,
+            current_x_m,
+        )
+        self._position_tracking_velocity_m_s = measured_velocity_m_s
+
+        direction = 1.0 if step.linear_m_s > 0.0 else -1.0
+        signed_error_m = direction * (goal.target_x_m - current_x_m)
+        signed_velocity_m_s = direction * measured_velocity_m_s
+        requested_m_s = gain * signed_error_m - (
+            derivative_gain * signed_velocity_m_s
+        )
+        magnitude_m_s = min(
+            abs(speed_limit_m_s), max(minimum_speed, requested_m_s)
+        )
+        return direction * magnitude_m_s
 
     @staticmethod
     def _position_goal_reached(

@@ -14,6 +14,14 @@ from smores_ep.isaac.kinematic_stage import (
 
 PHYSICS_ROOT = "/World/smores_ep"
 
+# Reduced central collision core for the fixed chassis.  The visible CAD has
+# deep wheel-side reliefs, so a near wheel-diameter cuboid is a poor proxy when
+# the module pitches over a sharp riser.  Keeping this core centred and well
+# inside the rolling circle leaves stair-edge contact to the two tire shapes;
+# the separately authored TILT/PAN face and rear skid remain collidable.
+CHASSIS_PROXY_CENTER_M = (0.0, 0.0, 0.0)
+CHASSIS_PROXY_SIZE_M = (0.030, 0.040, 0.030)
+
 
 def _set_link_pose(prim: Any, position: tuple[float, float, float]) -> None:
     from pxr import Gf, UsdGeom
@@ -392,11 +400,15 @@ def build_physics_asset(
             visual_reference,
             dimensions,
         )
+    # Its X-Z corner radius is about 21.2 mm, leaving 9.8 mm inside the
+    # 31.06 mm wheel rolling envelope at every body pitch.  The previous
+    # 38 x 40 mm proxy left only 0.6 mm nominal radial margin, which was less
+    # than the effective PhysX contact skin at a sharp stair edge.
     _add_box_collider(
         stage,
         f"{body_path}/colliders/chassis",
-        (-0.0040, 0.0, 0.0),
-        (0.060, 0.046, 0.058),
+        CHASSIS_PROXY_CENTER_M,
+        CHASSIS_PROXY_SIZE_M,
         body_material,
     )
     # The rear lower edge is the low-friction third support described by

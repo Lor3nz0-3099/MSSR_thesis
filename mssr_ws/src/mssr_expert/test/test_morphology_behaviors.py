@@ -9,6 +9,9 @@ import pytest
 
 from mssr_expert.behaviors.morphology_library import (
     AssignedModule,
+    BehaviorProgramStep,
+    JointTarget,
+    LongitudinalDisplacementGoal,
     MorphologyLibrary,
     MorphologyLibraryError,
 )
@@ -148,6 +151,20 @@ def _succeeded(goal) -> dict:
     }
 
 
+def _accepted(goal) -> dict:
+    return {
+        "schema_version": "mssr.primitive_status.v1",
+        "goal_id": goal.goal_id,
+        "primitive": goal.primitive,
+        "state": "accepted",
+        "module_ids": list(goal.module_ids),
+        "phase": "admission",
+        "progress": 0.0,
+        "code": "ACCEPTED",
+        "message": "accepted",
+    }
+
+
 def _finish_posture(executor: MorphologyBehaviorExecutor, now_s: float):
     decision = executor.step(now_s)
     while decision.primitive_goal is not None:
@@ -171,6 +188,92 @@ def _finish_program_posture(
             _succeeded(decision.primitive_goal),
         )
     return decision, goals
+
+
+def test_posture_displacement_step_reshapes_while_wheels_advance() -> None:
+    """A caterpillar transfer must not brake before each joint update."""
+
+    assignments = _assignments(SNAKE8_ROLES)
+    step = BehaviorProgramStep(
+        phase="TRANSFER",
+        posture_targets=(
+            JointTarget(
+                module_id="m3",
+                joint="tilt",
+                angle_rad=0.35,
+                target_vertex_id="v3",
+                target_role="snake_center_rear",
+                coordination_group="stair:transfer",
+            ),
+        ),
+        linear_m_s=0.025,
+        active_target_roles=SNAKE8_ROLES,
+        displacement_goal=LongitudinalDisplacementGoal(
+            module_ids=("m0", "m1", "m2"),
+            distance_m=0.020,
+            tolerance_m=0.002,
+        ),
+        hold_locomotion_until_admitted=False,
+    )
+    executor = MorphologyBehaviorExecutor(_library())
+    executor.start(
+        MorphologyCommand(
+            command_id="coupled-transfer",
+            morphology="snake8",
+            behavior="crawl_stairs_spatial_concertina",
+        ),
+        assignments,
+        program_steps_override=(step,),
+    )
+    origin = {
+        f"m{index}": (0.10 * index, 0.0, 0.03)
+        for index in range(8)
+    }
+
+    dispatched = executor.step(0.0, module_positions=origin)
+    assert dispatched.primitive_goal is not None
+    assert dispatched.locomotion
+    assert all(
+        command["vx"] == pytest.approx(0.025)
+        for command in dispatched.locomotion.values()
+    )
+
+    admitted = executor.step(
+        0.01,
+        _accepted(dispatched.primitive_goal),
+        origin,
+    )
+    assert admitted.state == "WAITING_JOINT"
+    assert admitted.locomotion
+    assert all(
+        command["vx"] == pytest.approx(0.025)
+        for command in admitted.locomotion.values()
+    )
+
+    halfway = dict(origin)
+    for module_id in ("m0", "m1", "m2"):
+        x_m, y_m, z_m = halfway[module_id]
+        halfway[module_id] = (x_m + 0.010, y_m, z_m)
+    posture_done = executor.step(
+        0.02,
+        _succeeded(dispatched.primitive_goal),
+        halfway,
+    )
+    assert posture_done.state == "RUNNING_PROGRAM_DRIVE"
+    assert posture_done.locomotion
+
+    beyond_goal = dict(origin)
+    for module_id in ("m0", "m1", "m2"):
+        x_m, y_m, z_m = beyond_goal[module_id]
+        beyond_goal[module_id] = (x_m + 0.019, y_m, z_m)
+    barrier = executor.step(0.03, module_positions=beyond_goal)
+    assert barrier.state == "PROGRAM_BARRIER"
+    assert barrier.locomotion == {}
+
+    finished = executor.step(0.04, module_positions=beyond_goal)
+    assert finished.done
+    assert finished.success
+    assert finished.locomotion == {}
 
 
 def _angles_by_module(goals) -> dict[str, float]:
