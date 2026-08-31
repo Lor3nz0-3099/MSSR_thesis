@@ -15,6 +15,7 @@ from smores_ep.config.simulation import DynamicSimulationConfig
 from smores_ep.isaac.physics_asset import (
     CHASSIS_PROXY_CENTER_M,
     CHASSIS_PROXY_SIZE_M,
+    PAN_FACE_COLLISION_RADIUS_M,
 )
 
 
@@ -49,6 +50,21 @@ def test_chassis_proxy_stays_well_inside_wheel_envelope_at_every_pitch() -> None
     # An eight-millimetre minimum gap remains larger than the collision skin
     # observed at the seed-3000 stair edge.
     assert geometry.wheel_radius_m - radial_extent >= 0.008
+
+
+def test_pan_face_collision_proxy_is_inset_from_visual_rim() -> None:
+    geometry = SmoresGeometry()
+
+    # Keep the planner/visual envelope exact while preventing the perfectly
+    # sharp PhysX rim from becoming a stair-edge brake.
+    assert PAN_FACE_COLLISION_RADIUS_M < geometry.pan_face_radius_m
+
+    # The proxy should also sit inside the driven-wheel rolling envelope so
+    # small rim contacts do not unload the wheels first.
+    assert PAN_FACE_COLLISION_RADIUS_M < geometry.wheel_radius_m
+
+    # Do not hide large portions of the real connector geometry.
+    assert geometry.pan_face_radius_m - PAN_FACE_COLLISION_RADIUS_M <= 0.002
 
 
 def test_payload_overdrive_scales_effort_and_stiffens_holding_drives() -> None:

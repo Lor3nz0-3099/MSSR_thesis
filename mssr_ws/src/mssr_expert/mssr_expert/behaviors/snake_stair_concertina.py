@@ -88,11 +88,46 @@ class SnakeStairConcertinaPlanner:
         corner_radius = max(
             wheel_radius, forward_extent, pan_face_radius
         ) + edge_safety
-        approach_run = self._number(
-            parameters, "path_approach_run_m", max(0.135, 1.70 * spacing)
+        # Preserve a real horizontal support plateau on each tread.
+        #
+        # Two consecutive Snake8 module centres are one rigid link apart.
+        # The previous 135 mm approach + 105 mm landing consumed 240 mm of
+        # the reference 272 mm tread, leaving only 32 mm flat: physically
+        # impossible for two consecutive modules to share the tread.
+        #
+        # The new defaults leave about 102 mm flat for seed-3000:
+        #   272 - 110 - 60 = 102 mm
+        # versus the measured ~77.77 mm module spacing.
+        support_margin = self._number(
+            parameters, "path_support_margin_m", 0.012
         )
+        if not 0.005 <= support_margin <= 0.030:
+            raise SnakeStairGaitError(
+                "path_support_margin_m must be in [0.005, 0.030]"
+            )
+
+        # Reserve one complete rigid link plus support margin as a flat
+        # two-module support plateau, then use all remaining available tread
+        # before the riser for the smooth ascent.  This minimizes curvature
+        # without sacrificing the two-module support condition.
         landing_run = self._number(
-            parameters, "path_landing_run_m", max(0.105, 1.30 * spacing)
+            parameters, "path_landing_run_m", max(0.060, 0.75 * spacing)
+        )
+        maximum_support_preserving_approach = (
+            staircase.tread_depth_m
+            - landing_run
+            - spacing
+            - support_margin
+        )
+        if maximum_support_preserving_approach < 0.080:
+            raise SnakeStairGaitError(
+                "Stair tread is too short for the required two-module "
+                "support plateau and minimum approach run"
+            )
+        approach_run = self._number(
+            parameters,
+            "path_approach_run_m",
+            min(0.180, maximum_support_preserving_approach),
         )
         if not 0.080 <= approach_run <= 0.180:
             raise SnakeStairGaitError(
@@ -101,6 +136,17 @@ class SnakeStairConcertinaPlanner:
         if not 0.060 <= landing_run <= 0.140:
             raise SnakeStairGaitError(
                 "path_landing_run_m must be in [0.060, 0.140]"
+            )
+
+        support_plateau = (
+            staircase.tread_depth_m - approach_run - landing_run
+        )
+        minimum_support_plateau = spacing + support_margin
+        if support_plateau + 1.0e-9 < minimum_support_plateau:
+            raise SnakeStairGaitError(
+                "Stair path leaves insufficient two-module support plateau: "
+                f"{support_plateau:.4f} m available, "
+                f"{minimum_support_plateau:.4f} m required"
             )
         path = WheelCenterPath(
             staircase=staircase,

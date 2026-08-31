@@ -172,8 +172,12 @@ class SmoresContactConfig:
     # low-friction skid. Keep it separate from the chassis material.
     skid_static_friction: float = 0.03
     skid_dynamic_friction: float = 0.02
-    pan_static_friction: float = 0.25
-    pan_dynamic_friction: float = 0.20
+    # EP-face/module-on-table friction was experimentally measured
+    # at about mu=0.15.  The TOP face can become a passive sliding
+    # support during articulated Snake8 locomotion, so it must not
+    # behave like a high-friction brake when it contacts the terrain.
+    pan_static_friction: float = 0.15
+    pan_dynamic_friction: float = 0.12
 
     def __post_init__(self) -> None:
         values = tuple(self.__dict__.values())

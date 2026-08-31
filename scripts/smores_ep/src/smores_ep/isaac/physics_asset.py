@@ -20,6 +20,13 @@ PHYSICS_ROOT = "/World/smores_ep"
 # inside the rolling circle leaves stair-edge contact to the two tire shapes;
 # the separately authored TILT/PAN face and rear skid remain collidable.
 CHASSIS_PROXY_CENTER_M = (0.0, 0.0, 0.0)
+# The visual TOP/EP face is 31.40 mm in radius, but a full-radius
+# sharp PhysX cylinder can wedge on stair/ground edges when the module
+# pitches.  Keep the visual/planning envelope exact and use only a modest
+# inset for the contact proxy, approximating the real edge chamfer,
+# tolerances and local compliance.
+PAN_FACE_COLLISION_RADIUS_M = 0.03000
+
 CHASSIS_PROXY_SIZE_M = (0.030, 0.040, 0.030)
 
 
@@ -111,15 +118,27 @@ def _add_convex_cylinder_collider(
     height_m: float,
     material: Any,
     sides: int = 32,
+    *,
+    contact_offset_m: float | None = None,
+    rest_offset_m: float = 0.0,
 ) -> Any:
     """Create an explicit convex wheel shape for reliable dynamic contact."""
 
-    from pxr import Gf, UsdGeom, UsdPhysics
+    from pxr import Gf, PhysxSchema, UsdGeom, UsdPhysics
 
     if axis not in ("X", "Y"):
         raise ValueError(f"Unsupported convex-cylinder axis: {axis}")
     if sides < 8:
         raise ValueError("Convex cylinder requires at least eight sides")
+    if contact_offset_m is not None:
+        if contact_offset_m <= 0.0:
+            raise ValueError("contact_offset_m must be positive")
+        if rest_offset_m < 0.0:
+            raise ValueError("rest_offset_m must be non-negative")
+        if rest_offset_m >= contact_offset_m:
+            raise ValueError(
+                "rest_offset_m must be smaller than contact_offset_m"
+            )
 
     half_height = 0.5 * height_m
     points = []
@@ -157,6 +176,15 @@ def _add_convex_cylinder_collider(
     UsdPhysics.CollisionAPI.Apply(mesh.GetPrim())
     mesh_collision = UsdPhysics.MeshCollisionAPI.Apply(mesh.GetPrim())
     mesh_collision.CreateApproximationAttr("convexHull")
+
+    if contact_offset_m is not None:
+        # Generate tire/terrain contacts before a sharp stair edge can
+        # penetrate deeply into the convex wheel proxy.  restOffset=0 keeps
+        # the physical resting surface at the actual wheel geometry.
+        physx_collision = PhysxSchema.PhysxCollisionAPI.Apply(mesh.GetPrim())
+        physx_collision.CreateRestOffsetAttr(float(rest_offset_m))
+        physx_collision.CreateContactOffsetAttr(float(contact_offset_m))
+
     _bind_collision_material(mesh.GetPrim(), material)
     return mesh
 
@@ -414,11 +442,20 @@ def build_physics_asset(
     # The rear lower edge is the low-friction third support described by
     # Davey et al. Its transformed CAD bottom is z=-29.23 mm; the former
     # proxy extended to -32.5 mm and unloaded the driving wheels.
+    # Keep the passive rear skid inside the wheel rolling envelope in X-Z.
+    # The previous centre (-28, -27.98) mm had a radial extent of ~39.6 mm,
+    # far outside the ~31.06 mm driven-wheel radius.  When the module pitched
+    # on stairs it therefore became the first rigid contact at a riser and
+    # geometrically wedged the body even with very low skid friction.
+    #
+    # At z=-10 mm the centre radius is ~29.7 mm; with the 1.25 mm sphere the
+    # proxy remains approximately inside the wheel envelope while preserving
+    # a passive low-friction rear contact.
     for side, y_m in (("left", 0.0255), ("right", -0.0255)):
         _add_sphere_collider(
             stage,
             f"{body_path}/colliders/rear_skid_{side}",
-            (-0.028, y_m, -0.02798),
+            (-0.028, y_m, -0.010),
             0.00125,
             skid_material,
         )
@@ -442,6 +479,8 @@ def build_physics_asset(
         dimensions.wheel_radius_m,
         dimensions.wheel_width_m,
         wheel_material,
+        contact_offset_m=0.0020,
+        rest_offset_m=0.0,
     )
 
     right_path = f"{PHYSICS_ROOT}/right_wheel_link"
@@ -463,6 +502,8 @@ def build_physics_asset(
         dimensions.wheel_radius_m,
         dimensions.wheel_width_m,
         wheel_material,
+        contact_offset_m=0.0020,
+        rest_offset_m=0.0,
     )
 
     tilt_path = f"{PHYSICS_ROOT}/tilt_link"
@@ -504,7 +545,7 @@ def build_physics_asset(
         stage,
         f"{pan_path}/colliders/face",
         "X",
-        dimensions.pan_face_radius_m,
+        PAN_FACE_COLLISION_RADIUS_M,
         dimensions.pan_face_thickness_m,
         pan_material,
     )

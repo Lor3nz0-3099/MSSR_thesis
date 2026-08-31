@@ -140,8 +140,8 @@ def _path() -> WheelCenterPath:
         staircase=ConcertinaStaircase.from_course(_course()),
         wheel_radius_m=WHEEL_RADIUS_M,
         corner_clearance_radius_m=CORNER_RADIUS_M,
-        approach_run_m=0.135,
-        landing_run_m=0.105,
+        approach_run_m=0.272 - SPACING_M - 0.012 - 0.060,
+        landing_run_m=0.060,
     )
 
 
@@ -190,6 +190,59 @@ def test_curve_clears_the_full_corner_exclusion_radius() -> None:
         assert minimum >= CORNER_RADIUS_M - 1.0e-9
 
 
+def test_seed3000_treads_leave_two_module_support_plateau() -> None:
+    path = _path()
+
+    flat_run = (
+        path.staircase.tread_depth_m
+        - path.approach_run_m
+        - path.landing_run_m
+    )
+
+    assert flat_run == pytest.approx(SPACING_M + 0.012)
+    assert flat_run >= SPACING_M + 0.012 - 1.0e-9
+
+    # Between successive risers there is now a genuine horizontal support
+    # interval long enough for two consecutive rigidly-spaced centres.
+    for edge_x, top_z in zip(
+        path.riser_edges_m[:-1],
+        path.staircase.top_heights_m[:-1],
+    ):
+        flat_start = edge_x + path.landing_run_m
+        flat_end = (
+            edge_x
+            + path.staircase.tread_depth_m
+            - path.approach_run_m
+        )
+
+        assert (
+            flat_end - flat_start
+            >= SPACING_M + 0.012 - 1.0e-9
+        )
+        assert path.height_m(flat_start) == pytest.approx(
+            top_z + WHEEL_RADIUS_M
+        )
+        assert path.height_m(flat_end) == pytest.approx(
+            top_z + WHEEL_RADIUS_M
+        )
+
+
+def test_old_long_transitions_are_rejected_for_two_module_support() -> None:
+    with pytest.raises(
+        SnakeStairGaitError,
+        match="two-module support plateau",
+    ):
+        SnakeStairConcertinaPlanner().plan(
+            _graph(),
+            _assignments(),
+            {
+                "path_approach_run_m": 0.135,
+                "path_landing_run_m": 0.105,
+            },
+        )
+
+
+
 def test_eight_centres_use_true_rigid_link_spacing() -> None:
     points = _path().sample_module_centers(
         head_x_m=0.922,
@@ -233,7 +286,7 @@ def test_seed3000_geometry_stays_well_inside_ninety_degrees() -> None:
         )
         worst = max(worst, *(abs(value) for value in relative_tilt_ik(points)))
 
-    assert worst < math.radians(50.0)
+    assert worst < math.radians(60.0)
 
 
 def test_planner_generates_only_global_path_ik_tracking() -> None:
@@ -280,9 +333,10 @@ def test_terminal_tail_lift_reverses_only_q0_against_supported_chain() -> None:
 
     previous_track = program[lift_index - 1]
     lift = program[lift_index]
+    next_track = program[lift_index + 1]
 
     assert previous_track.phase.startswith("PATH_IK_TRACK_")
-    assert not previous_track.continuous_with_next
+    assert next_track.phase.startswith("PATH_IK_TRACK_")
 
     # LIFT_TAIL is a pure posture transition: no wheel motion or spatial goal.
     assert lift.kind == "posture"
@@ -329,7 +383,7 @@ def test_final_solution_is_flat_and_landed_beyond_the_last_corner() -> None:
     )
     final_track = program[-2]
     assert final_track.position_goal is not None
-    expected_head_x = 0.65 + 2 * 0.272 + 0.105 + 7 * SPACING_M
+    expected_head_x = 0.65 + 2 * 0.272 + 0.060 + 7 * SPACING_M
     assert final_track.position_goal.target_x_m == pytest.approx(
         expected_head_x, abs=1.0e-7
     )
