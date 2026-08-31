@@ -244,12 +244,18 @@ def test_planner_generates_only_global_path_ik_tracking() -> None:
 
     assert phases[0] == "PATH_IK_PRELOAD"
     assert phases[-1] == "PATH_IK_UPPER_DECK_SETTLE"
+    assert phases.count("PATH_IK_LIFT_TAIL") == 1
     assert all(
         token not in phase
         for phase in phases
         for token in ("BUILD", "GROW", "SHIFT", "ADVANCE")
     )
-    tracking = program[1:-1]
+
+    tracking = tuple(
+        step
+        for step in program
+        if step.phase.startswith("PATH_IK_TRACK_")
+    )
     assert tracking
     assert all(step.kind == "posture_drive" for step in tracking)
     assert all(len(step.posture_targets) == 8 for step in program)
@@ -259,6 +265,55 @@ def test_planner_generates_only_global_path_ik_tracking() -> None:
         target.angle_reference == "captured_neutral"
         for step in program
         for target in step.posture_targets
+    )
+
+
+def test_terminal_tail_lift_reverses_only_q0_against_supported_chain() -> None:
+    assignments = _assignments()
+    program = SnakeStairConcertinaPlanner().plan(
+        _graph(), assignments, {}
+    )
+    phases = tuple(step.phase for step in program)
+
+    lift_index = phases.index("PATH_IK_LIFT_TAIL")
+    assert lift_index > 0
+
+    previous_track = program[lift_index - 1]
+    lift = program[lift_index]
+
+    assert previous_track.phase.startswith("PATH_IK_TRACK_")
+    assert not previous_track.continuous_with_next
+
+    # LIFT_TAIL is a pure posture transition: no wheel motion or spatial goal.
+    assert lift.kind == "posture"
+    assert lift.position_goal is None
+    assert lift.displacement_goal is None
+
+    before = {
+        target.module_id: target.angle_rad
+        for target in previous_track.posture_targets
+    }
+    lifted = {
+        target.module_id: target.angle_rad
+        for target in lift.posture_targets
+    }
+
+    assert set(before) == set(lifted)
+    tail_id = assignments[0].module_id
+
+    # q0 alone changes sign: the support side of the serial chain has changed.
+    assert abs(before[tail_id]) > math.radians(3.0)
+    assert lifted[tail_id] == pytest.approx(-before[tail_id])
+
+    for assignment in assignments[1:]:
+        assert lifted[assignment.module_id] == pytest.approx(
+            before[assignment.module_id]
+        )
+
+    # Normal IK resumes after the special terminal reaction maneuver.
+    assert any(
+        step.phase.startswith("PATH_IK_TRACK_")
+        for step in program[lift_index + 1 : -1]
     )
 
 

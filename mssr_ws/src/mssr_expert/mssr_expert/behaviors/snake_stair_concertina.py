@@ -202,6 +202,31 @@ class SnakeStairConcertinaPlanner:
             for head_x in head_waypoints
         )
 
+        # Terminal boundary condition: when the first rigid link straddles
+        # the final riser, v1 is already supported by the upper structure but
+        # v0 has no upstream module available to lift it.  The ordinary IK
+        # assumes v0 as the kinematic base; physically we instead use the
+        # already-landed chain as the reaction support and reverse q0 once.
+        #
+        # Pick the *last* still-ascending straddling waypoint so this special
+        # action is confined to the terminal tail transfer.
+        tail_lift_candidates = tuple(
+            index
+            for index, (points, tilts) in enumerate(
+                solutions[1:], start=1
+            )
+            if (
+                points[0].x_m < last_edge <= points[1].x_m
+                and points[1].z_m > points[0].z_m + 1.0e-4
+                and abs(tilts[0]) > math.radians(3.0)
+            )
+        )
+        if not tail_lift_candidates:
+            raise SnakeStairGaitError(
+                "Path IK has no supported terminal tail-lift configuration"
+            )
+        tail_lift_index = tail_lift_candidates[-1]
+
         all_roles = tuple(item.target_role for item in ordered)
         program: list[BehaviorProgramStep] = []
         _, initial_tilts = solutions[0]
@@ -237,13 +262,47 @@ class SnakeStairConcertinaPlanner:
                         target_x_m=head_x,
                         tolerance_m=goal_tolerance,
                     ),
-                    continuous_with_next=index < interval_count,
+                    continuous_with_next=(
+                        index < interval_count
+                        and index != tail_lift_index
+                    ),
                     hold_locomotion_until_admitted=True,
                     position_tracking_kp_s_inv=tracking_kp,
                     position_tracking_kd=tracking_kd,
                     minimum_tracking_linear_m_s=minimum_speed,
                 )
             )
+
+            if index == tail_lift_index:
+                reaction_tilts = list(tilts)
+
+                # The normal path IK is written with v0 as the kinematic
+                # base.  At the terminal boundary v1..v7 are the supported
+                # side instead, therefore q0 must act by equal-and-opposite
+                # reaction against that chain.
+                reaction_tilts[0] = -float(tilts[0])
+
+                lower, upper = safe_bounds[0]
+                if not (
+                    lower - 1.0e-9
+                    <= reaction_tilts[0]
+                    <= upper + 1.0e-9
+                ):
+                    raise SnakeStairGaitError(
+                        "Terminal tail self-lift exceeds the safe q0 "
+                        "TILT range"
+                    )
+
+                program.append(
+                    BehaviorProgramStep(
+                        phase="PATH_IK_LIFT_TAIL",
+                        posture_targets=self._posture_targets(
+                            phase="PATH_IK_LIFT_TAIL",
+                            tilts=reaction_tilts,
+                            assignments=ordered,
+                        ),
+                    )
+                )
 
         final_points, final_tilts = solutions[-1]
         if final_points[0].x_m + 1.0e-6 < last_edge + tail_landing_inset:
