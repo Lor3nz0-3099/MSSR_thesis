@@ -1098,6 +1098,11 @@ class MorphologyBehaviorExecutor:
             return speed_limit_m_s
         derivative_gain = step.position_tracking_kd
         minimum_speed = step.minimum_tracking_linear_m_s
+        settled_speed_limit = abs(
+            step.posture_reached_linear_m_s
+            if step.posture_reached_linear_m_s is not None
+            else step.linear_m_s
+        )
         if (
             not math.isfinite(gain)
             or gain <= 0.0
@@ -1105,7 +1110,8 @@ class MorphologyBehaviorExecutor:
             or derivative_gain < 0.0
             or not math.isfinite(minimum_speed)
             or minimum_speed < 0.0
-            or minimum_speed > abs(speed_limit_m_s)
+            or minimum_speed
+            > max(abs(step.linear_m_s), settled_speed_limit)
         ):
             raise MorphologyLibraryError(
                 "Position tracking gains or speed limits are invalid"
@@ -1139,8 +1145,17 @@ class MorphologyBehaviorExecutor:
         requested_m_s = gain * signed_error_m - (
             derivative_gain * signed_velocity_m_s
         )
+        # A synchronized posture-drive deliberately uses a lower speed while
+        # loaded TILTs move, then switches to ``posture_reached_linear_m_s``.
+        # Clamp the requested anti-stall floor to the active phase limit; the
+        # former strict comparison crashed the behavior node whenever the
+        # synchronized limit fell below the settled 20 mm/s floor.
+        effective_minimum_m_s = min(
+            minimum_speed, abs(speed_limit_m_s)
+        )
         magnitude_m_s = min(
-            abs(speed_limit_m_s), max(minimum_speed, requested_m_s)
+            abs(speed_limit_m_s),
+            max(effective_minimum_m_s, requested_m_s),
         )
         return direction * magnitude_m_s
 

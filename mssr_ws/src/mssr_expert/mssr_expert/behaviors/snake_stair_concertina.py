@@ -151,7 +151,7 @@ class SnakeStairConcertinaPlanner:
             parameters, "trajectory_tracking_kd", 0.25
         )
         minimum_speed = self._number(
-            parameters, "trajectory_tracking_min_linear_m_s", 0.012
+            parameters, "trajectory_tracking_min_linear_m_s", 0.020
         )
         if not 0.2 <= tracking_kp <= 8.0:
             raise SnakeStairGaitError(
@@ -362,7 +362,7 @@ class SnakeStairConcertinaPlanner:
                     posture_reached_active_target_roles=all_roles,
                     position_tracking_kp_s_inv=tracking_kp,
                     position_tracking_kd=tracking_kd,
-                    minimum_tracking_linear_m_s=0.020,
+                    minimum_tracking_linear_m_s=minimum_speed,
                 )
             )
 

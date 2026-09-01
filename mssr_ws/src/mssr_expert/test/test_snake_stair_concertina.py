@@ -483,10 +483,7 @@ def test_path_translation_slows_while_loaded_tilts_are_moving() -> None:
     for step in tracking:
         assert 0.0 < step.linear_m_s <= 0.040
         assert step.posture_reached_linear_m_s == pytest.approx(0.040)
-        assert (
-            step.minimum_tracking_linear_m_s
-            <= step.linear_m_s + 1.0e-12
-        )
+        assert step.minimum_tracking_linear_m_s == pytest.approx(0.020)
 
 
 def test_path_ik_keeps_all_eight_modules_in_traction() -> None:
@@ -630,3 +627,42 @@ def test_pd_tracking_decelerates_from_live_position_and_velocity() -> None:
 
     assert first == pytest.approx(0.024)
     assert 0.005 <= second < first
+
+
+def test_pd_floor_is_clamped_during_synchronized_tilt_motion() -> None:
+    executor = MorphologyBehaviorExecutor(_library())
+    step = BehaviorProgramStep(
+        phase="PATH_IK_TRACK_SYNC_TEST",
+        linear_m_s=0.010,
+        posture_reached_linear_m_s=0.040,
+        active_target_roles=ROLES,
+        position_goal=LongitudinalPositionGoal("m7", 1.012, 0.001),
+        position_tracking_kp_s_inv=2.0,
+        position_tracking_kd=0.25,
+        minimum_tracking_linear_m_s=0.020,
+    )
+    executor.start(
+        MorphologyCommand(
+            "path-pd-sync-test",
+            "snake8",
+            "crawl_stairs_spatial_concertina",
+        ),
+        _assignments(),
+        program_steps_override=(step,),
+    )
+
+    deforming = executor._position_tracking_speed(
+        step,
+        0.0,
+        {"m7": (1.000, 0.0, 0.03)},
+        speed_limit_m_s=0.010,
+    )
+    settled = executor._position_tracking_speed(
+        step,
+        0.1,
+        {"m7": (1.002, 0.0, 0.03)},
+        speed_limit_m_s=0.040,
+    )
+
+    assert deforming == pytest.approx(0.010)
+    assert settled >= 0.020
