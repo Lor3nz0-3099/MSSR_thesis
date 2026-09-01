@@ -79,7 +79,7 @@ class SnakeStairConcertinaPlanner:
             )
 
         edge_safety = self._number(
-            parameters, "path_corner_safety_m", 0.005
+            parameters, "path_corner_safety_m", 0.020
         )
         if not 0.003 <= edge_safety <= 0.020:
             raise SnakeStairGaitError(
@@ -157,7 +157,7 @@ class SnakeStairConcertinaPlanner:
         )
 
         trajectory_step = self._number(
-            parameters, "trajectory_step_m", 0.012
+            parameters, "trajectory_step_m", 0.005
         )
         if not 0.005 <= trajectory_step <= 0.030:
             raise SnakeStairGaitError(
@@ -292,6 +292,7 @@ class SnakeStairConcertinaPlanner:
             zip(head_waypoints[1:], solutions[1:]), start=1
         ):
             _, tilts = solution
+            previous_tilts = solutions[index - 1][1]
             phase = f"PATH_IK_TRACK_{index:03d}_OF_{interval_count:03d}"
             program.append(
                 BehaviorProgramStep(
@@ -300,6 +301,7 @@ class SnakeStairConcertinaPlanner:
                         phase=phase,
                         tilts=tilts,
                         assignments=ordered,
+                        previous_tilts=previous_tilts,
                     ),
                     linear_m_s=maximum_speed,
                     active_target_roles=all_roles,
@@ -400,7 +402,55 @@ class SnakeStairConcertinaPlanner:
         phase: str,
         tilts: Sequence[float],
         assignments: Sequence[AssignedModule],
+        previous_tilts: Sequence[float] | None = None,
     ) -> tuple[JointTarget, ...]:
+        """Build one coordinated whole-chain TILT target.
+
+        PATH_IK tracking transitions use one common nominal duration instead
+        of giving every actuator the same angular speed.  A joint that must
+        move half as far therefore receives half the speed and reaches its
+        target together with the joint carrying the largest angular change.
+        """
+
+        maximum_servo_speed = 0.45
+        tracking_tolerance = 0.015
+
+        if len(tilts) != len(assignments):
+            raise ValueError("TILT target count does not match assignments")
+
+        if previous_tilts is None:
+            servo_speeds = (maximum_servo_speed,) * len(tilts)
+            tolerance = 0.035
+        else:
+            if len(previous_tilts) != len(tilts):
+                raise ValueError(
+                    "Previous and target TILT vectors must have equal length"
+                )
+
+            deltas = tuple(
+                abs(float(target) - float(previous))
+                for previous, target in zip(previous_tilts, tilts)
+            )
+            largest_delta = max(deltas, default=0.0)
+
+            if largest_delta <= tracking_tolerance:
+                servo_speeds = (maximum_servo_speed,) * len(tilts)
+            else:
+                common_duration_s = (
+                    largest_delta / maximum_servo_speed
+                )
+                servo_speeds = tuple(
+                    maximum_servo_speed
+                    if delta <= tracking_tolerance
+                    else min(
+                        maximum_servo_speed,
+                        max(1.0e-4, delta / common_duration_s),
+                    )
+                    for delta in deltas
+                )
+
+            tolerance = tracking_tolerance
+
         return tuple(
             JointTarget(
                 module_id=assignment.module_id,
@@ -408,10 +458,10 @@ class SnakeStairConcertinaPlanner:
                 angle_rad=float(tilts[index]),
                 target_vertex_id=assignment.target_vertex_id,
                 target_role=assignment.target_role,
-                tolerance_rad=0.035,
+                tolerance_rad=tolerance,
                 coordination_group=f"stair-path:{phase}",
                 max_servo_error_rad=0.05,
-                max_servo_speed_rad_s=0.45,
+                max_servo_speed_rad_s=float(servo_speeds[index]),
                 passive_module_ids=(),
                 angle_reference="captured_neutral",
             )

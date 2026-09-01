@@ -99,6 +99,27 @@ class WheelCenterPath:
                     (x_m - edge_x) / self.landing_run_m
                 )
             height += rise * approach_phase + apex_extra * apex_phase
+
+        # The quintic profile gives a smooth nominal stair trajectory, but
+        # for large requested clearances it can dip back inside the circular
+        # exclusion envelope immediately before/after a top-front corner.
+        #
+        # Keep the smooth profile wherever it is already safe and lift it
+        # only where necessary to remain outside the actual corner envelope.
+        # This is a corner-clearance constraint, not a vertical-riser
+        # avoidance rule.
+        radius = self.corner_clearance_radius_m
+        for edge_x, top_z in zip(
+            self.riser_edges_m,
+            self.staircase.top_heights_m,
+        ):
+            dx = x_m - edge_x
+            if abs(dx) < radius:
+                required_height = top_z + math.sqrt(
+                    max(0.0, radius * radius - dx * dx)
+                )
+                height = max(height, required_height)
+
         return height
 
     def validate_corner_clearance(self, samples_per_corner: int = 400) -> None:

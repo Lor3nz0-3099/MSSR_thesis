@@ -190,6 +190,38 @@ def test_curve_clears_the_full_corner_exclusion_radius() -> None:
         assert minimum >= CORNER_RADIUS_M - 1.0e-9
 
 
+def test_high_clearance_path_clears_twenty_mm_safety_envelope() -> None:
+    high_radius = FORWARD_EXTENT_M + 0.020
+    approach = 0.272 - SPACING_M - 0.012 - 0.060
+
+    path = WheelCenterPath(
+        staircase=ConcertinaStaircase.from_course(_course()),
+        wheel_radius_m=WHEEL_RADIUS_M,
+        corner_clearance_radius_m=high_radius,
+        approach_run_m=approach,
+        landing_run_m=0.060,
+    )
+
+    for edge_x, top_z in zip(
+        path.riser_edges_m,
+        path.staircase.top_heights_m,
+    ):
+        minimum = min(
+            math.hypot(
+                x_m - edge_x,
+                path.height_m(x_m) - top_z,
+            )
+            for x_m in (
+                edge_x - high_radius
+                + 2.0 * high_radius * i / 1000
+                for i in range(1001)
+            )
+        )
+
+        assert minimum >= high_radius - 1.0e-9
+
+
+
 def test_seed3000_treads_leave_two_module_support_plateau() -> None:
     path = _path()
 
@@ -371,6 +403,46 @@ def test_terminal_tail_lift_reverses_only_q0_against_supported_chain() -> None:
     )
 
 
+def test_tracking_tilts_are_time_synchronized() -> None:
+    assignments = _assignments()
+
+    targets = SnakeStairConcertinaPlanner._posture_targets(
+        phase="PATH_IK_TRACK_SYNC_TEST",
+        previous_tilts=(0.0,) * 8,
+        tilts=(0.20, 0.10, 0.005, 0.0, 0.0, 0.0, 0.0, 0.0),
+        assignments=assignments,
+    )
+
+    by_module = {
+        target.module_id: target
+        for target in targets
+    }
+
+    fast = by_module["m0"]
+    slow = by_module["m1"]
+    tiny = by_module["m2"]
+
+    assert fast.max_servo_speed_rad_s == pytest.approx(0.45)
+    assert slow.max_servo_speed_rad_s == pytest.approx(0.225)
+
+    # Both meaningful motions have the same nominal completion time.
+    assert (
+        0.20 / fast.max_servo_speed_rad_s
+        == pytest.approx(
+            0.10 / slow.max_servo_speed_rad_s
+        )
+    )
+
+    # Tiny changes already within tolerance must not slow the entire group.
+    assert tiny.max_servo_speed_rad_s == pytest.approx(0.45)
+
+    assert all(
+        target.tolerance_rad == pytest.approx(0.015)
+        for target in targets
+    )
+
+
+
 def test_final_solution_is_flat_and_landed_beyond_the_last_corner() -> None:
     program = SnakeStairConcertinaPlanner().plan(
         _graph(), _assignments(), {}
@@ -383,7 +455,20 @@ def test_final_solution_is_flat_and_landed_beyond_the_last_corner() -> None:
     )
     final_track = program[-2]
     assert final_track.position_goal is not None
-    expected_head_x = 0.65 + 2 * 0.272 + 0.060 + 7 * SPACING_M
+    # Final tail placement must clear the enlarged corner envelope.
+    # With the default 20 mm safety:
+    #   corner radius = forward extent + safety
+    #   tail inset    = max(landing run, corner radius + 10 mm)
+    expected_tail_inset = max(
+        0.060,
+        FORWARD_EXTENT_M + 0.020 + 0.010,
+    )
+    expected_head_x = (
+        0.65
+        + 2 * 0.272
+        + expected_tail_inset
+        + 7 * SPACING_M
+    )
     assert final_track.position_goal.target_x_m == pytest.approx(
         expected_head_x, abs=1.0e-7
     )
