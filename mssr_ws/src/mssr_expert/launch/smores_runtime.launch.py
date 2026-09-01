@@ -210,6 +210,9 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
                     "behavior_dataset_log_period": LaunchConfiguration(
                         "behavior_dataset_log_period"
                     ),
+                    "control_rate_hz": LaunchConfiguration(
+                        "behavior_control_rate_hz"
+                    ),
                 }
             ],
         ),
@@ -410,6 +413,11 @@ def generate_launch_description() -> LaunchDescription:
                 "behavior_dataset_log_period",
                 default_value="1",
                 description="Record one behavior transition every N ticks.",
+            ),
+            DeclareLaunchArgument(
+                "behavior_control_rate_hz",
+                default_value="10.0",
+                description="Morphology behavior/executor update frequency.",
             ),
             DeclareLaunchArgument(
                 "ros_domain_id",

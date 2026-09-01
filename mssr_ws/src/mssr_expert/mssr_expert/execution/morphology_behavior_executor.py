@@ -107,6 +107,14 @@ class MorphologyBehaviorExecutor:
             "FAILED",
         }
 
+    @property
+    def active_position_goal(self) -> LongitudinalPositionGoal | None:
+        """Expose the current geometric barrier for runtime diagnostics."""
+
+        if not 0 <= self._program_step_index < len(self._program_steps):
+            return None
+        return self._program_steps[self._program_step_index].position_goal
+
     def start(
         self,
         command: MorphologyCommand,
@@ -662,7 +670,13 @@ class MorphologyBehaviorExecutor:
             {}
             if reached or not goal_available
             else self._program_step_locomotion(
-                step, linear_m_s=drive_speed
+                step,
+                linear_m_s=drive_speed,
+                active_target_roles=(
+                    step.posture_reached_active_target_roles
+                    if posture_reached
+                    else None
+                ),
             )
         )
 
@@ -948,6 +962,7 @@ class MorphologyBehaviorExecutor:
         step: BehaviorProgramStep,
         *,
         linear_m_s: float | None = None,
+        active_target_roles: tuple[str, ...] | None = None,
     ) -> dict[str, Mapping[str, float]]:
         resolved_linear_m_s = (
             step.linear_m_s if linear_m_s is None else linear_m_s
@@ -968,10 +983,15 @@ class MorphologyBehaviorExecutor:
             step.yaw_rate_rad_s,
             step.lateral_m_s,
         )
+        resolved_active_roles = (
+            step.active_target_roles
+            if active_target_roles is None
+            else active_target_roles
+        )
         allowed_module_ids = {
             assignment.module_id
             for assignment in self._assignments
-            if assignment.target_role in step.active_target_roles
+            if assignment.target_role in resolved_active_roles
         }
         filtered = {
             module_id: command
@@ -1041,7 +1061,17 @@ class MorphologyBehaviorExecutor:
             speed_limit_m_s=step.linear_m_s,
         )
         return self._program_step_locomotion(
-            step, linear_m_s=drive_speed
+            step,
+            linear_m_s=drive_speed,
+            active_target_roles=(
+                step.posture_reached_active_target_roles
+                if (
+                    self._next_joint_index >= len(self._joint_targets)
+                    and not self._active_goal_ids
+                    and self._awaiting_admission_goal_id is None
+                )
+                else None
+            ),
         )
 
     def _position_tracking_speed(

@@ -309,12 +309,14 @@ class SmoresStateGraphPublisher:
                 },
                 "pan": {
                     "position_rad": joint_state.pan_joint_rad,
+                    "velocity_rad_s": joint_state.pan_joint_rad_s,
                     "continuous": True,
                     "max_velocity_rad_s": actuators.internal_max_speed_rad_s,
                     "max_effort_nm": actuators.pan_max_effort_nm,
                 },
                 "tilt": {
                     "position_rad": -joint_state.tilt_joint_rad,
+                    "velocity_rad_s": -joint_state.tilt_joint_rad_s,
                     "continuous": False,
                     "lower_limit_rad": self._geometry.tilt_min_rad,
                     "upper_limit_rad": self._geometry.tilt_max_rad,

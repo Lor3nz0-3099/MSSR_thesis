@@ -37,6 +37,7 @@ class SnakeStairConcertinaPlanner:
     """
 
     MODULE_COUNT = 8
+    MAX_TRACK_TILT_SPEED_RAD_S = 0.45
 
     def plan(
         self,
@@ -88,46 +89,28 @@ class SnakeStairConcertinaPlanner:
         corner_radius = max(
             wheel_radius, forward_extent, pan_face_radius
         ) + edge_safety
-        # Preserve a real horizontal support plateau on each tread.
+         # Single-module tread support.
         #
-        # Two consecutive Snake8 module centres are one rigid link apart.
-        # The previous 135 mm approach + 105 mm landing consumed 240 mm of
-        # the reference 272 mm tread, leaving only 32 mm flat: physically
-        # impossible for two consecutive modules to share the tread.
+        # Keep the current collider-aware corner clearance and smooth
+        # edge-lifting law, but do not reserve one whole rigid link of flat
+        # tread for two consecutive modules.  The former PATH-IK geometry
+        # used 135 mm of pre-riser rise and 105 mm of post-riser landing.
         #
-        # The new defaults leave about 102 mm flat for seed-3000:
-        #   272 - 110 - 60 = 102 mm
-        # versus the measured ~77.77 mm module spacing.
-        support_margin = self._number(
-            parameters, "path_support_margin_m", 0.012
-        )
-        if not 0.005 <= support_margin <= 0.030:
-            raise SnakeStairGaitError(
-                "path_support_margin_m must be in [0.005, 0.030]"
-            )
-
-        # Reserve one complete rigid link plus support margin as a flat
-        # two-module support plateau, then use all remaining available tread
-        # before the riser for the smooth ascent.  This minimizes curvature
-        # without sacrificing the two-module support condition.
-        landing_run = self._number(
-            parameters, "path_landing_run_m", max(0.060, 0.75 * spacing)
-        )
-        maximum_support_preserving_approach = (
-            staircase.tread_depth_m
-            - landing_run
-            - spacing
-            - support_margin
-        )
-        if maximum_support_preserving_approach < 0.080:
-            raise SnakeStairGaitError(
-                "Stair tread is too short for the required two-module "
-                "support plateau and minimum approach run"
-            )
+        # For seed-3000:
+        #     272 - 135 - 105 = 32 mm
+        #
+        # This gives one local tread support point while the neighbouring
+        # modules are free to belong to the transfer arches.  It avoids
+        # vertically over-constraining the rigid chain against the floor.
         approach_run = self._number(
             parameters,
             "path_approach_run_m",
-            min(0.180, maximum_support_preserving_approach),
+            max(0.135, 1.70 * spacing),
+        )
+        landing_run = self._number(
+            parameters,
+            "path_landing_run_m",
+            max(0.105, 1.30 * spacing),
         )
         if not 0.080 <= approach_run <= 0.180:
             raise SnakeStairGaitError(
@@ -138,16 +121,6 @@ class SnakeStairConcertinaPlanner:
                 "path_landing_run_m must be in [0.060, 0.140]"
             )
 
-        support_plateau = (
-            staircase.tread_depth_m - approach_run - landing_run
-        )
-        minimum_support_plateau = spacing + support_margin
-        if support_plateau + 1.0e-9 < minimum_support_plateau:
-            raise SnakeStairGaitError(
-                "Stair path leaves insufficient two-module support plateau: "
-                f"{support_plateau:.4f} m available, "
-                f"{minimum_support_plateau:.4f} m required"
-            )
         path = WheelCenterPath(
             staircase=staircase,
             wheel_radius_m=wheel_radius,
@@ -192,6 +165,37 @@ class SnakeStairConcertinaPlanner:
             raise SnakeStairGaitError(
                 "trajectory_tracking_min_linear_m_s must be at least 0.005 "
                 "and no larger than linear_m_s"
+            )
+
+        admission_guard_s = self._number(
+            parameters, "joint_admission_guard_s", 0.35
+        )
+        if not 0.10 <= admission_guard_s <= 1.0:
+            raise SnakeStairGaitError(
+                "joint_admission_guard_s must be in [0.10, 1.0]"
+            )
+
+        tilt_completion_fraction = self._number(
+            parameters, "tilt_completion_fraction", 0.65
+        )
+        if not 0.40 <= tilt_completion_fraction <= 0.85:
+            raise SnakeStairGaitError(
+                "tilt_completion_fraction must be in [0.40, 0.85]"
+            )
+
+        raw_settled_traction_module_count = self._number(
+            parameters, "settled_traction_module_count", 2.0
+        )
+        settled_traction_module_count = int(
+            raw_settled_traction_module_count
+        )
+        if (
+            raw_settled_traction_module_count
+            != settled_traction_module_count
+            or not 2 <= settled_traction_module_count <= 4
+        ):
+            raise SnakeStairGaitError(
+                "settled_traction_module_count must be in [2, 4]"
             )
 
         tilt_margin = self._number(
@@ -254,8 +258,11 @@ class SnakeStairConcertinaPlanner:
         # assumes v0 as the kinematic base; physically we instead use the
         # already-landed chain as the reaction support and reverse q0 once.
         #
-        # Pick the *last* still-ascending straddling waypoint so this special
-        # action is confined to the terminal tail transfer.
+        # Pick the last straddling waypoint with a meaningful q0.  With the
+        # clearance-safe early rise, shallow stairs can already be on the
+        # descending side of the apex when the first link crosses the edge;
+        # the equal-and-opposite supported-chain reaction is still the action
+        # that transfers the terminal tail.
         tail_lift_candidates = tuple(
             index
             for index, (points, tilts) in enumerate(
@@ -263,7 +270,6 @@ class SnakeStairConcertinaPlanner:
             )
             if (
                 points[0].x_m < last_edge <= points[1].x_m
-                and points[1].z_m > points[0].z_m + 1.0e-4
                 and abs(tilts[0]) > math.radians(3.0)
             )
         )
@@ -291,8 +297,41 @@ class SnakeStairConcertinaPlanner:
         for index, (head_x, solution) in enumerate(
             zip(head_waypoints[1:], solutions[1:]), start=1
         ):
-            _, tilts = solution
+            points, tilts = solution
             previous_tilts = solutions[index - 1][1]
+
+            segment_distance = (
+                head_x - head_waypoints[index - 1]
+            )
+            maximum_tilt_delta = max(
+                abs(float(target) - float(previous))
+                for previous, target in zip(previous_tilts, tilts)
+            )
+
+            servo_at_limit_s = (
+                maximum_tilt_delta
+                / self.MAX_TRACK_TILT_SPEED_RAD_S
+            )
+
+            # Do not let the wheels outrun the posture trajectory.
+            #
+            # The translational segment lasts at least as long as the
+            # loaded TILT transition.  Once the posture has actually
+            # converged the executor may return to maximum traction speed.
+            segment_duration_s = max(
+                segment_distance / maximum_speed,
+                (
+                    servo_at_limit_s + admission_guard_s
+                ) / tilt_completion_fraction
+                if maximum_tilt_delta > 1.0e-6
+                else 0.0
+            )
+
+            synchronized_linear_speed = min(
+                maximum_speed,
+                segment_distance / segment_duration_s,
+            )
+
             phase = f"PATH_IK_TRACK_{index:03d}_OF_{interval_count:03d}"
             program.append(
                 BehaviorProgramStep(
@@ -303,7 +342,7 @@ class SnakeStairConcertinaPlanner:
                         assignments=ordered,
                         previous_tilts=previous_tilts,
                     ),
-                    linear_m_s=maximum_speed,
+                    linear_m_s=synchronized_linear_speed,
                     active_target_roles=all_roles,
                     position_goal=LongitudinalPositionGoal(
                         module_id=head_module_id,
@@ -315,9 +354,15 @@ class SnakeStairConcertinaPlanner:
                         and index != tail_lift_index
                     ),
                     hold_locomotion_until_admitted=True,
+                    posture_reached_linear_m_s=maximum_speed,
+                    # Snake8 requires distributed traction from the full
+                    # connected chain.  The two-module tread requirement is
+                    # geometric support only; it must never disable the other
+                    # six wheel pairs.
+                    posture_reached_active_target_roles=all_roles,
                     position_tracking_kp_s_inv=tracking_kp,
                     position_tracking_kd=tracking_kd,
-                    minimum_tracking_linear_m_s=minimum_speed,
+                    minimum_tracking_linear_m_s=0.020,
                 )
             )
 
@@ -367,6 +412,61 @@ class SnakeStairConcertinaPlanner:
         )
         return tuple(program)
 
+    @staticmethod
+    def _settled_traction_roles(
+        *,
+        path: WheelCenterPath,
+        points: Sequence[PathPoint],
+        assignments: Sequence[AssignedModule],
+        module_count: int,
+    ) -> tuple[str, ...]:
+        """Select a forward flat-tread support pair after posture settling.
+
+        During the coordinated TILT transition all modules retain the slow
+        rail command.  Once the posture is reached, airborne modules and
+        modules riding the clearance arches no longer receive wheel torque:
+        their free LEFT/RIGHT wheels remain towable while the foremost stable
+        tread pair pulls the chain.  This avoids the measured all-wheel
+        overconstraint where wheels spin but the morphology does not advance.
+        """
+
+        if len(points) != len(assignments):
+            raise ValueError("Path points and assignments must have equal size")
+        supported_by_level: dict[float, list[int]] = {}
+        for index, point in enumerate(points):
+            support_height = path.support_height_m(point.x_m)
+            if abs(point.z_m - support_height) > 0.0015:
+                continue
+            supported_by_level.setdefault(round(support_height, 6), []).append(
+                index
+            )
+
+        eligible_levels = {
+            level: indices
+            for level, indices in supported_by_level.items()
+            if len(indices) >= module_count
+        }
+        if eligible_levels:
+            # Prefer the highest occupied tread.  A front support pulls the
+            # rest of the snake over an edge instead of compressing it from
+            # the floor below.
+            selected_indices = eligible_levels[max(eligible_levels)][
+                -module_count:
+            ]
+        else:
+            supported_indices = sorted(
+                index
+                for indices in supported_by_level.values()
+                for index in indices
+            )
+            if len(supported_indices) < module_count:
+                # Some transition configurations have fewer than two flat
+                # tire contacts. Preserve the validated broad traction there
+                # instead of inventing an airborne support.
+                return tuple(item.target_role for item in assignments)
+            selected_indices = supported_indices[-module_count:]
+        return tuple(assignments[index].target_role for index in selected_indices)
+
     def _solve_waypoint(
         self,
         *,
@@ -412,8 +512,11 @@ class SnakeStairConcertinaPlanner:
         target together with the joint carrying the largest angular change.
         """
 
-        maximum_servo_speed = 0.45
-        tracking_tolerance = 0.015
+        maximum_servo_speed = (
+            SnakeStairConcertinaPlanner.MAX_TRACK_TILT_SPEED_RAD_S
+        )
+        speed_sync_deadband_rad = 0.015
+        tracking_tolerance = math.radians(5.0)
 
         if len(tilts) != len(assignments):
             raise ValueError("TILT target count does not match assignments")
@@ -433,7 +536,7 @@ class SnakeStairConcertinaPlanner:
             )
             largest_delta = max(deltas, default=0.0)
 
-            if largest_delta <= tracking_tolerance:
+            if largest_delta <= speed_sync_deadband_rad:
                 servo_speeds = (maximum_servo_speed,) * len(tilts)
             else:
                 common_duration_s = (
@@ -441,7 +544,7 @@ class SnakeStairConcertinaPlanner:
                 )
                 servo_speeds = tuple(
                     maximum_servo_speed
-                    if delta <= tracking_tolerance
+                    if delta <= speed_sync_deadband_rad
                     else min(
                         maximum_servo_speed,
                         max(1.0e-4, delta / common_duration_s),

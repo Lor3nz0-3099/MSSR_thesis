@@ -28,7 +28,9 @@ class DynamicJointState:
     left_wheel_rad_s: float
     right_wheel_rad_s: float
     tilt_joint_rad: float
+    tilt_joint_rad_s: float
     pan_joint_rad: float
+    pan_joint_rad_s: float
 
 
 class DynamicDriveController:
@@ -245,7 +247,9 @@ class ArticulationStateReader:
                 velocities[self._indices["right_wheel"]]
             ),
             tilt_joint_rad=position("tilt"),
+            tilt_joint_rad_s=float(velocities[self._indices["tilt"]]),
             pan_joint_rad=position("pan"),
+            pan_joint_rad_s=float(velocities[self._indices["pan"]]),
         )
 
     def configure_structural_hold_mode(

@@ -26,13 +26,10 @@ from smores_ep.isaac.obstacle_course import (  # noqa: E402
 
 
 DEFAULT_BEHAVIOR_PARAMETERS = {
-    "riser_approach_linear_m_s": 0.060,
-    "riser_approach_tolerance_m": 0.010,
     "linear_m_s": 0.040,
-    "profile_substeps": 6,
-    "transition_clearance_m": 0.0065,
-    "arch_clearance_m": 0.010,
     "crawl_goal_tolerance_m": 0.004,
+    "path_corner_safety_m": 0.020,
+    "trajectory_step_m": 0.005,
 }
 
 
@@ -200,9 +197,9 @@ def _run_behavior_client(
         "--morphology",
         "snake8",
         "--command-id",
-        f"{episode_id}-crawl-stairs-arch-wave",
+        f"{episode_id}-crawl-stairs-spatial-concertina",
         "--behavior",
-        "crawl_stairs_arch_wave",
+        "crawl_stairs_spatial_concertina",
         "--parameters-json",
         json.dumps(DEFAULT_BEHAVIOR_PARAMETERS, separators=(",", ":")),
     ]
@@ -234,11 +231,11 @@ def run_episode(
         "schema_version": "mssr.stair_headless_episode.v1",
         "episode_id": episode_id,
         "stair": spec.to_dict(),
-        "behavior": "crawl_stairs_arch_wave",
+        "behavior": "crawl_stairs_spatial_concertina",
         "behavior_parameters": DEFAULT_BEHAVIOR_PARAMETERS,
         "curriculum_level": curriculum_level,
         "curriculum_difficulty": curriculum_difficulty,
-        "validated_baseline_commit": "70a3bdc",
+        "planner_profile": "global_path_ik_support_pair_v1",
     }
     (runtime_dir / "manifest.json").write_text(
         json.dumps(manifest, indent=2, sort_keys=True) + "\n",
@@ -274,7 +271,10 @@ def run_episode(
         "behavior_dataset_stage_name:="
         + f"snake8_stairs_{curriculum_level}",
         f"behavior_dataset_difficulty:={curriculum_difficulty}",
-        "behavior_dataset_log_period:=1",
+        "behavior_dataset_log_period:="
+        + str(getattr(args, "behavior_dataset_log_period", 30)),
+        "behavior_control_rate_hz:="
+        + str(getattr(args, "behavior_control_rate_hz", 30.0)),
         f"ros_domain_id:={ros_domain_id}",
         f"rmw_implementation:={rmw_implementation}",
     ]
@@ -296,9 +296,15 @@ def run_episode(
         f"execution_id:={episode_id}-assembly",
         "-p",
         f"episode_id:={episode_id}",
-        "-p",
-        "dataset_path:=" + str(runtime_dir / "assembly_dataset.jsonl"),
     ]
+    if getattr(args, "record_assembly_dataset", False):
+        assembly_command.extend(
+            (
+                "-p",
+                "dataset_path:="
+                + str(runtime_dir / "assembly_dataset.jsonl"),
+            )
+        )
     environment = dict(os.environ)
     environment["PYTHONUNBUFFERED"] = "1"
     ros_log_dir = runtime_dir / "ros_logs"
@@ -393,6 +399,9 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--simulation-speed-factor", type=float, default=1.0)
     parser.add_argument("--assembly-wall-timeout-s", type=float, default=600.0)
     parser.add_argument("--behavior-wall-timeout-s", type=float, default=600.0)
+    parser.add_argument("--behavior-dataset-log-period", type=int, default=30)
+    parser.add_argument("--behavior-control-rate-hz", type=float, default=30.0)
+    parser.add_argument("--record-assembly-dataset", action="store_true")
     return parser
 
 

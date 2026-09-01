@@ -153,9 +153,6 @@ def test_self_assembly_cli_defaults_match_target_demonstration() -> None:
     assert args.stair_depth_m is None
     assert args.stair_count is None
     assert args.simulation_speed_factor == pytest.approx(1.0)
-    assert args.wheel_friction_scale == pytest.approx(1.50)
-    assert args.actuator_effort_scale == pytest.approx(4.0)
-    assert args.tilt_effort_scale == pytest.approx(8.0)
 
 
 def test_course_cli_options_are_mutually_exclusive() -> None:
@@ -243,18 +240,6 @@ def test_self_assembly_config_validates_all_runtime_frequencies(
             physics_hz=60,
             render_hz=30,
             state_publish_hz=7,
-        )
-
-
-@pytest.mark.parametrize("scale", [0.99, 3.01, math.inf])
-def test_self_assembly_config_rejects_unsafe_wheel_friction_scale(
-    tmp_path,
-    scale,
-) -> None:
-    with pytest.raises(ValueError):
-        SelfAssemblySimulationConfig(
-            physics_usd=tmp_path / "physics.usd",
-            wheel_friction_scale=scale,
         )
 
 

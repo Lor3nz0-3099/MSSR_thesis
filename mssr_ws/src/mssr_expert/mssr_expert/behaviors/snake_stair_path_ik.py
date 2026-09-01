@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 from typing import Sequence
 
@@ -36,6 +36,7 @@ class WheelCenterPath:
     corner_clearance_radius_m: float
     approach_run_m: float
     landing_run_m: float
+    transition_bias: float = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
         values = (
@@ -58,6 +59,11 @@ class WheelCenterPath:
             raise SnakeStairGaitError(
                 "Wheel-centre smoothing consumes an entire stair tread"
             )
+        object.__setattr__(
+            self,
+            "transition_bias",
+            self._solve_transition_bias(),
+        )
         self.validate_corner_clearance()
 
     @property
@@ -73,11 +79,31 @@ class WheelCenterPath:
         value = max(0.0, min(1.0, value))
         return value**3 * (value * (value * 6.0 - 15.0) + 10.0)
 
+    @classmethod
+    def _biased_smootherstep(cls, value: float, bias: float) -> float:
+        """Return a C2 monotone transition with adjustable timing.
+
+        ``bias < 1`` advances the rise while preserving zero endpoint slope
+        and curvature.  Its reciprocal delays the landing descent.  This is
+        used to clear a corner continuously instead of inserting the upper
+        circular branch with a discontinuous hard ``max``.
+        """
+
+        forward = cls._smootherstep(value)
+        reverse = cls._smootherstep(1.0 - value)
+        denominator = forward + bias * reverse
+        if denominator <= 0.0:
+            return 1.0 if value >= 1.0 else 0.0
+        return forward / denominator
+
     def height_m(self, x_m: float) -> float:
         """Return the desired module-centre height at world X."""
 
         if not math.isfinite(x_m):
             raise SnakeStairGaitError("Path query X must be finite")
+        return self._height_with_bias(x_m, self.transition_bias)
+
+    def _height_with_bias(self, x_m: float, bias: float) -> float:
         height = self.wheel_radius_m
         lower_top = 0.0
         apex_extra = (
@@ -88,39 +114,78 @@ class WheelCenterPath:
         ):
             rise = upper_top - lower_top
             lower_top = upper_top
-            approach_phase = self._smootherstep(
+            approach_phase = self._biased_smootherstep(
                 (x_m - (edge_x - self.approach_run_m))
-                / self.approach_run_m
+                / self.approach_run_m,
+                bias,
             )
             if x_m <= edge_x:
                 apex_phase = approach_phase
             else:
-                apex_phase = 1.0 - self._smootherstep(
-                    (x_m - edge_x) / self.landing_run_m
+                apex_phase = 1.0 - self._biased_smootherstep(
+                    (x_m - edge_x) / self.landing_run_m,
+                    1.0 / bias,
                 )
             height += rise * approach_phase + apex_extra * apex_phase
+        return height
 
-        # The quintic profile gives a smooth nominal stair trajectory, but
-        # for large requested clearances it can dip back inside the circular
-        # exclusion envelope immediately before/after a top-front corner.
-        #
-        # Keep the smooth profile wherever it is already safe and lift it
-        # only where necessary to remain outside the actual corner envelope.
-        # This is a corner-clearance constraint, not a vertical-riser
-        # avoidance rule.
+    def _solve_transition_bias(self) -> float:
+        """Find the least aggressive smooth timing that clears all corners."""
+
+        lower = 0.001
+        upper = 1.0
+        if not self._bias_clears_corners(lower):
+            raise SnakeStairGaitError(
+                "Stair geometry cannot satisfy smooth corner clearance"
+            )
+        if self._bias_clears_corners(upper):
+            return upper
+        for _ in range(36):
+            middle = 0.5 * (lower + upper)
+            if self._bias_clears_corners(middle):
+                lower = middle
+            else:
+                upper = middle
+        # Retain a small numerical margin between the sampled proof and the
+        # continuous path evaluated by PhysX.
+        return max(0.001, 0.995 * lower)
+
+    def _bias_clears_corners(
+        self,
+        bias: float,
+        samples_per_corner: int = 500,
+    ) -> bool:
         radius = self.corner_clearance_radius_m
         for edge_x, top_z in zip(
             self.riser_edges_m,
             self.staircase.top_heights_m,
         ):
-            dx = x_m - edge_x
-            if abs(dx) < radius:
-                required_height = top_z + math.sqrt(
-                    max(0.0, radius * radius - dx * dx)
+            for index in range(samples_per_corner + 1):
+                x_m = edge_x - radius + (
+                    2.0 * radius * index / samples_per_corner
                 )
-                height = max(height, required_height)
+                distance = math.hypot(
+                    x_m - edge_x,
+                    self._height_with_bias(x_m, bias) - top_z,
+                )
+                if distance + 1.0e-9 < radius:
+                    return False
+        return True
 
-        return height
+    def support_height_m(self, x_m: float) -> float:
+        """Return wheel-centre height for a tire resting on a flat tread."""
+
+        if not math.isfinite(x_m):
+            raise SnakeStairGaitError("Path query X must be finite")
+        top_z = 0.0
+        for edge_x, candidate_top_z in zip(
+            self.riser_edges_m,
+            self.staircase.top_heights_m,
+        ):
+            if x_m < edge_x:
+                break
+            top_z = candidate_top_z
+        return top_z + self.wheel_radius_m
 
     def validate_corner_clearance(self, samples_per_corner: int = 400) -> None:
         """Prove the generated centreline clears every top-front corner."""

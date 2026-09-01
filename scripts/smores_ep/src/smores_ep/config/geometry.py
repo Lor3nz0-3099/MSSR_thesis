@@ -77,7 +77,7 @@ class SmoresGeometry:
     # Both driving wheels reference the same CAD prototype. Its raw mesh is
     # exactly 62 mm in diameter; 31.06 mm includes the sub-0.1 mm tessellation
     # and assembly-orientation envelope measured from the transformed points.
-    wheel_radius_m: float = 0.03106
+    wheel_radius_m: float = 0.03150
     wheel_width_m: float = 0.0165
     pan_face_radius_m: float = 0.03140
     pan_face_thickness_m: float = 0.02030
@@ -176,13 +176,45 @@ class SmoresGeometry:
         )
         return self.source_vector_to_body(delta)  # type: ignore[arg-type]
 
+    def _measured_wheel_centers_body_m(
+        self,
+    ) -> tuple[Vector3, Vector3]:
+        """Raw wheel-axis centres measured from the imported CAD."""
+        return (
+            self.source_point_to_body(self.source_left_wheel_center_m),
+            self.source_point_to_body(self.source_right_wheel_center_m),
+        )
+
     @property
     def left_wheel_center_body_m(self) -> Vector3:
-        return self.source_point_to_body(self.source_left_wheel_center_m)
+        """Symmetric physical left-wheel centre.
+
+        The imported CAD places the two measured wheel axes at slightly
+        different X/Z coordinates (about 0.71 mm in Z).  Using those raw
+        values as articulation anchors systematically preloads one wheel row
+        and unloads the other on a flat floor.
+
+        Preserve the measured track width, but project both physical wheel
+        centres onto their common mean axle.
+        """
+        left, right = self._measured_wheel_centers_body_m()
+
+        axle_x = 0.5 * (left[0] + right[0])
+        axle_z = 0.5 * (left[2] + right[2])
+        half_track = 0.5 * abs(left[1] - right[1])
+
+        return (axle_x, half_track, axle_z)
 
     @property
     def right_wheel_center_body_m(self) -> Vector3:
-        return self.source_point_to_body(self.source_right_wheel_center_m)
+        """Symmetric physical right-wheel centre."""
+        left, right = self._measured_wheel_centers_body_m()
+
+        axle_x = 0.5 * (left[0] + right[0])
+        axle_z = 0.5 * (left[2] + right[2])
+        half_track = 0.5 * abs(left[1] - right[1])
+
+        return (axle_x, -half_track, axle_z)
 
     @property
     def pan_center_body_m(self) -> Vector3:

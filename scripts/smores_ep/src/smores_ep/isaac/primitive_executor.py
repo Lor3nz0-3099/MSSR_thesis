@@ -54,6 +54,8 @@ class _ActiveGoal:
     started_at_s: float
     resources: frozenset[str]
     resource_modes: Mapping[str, str]
+    execution_started_at_s: float | None = None
+    coordination_target_reached: bool = False
     resolved_target_rad: float | None = None
     joint_commanded_target_rad: float | None = None
     joint_commanded_at_s: float | None = None
@@ -194,7 +196,7 @@ class IsaacPrimitiveExecutor:
             self._pose_controller,
             max_linear_speed_m_s=min(
                 self._pose_controller.max_linear_speed_m_s,
-                0.070,
+                0.055,
             ),
             position_tolerance_m=0.002,
             yaw_tolerance_rad=face_alignment_staging_yaw_tolerance_rad,
@@ -531,7 +533,22 @@ class IsaacPrimitiveExecutor:
             if runtime is None:
                 continue
             goal = runtime.goal
-            if now_s - runtime.started_at_s > goal.timeout_s:
+            coordination_group = goal.parameters.get("coordination_group")
+            waiting_for_group = (
+                goal.primitive is PrimitiveName.SET_TILT
+                and coordination_group is not None
+                and str(coordination_group)
+                not in self._released_joint_groups
+            )
+            timeout_started_at_s = (
+                runtime.execution_started_at_s
+                if runtime.execution_started_at_s is not None
+                else runtime.started_at_s
+            )
+            if (
+                not waiting_for_group
+                and now_s - timeout_started_at_s > goal.timeout_s
+            ):
                 contact_timeout = (
                     goal.primitive is PrimitiveName.ALIGN_FACES
                     and runtime.alignment_approach_started
@@ -1849,7 +1866,7 @@ class IsaacPrimitiveExecutor:
             # avoid spending most of an assembly wave on a long alignment arc.
             # The final straight magnetic approach remains independently
             # capped at 25 mm/s.
-            translation_speed_m_s = 0.045
+            translation_speed_m_s = 0.035
             # Eq. (4)-(5) in Liu et al. controls y' and theta' in the target
             # connector frame with K=diag(2, 1). The helper below is the
             # bounded, nonsingular realization of that law: at the requested
@@ -2163,7 +2180,7 @@ class IsaacPrimitiveExecutor:
         tolerance = float(goal.parameters.get("tolerance_rad", tolerance))
         coordination_group = goal.parameters.get("coordination_group")
         if not is_pan and coordination_group is not None:
-            if not self._coordinated_tilt_ready(runtime):
+            if not self._coordinated_tilt_ready(runtime, now_s):
                 command = SmoresCommand(
                     pan_target_rad=current_pan,
                     tilt_target_rad=current_tilt,
@@ -2193,6 +2210,13 @@ class IsaacPrimitiveExecutor:
         # is admitted removes it from ``_active`` and makes the requested
         # coordination_size unreachable for the remaining members.
         if abs(error) <= tolerance:
+            if not is_pan and coordination_group is not None:
+                # A loaded articulated chain does not necessarily place all
+                # joints inside a narrow position band in the same physics
+                # frame. Remember that this member has genuinely reached its
+                # target while continuing to energize/hold it.
+                runtime.coordination_target_reached = True
+
             if (
                 not is_pan
                 and coordination_group is not None
@@ -2457,6 +2481,7 @@ class IsaacPrimitiveExecutor:
     def _coordinated_tilt_ready(
         self,
         runtime: _ActiveGoal,
+        now_s: float,
     ) -> bool:
         """Release a connected tilt group in one simulation frame.
 
@@ -2480,6 +2505,12 @@ class IsaacPrimitiveExecutor:
             if len(group) < expected_size:
                 return False
             self._released_joint_groups.add(group_name)
+            # Goals arrive serially while accelerated/headless PhysX keeps
+            # advancing simulation time.  Admission latency is not actuator
+            # execution time: start every member's timeout together when the
+            # complete group is finally released.
+            for candidate in group:
+                candidate.execution_started_at_s = now_s
         return True
 
     def _coordinated_tilt_complete(self, runtime: _ActiveGoal) -> bool:
@@ -2502,6 +2533,7 @@ class IsaacPrimitiveExecutor:
             target = candidate.resolved_target_rad
             if target is None:
                 return False
+
             _, current_tilt = self._joint_positions(
                 candidate.goal.module_ids[0]
             )
@@ -2510,8 +2542,15 @@ class IsaacPrimitiveExecutor:
                     "tolerance_rad", self._tilt_joint_tolerance_rad
                 )
             )
-            if abs(target - current_tilt) > tolerance:
-                return False
+
+            if abs(target - current_tilt) <= tolerance:
+                candidate.coordination_target_reached = True
+
+        if not all(
+            candidate.coordination_target_reached
+            for candidate in group
+        ):
+            return False
         hold_ids: set[str] = set()
         for candidate in group:
             hold_ids.update(

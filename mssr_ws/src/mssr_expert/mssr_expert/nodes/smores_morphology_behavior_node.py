@@ -853,6 +853,7 @@ class SmoresMorphologyBehaviorNode(Node):
         self._publish_actions(
             locomotion,
             fsm_state=decision.state,
+            phase=decision.phase,
             active_primitive=(
                 decision.primitive_goal.primitive
                 if decision.primitive_goal is not None
@@ -863,6 +864,7 @@ class SmoresMorphologyBehaviorNode(Node):
             done=decision.done,
             message=decision.message,
             task_type="morphology_behavior",
+            position_goal=self._executor.active_position_goal,
         )
         if (
             decision.done
@@ -1058,6 +1060,7 @@ class SmoresMorphologyBehaviorNode(Node):
         self._publish_actions(
             locomotion,
             fsm_state="NAV2_DRIVE" if fresh else "NAV2_WATCHDOG_STOP",
+            phase="NAV2_DRIVE" if fresh else "NAV2_WATCHDOG_STOP",
             active_primitive="cmd_vel",
             progress=0.0,
             success=False,
@@ -1077,12 +1080,14 @@ class SmoresMorphologyBehaviorNode(Node):
         locomotion: Mapping[str, Mapping[str, float]],
         *,
         fsm_state: str,
+        phase: str,
         active_primitive: str,
         progress: float,
         success: bool,
         done: bool,
         message: str,
         task_type: str,
+        position_goal: Any | None = None,
     ) -> None:
         self._actions_publisher.publish(
             dict_to_string_msg(
@@ -1105,7 +1110,21 @@ class SmoresMorphologyBehaviorNode(Node):
                             item.module_id: item.target_role
                             for item in self._assignments
                         },
-                        "task_metrics": {"progress": float(progress)},
+                        "task_metrics": {
+                            "progress": float(progress),
+                            "phase": phase,
+                            **(
+                                {
+                                    "target_module_id": position_goal.module_id,
+                                    "target_x_m": float(position_goal.target_x_m),
+                                    "target_tolerance_m": float(
+                                        position_goal.tolerance_m
+                                    ),
+                                }
+                                if position_goal is not None
+                                else {}
+                            ),
+                        },
                         "success": bool(success),
                         "done": bool(done),
                         "debug": {"message": message},

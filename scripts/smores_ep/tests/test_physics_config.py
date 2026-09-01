@@ -164,4 +164,7 @@ def test_dynamic_spawn_starts_just_above_the_lowest_cad_wheel(
         geometry.right_wheel_center_body_m[2] - geometry.wheel_radius_m,
     )
     clearance = config.spawn_height_m + lowest_wheel_z
-    assert clearance == pytest.approx(0.000186, abs=5.0e-5)
+    # The physical wheel axle is now symmetric in Z.  With the
+    # 31.6-mm spawn height and 31.06-mm wheel radius this leaves
+    # about 0.54 mm of initial wheel clearance.
+    assert clearance == pytest.approx(0.0001005, abs=5.0e-5)

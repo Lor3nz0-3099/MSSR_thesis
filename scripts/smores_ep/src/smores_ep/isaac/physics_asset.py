@@ -29,6 +29,27 @@ PAN_FACE_COLLISION_RADIUS_M = 0.03000
 
 CHASSIS_PROXY_SIZE_M = (0.030, 0.040, 0.030)
 
+# Rear fixed-chassis collision volume.
+#
+# The small central core intentionally ends at x=-15 mm.  The real CAD
+# continues rearward to x=-33.999 mm and down to roughly z=-29 mm.
+# Restore only that rear portion instead of filling the complete module
+# with the former 60 x 46 x 58 mm cuboid.
+#
+# Its lower surface remains about 2 mm above the nominal tire bottom,
+# reproducing the passive third support: the tires carry normal traction
+# while a small body pitch brings the rear chassis into stabilising contact.
+REAR_CHASSIS_PROXY_CENTER_M = (
+    -0.0244995,
+    0.0,
+    0.0,
+)
+REAR_CHASSIS_PROXY_SIZE_M = (
+    0.018999,
+    0.046,
+    0.058,
+)
+
 
 def _set_link_pose(prim: Any, position: tuple[float, float, float]) -> None:
     from pxr import Gf, UsdGeom
@@ -451,14 +472,17 @@ def build_physics_asset(
     # At z=-10 mm the centre radius is ~29.7 mm; with the 1.25 mm sphere the
     # proxy remains approximately inside the wheel envelope while preserving
     # a passive low-friction rear contact.
-    for side, y_m in (("left", 0.0255), ("right", -0.0255)):
-        _add_sphere_collider(
-            stage,
-            f"{body_path}/colliders/rear_skid_{side}",
-            (-0.028, y_m, -0.010),
-            0.00125,
-            skid_material,
-        )
+    # The physical SMORES chassis uses its rear underside as the passive
+    # third support.  Model that actual rear volume instead of two point-like
+    # skids located far above the ground.  Use the low-friction skid material:
+    # this contact stabilises pitch but must not become a driven traction pad.
+    _add_box_collider(
+        stage,
+        f"{body_path}/colliders/rear_chassis",
+        REAR_CHASSIS_PROXY_CENTER_M,
+        REAR_CHASSIS_PROXY_SIZE_M,
+        skid_material,
+    )
 
     left_path = f"{PHYSICS_ROOT}/left_wheel_link"
     left = UsdGeom.Xform.Define(stage, left_path)

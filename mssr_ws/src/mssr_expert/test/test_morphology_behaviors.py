@@ -276,6 +276,58 @@ def test_posture_displacement_step_reshapes_while_wheels_advance() -> None:
     assert finished.locomotion == {}
 
 
+def test_posture_drive_hands_settled_traction_to_selected_supports() -> None:
+    assignments = _assignments(SNAKE8_ROLES)
+    step = BehaviorProgramStep(
+        phase="PATH_IK_TRACK_TEST",
+        posture_targets=(
+            JointTarget(
+                module_id="m3",
+                joint="tilt",
+                angle_rad=0.2,
+                target_vertex_id="v3",
+                target_role="snake_center_rear",
+            ),
+        ),
+        linear_m_s=0.02,
+        active_target_roles=SNAKE8_ROLES,
+        posture_reached_active_target_roles=("snake_neck", "snake_head"),
+        displacement_goal=LongitudinalDisplacementGoal(
+            module_ids=("m6", "m7"),
+            distance_m=0.02,
+            tolerance_m=0.002,
+        ),
+        hold_locomotion_until_admitted=False,
+    )
+    executor = MorphologyBehaviorExecutor(_library())
+    executor.start(
+        MorphologyCommand(
+            command_id="settled-traction",
+            morphology="snake8",
+            behavior="crawl_stairs_spatial_concertina",
+        ),
+        assignments,
+        program_steps_override=(step,),
+    )
+    positions = {
+        f"m{index}": (0.1 * index, 0.0, 0.03)
+        for index in range(8)
+    }
+
+    dispatched = executor.step(0.0, module_positions=positions)
+    assert set(dispatched.locomotion) == {
+        assignment.module_id for assignment in assignments
+    }
+    settled = executor.step(
+        0.1,
+        _succeeded(dispatched.primitive_goal),
+        positions,
+    )
+
+    assert settled.state == "RUNNING_PROGRAM_DRIVE"
+    assert set(settled.locomotion) == {"m6", "m7"}
+
+
 def _angles_by_module(goals) -> dict[str, float]:
     return {
         goal.module_ids[0]: float(goal.parameters["angle_rad"])

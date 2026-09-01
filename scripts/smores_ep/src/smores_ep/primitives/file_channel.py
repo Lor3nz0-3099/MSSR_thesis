@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
 
@@ -12,6 +13,30 @@ from smores_ep.primitives.model import (
     PrimitiveStatus,
     PrimitiveStatusBatch,
 )
+
+
+@dataclass(frozen=True)
+class ActionDiagnostics:
+    """Expert context retained beside the real-time locomotion command."""
+
+    phase: str = ""
+    fsm_state: str = ""
+    message: str = ""
+    module_roles: tuple[tuple[str, str], ...] = ()
+    progress: float = 0.0
+    target_module_id: str = ""
+    target_x_m: float | None = None
+
+    @property
+    def head_module_id(self) -> str:
+        return next(
+            (
+                module_id
+                for module_id, role in self.module_roles
+                if role == "snake_head"
+            ),
+            "",
+        )
 
 
 class PrimitiveFileChannel:
@@ -136,6 +161,7 @@ class ActionFileChannel:
         )
         self._last_received_s: float | None = None
         self._commands: dict[str, SmoresCommand] = {}
+        self._diagnostics = ActionDiagnostics()
 
     def commands(self, now_s: float) -> dict[str, SmoresCommand]:
         """Poll once and return only commands that still satisfy the timeout."""
@@ -147,7 +173,7 @@ class ActionFileChannel:
             signature, payload = snapshot
             if signature != self._last_signature:
                 self._last_signature = signature
-                self._commands = self._parse(payload)
+                self._commands, self._diagnostics = self._parse(payload)
                 self._last_received_s = now_s
         if self._last_received_s is None:
             return {}
@@ -155,8 +181,16 @@ class ActionFileChannel:
             return {}
         return dict(self._commands)
 
+    @property
+    def diagnostics(self) -> ActionDiagnostics:
+        """Return metadata from the most recently accepted action payload."""
+
+        return self._diagnostics
+
     @staticmethod
-    def _parse(payload: str) -> dict[str, SmoresCommand]:
+    def _parse(
+        payload: str,
+    ) -> tuple[dict[str, SmoresCommand], ActionDiagnostics]:
         decoded = json.loads(payload)
         if not isinstance(decoded, Mapping):
             raise ValueError("Action payload must be a JSON object")
@@ -198,4 +232,39 @@ class ActionFileChannel:
                 ),
                 pan_velocity_rad_s=pan_velocity,
             )
-        return commands
+        expert = decoded.get("expert", {})
+        if not isinstance(expert, Mapping):
+            expert = {}
+        metrics = expert.get("task_metrics", {})
+        if not isinstance(metrics, Mapping):
+            metrics = {}
+        debug = expert.get("debug", {})
+        if not isinstance(debug, Mapping):
+            debug = {}
+        raw_roles = expert.get("module_roles", {})
+        roles = (
+            tuple(
+                sorted(
+                    (str(module_id), str(role))
+                    for module_id, role in raw_roles.items()
+                )
+            )
+            if isinstance(raw_roles, Mapping)
+            else ()
+        )
+        raw_target_x = metrics.get("target_x_m")
+        target_x_m = (
+            None if raw_target_x is None else float(raw_target_x)
+        )
+        if target_x_m is not None and not math.isfinite(target_x_m):
+            raise ValueError("Action target_x_m must be finite")
+        diagnostics = ActionDiagnostics(
+            phase=str(metrics.get("phase", "")),
+            fsm_state=str(expert.get("fsm_state", "")),
+            message=str(debug.get("message", "")),
+            module_roles=roles,
+            progress=float(metrics.get("progress", 0.0)),
+            target_module_id=str(metrics.get("target_module_id", "")),
+            target_x_m=target_x_m,
+        )
+        return commands, diagnostics

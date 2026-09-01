@@ -75,6 +75,10 @@ class BehaviorProgramStep:
     continuous_with_next: bool = False
     hold_locomotion_until_admitted: bool = True
     posture_reached_linear_m_s: float | None = None
+    # A posture-drive may use broad low-speed traction while deforming, then
+    # hand propulsion to a smaller set of load-bearing wheel modules once the
+    # target shape is settled.  ``None`` preserves ``active_target_roles``.
+    posture_reached_active_target_roles: tuple[str, ...] | None = None
     # Optional closed-loop longitudinal tracking for world-X position goals.
     # ``linear_m_s`` remains the signed speed limit; the controller reduces
     # it as the tracked module approaches its next geometric waypoint.

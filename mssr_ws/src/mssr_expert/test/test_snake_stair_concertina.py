@@ -190,6 +190,33 @@ def test_curve_clears_the_full_corner_exclusion_radius() -> None:
         assert minimum >= CORNER_RADIUS_M - 1.0e-9
 
 
+def test_corner_clearance_profile_is_continuous_with_continuous_slope() -> None:
+    path = _path()
+    assert 0.0 < path.transition_bias <= 1.0
+
+    sample_dx = 1.0e-5
+    for edge_x in path.riser_edges_m:
+        for boundary_x in (
+            edge_x - path.approach_run_m,
+            edge_x - path.corner_clearance_radius_m,
+            edge_x,
+            edge_x + path.corner_clearance_radius_m,
+            edge_x + path.landing_run_m,
+        ):
+            left_slope = (
+                path.height_m(boundary_x)
+                - path.height_m(boundary_x - sample_dx)
+            ) / sample_dx
+            right_slope = (
+                path.height_m(boundary_x + sample_dx)
+                - path.height_m(boundary_x)
+            ) / sample_dx
+
+            assert math.isfinite(left_slope)
+            assert math.isfinite(right_slope)
+            assert abs(right_slope - left_slope) < 0.02
+
+
 def test_high_clearance_path_clears_twenty_mm_safety_envelope() -> None:
     high_radius = FORWARD_EXTENT_M + 0.020
     approach = 0.272 - SPACING_M - 0.012 - 0.060
@@ -259,21 +286,21 @@ def test_seed3000_treads_leave_two_module_support_plateau() -> None:
         )
 
 
-def test_old_long_transitions_are_rejected_for_two_module_support() -> None:
-    with pytest.raises(
-        SnakeStairGaitError,
-        match="two-module support plateau",
-    ):
-        SnakeStairConcertinaPlanner().plan(
-            _graph(),
-            _assignments(),
-            {
-                "path_approach_run_m": 0.135,
-                "path_landing_run_m": 0.105,
-            },
-        )
+def test_old_long_transitions_are_accepted_for_single_module_support() -> None:
+    program = SnakeStairConcertinaPlanner().plan(
+        _graph(),
+        _assignments(),
+        {
+            "path_approach_run_m": 0.135,
+            "path_landing_run_m": 0.105,
+        },
+    )
 
-
+    assert program
+    assert any(
+        step.phase.startswith("PATH_IK_TRACK_")
+        for step in program
+    )
 
 def test_eight_centres_use_true_rigid_link_spacing() -> None:
     points = _path().sample_module_centers(
@@ -319,6 +346,43 @@ def test_seed3000_geometry_stays_well_inside_ninety_degrees() -> None:
         worst = max(worst, *(abs(value) for value in relative_tilt_ik(points)))
 
     assert worst < math.radians(60.0)
+
+
+@pytest.mark.parametrize(
+    ("rise_m", "tread_depth_m", "stair_count"),
+    (
+        (0.050, 0.320, 2),
+        (0.060, 0.272, 3),
+        # This geometry exposed the former discontinuous corner envelope.
+        (0.064, 0.251, 4),
+    ),
+)
+def test_global_path_ik_plans_the_robust_stair_envelope(
+    rise_m: float,
+    tread_depth_m: float,
+    stair_count: int,
+) -> None:
+    base = _graph()
+    graph = AttributedRobotGraph(
+        nodes=base.nodes,
+        edges=base.edges,
+        global_attributes={
+            **base.global_attributes,
+            "course": _course(
+                rise_m=rise_m,
+                tread_depth_m=tread_depth_m,
+                stair_count=stair_count,
+            ),
+        },
+    )
+
+    program = SnakeStairConcertinaPlanner().plan(
+        graph, _assignments(), {}
+    )
+
+    assert program[0].phase == "PATH_IK_PRELOAD"
+    assert program[-1].phase == "PATH_IK_UPPER_DECK_SETTLE"
+    assert any(step.phase == "PATH_IK_LIFT_TAIL" for step in program)
 
 
 def test_planner_generates_only_global_path_ik_tracking() -> None:
@@ -403,6 +467,47 @@ def test_terminal_tail_lift_reverses_only_q0_against_supported_chain() -> None:
     )
 
 
+def test_path_translation_slows_while_loaded_tilts_are_moving() -> None:
+    program = SnakeStairConcertinaPlanner().plan(
+        _graph(), _assignments(), {}
+    )
+
+    tracking = [
+        step for step in program
+        if step.phase.startswith("PATH_IK_TRACK_")
+    ]
+
+    assert tracking
+    assert any(step.linear_m_s < 0.040 for step in tracking)
+
+    for step in tracking:
+        assert 0.0 < step.linear_m_s <= 0.040
+        assert step.posture_reached_linear_m_s == pytest.approx(0.040)
+        assert (
+            step.minimum_tracking_linear_m_s
+            <= step.linear_m_s + 1.0e-12
+        )
+
+
+def test_path_ik_keeps_all_eight_modules_in_traction() -> None:
+    program = SnakeStairConcertinaPlanner().plan(
+        _graph(), _assignments(), {}
+    )
+
+    tracking = [
+        step
+        for step in program
+        if step.phase.startswith("PATH_IK_TRACK_")
+    ]
+
+    assert tracking
+
+    for step in tracking:
+        assert step.active_target_roles == ROLES
+        assert step.posture_reached_active_target_roles == ROLES
+
+
+
 def test_tracking_tilts_are_time_synchronized() -> None:
     assignments = _assignments()
 
@@ -436,8 +541,11 @@ def test_tracking_tilts_are_time_synchronized() -> None:
     # Tiny changes already within tolerance must not slow the entire group.
     assert tiny.max_servo_speed_rad_s == pytest.approx(0.45)
 
+    # PATH-IK uses the narrow 0.015-rad band only for servo-speed
+    # synchronization. Micro-waypoint completion deliberately allows
+    # a 5-degree physical tracking tolerance under load.
     assert all(
-        target.tolerance_rad == pytest.approx(0.015)
+        target.tolerance_rad == pytest.approx(math.radians(5.0))
         for target in targets
     )
 
@@ -460,7 +568,7 @@ def test_final_solution_is_flat_and_landed_beyond_the_last_corner() -> None:
     #   corner radius = forward extent + safety
     #   tail inset    = max(landing run, corner radius + 10 mm)
     expected_tail_inset = max(
-        0.060,
+        0.105,
         FORWARD_EXTENT_M + 0.020 + 0.010,
     )
     expected_head_x = (

@@ -97,6 +97,11 @@ def _episode_args(
         simulation_speed_factor=campaign_args.simulation_speed_factor,
         assembly_wall_timeout_s=campaign_args.assembly_wall_timeout_s,
         behavior_wall_timeout_s=campaign_args.behavior_wall_timeout_s,
+        behavior_dataset_log_period=(
+            campaign_args.behavior_dataset_log_period
+        ),
+        behavior_control_rate_hz=campaign_args.behavior_control_rate_hz,
+        record_assembly_dataset=campaign_args.record_assembly_dataset,
         curriculum_level=level,
         curriculum_difficulty=DIFFICULTY_BY_LEVEL[level],
     )
@@ -223,6 +228,9 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--simulation-speed-factor", type=float, default=1.0)
     parser.add_argument("--assembly-wall-timeout-s", type=float, default=600.0)
     parser.add_argument("--behavior-wall-timeout-s", type=float, default=600.0)
+    parser.add_argument("--behavior-dataset-log-period", type=int, default=30)
+    parser.add_argument("--behavior-control-rate-hz", type=float, default=30.0)
+    parser.add_argument("--record-assembly-dataset", action="store_true")
     return parser
 
 
