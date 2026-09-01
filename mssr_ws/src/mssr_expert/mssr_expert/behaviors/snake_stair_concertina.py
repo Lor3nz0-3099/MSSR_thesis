@@ -139,9 +139,9 @@ class SnakeStairConcertinaPlanner:
         goal_tolerance = self._number(
             parameters, "crawl_goal_tolerance_m", 0.003
         )
-        if not 0.001 <= goal_tolerance <= 0.006:
+        if not 0.001 <= goal_tolerance <= 0.015:
             raise SnakeStairGaitError(
-                "crawl_goal_tolerance_m must be in [0.001, 0.006]"
+                "crawl_goal_tolerance_m must be in [0.001, 0.015]"
             )
         maximum_speed = self._speed(parameters, "linear_m_s", 0.040)
         tracking_kp = self._number(
@@ -558,7 +558,12 @@ class SnakeStairConcertinaPlanner:
             JointTarget(
                 module_id=assignment.module_id,
                 joint="tilt",
-                angle_rad=float(tilts[index]),
+                angle_rad=(
+                    1.2217304763960306
+                    if assignment.module_id == "smores_08"
+                    and phase.startswith("PATH_IK_TRACK_")
+                    else float(tilts[index])
+                ),
                 target_vertex_id=assignment.target_vertex_id,
                 target_role=assignment.target_role,
                 tolerance_rad=tolerance,

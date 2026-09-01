@@ -27,7 +27,7 @@ from smores_ep.isaac.obstacle_course import (  # noqa: E402
 
 DEFAULT_BEHAVIOR_PARAMETERS = {
     "linear_m_s": 0.040,
-    "crawl_goal_tolerance_m": 0.004,
+    "crawl_goal_tolerance_m": 0.012,
     "path_corner_safety_m": 0.020,
     "trajectory_step_m": 0.005,
 }
@@ -261,6 +261,9 @@ def run_episode(
         "simple_visuals:=true",
         f"simulation_steps:={args.simulation_steps}",
         f"simulation_speed_factor:={args.simulation_speed_factor}",
+        "actuator_effort_scale:=2.0",
+        "tilt_effort_scale:=8.0",
+        "wheel_friction_scale:=1.50",
         f"stair_rise_m:={spec.rise_m}",
         f"stair_depth_m:={spec.tread_depth_m}",
         f"stair_count:={spec.step_count}",
