@@ -82,9 +82,10 @@ controller_server:
     controller_plugins: [FollowPath]
 
     progress_checker:
-      plugin: nav2_controller::SimpleProgressChecker
-      required_movement_radius: 0.03
-      movement_time_allowance: 15.0
+      plugin: nav2_controller::PoseProgressChecker
+      required_movement_radius: 0.015
+      required_movement_angle: 0.08
+      movement_time_allowance: 4.0
 
     general_goal_checker:
       stateful: true
@@ -97,16 +98,16 @@ controller_server:
       debug_trajectory_details: false
       min_vel_x: 0.0
       min_vel_y: 0.0
-      max_vel_x: 0.06
+      max_vel_x: 0.10
       max_vel_y: 0.0
       max_vel_theta: 0.50
       min_speed_xy: 0.0
-      max_speed_xy: 0.06
+      max_speed_xy: 0.10
       min_speed_theta: 0.0
-      acc_lim_x: 0.15
+      acc_lim_x: 0.20
       acc_lim_y: 0.0
       acc_lim_theta: 1.0
-      decel_lim_x: -0.20
+      decel_lim_x: -0.25
       decel_lim_y: 0.0
       decel_lim_theta: -1.2
       vx_samples: 12
@@ -144,13 +145,17 @@ local_costmap:
       width: 2
       height: 2
       resolution: 0.025
-      robot_radius: 0.25
+      footprint: "[[0.165, 0.126], [0.165, -0.126], [-0.165, -0.126], [-0.165, 0.126]]"
       track_unknown_space: false
-      plugins: [inflation_layer]
+      plugins: [static_layer, inflation_layer]
+      static_layer:
+        plugin: nav2_costmap_2d::StaticLayer
+        map_subscribe_transient_local: true
+        subscribe_to_updates: false
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
         cost_scaling_factor: 3.0
-        inflation_radius: 0.30
+        inflation_radius: 0.10
       always_send_full_costmap: true
 
 global_costmap:
@@ -165,13 +170,17 @@ global_costmap:
       width: 8
       height: 4
       resolution: 0.025
-      robot_radius: 0.25
+      footprint: "[[0.165, 0.126], [0.165, -0.126], [-0.165, -0.126], [-0.165, 0.126]]"
       track_unknown_space: false
-      plugins: [inflation_layer]
+      plugins: [static_layer, inflation_layer]
+      static_layer:
+        plugin: nav2_costmap_2d::StaticLayer
+        map_subscribe_transient_local: true
+        subscribe_to_updates: false
       inflation_layer:
         plugin: nav2_costmap_2d::InflationLayer
         cost_scaling_factor: 3.0
-        inflation_radius: 0.30
+        inflation_radius: 0.10
       always_send_full_costmap: true
 
 planner_server:

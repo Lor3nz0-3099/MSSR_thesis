@@ -27,7 +27,7 @@ from smores_ep.isaac.obstacle_course import (  # noqa: E402
 
 DEFAULT_BEHAVIOR_PARAMETERS = {
     "linear_m_s": 0.040,
-    "crawl_goal_tolerance_m": 0.012,
+    "crawl_goal_tolerance_m": 0.016,
     "path_corner_safety_m": 0.020,
     "trajectory_step_m": 0.005,
 }

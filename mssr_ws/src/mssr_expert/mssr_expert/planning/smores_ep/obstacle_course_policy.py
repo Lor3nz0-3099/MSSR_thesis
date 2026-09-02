@@ -27,7 +27,7 @@ class ObstacleCoursePolicy:
     """Select the lowest-complexity morphology that satisfies each task."""
 
     _CAPABILITIES = {
-        "snake8": frozenset({"assembly", "gap", "stairs", "train"}),
+        "snake8": frozenset({"assembly", "ramp", "gap", "stairs", "train"}),
         "bridge8": frozenset({"gap", "train"}),
         "mobile_manipulator8": frozenset({"button", "train"}),
         "rc_car8": frozenset({"exit", "train"}),
@@ -44,24 +44,27 @@ class ObstacleCoursePolicy:
         )
 
     def steps(self) -> tuple[CourseStep, ...]:
-        """Return the complete assembly, reconfiguration and task program."""
-        snake = self.choose_morphology("stairs")
+        """Return the complete morphology-aware task program."""
+        snake = self.choose_morphology("ramp")
         manipulator = self.choose_morphology("button")
         rc_car = self.choose_morphology("exit")
+
         return (
-            CourseStep("assembly", rc_car),
+            # Non-planar terrain starts directly in Snake8.  RC-Car8 is not
+            # asked to negotiate the ramp after the physical validation
+            # showed a morphology/breakover limitation rather than a control
+            # or friction limitation.
+            CourseStep("assembly", snake),
             CourseStep(
                 "ramp_climb",
-                rc_car,
+                snake,
                 navigation="ramp_exit",
             ),
             CourseStep(
-                "rc_car_pre_gap",
-                rc_car,
-                navigation="safe_before_snake_reconfiguration",
+                "snake_gap_approach",
+                snake,
+                navigation="front_before_gap",
             ),
-            CourseStep("snake_reconfiguration", snake),
-            CourseStep("snake_gap_approach", snake, navigation="front_before_gap"),
             CourseStep(
                 "snake_gap_crossing",
                 snake,
@@ -72,33 +75,62 @@ class ObstacleCoursePolicy:
                     "gap_goal_tolerance_m": 0.004,
                 },
             ),
-            CourseStep("gap_clearance", snake, navigation="rear_past_gap"),
-            CourseStep("stairs_approach", snake, navigation="front_before_stair_1"),
+            CourseStep(
+                "gap_clearance",
+                snake,
+                navigation="rear_past_gap",
+            ),
+            CourseStep(
+                "stairs_approach",
+                snake,
+                navigation="front_before_stair_1",
+            ),
             CourseStep(
                 "stairs_crawl",
                 snake,
-                "crawl_stairs_arch_wave",
+                "crawl_stairs_spatial_concertina",
                 {
                     "linear_m_s": 0.040,
-                    "riser_approach_linear_m_s": 0.060,
-                    "riser_approach_tolerance_m": 0.010,
-                    "crawl_goal_tolerance_m": 0.004,
-                    "profile_substeps": 6,
-                    "transition_clearance_m": 0.0065,
+                    "crawl_goal_tolerance_m": 0.012,
+                    "path_corner_safety_m": 0.020,
+                    "trajectory_step_m": 0.005,
                 },
             ),
-            CourseStep("upper_deck_clearance", snake, navigation="front_on_upper_deck"),
+            CourseStep(
+                "upper_deck_clearance",
+                snake,
+                navigation="front_on_upper_deck",
+            ),
             CourseStep("button_reconfiguration", manipulator),
-            CourseStep("button_approach", manipulator, navigation="button_standoff"),
+            CourseStep(
+                "button_approach",
+                manipulator,
+                navigation="button_standoff",
+            ),
             CourseStep(
                 "button",
                 manipulator,
                 "press_button",
                 requires_button=True,
             ),
-            CourseStep("button_release", manipulator, "release_button"),
-            CourseStep("button_retreat", manipulator, navigation="button_retreat"),
+            CourseStep(
+                "button_release",
+                manipulator,
+                "release_button",
+            ),
+            CourseStep(
+                "button_retreat",
+                manipulator,
+                navigation="button_retreat",
+            ),
+            # Once non-planar/manipulation tasks are over, return to the
+            # planar morphology for the final navigation segment.
             CourseStep("exit_reconfiguration", rc_car),
-            CourseStep("exit", rc_car, navigation="cross_exit", requires_goal=True),
+            CourseStep(
+                "exit",
+                rc_car,
+                navigation="cross_exit",
+                requires_goal=True,
+            ),
             CourseStep("exit_stop", rc_car, "stop"),
         )

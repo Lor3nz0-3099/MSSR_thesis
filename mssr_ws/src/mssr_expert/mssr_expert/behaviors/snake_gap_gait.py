@@ -230,6 +230,20 @@ class SnakeGapGaitPlanner:
         usable_limit = self._symmetric_tilt_limit(graph, ordered) - tilt_margin
         roles = tuple(item.target_role for item in ordered)
         neutral = (0.0,) * self.MODULE_COUNT
+
+        # Diagnostic/robustness hypothesis shared with the stair PATH-IK:
+        # lift the Snake8 head before any longitudinal motion and keep it
+        # elevated while the traveling gap profile advances.
+        head_lift_angle_rad = math.radians(70.0)
+        if head_lift_angle_rad > usable_limit:
+            raise SnakeGapGaitError(
+                "70deg gap head lift exceeds the live Snake8 TILT limit"
+            )
+        head_lift_profile = (
+            *neutral[:-1],
+            head_lift_angle_rad,
+        )
+
         clearance_wheel_radii = self._number(
             parameters,
             "arch_clearance_wheel_radii",
@@ -326,7 +340,7 @@ class SnakeGapGaitPlanner:
             math.ceil(body_travel / (spacing / profile_substeps)),
         )
         profile_steps: list[BehaviorProgramStep] = []
-        previous_profile = neutral
+        previous_profile = head_lift_profile
         previous_head_target_x = near_support_x
         for profile_index in range(1, profile_step_count + 1):
             fraction = profile_index / profile_step_count
@@ -368,6 +382,15 @@ class SnakeGapGaitPlanner:
                     landing_release * traction_preload_m
                 ),
             )
+
+            # Keep v7 / snake_head raised exactly as in the successful
+            # stair strategy instead of letting the geometric profile
+            # lower the head while approaching/crossing the edge.
+            profile = (
+                *profile[:-1],
+                head_lift_angle_rad,
+            )
+
             if max(abs(value) for value in profile) > usable_limit:
                 raise SnakeGapGaitError(
                     "Traveling gap arch exceeds the live Snake8 TILT limits"
@@ -432,6 +455,13 @@ class SnakeGapGaitPlanner:
                 neutral,
                 ordered,
                 all_targets=True,
+            ),
+            self._posture(
+                "PRELIFT_GAP_HEAD_70DEG",
+                neutral,
+                head_lift_profile,
+                ordered,
+                motion_tolerance_rad=loaded_tilt_tolerance,
             ),
             self._drive_to(
                 "APPROACH_HEAD_TO_NEAR_EDGE",

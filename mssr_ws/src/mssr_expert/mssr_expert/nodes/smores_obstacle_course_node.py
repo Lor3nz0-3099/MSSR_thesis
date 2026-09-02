@@ -178,6 +178,7 @@ class SmoresObstacleCourseNode(Node):
         self.declare_parameter("gap_clearance_margin_m", 0.08)
         self.declare_parameter("stair_approach_margin_m", 0.04)
         self.declare_parameter("navigation_speed_m_s", 0.050)
+        self.declare_parameter("ramp_navigation_speed_m_s", 0.050)
         self.declare_parameter("navigation_yaw_rate_rad_s", 0.25)
         self.declare_parameter("navigation_position_tolerance_m", 0.06)
 
@@ -323,11 +324,6 @@ class SmoresObstacleCourseNode(Node):
             assembly_kwargs = (
                 DEFAULT_ASSEMBLY_EXECUTION_POLICY.executor_kwargs()
             )
-            if course_step.morphology == "rc_car8":
-                # RC Car8's first topology wave shares chassis parents.
-                # The Isaac primitive arbiter reserves those parent resources
-                # during REACH, so dispatch it serially within the wave.
-                assembly_kwargs["max_concurrent_alignments_per_wave"] = 1
             self._engine = ParallelAssemblyExecutor(
                 result.assembly_plan,
                 execution_id=execution_id,
@@ -499,12 +495,14 @@ class SmoresObstacleCourseNode(Node):
             decision = self._engine.step(self._latest_status)
             if decision.primitive_goal is not None:
                 self._goal_publisher.publish(dict_to_string_msg(decision.primitive_goal.to_dict()))
+            self._publish_actions(course_step, {}, decision)
             output = ExpertOutput(fsm_state=decision.state, primitive_goal=decision.primitive_goal_payload, success=decision.success, done=decision.done)
             return decision, output
         if isinstance(self._engine, SelfReconfigurationExecutor):
             decision = self._engine.step(self._latest_status, current_graph=current_graph)
             if decision.primitive_goal is not None:
                 self._goal_publisher.publish(dict_to_string_msg(decision.primitive_goal.to_dict()))
+            self._publish_actions(course_step, {}, decision)
             output = ExpertOutput(fsm_state=decision.state, primitive_goal=decision.primitive_goal_payload, success=decision.success, done=decision.done)
             return decision, output
         executor, assignments = self._engine
@@ -534,11 +532,49 @@ class SmoresObstacleCourseNode(Node):
         locomotion: Mapping[str, Mapping[str, float]],
         decision: Any,
     ) -> None:
-        self._actions_publisher.publish(dict_to_string_msg({
-            "schema_version": "mssr.actions.v2", "stamp": time.time(), "stage_id": self._step_index,
-            "task_type": course_step.task, "reset": False, "locomotion": locomotion, "magnetic": [],
-            "expert": {"fsm_state": decision.state, "success": decision.success, "done": decision.done},
-        }))
+        # PAN is normally a low-friction connector/support face.
+        # In RC-Car8 only the four wheel-role modules use that face as
+        # a rolling tire, and only during operational navigation.
+        pan_traction_module_ids: list[str] = []
+
+        if (
+            course_step.morphology == "rc_car8"
+            and isinstance(self._engine, _NavigationEngine)
+            and self._active_target is not None
+        ):
+            roles = target_roles_from_graph(self._active_target)
+            pan_traction_module_ids = sorted(
+                str(module_id)
+                for vertex, module_id in self._assignment.items()
+                if (
+                    vertex in roles
+                    and str(
+                        roles[vertex].get("target_role", "")
+                    ).startswith("wheel_")
+                )
+            )
+
+        self._actions_publisher.publish(
+            dict_to_string_msg(
+                {
+                    "schema_version": "mssr.actions.v2",
+                    "stamp": time.time(),
+                    "stage_id": self._step_index,
+                    "task_type": course_step.task,
+                    "reset": False,
+                    "locomotion": locomotion,
+                    "magnetic": [],
+                    "expert": {
+                        "fsm_state": decision.state,
+                        "pan_traction_module_ids": (
+                            pan_traction_module_ids
+                        ),
+                        "success": decision.success,
+                        "done": decision.done,
+                    },
+                }
+            )
+        )
 
     def _run_navigation(
         self,
@@ -676,8 +712,29 @@ class SmoresObstacleCourseNode(Node):
         progress_x_m = min(position[0] for position in positions) if use_rear else max(position[0] for position in positions)
         if progress_x_m >= target_x_m:
             return _NavigationDecision("SUCCEEDED", phase, {}, True, True, f"Reached x={progress_x_m:.3f}m.")
-        locomotion = self._heading_locomotion(current_graph, modules, 0.0)
-        return _NavigationDecision("RUNNING_NAVIGATION", phase, locomotion, message=f"x={progress_x_m:.3f}m, target={target_x_m:.3f}m.")
+        locomotion = self._heading_locomotion(
+            current_graph,
+            modules,
+            0.0,
+            linear_speed_m_s=(
+                float(
+                    self.get_parameter(
+                        "ramp_navigation_speed_m_s"
+                    ).value
+                )
+                if phase == "CLIMB_RAMP"
+                else None
+            ),
+        )
+        return _NavigationDecision(
+            "RUNNING_NAVIGATION",
+            phase,
+            locomotion,
+            message=(
+                f"x={progress_x_m:.3f}m, "
+                f"target={target_x_m:.3f}m."
+            ),
+        )
 
     def _navigate_stair(
         self,
@@ -732,13 +789,40 @@ class SmoresObstacleCourseNode(Node):
         current_graph: Any,
         modules: Mapping[str, Mapping[str, Any]],
         target_yaw_rad: float,
+        linear_speed_m_s: float | None = None,
     ) -> dict[str, dict[str, float]]:
         _, root_yaw_rad = self._root_pose(modules)
-        heading_error_rad = _wrap_angle(target_yaw_rad - root_yaw_rad)
+        heading_error_rad = _wrap_angle(
+            target_yaw_rad - root_yaw_rad
+        )
+        speed_m_s = (
+            float(
+                self.get_parameter(
+                    "navigation_speed_m_s"
+                ).value
+            )
+            if linear_speed_m_s is None
+            else float(linear_speed_m_s)
+        )
         return self._drive_locomotion(
             current_graph,
-            0.0 if abs(heading_error_rad) > 0.15 else float(self.get_parameter("navigation_speed_m_s").value),
-            math.copysign(float(self.get_parameter("navigation_yaw_rate_rad_s").value), heading_error_rad) if abs(heading_error_rad) > 0.15 else 0.0,
+            (
+                0.0
+                if abs(heading_error_rad) > 0.15
+                else speed_m_s
+            ),
+            (
+                math.copysign(
+                    float(
+                        self.get_parameter(
+                            "navigation_yaw_rate_rad_s"
+                        ).value
+                    ),
+                    heading_error_rad,
+                )
+                if abs(heading_error_rad) > 0.15
+                else 0.0
+            ),
         )
 
     def _drive_locomotion(

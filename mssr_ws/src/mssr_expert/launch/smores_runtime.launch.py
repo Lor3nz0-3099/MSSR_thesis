@@ -149,6 +149,11 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         value = LaunchConfiguration(launch_name).perform(context).strip()
         if value:
             simulation_command.extend((option_name, value))
+    rc_car_seed = LaunchConfiguration(
+        "rc_car_seed"
+    ).perform(context).strip()
+    if rc_car_seed:
+        simulation_command.extend(("--rc-car-seed", rc_car_seed))
     if _as_bool(LaunchConfiguration("performance").perform(context)):
         simulation_command.append("--performance")
     if _as_bool(LaunchConfiguration("simple_visuals").perform(context)):
@@ -161,6 +166,10 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         simulation_command.append("--button-test-course")
     if _as_bool(LaunchConfiguration("gap_test_course").perform(context)):
         simulation_command.append("--gap-test-course")
+    if _as_bool(
+        LaunchConfiguration("rc_car_planar_test_course").perform(context)
+    ):
+        simulation_command.append("--rc-car-planar-test-course")
     if _as_bool(LaunchConfiguration("headless").perform(context)):
         simulation_command.append("--headless")
 
@@ -285,6 +294,13 @@ def generate_launch_description() -> LaunchDescription:
                 description="Spawn the isolated Snake8 gap test stage.",
             ),
             DeclareLaunchArgument(
+                "rc_car_planar_test_course",
+                default_value="false",
+                description=(
+                    "Spawn the seeded flat RC-Car8 Nav2 route stage."
+                ),
+            ),
+            DeclareLaunchArgument(
                 "headless",
                 default_value="false",
                 description="Run Isaac without its GUI.",
@@ -384,6 +400,13 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="",
                 description=(
                     "Optional world-X coordinate of the near gap edge."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "rc_car_seed",
+                default_value="",
+                description=(
+                    "Seed for RC-Car8 S-curve/slalom/loop route generation."
                 ),
             ),
             DeclareLaunchArgument(

@@ -278,6 +278,15 @@ def behavior_task_context(
             "preserve_connection_count": 7,
             "finish_near_neutral": True,
         }
+    elif decision.behavior == "nav2_planar_route":
+        instruction = (
+            "Follow the seeded planar route with Nav2 while preserving "
+            "the assembled RC-Car8 topology."
+        )
+        success_criteria = {
+            "nav2_route_terminal_success": True,
+            "preserve_connection_count": 7,
+        }
     else:
         instruction = f"Execute the {decision.behavior} behavior."
         success_criteria = {"behavior_terminal_success": True}
@@ -324,6 +333,9 @@ class SmoresMorphologyBehaviorNode(Node):
         self.declare_parameter("robot_graph_topic", "/mssr/robot_graph")
         self.declare_parameter("cmd_vel_topic", "/cmd_vel")
         self.declare_parameter("cmd_vel_timeout_s", 0.5)
+        self.declare_parameter(
+            "nav2_route_status_topic", "/mssr/nav2/route_status"
+        )
         self.declare_parameter("odom_topic", "/odom")
         self.declare_parameter("odom_frame", "odom")
         self.declare_parameter("base_frame", "base_link")
@@ -366,6 +378,8 @@ class SmoresMorphologyBehaviorNode(Node):
         self._latest_cmd_vel = (0.0, 0.0, 0.0)
         self._last_cmd_vel_s: float | None = None
         self._cmd_vel_output_active = False
+        self._latest_nav2_route_status: dict[str, Any] = {}
+        self._nav2_terminal_status_consumed = False
         self._latest_tilt_rad_by_module: dict[str, float] = {}
         self._neutral_tilt_rad_by_module: dict[str, float] = {}
         self._neutral_assignment_signature: tuple[
@@ -448,6 +462,12 @@ class SmoresMorphologyBehaviorNode(Node):
             Twist,
             str(self.get_parameter("cmd_vel_topic").value),
             self._on_cmd_vel,
+            10,
+        )
+        self.create_subscription(
+            String,
+            str(self.get_parameter("nav2_route_status_topic").value),
+            self._on_nav2_route_status,
             10,
         )
         rate_hz = max(
@@ -672,6 +692,14 @@ class SmoresMorphologyBehaviorNode(Node):
             return
         self._latest_cmd_vel = values
         self._last_cmd_vel_s = time.monotonic()
+
+    def _on_nav2_route_status(self, message: String) -> None:
+        payload = string_msg_to_dict(message)
+        if not payload:
+            return
+        self._latest_nav2_route_status = dict(payload)
+        if not bool(payload.get("done", False)):
+            self._nav2_terminal_status_consumed = False
 
     def _on_primitive_status(self, message: String) -> None:
         payload = string_msg_to_dict(message)
@@ -1014,18 +1042,30 @@ class SmoresMorphologyBehaviorNode(Node):
         )
 
     def _step_cmd_vel(self) -> bool:
-        """Forward a fresh Nav2-style body twist through the morphology map."""
-
+        """Forward Nav2 body twists and record graph-conditioned IL labels."""
         now_s = time.monotonic()
         timeout_s = float(self.get_parameter("cmd_vel_timeout_s").value)
         if not math.isfinite(timeout_s) or timeout_s <= 0.0:
             timeout_s = 0.5
+
         fresh = (
             self._last_cmd_vel_s is not None
             and now_s - self._last_cmd_vel_s <= timeout_s
         )
-        if not fresh and not self._cmd_vel_output_active:
+
+        route_status = self._latest_nav2_route_status
+        terminal_pending = (
+            bool(route_status.get("done", False))
+            and not self._nav2_terminal_status_consumed
+        )
+
+        if (
+            not fresh
+            and not self._cmd_vel_output_active
+            and not terminal_pending
+        ):
             return False
+
         if (
             not self._morphology_name
             or not self._assignments
@@ -1033,9 +1073,17 @@ class SmoresMorphologyBehaviorNode(Node):
         ):
             return False
 
-        linear, lateral, yaw_rate = (
-            self._latest_cmd_vel if fresh else (0.0, 0.0, 0.0)
-        )
+        if terminal_pending:
+            linear = 0.0
+            lateral = 0.0
+            yaw_rate = 0.0
+        else:
+            linear, lateral, yaw_rate = (
+                self._latest_cmd_vel
+                if fresh
+                else (0.0, 0.0, 0.0)
+            )
+
         try:
             locomotion = self._library.drive_commands(
                 self._morphology_name,
@@ -1045,34 +1093,111 @@ class SmoresMorphologyBehaviorNode(Node):
                 lateral,
             )
             locomotion = coherent_planar_train_commands(
-                self._latest_robot_graph, locomotion
+                self._latest_robot_graph,
+                locomotion,
             )
-            validate_locomotion_dofs(locomotion, self._dof_inventory)
+            validate_locomotion_dofs(
+                locomotion,
+                self._dof_inventory,
+            )
         except ValueError as error:
             self.get_logger().error(
                 f"Rejected /cmd_vel for current morphology: {error}"
             )
-            if not self._cmd_vel_output_active:
+            if (
+                not self._cmd_vel_output_active
+                and not terminal_pending
+            ):
                 return False
             locomotion = {}
             fresh = False
 
-        self._publish_actions(
-            locomotion,
-            fsm_state="NAV2_DRIVE" if fresh else "NAV2_WATCHDOG_STOP",
-            phase="NAV2_DRIVE" if fresh else "NAV2_WATCHDOG_STOP",
-            active_primitive="cmd_vel",
-            progress=0.0,
-            success=False,
-            done=False,
-            message=(
+        if terminal_pending:
+            success = bool(route_status.get("success", False))
+            done = True
+            progress = float(
+                route_status.get(
+                    "progress",
+                    1.0 if success else 0.0,
+                )
+            )
+            fsm_state = (
+                "NAV2_ROUTE_SUCCEEDED"
+                if success
+                else "NAV2_ROUTE_FAILED"
+            )
+            phase = "NAV2_ROUTE_TERMINAL"
+            message = str(
+                route_status.get(
+                    "message",
+                    "Nav2 route completed.",
+                )
+            )
+        else:
+            success = False
+            done = False
+            progress = float(route_status.get("progress", 0.0))
+            fsm_state = (
+                "NAV2_DRIVE"
+                if fresh
+                else "NAV2_WATCHDOG_STOP"
+            )
+            phase = fsm_state
+            message = (
                 "Following /cmd_vel through morphology controller."
                 if fresh
                 else "/cmd_vel watchdog expired; locomotion stopped."
-            ),
-            task_type="morphology_velocity",
+            )
+
+        self._publish_actions(
+            locomotion,
+            fsm_state=fsm_state,
+            phase=phase,
+            active_primitive="cmd_vel",
+            progress=progress,
+            success=success,
+            done=done,
+            message=message,
+            task_type="nav2_planar_route",
         )
-        self._cmd_vel_output_active = fresh
+
+        episode_id = str(
+            self.get_parameter(
+                "behavior_dataset_episode_id"
+            ).value
+        ).strip()
+        route_id = str(route_status.get("route_id", "")).strip()
+        if not route_id:
+            route_id = (
+                f"{episode_id}-nav2"
+                if episode_id
+                else "nav2-planar-route"
+            )
+
+        nav_decision = MorphologyBehaviorDecision(
+            command_id=route_id,
+            morphology=self._morphology_name,
+            behavior="nav2_planar_route",
+            state=fsm_state,
+            phase=phase,
+            locomotion=locomotion,
+            progress=progress,
+            done=done,
+            success=success,
+            message=message,
+        )
+        self._record_behavior_transition(
+            nav_decision,
+            locomotion,
+        )
+
+        if terminal_pending:
+            self._nav2_terminal_status_consumed = True
+            self._cmd_vel_output_active = False
+            self._last_cmd_vel_s = None
+        else:
+            self._cmd_vel_output_active = fresh
+
         return True
 
     def _publish_actions(
@@ -1110,6 +1235,16 @@ class SmoresMorphologyBehaviorNode(Node):
                             item.module_id: item.target_role
                             for item in self._assignments
                         },
+                        "pan_traction_module_ids": (
+                            sorted(
+                                item.module_id
+                                for item in self._assignments
+                                if (
+                                    self._morphology_name == "rc_car8"
+                                    and item.target_role.startswith("wheel_")
+                                )
+                            )
+                        ),
                         "task_metrics": {
                             "progress": float(progress),
                             "phase": phase,

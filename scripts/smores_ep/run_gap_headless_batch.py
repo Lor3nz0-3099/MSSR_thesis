@@ -282,8 +282,8 @@ def run_episode(
         f"runtime_dir:={runtime_dir}",
         "module_count:=8",
         "gap_test_course:=true",
-        "headless:=true",
-        "performance:=true",
+        f"headless:={'false' if args.gui else 'true'}",
+        f"performance:={'false' if args.gui else 'true'}",
         "simple_visuals:=true",
         f"simulation_steps:={args.simulation_steps}",
         f"simulation_speed_factor:={args.simulation_speed_factor}",
@@ -415,6 +415,11 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--simulation-speed-factor", type=float, default=1.0)
     parser.add_argument("--assembly-wall-timeout-s", type=float, default=600.0)
     parser.add_argument("--behavior-wall-timeout-s", type=float, default=600.0)
+    parser.add_argument(
+        "--gui",
+        action="store_true",
+        help="Render Isaac for gap diagnosis",
+    )
     return parser
 
 

@@ -208,6 +208,501 @@ def sample_coplanar_gap_spec(
     )
 
 
+
+
+def _route_points_with_yaw(
+    xy_points: tuple[tuple[float, float], ...],
+) -> tuple[tuple[float, float, float], ...]:
+    """Attach a tangent heading to each sampled planar route point."""
+    if len(xy_points) < 2:
+        raise ValueError("A planar route needs at least two points")
+
+    result: list[tuple[float, float, float]] = []
+    for index, (x_m, y_m) in enumerate(xy_points):
+        if index + 1 < len(xy_points):
+            next_x_m, next_y_m = xy_points[index + 1]
+            dx = next_x_m - x_m
+            dy = next_y_m - y_m
+        else:
+            prev_x_m, prev_y_m = xy_points[index - 1]
+            dx = x_m - prev_x_m
+            dy = y_m - prev_y_m
+
+        yaw_rad = math.atan2(dy, dx)
+        result.append((x_m, y_m, yaw_rad))
+
+    return tuple(result)
+
+
+@dataclass(frozen=True)
+class RCPlanarSpec:
+    """Seeded free-space route used to teach RC-Car8 planar navigation."""
+
+    seed: int
+    route_kind: str
+    waypoints_xyyaw: tuple[tuple[float, float, float], ...]
+    platform_size_x_m: float = 4.80
+    platform_size_y_m: float = 3.20
+    platform_thickness_m: float = 0.02
+
+    def __post_init__(self) -> None:
+        if self.route_kind not in {"s_curve", "slalom", "loop"}:
+            raise ValueError(f"Unknown RC-Car route {self.route_kind!r}")
+        if len(self.waypoints_xyyaw) < 6:
+            raise ValueError("RC-Car route must contain at least six poses")
+        if (
+            self.platform_size_x_m <= 3.0
+            or self.platform_size_y_m <= 2.0
+            or self.platform_thickness_m <= 0.0
+        ):
+            raise ValueError("RC-Car planar platform is too small")
+
+        for pose in self.waypoints_xyyaw:
+            if len(pose) != 3 or not all(math.isfinite(v) for v in pose):
+                raise ValueError("RC-Car route poses must be finite x/y/yaw")
+
+    @property
+    def final_pose_xyyaw(self) -> tuple[float, float, float]:
+        return self.waypoints_xyyaw[-1]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "seed": self.seed,
+            "route_kind": self.route_kind,
+            "waypoints_xyyaw": [
+                [float(x_m), float(y_m), float(yaw_rad)]
+                for x_m, y_m, yaw_rad in self.waypoints_xyyaw
+            ],
+            "platform_size_x_m": self.platform_size_x_m,
+            "platform_size_y_m": self.platform_size_y_m,
+            "platform_thickness_m": self.platform_thickness_m,
+        }
+
+
+def sample_rc_car_planar_spec(seed: int) -> RCPlanarSpec:
+    """Generate reproducible S, slalom and loop trajectories."""
+    generator = random.Random(seed)
+    route_kind = ("s_curve", "slalom", "loop")[seed % 3]
+    lateral_bias_m = generator.uniform(-0.10, 0.10)
+    amplitude_m = generator.uniform(0.25, 0.44)
+    final_x_m = generator.uniform(2.35, 2.70)
+
+    if route_kind == "s_curve":
+        count = 11
+        xy_points = tuple(
+            (
+                0.25 + (final_x_m - 0.25) * index / count,
+                lateral_bias_m
+                + amplitude_m
+                * math.sin(2.0 * math.pi * index / count),
+            )
+            for index in range(1, count + 1)
+        )
+
+    elif route_kind == "slalom":
+        count = 13
+        xy_points = tuple(
+            (
+                0.25 + (final_x_m - 0.25) * index / count,
+                lateral_bias_m
+                + amplitude_m
+                * math.sin(3.0 * math.pi * index / count),
+            )
+            for index in range(1, count + 1)
+        )
+
+    else:
+        radius_m = generator.uniform(0.42, 0.55)
+        center_x_m = 1.35
+        circle = tuple(
+            (
+                center_x_m + radius_m * math.cos(
+                    math.pi + 2.0 * math.pi * index / 12.0
+                ),
+                lateral_bias_m + radius_m * math.sin(
+                    math.pi + 2.0 * math.pi * index / 12.0
+                ),
+            )
+            for index in range(13)
+        )
+        xy_points = (
+            (0.40, lateral_bias_m),
+            *circle,
+            (2.05, lateral_bias_m),
+            (final_x_m, 0.0),
+        )
+
+    return RCPlanarSpec(
+        seed=seed,
+        route_kind=route_kind,
+        waypoints_xyyaw=_route_points_with_yaw(xy_points),
+    )
+
+
+
+def rc_car_planar_obstacle_layout(
+    seed: int,
+    *,
+    platform_center_x_m: float = 1.10,
+    platform_size_x_m: float = 4.80,
+    platform_size_y_m: float = 3.20,
+) -> dict[str, Any]:
+    """Externally-known procedural track for RC-Car8.
+
+    Physical support and navigation corridor are intentionally distinct:
+    the large rectangular platform supports self-assembly, while Nav2 sees
+    only the drivable road plus the start area.
+    """
+    import math
+    from random import Random
+
+    rng = Random(int(seed) ^ 0x51A10)
+
+    # --------------------------------------------------------
+    # Measured RC-Car8 footprint.
+    # --------------------------------------------------------
+    vehicle_length_m = 0.310
+    vehicle_width_m = 0.232
+    vehicle_half_width_m = 0.5 * vehicle_width_m
+
+    cone_radius_m = 0.050
+    cone_height_m = 0.170
+    collision_margin_m = 0.015
+
+    # Road sized from the actual vehicle envelope.
+    #
+    # Planning footprint is ~0.252 m wide.
+    # 0.66 m road gives enough steering space, but not enough to
+    # trivially bypass alternating cones on one common outside line.
+    corridor_width_m = 0.840
+
+    # Cone lateral offset relative to LOCAL road centreline.
+    cone_offset_m = 0.075
+
+    # --------------------------------------------------------
+    # FULL PHYSICAL SUPPORT PLATFORM.
+    # --------------------------------------------------------
+    x_min = platform_center_x_m - 0.5 * platform_size_x_m
+    x_max = platform_center_x_m + 0.5 * platform_size_x_m
+    y_min = -0.5 * platform_size_y_m
+    y_max = +0.5 * platform_size_y_m
+
+    # Wide starting region used only while the modules assemble.
+    start_pad_bounds_xy_m = [
+        x_min + 0.05,
+        0.42,
+        -0.78,
+        +0.78,
+    ]
+
+    # --------------------------------------------------------
+    # Seeded track family.
+    #
+    # Even seeds -> curved course.
+    # Odd seeds  -> straight course.
+    #
+    # A second seed bit decides whether the curve goes toward +Y or -Y.
+    # --------------------------------------------------------
+    has_curve = (int(seed) % 2 == 0)
+
+    curve_direction = (
+        +1.0
+        if ((int(seed) // 2) % 2 == 0)
+        else -1.0
+    )
+
+    centerline: list[tuple[float, float]] = []
+
+    if has_curve:
+        # Straight approach.
+        start_x = 0.18
+        bend_x = 1.34
+
+        for i in range(9):
+            alpha = i / 8.0
+            centerline.append(
+                (
+                    start_x + alpha * (bend_x - start_x),
+                    0.0,
+                )
+            )
+
+        # Smooth quarter-circle.
+        radius = 0.62
+
+        for i in range(1, 13):
+            t = (math.pi / 2.0) * i / 12.0
+
+            centerline.append(
+                (
+                    bend_x + radius * math.sin(t),
+                    curve_direction
+                    * radius
+                    * (1.0 - math.cos(t)),
+                )
+            )
+
+        # Straight section after the bend.
+        curve_end_x = bend_x + radius
+        curve_end_y = curve_direction * radius
+        final_extra = 0.54
+
+        for i in range(1, 7):
+            alpha = i / 6.0
+
+            centerline.append(
+                (
+                    curve_end_x,
+                    curve_end_y
+                    + curve_direction * final_extra * alpha,
+                )
+            )
+
+    else:
+        start_x = 0.18
+        finish_x = 3.08
+
+        for i in range(25):
+            alpha = i / 24.0
+            centerline.append(
+                (
+                    start_x + alpha * (finish_x - start_x),
+                    0.0,
+                )
+            )
+
+    # --------------------------------------------------------
+    # Arclength representation of centreline.
+    # Used to position obstacles relative to the road itself.
+    # --------------------------------------------------------
+    cumulative = [0.0]
+
+    for a, b in zip(centerline[:-1], centerline[1:]):
+        cumulative.append(
+            cumulative[-1]
+            + math.hypot(
+                b[0] - a[0],
+                b[1] - a[1],
+            )
+        )
+
+    total_length = cumulative[-1]
+
+    def pose_at_distance(distance_m):
+        d = min(
+            max(float(distance_m), 0.0),
+            total_length,
+        )
+
+        for index in range(len(centerline) - 1):
+            s0 = cumulative[index]
+            s1 = cumulative[index + 1]
+
+            if d > s1 and index < len(centerline) - 2:
+                continue
+
+            a = centerline[index]
+            b = centerline[index + 1]
+
+            seg = max(s1 - s0, 1.0e-9)
+            alpha = min(
+                1.0,
+                max(0.0, (d - s0) / seg),
+            )
+
+            x = a[0] + alpha * (b[0] - a[0])
+            y = a[1] + alpha * (b[1] - a[1])
+
+            dx = b[0] - a[0]
+            dy = b[1] - a[1]
+
+            norm = max(math.hypot(dx, dy), 1.0e-9)
+
+            tx = dx / norm
+            ty = dy / norm
+
+            return x, y, tx, ty
+
+        a = centerline[-2]
+        b = centerline[-1]
+
+        dx = b[0] - a[0]
+        dy = b[1] - a[1]
+
+        norm = max(math.hypot(dx, dy), 1.0e-9)
+
+        return (
+            b[0],
+            b[1],
+            dx / norm,
+            dy / norm,
+        )
+
+    # --------------------------------------------------------
+    # Five alternating cones.
+    #
+    # They are positioned using the local normal of the road,
+    # so the same generator works on both straight and curved sections.
+    # --------------------------------------------------------
+    # Give the non-holonomic RC-Car8 enough longitudinal distance
+    # to finish one avoidance turn before starting the next.
+    fractions = (
+        0.22,
+        0.38,
+        0.54,
+        0.70,
+        0.86,
+    )
+
+    cone_centers = []
+
+    for index, fraction in enumerate(fractions):
+        x, y, tx, ty = pose_at_distance(
+            total_length * fraction
+        )
+
+        # local left-hand normal
+        nx = -ty
+        ny = tx
+
+        sign = +1.0 if index % 2 == 0 else -1.0
+
+        offset = (
+            sign
+            * (
+                cone_offset_m
+                + rng.uniform(-0.008, 0.008)
+            )
+        )
+
+        cone_centers.append(
+            (
+                x + nx * offset,
+                y + ny * offset,
+            )
+        )
+
+    # --------------------------------------------------------
+    # Reproducible manually-validated layout.
+    #
+    # During GUI tuning the live Isaac obstacle bridge records the
+    # actual physical collider positions.  For seed 5100 we may freeze
+    # that validated arrangement here so subsequent runs reproduce it
+    # exactly instead of losing manual Stage edits.
+    # --------------------------------------------------------
+    if int(seed) == 5100:
+        import json
+        from pathlib import Path
+
+        override_path = (
+            Path(__file__).resolve().parents[3]
+            / "config"
+            / "rc_car_seed5100_layout.json"
+        )
+
+        if override_path.exists():
+            override = json.loads(
+                override_path.read_text()
+            )
+
+            saved_cones = override.get(
+                "cone_centers_xy_m",
+                [],
+            )
+
+            if len(saved_cones) >= 5:
+                cone_centers = [
+                    (
+                        float(point[0]),
+                        float(point[1]),
+                    )
+                    for point in saved_cones
+                ]
+
+    # Goal at end of the actual generated road.
+    gx, gy, tx, ty = pose_at_distance(total_length)
+
+    goal_yaw = math.atan2(ty, tx)
+
+    return {
+        "generator": "rc_car_planar_track_v2",
+        "seed": int(seed),
+        "frame_id": "map",
+
+        "track_profile": (
+            "quarter_turn"
+            if has_curve
+            else "straight"
+        ),
+
+        "has_curve": bool(has_curve),
+        "curve_direction": (
+            int(curve_direction)
+            if has_curve
+            else 0
+        ),
+
+        "platform_bounds_xy_m": [
+            x_min,
+            x_max,
+            y_min,
+            y_max,
+        ],
+
+        "start_pad_bounds_xy_m":
+            start_pad_bounds_xy_m,
+
+        "centerline_xy_m": [
+            list(point)
+            for point in centerline
+        ],
+
+        "corridor_width_m":
+            corridor_width_m,
+
+        "start_xyyaw": [
+            0.0,
+            0.0,
+            0.0,
+        ],
+
+        "goal_xyyaw": [
+            gx,
+            gy,
+            goal_yaw,
+        ],
+
+        "finish_x_m": gx,
+        "finish_y_m": gy,
+        "finish_yaw_rad": goal_yaw,
+
+        "cone_radius_m":
+            cone_radius_m,
+
+        "cone_height_m":
+            cone_height_m,
+
+        "cone_centers_xy_m": [
+            list(point)
+            for point in cone_centers
+        ],
+
+        "vehicle_footprint": {
+            "length_m": vehicle_length_m,
+            "width_m": vehicle_width_m,
+            "collision_margin_m":
+                collision_margin_m,
+        },
+
+        "required_lateral_clearance_m": (
+            vehicle_half_width_m
+            + cone_radius_m
+            + collision_margin_m
+        ),
+    }
+
+
+
 @dataclass(frozen=True)
 class CourseBox:
     """One axis-aligned stage element expressed in metres."""
@@ -301,6 +796,12 @@ class StairTestCourse:
                 "first_riser_x_m": self.first_riser_x_m,
                 "riser_depth_m": self.riser_depth_m,
             },
+            "known_environment": rc_car_planar_obstacle_layout(
+                self.spec.seed,
+                platform_center_x_m=1.10,
+                platform_size_x_m=self.spec.platform_size_x_m,
+                platform_size_y_m=self.spec.platform_size_y_m,
+            ),
             "collision_boxes": _collision_box_observations(self.boxes),
         }
 
@@ -351,6 +852,68 @@ class GapTestCourse:
         }
 
 
+
+
+@dataclass(frozen=True)
+class RCPlanarTestCourse:
+    """Large flat stage carrying a seeded Nav2 route for RC-Car8."""
+
+    boxes: tuple[CourseBox, ...]
+    spec: RCPlanarSpec
+
+    def to_observation(self) -> dict[str, Any]:
+        return {
+            "frame_id": "world",
+            "course_profile": "rc_car8_planar_nav2",
+            "scenario": {
+                "generator": "rc_car_planar_route_v1",
+                **self.spec.to_dict(),
+            },
+            "navigation": {
+                "controller": "nav2",
+                "route_kind": self.spec.route_kind,
+                "waypoints_xyyaw": [
+                    list(pose) for pose in self.spec.waypoints_xyyaw
+                ],
+                "goal_xy_tolerance_m": 0.05,
+                "goal_yaw_tolerance_rad": 0.12,
+            },
+            "collision_boxes": _collision_box_observations(self.boxes),
+        }
+
+
+
+def rc_car_planar_test_course(
+    spec: RCPlanarSpec | None = None,
+) -> RCPlanarTestCourse:
+    """Return a LARGE support platform for the procedural RC-Car8 track."""
+
+    if spec is None:
+        spec = sample_rc_car_planar_spec(0)
+
+    # Deliberately keep the complete original 3.2 m platform width.
+    # Navigation confinement now belongs to the OccupancyGrid, not to
+    # the physical floor supporting self-assembly.
+    platform = CourseBox(
+        "RCPlanarPlatform",
+        (1.10, 0.0, -0.01),
+        (
+            spec.platform_size_x_m,
+            spec.platform_size_y_m,
+            spec.platform_thickness_m,
+        ),
+        (0.78, 0.80, 0.82),
+        semantic="rc_car_planar_support_platform",
+    )
+
+    return RCPlanarTestCourse(
+        boxes=(platform,),
+        spec=spec,
+    )
+
+
+
+
 def manual_obstacle_course() -> ManualObstacleCourse:
     """Return a compact +X course sized for an eight-module morphology.
 
@@ -373,7 +936,7 @@ def manual_obstacle_course() -> ManualObstacleCourse:
             ),
             CourseBox(
                 "ApproachRamp",
-                (-1.325, 0.0, -0.065),
+                (-1.325, 0.0, -0.0793),
                 (0.465, 1.20, 0.04),
                 platform_color,
                 semantic="approach_ramp",
@@ -703,4 +1266,289 @@ def install_snake8_gap_test_course(
 
     course = snake8_gap_test_course(spec)
     _install_course_boxes(stage, "/World/Snake8GapTestCourse", course.boxes)
+    return course
+
+
+
+
+def install_rc_car_planar_test_course(
+    stage: Any,
+    spec: RCPlanarSpec | None = None,
+) -> RCPlanarTestCourse:
+    """Install wide support floor plus visual procedural road."""
+
+    import math
+    from pxr import Gf, UsdGeom, UsdPhysics
+
+    course = rc_car_planar_test_course(spec)
+
+    _install_course_boxes(
+        stage,
+        "/World/RCPlanarTestCourse",
+        course.boxes,
+    )
+
+    # Large support floor is needed physically during self-assembly,
+    # but it must not look like part of the navigation course.
+    support_prim = stage.GetPrimAtPath(
+        "/World/RCPlanarTestCourse/RCPlanarPlatform"
+    )
+    if support_prim and support_prim.IsValid():
+        UsdGeom.Imageable(support_prim).MakeInvisible()
+
+    layout = rc_car_planar_obstacle_layout(
+        course.spec.seed,
+        platform_center_x_m=1.10,
+        platform_size_x_m=course.spec.platform_size_x_m,
+        platform_size_y_m=course.spec.platform_size_y_m,
+    )
+
+    root = "/World/RCPlanarTestCourse"
+
+    # --------------------------------------------------------
+    # VISUAL ROAD
+    # --------------------------------------------------------
+    road_root = f"{root}/Road"
+
+    if stage.GetPrimAtPath(road_root):
+        stage.RemovePrim(road_root)
+
+    UsdGeom.Xform.Define(stage, road_root)
+
+    centerline = [
+        (float(x), float(y))
+        for x, y in layout["centerline_xy_m"]
+    ]
+
+    road_width = float(
+        layout["corridor_width_m"]
+    )
+
+    for index, (a, b) in enumerate(
+        zip(centerline[:-1], centerline[1:])
+    ):
+        dx = b[0] - a[0]
+        dy = b[1] - a[1]
+
+        length = math.hypot(dx, dy)
+
+        if length <= 1.0e-6:
+            continue
+
+        mx = 0.5 * (a[0] + b[0])
+        my = 0.5 * (a[1] + b[1])
+
+        yaw_deg = math.degrees(
+            math.atan2(dy, dx)
+        )
+
+        tile = UsdGeom.Cube.Define(
+            stage,
+            f"{road_root}/Segment{index:02d}",
+        )
+
+        tile.CreateSizeAttr(1.0)
+
+        tile.CreateDisplayColorAttr(
+            [Gf.Vec3f(0.22, 0.24, 0.27)]
+        )
+
+        xf = UsdGeom.Xformable(tile)
+
+        xf.AddTranslateOp().Set(
+            Gf.Vec3d(mx, my, 0.0005)
+        )
+
+        xf.AddRotateZOp().Set(yaw_deg)
+
+        xf.AddScaleOp().Set(
+            Gf.Vec3f(
+                length + 0.035,
+                road_width,
+                0.001,
+            )
+        )
+
+    # Wide visual start box.
+    sx0, sx1, sy0, sy1 = [
+        float(v)
+        for v in layout["start_pad_bounds_xy_m"]
+    ]
+
+    start = UsdGeom.Cube.Define(
+        stage,
+        f"{road_root}/AssemblyStartPad",
+    )
+
+    start.CreateSizeAttr(1.0)
+
+    start.CreateDisplayColorAttr(
+        [Gf.Vec3f(0.30, 0.32, 0.35)]
+    )
+
+    start_xf = UsdGeom.Xformable(start)
+
+    start_xf.AddTranslateOp().Set(
+        Gf.Vec3d(
+            0.5 * (sx0 + sx1),
+            0.5 * (sy0 + sy1),
+            0.0005,
+        )
+    )
+
+    start_xf.AddScaleOp().Set(
+        Gf.Vec3f(
+            sx1 - sx0,
+            sy1 - sy0,
+            0.001,
+        )
+    )
+
+    # --------------------------------------------------------
+    # TRUE TRAFFIC CONES
+    # --------------------------------------------------------
+    cones_root = f"{root}/NavigationCones"
+
+    if stage.GetPrimAtPath(cones_root):
+        stage.RemovePrim(cones_root)
+
+    UsdGeom.Xform.Define(stage, cones_root)
+
+    radius = float(layout["cone_radius_m"])
+    height = float(layout["cone_height_m"])
+
+    for index, (x_m, y_m) in enumerate(
+        layout["cone_centers_xy_m"],
+        start=1,
+    ):
+        cone_root = (
+            f"{cones_root}/Cone{index:02d}"
+        )
+
+        cone = UsdGeom.Cone.Define(
+            stage,
+            f"{cone_root}/visual",
+        )
+
+        cone.CreateAxisAttr(UsdGeom.Tokens.z)
+        cone.CreateRadiusAttr(radius)
+        cone.CreateHeightAttr(height)
+
+        cone.CreateDisplayColorAttr(
+            [Gf.Vec3f(1.0, 0.30, 0.02)]
+        )
+
+        UsdGeom.Xformable(
+            cone
+        ).AddTranslateOp().Set(
+            Gf.Vec3d(
+                float(x_m),
+                float(y_m),
+                0.5 * height,
+            )
+        )
+
+        # Cylinder collision proxy:
+        # stable physically but hidden visually.
+        collider = UsdGeom.Cylinder.Define(
+            stage,
+            f"{cone_root}/collision",
+        )
+
+        collider.CreateAxisAttr(
+            UsdGeom.Tokens.z
+        )
+
+        collider.CreateRadiusAttr(radius)
+        collider.CreateHeightAttr(height)
+
+        collider.CreateVisibilityAttr(
+            UsdGeom.Tokens.invisible
+        )
+
+        UsdGeom.Xformable(
+            collider
+        ).AddTranslateOp().Set(
+            Gf.Vec3d(
+                float(x_m),
+                float(y_m),
+                0.5 * height,
+            )
+        )
+
+        UsdPhysics.CollisionAPI.Apply(
+            collider.GetPrim()
+        )
+
+    # --------------------------------------------------------
+    # CHECKERED FINISH LINE, perpendicular to local road.
+    # --------------------------------------------------------
+    finish_root = f"{root}/FinishLine"
+
+    if stage.GetPrimAtPath(finish_root):
+        stage.RemovePrim(finish_root)
+
+    UsdGeom.Xform.Define(
+        stage,
+        finish_root,
+    )
+
+    gx = float(layout["finish_x_m"])
+    gy = float(layout["finish_y_m"])
+    gyaw = float(layout["finish_yaw_rad"])
+
+    nx = -math.sin(gyaw)
+    ny = math.cos(gyaw)
+
+    tiles = 10
+    tile_width = road_width / tiles
+
+    for index in range(tiles):
+        lateral = (
+            -0.5 * road_width
+            + (index + 0.5) * tile_width
+        )
+
+        tx = gx + nx * lateral
+        ty = gy + ny * lateral
+
+        tile = UsdGeom.Cube.Define(
+            stage,
+            f"{finish_root}/Tile{index:02d}",
+        )
+
+        tile.CreateSizeAttr(1.0)
+
+        shade = (
+            0.05
+            if index % 2 == 0
+            else 0.95
+        )
+
+        tile.CreateDisplayColorAttr(
+            [Gf.Vec3f(shade, shade, shade)]
+        )
+
+        xf = UsdGeom.Xformable(tile)
+
+        xf.AddTranslateOp().Set(
+            Gf.Vec3d(
+                tx,
+                ty,
+                0.009,
+            )
+        )
+
+        xf.AddRotateZOp().Set(
+            math.degrees(gyaw)
+        )
+
+        xf.AddScaleOp().Set(
+            Gf.Vec3f(
+                0.055,
+                tile_width,
+                0.008,
+            )
+        )
+
     return course

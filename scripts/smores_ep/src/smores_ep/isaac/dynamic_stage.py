@@ -165,6 +165,7 @@ class ArticulationStateReader:
         self.module_root = module_root
         self._stage = stage
         self._wheel_contact_mode: str | None = None
+        self._pan_contact_mode: str | None = None
         drive = actuators or SmoresActuatorConfig()
         self._drive = drive
         self._articulation = Articulation(module_root)
@@ -559,6 +560,79 @@ class ArticulationStateReader:
                 "physics",
             )
         self._wheel_contact_mode = material_name
+
+
+    def set_pan_contact_mode(self, material_name: str) -> None:
+        """Select normal PAN contact or RC-Car8 traction contact."""
+
+        if material_name not in {"pan_face", "wheel"}:
+            raise ValueError(
+                f"Unknown PAN contact material {material_name}"
+            )
+        if self._stage is None or self._pan_contact_mode == material_name:
+            return
+
+        from pxr import PhysxSchema, UsdPhysics, UsdShade
+
+        # "wheel" here means that the PAN is acting as an RC-Car8 tire.
+        # Do NOT modify the ordinary wheel material: create a dedicated
+        # high-traction material local to this module instead.
+        if material_name == "wheel":
+            actual_material_name = "rc_car_pan_traction"
+            material_path = (
+                f"{self.module_root}/materials/"
+                f"{actual_material_name}"
+            )
+
+            material_prim = self._stage.GetPrimAtPath(material_path)
+
+            if not material_prim:
+                material = UsdShade.Material.Define(
+                    self._stage,
+                    material_path,
+                )
+                material_prim = material.GetPrim()
+
+                physics = UsdPhysics.MaterialAPI.Apply(material_prim)
+                physics.CreateStaticFrictionAttr(1.20)
+                physics.CreateDynamicFrictionAttr(1.00)
+                physics.CreateRestitutionAttr(0.0)
+
+                physx = PhysxSchema.PhysxMaterialAPI.Apply(
+                    material_prim
+                )
+                physx.CreateFrictionCombineModeAttr("multiply")
+            else:
+                material = UsdShade.Material(material_prim)
+
+        else:
+            material_path = (
+                f"{self.module_root}/materials/pan_face"
+            )
+            material_prim = self._stage.GetPrimAtPath(material_path)
+
+            if not material_prim:
+                raise RuntimeError(
+                    f"Missing pan_face material for {self.module_root}"
+                )
+
+            material = UsdShade.Material(material_prim)
+
+        pan_face = self._stage.GetPrimAtPath(
+            f"{self.module_root}/pan_link/colliders/face"
+        )
+        if not pan_face:
+            raise RuntimeError(
+                f"Missing PAN face collider below {self.module_root}"
+            )
+
+        UsdShade.MaterialBindingAPI.Apply(pan_face).Bind(
+            material,
+            UsdShade.Tokens.weakerThanDescendants,
+            "physics",
+        )
+
+        self._pan_contact_mode = material_name
 
     def set_targets(
         self,

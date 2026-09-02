@@ -139,9 +139,9 @@ class SnakeStairConcertinaPlanner:
         goal_tolerance = self._number(
             parameters, "crawl_goal_tolerance_m", 0.003
         )
-        if not 0.001 <= goal_tolerance <= 0.015:
+        if not 0.001 <= goal_tolerance <= 0.020:
             raise SnakeStairGaitError(
-                "crawl_goal_tolerance_m must be in [0.001, 0.015]"
+                "crawl_goal_tolerance_m must be in [0.001, 0.020]"
             )
         maximum_speed = self._speed(parameters, "linear_m_s", 0.040)
         tracking_kp = self._number(

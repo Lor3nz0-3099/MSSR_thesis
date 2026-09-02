@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import time
+from pathlib import Path
 from typing import Any, Mapping
 
 from smores_ep.config.simulation import SelfAssemblySimulationConfig
@@ -30,6 +31,78 @@ from smores_ep.primitives.pose_control import PoseControllerConfig
 
 
 ASSEMBLY_ROOT_PREFIX = "/World/smores_ep_assembly"
+
+
+
+
+def _write_rc_car_dynamic_obstacles(
+    stage: Any,
+    output_path: Path,
+    now_s: float,
+) -> None:
+    """Export the CURRENT physical cone poses from the live USD Stage.
+
+    The ROS/Nav2 route node runs in another process and cannot inspect the
+    Isaac Stage directly.  This small atomic file is therefore the bridge
+    between simulation truth and the live OccupancyGrid.
+
+    The collision child is used as the geometric truth.  Moving the ConeXX
+    parent in Isaac moves both visual and collider and is therefore reflected
+    here automatically.
+    """
+    import json
+    from pxr import UsdGeom
+
+    root = stage.GetPrimAtPath(
+        "/World/RCPlanarTestCourse/NavigationCones"
+    )
+    if not root or not root.IsValid():
+        return
+
+    cache = UsdGeom.XformCache()
+    cones = []
+
+    for cone in root.GetChildren():
+        name = cone.GetName()
+        if "cone" not in name.lower():
+            continue
+
+        # Use the collider as ground truth whenever present.
+        probe = cone
+        for child in cone.GetChildren():
+            if "collision" in child.GetName().lower():
+                probe = child
+                break
+
+        try:
+            transform = cache.GetLocalToWorldTransform(probe)
+            translation = transform.ExtractTranslation()
+            x_m = float(translation[0])
+            y_m = float(translation[1])
+        except Exception:
+            continue
+
+        cones.append({
+            "name": name,
+            "x_m": x_m,
+            "y_m": y_m,
+        })
+
+    if not cones:
+        return
+
+    cones.sort(key=lambda item: item["name"])
+
+    payload = {
+        "schema_version": "mssr.rc_car_dynamic_obstacles.v1",
+        "simulation_time_s": float(now_s),
+        "cones": cones,
+    }
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = output_path.with_suffix(".tmp")
+    temporary.write_text(json.dumps(payload, sort_keys=True))
+    temporary.replace(output_path)
 
 
 def self_assembly_module_roots(
@@ -305,6 +378,17 @@ def run_parallel_self_assembly_scenario(
                 seed=config.gap_seed,
             ),
         )
+    elif config.rc_car_planar_test_course:
+        from smores_ep.isaac.obstacle_course import (
+            install_rc_car_planar_test_course,
+            sample_rc_car_planar_spec,
+        )
+        obstacle_course = install_rc_car_planar_test_course(
+            stage,
+            sample_rc_car_planar_spec(
+                0 if config.rc_car_seed is None else config.rc_car_seed
+            ),
+        )
     layout = self_assembly_spawn_layout(config)
     if config.manual_obstacle_course:
         layout = {
@@ -433,6 +517,8 @@ def run_parallel_self_assembly_scenario(
             if config.manual_obstacle_course
             else 1.8
             if config.stair_test_course
+            else 2.80
+            if config.rc_car_planar_test_course
             else 1.25
             if config.button_test_course or config.gap_test_course
             else 0.0
@@ -483,33 +569,12 @@ def run_parallel_self_assembly_scenario(
         "and mssr_smores_self_assembly_node in separate terminals"
     )
     if obstacle_course is not None:
-        if config.manual_obstacle_course:
-            print(
-                "manual obstacle course: +X gap="
-                f"{obstacle_course.gap_interval_x_m}, stairs="
-                f"{obstacle_course.stair_top_heights_m}, button="
-                f"{obstacle_course.button_center_xyz_m}, exit="
-                f"{obstacle_course.exit_center_xyz_m}"
-            )
-        elif config.stair_test_course:
-            print(
-                "Snake8 stair test course: +X first_riser="
-                f"{obstacle_course.first_riser_x_m} m, depth="
-                f"{obstacle_course.riser_depth_m} m, tops="
-                f"{obstacle_course.stair_top_heights_m} m"
-            )
-        elif config.button_test_course:
-            print(
-                "MobileManipulator8 button test course: button="
-                f"{obstacle_course.button_center_xyz_m}, standoff="
-                f"{obstacle_course.base_standoff_xy_m}"
-            )
-        else:
-            print(
-                "Snake8 gap test course: +X gap="
-                f"{obstacle_course.gap_interval_x_m}"
-            )
-
+        course_observation = obstacle_course.to_observation()
+        print(
+            "test course: "
+            f"{course_observation.get('course_profile', 'manual')} "
+            f"scenario={course_observation.get('scenario', {})}"
+        )
     maximum_steps = config.steps if config.steps > 0 else None
     initial_step = SimulationManager.get_num_physics_steps()
     initial_time = SimulationManager.get_simulation_time()
@@ -520,6 +585,7 @@ def run_parallel_self_assembly_scenario(
     previous_behavior_commands: dict[str, SmoresCommand] = {}
     behavior_started_step: int | None = None
     last_behavior_diagnostic_step = 0
+    previous_pan_traction_module_ids: frozenset[str] = frozenset()
     # The deterministic expert does not need a graph traversal at physics
     # frequency. Keeping this configurable also prevents periodic file writes
     # from interrupting viewport presentation.
@@ -528,6 +594,10 @@ def run_parallel_self_assembly_scenario(
         config.physics_hz // config.state_publish_hz,
     )
     render_interval = max(1, config.physics_hz // config.render_hz)
+    dynamic_obstacle_interval = max(1, config.physics_hz // 5)
+    dynamic_obstacle_path = Path(config.action_file).with_name(
+        "rc_car_dynamic_obstacles.json"
+    )
     render_pacer = (
         _RealtimeRenderPacer(
             config.render_hz,
@@ -545,6 +615,15 @@ def run_parallel_self_assembly_scenario(
             break
 
         now_s = SimulationManager.get_simulation_time()
+        if (
+            config.rc_car_planar_test_course
+            and physics_step % dynamic_obstacle_interval == 0
+        ):
+            _write_rc_car_dynamic_obstacles(
+                stage,
+                dynamic_obstacle_path,
+                now_s,
+            )
         admission_statuses: list[Any] = []
         try:
             primitive_goal = primitive_channel.poll_goal()
@@ -598,6 +677,48 @@ def run_parallel_self_assembly_scenario(
             )
         except (TypeError, ValueError) as error:
             print(f"[behavior] REJECTED malformed action payload: {error}")
+        diagnostics = action_channel.diagnostics
+        pan_traction_module_ids = frozenset(
+            diagnostics.pan_traction_module_ids
+        )
+
+        unknown_pan_traction = (
+            set(pan_traction_module_ids) - set(states)
+        )
+        if unknown_pan_traction:
+            raise ValueError(
+                "PAN traction references unknown module(s): "
+                + ", ".join(sorted(unknown_pan_traction))
+            )
+
+        if (
+            pan_traction_module_ids
+            != previous_pan_traction_module_ids
+        ):
+            for module_id, state in states.items():
+                state.set_pan_contact_mode(
+                    "wheel"
+                    if module_id in pan_traction_module_ids
+                    else "pan_face"
+                )
+
+            if pan_traction_module_ids:
+                print(
+                    "[contact] RC_CAR8 PAN TRACTION ON: "
+                    + ", ".join(
+                        sorted(pan_traction_module_ids)
+                    )
+                )
+            elif previous_pan_traction_module_ids:
+                print(
+                    "[contact] RC_CAR8 PAN TRACTION OFF; "
+                    "restored pan_face material"
+                )
+
+            previous_pan_traction_module_ids = (
+                pan_traction_module_ids
+            )
+
         routed_commands = primitive_executor.compose_with_baseline(
             behavior_baseline,
             primitive_step.commands,

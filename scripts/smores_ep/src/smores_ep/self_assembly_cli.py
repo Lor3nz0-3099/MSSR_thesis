@@ -165,6 +165,20 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "Snake8 gap test course"
         ),
     )
+    course_group.add_argument(
+        "--rc-car-planar-test-course",
+        action="store_true",
+        help=(
+            "Replace the infinite floor with the seeded flat RC-Car8 "
+            "Nav2 route stage"
+        ),
+    )
+    parser.add_argument(
+        "--rc-car-seed",
+        type=int,
+        default=None,
+        help="Seed selecting the RC-Car8 S-curve/slalom/loop route",
+    )
     parser.add_argument(
         "--gap-seed",
         type=int,
@@ -329,6 +343,8 @@ def main() -> None:
                 stair_test_course=args.stair_test_course,
                 button_test_course=args.button_test_course,
                 gap_test_course=args.gap_test_course,
+                rc_car_planar_test_course=args.rc_car_planar_test_course,
+                rc_car_seed=args.rc_car_seed,
                 stair_rise_m=stair_spec.rise_m,
                 stair_depth_m=stair_spec.tread_depth_m,
                 stair_count=stair_spec.step_count,

@@ -350,6 +350,8 @@ class SelfAssemblySimulationConfig:
     stair_test_course: bool = False
     button_test_course: bool = False
     gap_test_course: bool = False
+    rc_car_planar_test_course: bool = False
+    rc_car_seed: int | None = None
     stair_rise_m: float = 0.065
     stair_depth_m: float = 0.280
     stair_count: int = 3
@@ -375,6 +377,7 @@ class SelfAssemblySimulationConfig:
                 self.stair_test_course,
                 self.button_test_course,
                 self.gap_test_course,
+                self.rc_car_planar_test_course,
             )
         ) > 1:
             raise ValueError(

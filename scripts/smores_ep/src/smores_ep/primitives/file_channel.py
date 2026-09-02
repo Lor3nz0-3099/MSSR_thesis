@@ -21,6 +21,7 @@ class ActionDiagnostics:
 
     phase: str = ""
     fsm_state: str = ""
+    pan_traction_module_ids: tuple[str, ...] = ()
     message: str = ""
     module_roles: tuple[tuple[str, str], ...] = ()
     progress: float = 0.0
@@ -258,9 +259,27 @@ class ActionFileChannel:
         )
         if target_x_m is not None and not math.isfinite(target_x_m):
             raise ValueError("Action target_x_m must be finite")
+        raw_pan_traction = expert.get(
+            "pan_traction_module_ids",
+            (),
+        )
+        if not isinstance(raw_pan_traction, (list, tuple)):
+            raise ValueError(
+                "expert.pan_traction_module_ids must be an array"
+            )
+        pan_traction_module_ids = tuple(
+            sorted(
+                {
+                    str(module_id)
+                    for module_id in raw_pan_traction
+                    if str(module_id)
+                }
+            )
+        )
         diagnostics = ActionDiagnostics(
             phase=str(metrics.get("phase", "")),
             fsm_state=str(expert.get("fsm_state", "")),
+            pan_traction_module_ids=pan_traction_module_ids,
             message=str(debug.get("message", "")),
             module_roles=roles,
             progress=float(metrics.get("progress", 0.0)),
