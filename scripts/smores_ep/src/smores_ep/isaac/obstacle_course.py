@@ -347,19 +347,21 @@ def rc_car_planar_obstacle_layout(
     platform_size_x_m: float = 4.80,
     platform_size_y_m: float = 3.20,
 ) -> dict[str, Any]:
-    """Externally-known procedural track for RC-Car8.
+    """Externally-known procedural RC-Car8 navigation course.
 
-    Physical support and navigation corridor are intentionally distinct:
-    the large rectangular platform supports self-assembly, while Nav2 sees
-    only the drivable road plus the start area.
+    Seed 5100 is the manually validated reference course.
+    Other seeds vary track geometry and obstacle placement.
+    Nav2 receives only the resulting environment and goal.
     """
+    import json
     import math
+    from pathlib import Path
     from random import Random
 
     rng = Random(int(seed) ^ 0x51A10)
 
     # --------------------------------------------------------
-    # Measured RC-Car8 footprint.
+    # Measured RC-Car8 physical envelope.
     # --------------------------------------------------------
     vehicle_length_m = 0.310
     vehicle_width_m = 0.232
@@ -369,25 +371,20 @@ def rc_car_planar_obstacle_layout(
     cone_height_m = 0.170
     collision_margin_m = 0.015
 
-    # Road sized from the actual vehicle envelope.
-    #
-    # Planning footprint is ~0.252 m wide.
-    # 0.66 m road gives enough steering space, but not enough to
-    # trivially bypass alternating cones on one common outside line.
+    # Validated road width.
     corridor_width_m = 0.840
 
-    # Cone lateral offset relative to LOCAL road centreline.
-    cone_offset_m = 0.075
-
-    # --------------------------------------------------------
-    # FULL PHYSICAL SUPPORT PLATFORM.
-    # --------------------------------------------------------
-    x_min = platform_center_x_m - 0.5 * platform_size_x_m
-    x_max = platform_center_x_m + 0.5 * platform_size_x_m
+    x_min = (
+        platform_center_x_m
+        - 0.5 * platform_size_x_m
+    )
+    x_max = (
+        platform_center_x_m
+        + 0.5 * platform_size_x_m
+    )
     y_min = -0.5 * platform_size_y_m
     y_max = +0.5 * platform_size_y_m
 
-    # Wide starting region used only while the modules assemble.
     start_pad_bounds_xy_m = [
         x_min + 0.05,
         0.42,
@@ -395,89 +392,215 @@ def rc_car_planar_obstacle_layout(
         +0.78,
     ]
 
+    # ========================================================
+    # TRACK GEOMETRY
+    # ========================================================
+
+    if int(seed) == 5100:
+        # Exact geometry of validated reference run.
+        has_curve = True
+        curve_direction = +1.0
+        curve_angle_deg = 90.0
+        curve_radius_m = 0.620
+
+        start_x = 0.180
+        bend_x = 1.340
+        exit_length_m = 0.540
+
+    else:
+        # Roughly 2/3 of episodes have a curve.
+        has_curve = (
+            rng.random() < 0.67
+        )
+
+        curve_direction = (
+            +1.0
+            if rng.random() < 0.5
+            else -1.0
+        )
+
+        if has_curve:
+            curve_angle_deg = rng.choice(
+                (45.0, 60.0, 75.0, 90.0)
+            )
+        else:
+            curve_angle_deg = 0.0
+
+        curve_radius_m = rng.uniform(
+            0.54,
+            0.70,
+        )
+
+        start_x = 0.180
+
+        bend_x = rng.uniform(
+            1.16,
+            1.42,
+        )
+
+        exit_length_m = rng.uniform(
+            0.42,
+            0.62,
+        )
+
+    centerline: list[
+        tuple[float, float]
+    ] = []
+
     # --------------------------------------------------------
-    # Seeded track family.
-    #
-    # Even seeds -> curved course.
-    # Odd seeds  -> straight course.
-    #
-    # A second seed bit decides whether the curve goes toward +Y or -Y.
+    # Straight approach.
     # --------------------------------------------------------
-    has_curve = (int(seed) % 2 == 0)
+    approach_samples = 10
 
-    curve_direction = (
-        +1.0
-        if ((int(seed) // 2) % 2 == 0)
-        else -1.0
-    )
+    for i in range(approach_samples):
+        alpha = i / (
+            approach_samples - 1
+        )
 
-    centerline: list[tuple[float, float]] = []
+        centerline.append(
+            (
+                start_x
+                + alpha
+                * (bend_x - start_x),
+                0.0,
+            )
+        )
 
+    # --------------------------------------------------------
+    # Optional smooth circular bend.
+    # --------------------------------------------------------
     if has_curve:
-        # Straight approach.
-        start_x = 0.18
-        bend_x = 1.34
+        theta_max = math.radians(
+            curve_angle_deg
+        )
 
-        for i in range(9):
-            alpha = i / 8.0
-            centerline.append(
-                (
-                    start_x + alpha * (bend_x - start_x),
-                    0.0,
+        arc_samples = max(
+            8,
+            int(
+                round(
+                    14
+                    * curve_angle_deg
+                    / 90.0
+                )
+            ),
+        )
+
+        for i in range(
+            1,
+            arc_samples + 1,
+        ):
+            theta = (
+                theta_max
+                * i
+                / arc_samples
+            )
+
+            x = (
+                bend_x
+                + curve_radius_m
+                * math.sin(theta)
+            )
+
+            y = (
+                curve_direction
+                * curve_radius_m
+                * (
+                    1.0
+                    - math.cos(theta)
                 )
             )
 
-        # Smooth quarter-circle.
-        radius = 0.62
-
-        for i in range(1, 13):
-            t = (math.pi / 2.0) * i / 12.0
-
             centerline.append(
-                (
-                    bend_x + radius * math.sin(t),
-                    curve_direction
-                    * radius
-                    * (1.0 - math.cos(t)),
-                )
+                (x, y)
             )
 
-        # Straight section after the bend.
-        curve_end_x = bend_x + radius
-        curve_end_y = curve_direction * radius
-        final_extra = 0.54
+        theta = theta_max
 
-        for i in range(1, 7):
-            alpha = i / 6.0
+        end_x = (
+            bend_x
+            + curve_radius_m
+            * math.sin(theta)
+        )
+
+        end_y = (
+            curve_direction
+            * curve_radius_m
+            * (
+                1.0
+                - math.cos(theta)
+            )
+        )
+
+        tx = math.cos(theta)
+        ty = (
+            curve_direction
+            * math.sin(theta)
+        )
+
+        exit_samples = 7
+
+        for i in range(
+            1,
+            exit_samples + 1,
+        ):
+            distance = (
+                exit_length_m
+                * i
+                / exit_samples
+            )
 
             centerline.append(
                 (
-                    curve_end_x,
-                    curve_end_y
-                    + curve_direction * final_extra * alpha,
+                    end_x
+                    + tx * distance,
+                    end_y
+                    + ty * distance,
                 )
             )
 
     else:
-        start_x = 0.18
-        finish_x = 3.08
+        # Long straight course.
+        straight_end_x = min(
+            x_max - 0.32,
+            3.05
+            + rng.uniform(
+                -0.12,
+                +0.15,
+            ),
+        )
 
-        for i in range(25):
-            alpha = i / 24.0
+        extra_samples = 18
+
+        for i in range(
+            1,
+            extra_samples + 1,
+        ):
+            alpha = (
+                i
+                / extra_samples
+            )
+
             centerline.append(
                 (
-                    start_x + alpha * (finish_x - start_x),
+                    bend_x
+                    + alpha
+                    * (
+                        straight_end_x
+                        - bend_x
+                    ),
                     0.0,
                 )
             )
 
-    # --------------------------------------------------------
-    # Arclength representation of centreline.
-    # Used to position obstacles relative to the road itself.
-    # --------------------------------------------------------
+    # ========================================================
+    # ARC-LENGTH PARAMETRIZATION
+    # ========================================================
     cumulative = [0.0]
 
-    for a, b in zip(centerline[:-1], centerline[1:]):
+    for a, b in zip(
+        centerline[:-1],
+        centerline[1:],
+    ):
         cumulative.append(
             cumulative[-1]
             + math.hypot(
@@ -490,38 +613,67 @@ def rc_car_planar_obstacle_layout(
 
     def pose_at_distance(distance_m):
         d = min(
-            max(float(distance_m), 0.0),
+            max(
+                float(distance_m),
+                0.0,
+            ),
             total_length,
         )
 
-        for index in range(len(centerline) - 1):
+        for index in range(
+            len(centerline) - 1
+        ):
             s0 = cumulative[index]
             s1 = cumulative[index + 1]
 
-            if d > s1 and index < len(centerline) - 2:
+            if (
+                d > s1
+                and index
+                < len(centerline) - 2
+            ):
                 continue
 
             a = centerline[index]
             b = centerline[index + 1]
 
-            seg = max(s1 - s0, 1.0e-9)
-            alpha = min(
-                1.0,
-                max(0.0, (d - s0) / seg),
+            seg = max(
+                s1 - s0,
+                1.0e-9,
             )
 
-            x = a[0] + alpha * (b[0] - a[0])
-            y = a[1] + alpha * (b[1] - a[1])
+            alpha = min(
+                1.0,
+                max(
+                    0.0,
+                    (d - s0) / seg,
+                ),
+            )
+
+            x = (
+                a[0]
+                + alpha
+                * (b[0] - a[0])
+            )
+            y = (
+                a[1]
+                + alpha
+                * (b[1] - a[1])
+            )
 
             dx = b[0] - a[0]
             dy = b[1] - a[1]
 
-            norm = max(math.hypot(dx, dy), 1.0e-9)
+            norm = max(
+                math.hypot(dx, dy),
+                1.0e-9,
+            )
 
-            tx = dx / norm
-            ty = dy / norm
-
-            return x, y, tx, ty
+            return (
+                x,
+                y,
+                dx / norm,
+                dy / norm,
+            )
 
         a = centerline[-2]
         b = centerline[-1]
@@ -529,7 +681,10 @@ def rc_car_planar_obstacle_layout(
         dx = b[0] - a[0]
         dy = b[1] - a[1]
 
-        norm = max(math.hypot(dx, dy), 1.0e-9)
+        norm = max(
+            math.hypot(dx, dy),
+            1.0e-9,
+        )
 
         return (
             b[0],
@@ -538,109 +693,206 @@ def rc_car_planar_obstacle_layout(
             dy / norm,
         )
 
-    # --------------------------------------------------------
-    # Five alternating cones.
-    #
-    # They are positioned using the local normal of the road,
-    # so the same generator works on both straight and curved sections.
-    # --------------------------------------------------------
-    # Give the non-holonomic RC-Car8 enough longitudinal distance
-    # to finish one avoidance turn before starting the next.
-    fractions = (
-        0.22,
-        0.38,
-        0.54,
-        0.70,
-        0.86,
-    )
+    # ========================================================
+    # PROCEDURAL CONES
+    # ========================================================
 
-    cone_centers = []
-
-    for index, fraction in enumerate(fractions):
-        x, y, tx, ty = pose_at_distance(
-            total_length * fraction
-        )
-
-        # local left-hand normal
-        nx = -ty
-        ny = tx
-
-        sign = +1.0 if index % 2 == 0 else -1.0
-
-        offset = (
-            sign
-            * (
-                cone_offset_m
-                + rng.uniform(-0.008, 0.008)
-            )
-        )
-
-        cone_centers.append(
-            (
-                x + nx * offset,
-                y + ny * offset,
-            )
-        )
-
-    # --------------------------------------------------------
-    # Reproducible manually-validated layout.
-    #
-    # During GUI tuning the live Isaac obstacle bridge records the
-    # actual physical collider positions.  For seed 5100 we may freeze
-    # that validated arrangement here so subsequent runs reproduce it
-    # exactly instead of losing manual Stage edits.
-    # --------------------------------------------------------
     if int(seed) == 5100:
-        import json
-        from pathlib import Path
-
+        # Use manually validated 6-cone arrangement.
         override_path = (
-            Path(__file__).resolve().parents[3]
+            Path(__file__)
+            .resolve()
+            .parents[3]
             / "config"
             / "rc_car_seed5100_layout.json"
         )
 
-        if override_path.exists():
-            override = json.loads(
-                override_path.read_text()
+        if not override_path.exists():
+            raise RuntimeError(
+                "Validated seed-5100 layout missing: "
+                f"{override_path}"
             )
 
-            saved_cones = override.get(
-                "cone_centers_xy_m",
-                [],
+        override = json.loads(
+            override_path.read_text()
+        )
+
+        cone_centers = [
+            (
+                float(point[0]),
+                float(point[1]),
+            )
+            for point in override[
+                "cone_centers_xy_m"
+            ]
+        ]
+
+    else:
+        cone_count = rng.randint(
+            5,
+            7,
+        )
+
+        # Leave some free distance after start and before finish.
+        first_fraction = rng.uniform(
+            0.20,
+            0.25,
+        )
+
+        last_fraction = rng.uniform(
+            0.80,
+            0.87,
+        )
+
+        fractions = []
+
+        for index in range(
+            cone_count
+        ):
+            if cone_count == 1:
+                alpha = 0.5
+            else:
+                alpha = (
+                    index
+                    / (cone_count - 1)
+                )
+
+            fraction = (
+                first_fraction
+                + alpha
+                * (
+                    last_fraction
+                    - first_fraction
+                )
             )
 
-            if len(saved_cones) >= 5:
-                cone_centers = [
-                    (
-                        float(point[0]),
-                        float(point[1]),
-                    )
-                    for point in saved_cones
-                ]
+            # Small longitudinal perturbation.
+            if (
+                index > 0
+                and index
+                < cone_count - 1
+            ):
+                fraction += rng.uniform(
+                    -0.018,
+                    +0.018,
+                )
 
-    # Goal at end of the actual generated road.
-    gx, gy, tx, ty = pose_at_distance(total_length)
+            fractions.append(
+                fraction
+            )
 
-    goal_yaw = math.atan2(ty, tx)
+        cone_centers = []
+
+        for index, fraction in enumerate(
+            fractions
+        ):
+            x, y, tx, ty = (
+                pose_at_distance(
+                    total_length
+                    * fraction
+                )
+            )
+
+            # Local road normal.
+            nx = -ty
+            ny = tx
+
+            # Alternating side relative to LOCAL track direction.
+            sign = (
+                +1.0
+                if index % 2 == 0
+                else -1.0
+            )
+
+            lateral_offset = (
+                sign
+                * rng.uniform(
+                    0.055,
+                    0.105,
+                )
+            )
+
+            cone_centers.append(
+                (
+                    x
+                    + nx
+                    * lateral_offset,
+                    y
+                    + ny
+                    * lateral_offset,
+                )
+            )
+
+    # ========================================================
+    # GOAL / FINISH
+    # ========================================================
+    gx, gy, tx, ty = (
+        pose_at_distance(
+            total_length
+        )
+    )
+
+    goal_yaw = math.atan2(
+        ty,
+        tx,
+    )
+
+    # Ensure procedural course remains on the large physical platform.
+    margin = 0.12
+
+    for index, (x, y) in enumerate(
+        centerline
+    ):
+        if not (
+            x_min + margin
+            <= x
+            <= x_max - margin
+            and y_min + margin
+            <= y
+            <= y_max - margin
+        ):
+            raise RuntimeError(
+                "Procedural RC-Car8 track "
+                f"seed={seed} leaves support platform "
+                f"at centerline[{index}]=({x:.3f},{y:.3f})"
+            )
 
     return {
-        "generator": "rc_car_planar_track_v2",
+        "generator":
+            "rc_car_planar_track_v3",
+
         "seed": int(seed),
         "frame_id": "map",
 
         "track_profile": (
-            "quarter_turn"
-            if has_curve
-            else "straight"
+            "straight"
+            if not has_curve
+            else (
+                f"curve_"
+                f"{int(curve_angle_deg)}deg"
+            )
         ),
 
-        "has_curve": bool(has_curve),
+        "has_curve":
+            bool(has_curve),
+
         "curve_direction": (
             int(curve_direction)
             if has_curve
             else 0
         ),
+
+        "curve_angle_deg":
+            float(curve_angle_deg),
+
+        "curve_radius_m":
+            float(curve_radius_m),
+
+        "approach_end_x_m":
+            float(bend_x),
+
+        "exit_length_m":
+            float(exit_length_m),
 
         "platform_bounds_xy_m": [
             x_min,
@@ -672,9 +924,14 @@ def rc_car_planar_obstacle_layout(
             goal_yaw,
         ],
 
-        "finish_x_m": gx,
-        "finish_y_m": gy,
-        "finish_yaw_rad": goal_yaw,
+        "finish_x_m":
+            gx,
+
+        "finish_y_m":
+            gy,
+
+        "finish_yaw_rad":
+            goal_yaw,
 
         "cone_radius_m":
             cone_radius_m,
@@ -687,9 +944,16 @@ def rc_car_planar_obstacle_layout(
             for point in cone_centers
         ],
 
+        "cone_count":
+            len(cone_centers),
+
         "vehicle_footprint": {
-            "length_m": vehicle_length_m,
-            "width_m": vehicle_width_m,
+            "length_m":
+                vehicle_length_m,
+
+            "width_m":
+                vehicle_width_m,
+
             "collision_margin_m":
                 collision_margin_m,
         },
@@ -700,6 +964,7 @@ def rc_car_planar_obstacle_layout(
             + collision_margin_m
         ),
     }
+
 
 
 
