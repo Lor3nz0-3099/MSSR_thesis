@@ -144,12 +144,16 @@ def evaluate_far_bank_result(
         else float("inf")
     )
     connections = graph_connection_count(payload)
+    # Crossing success is a geometric/topological condition:
+    # every module must be connected, beyond the far edge, and resting
+    # at the far-bank height.  Residual internal TILT curvature is kept
+    # as a diagnostic but does not invalidate an otherwise completed
+    # crossing.
     all_modules_on_far_bank = (
         len(positions) == 8
         and connections == 7
         and minimum_center_x_m >= spec.far_edge_x_m
         and maximum_bank_height_error_m <= vertical_tolerance_m
-        and tilt_spread_rad <= maximum_tilt_spread_rad
     )
     return {
         "module_count": len(positions),

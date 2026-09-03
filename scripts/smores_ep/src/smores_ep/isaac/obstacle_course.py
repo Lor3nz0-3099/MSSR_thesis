@@ -241,8 +241,8 @@ class RCPlanarSpec:
     seed: int
     route_kind: str
     waypoints_xyyaw: tuple[tuple[float, float, float], ...]
-    platform_size_x_m: float = 4.80
-    platform_size_y_m: float = 3.20
+    platform_size_x_m: float = 5.60
+    platform_size_y_m: float = 4.20
     platform_thickness_m: float = 0.02
 
     def __post_init__(self) -> None:
@@ -372,7 +372,7 @@ def rc_car_planar_obstacle_layout(
     collision_margin_m = 0.015
 
     # Validated road width.
-    corridor_width_m = 0.840
+    corridor_width_m = 1.100
 
     x_min = (
         platform_center_x_m
@@ -388,8 +388,8 @@ def rc_car_planar_obstacle_layout(
     start_pad_bounds_xy_m = [
         x_min + 0.05,
         0.42,
-        -0.78,
-        +0.78,
+        -0.95,
+        +0.95,
     ]
 
     # ========================================================
@@ -728,60 +728,72 @@ def rc_car_planar_obstacle_layout(
         ]
 
     else:
+        # ----------------------------------------------------
+        # Procedural obstacles.
+        #
+        # They are deliberately NOT an alternating slalom.
+        # Each cone is sampled independently on one side of
+        # the local road centerline, with longitudinal slots
+        # preventing clusters that geometrically close the
+        # corridor.
+        # ----------------------------------------------------
         cone_count = rng.randint(
-            5,
-            7,
+            4,
+            6,
         )
 
-        # Leave some free distance after start and before finish.
         first_fraction = rng.uniform(
-            0.20,
-            0.25,
+            0.18,
+            0.23,
         )
 
         last_fraction = rng.uniform(
-            0.80,
-            0.87,
+            0.79,
+            0.86,
+        )
+
+        span = (
+            last_fraction
+            - first_fraction
+        )
+
+        slot = (
+            span
+            / cone_count
         )
 
         fractions = []
 
-        for index in range(
-            cone_count
-        ):
-            if cone_count == 1:
-                alpha = 0.5
-            else:
-                alpha = (
-                    index
-                    / (cone_count - 1)
-                )
-
-            fraction = (
+        for index in range(cone_count):
+            center = (
                 first_fraction
-                + alpha
-                * (
-                    last_fraction
-                    - first_fraction
+                + (
+                    index
+                    + 0.5
                 )
+                * slot
             )
 
-            # Small longitudinal perturbation.
-            if (
-                index > 0
-                and index
-                < cone_count - 1
-            ):
-                fraction += rng.uniform(
-                    -0.018,
-                    +0.018,
+            # Random position inside its own longitudinal
+            # slot: random course, but no cone clusters.
+            fraction = (
+                center
+                + rng.uniform(
+                    -0.22,
+                    +0.22,
                 )
+                * slot
+            )
 
             fractions.append(
                 fraction
             )
 
+        fractions.sort()
+
         cone_centers = []
+
+        previous_sign = None
 
         for index, fraction in enumerate(
             fractions
@@ -793,22 +805,37 @@ def rc_car_planar_obstacle_layout(
                 )
             )
 
-            # Local road normal.
+            # Normal to the LOCAL direction of the road.
             nx = -ty
             ny = tx
 
-            # Alternating side relative to LOCAL track direction.
-            sign = (
-                +1.0
-                if index % 2 == 0
-                else -1.0
+            # Independent random side.
+            #
+            # Consecutive obstacles are explicitly allowed
+            # on the same side: this removes the artificial
+            # compulsory zig-zag of v3.
+            sign = rng.choice(
+                (-1.0, +1.0)
             )
 
+            # Occasionally flip repeated runs so all cones
+            # do not accidentally accumulate on one edge.
+            if (
+                previous_sign == sign
+                and rng.random() < 0.25
+            ):
+                sign = -sign
+
+            previous_sign = sign
+
+            # Wider road lets obstacles sit farther from the
+            # nominal centerline while still leaving a large
+            # navigable corridor around them.
             lateral_offset = (
                 sign
                 * rng.uniform(
-                    0.055,
-                    0.105,
+                    0.16,
+                    0.28,
                 )
             )
 
@@ -859,7 +886,7 @@ def rc_car_planar_obstacle_layout(
 
     return {
         "generator":
-            "rc_car_planar_track_v3",
+            "rc_car_planar_track_v4",
 
         "seed": int(seed),
         "frame_id": "map",
@@ -1061,12 +1088,6 @@ class StairTestCourse:
                 "first_riser_x_m": self.first_riser_x_m,
                 "riser_depth_m": self.riser_depth_m,
             },
-            "known_environment": rc_car_planar_obstacle_layout(
-                self.spec.seed,
-                platform_center_x_m=1.10,
-                platform_size_x_m=self.spec.platform_size_x_m,
-                platform_size_y_m=self.spec.platform_size_y_m,
-            ),
             "collision_boxes": _collision_box_observations(self.boxes),
         }
 
