@@ -448,7 +448,7 @@ def test_holonomic9_to_manipulator8_releases_one_leaf_reserve() -> None:
     assert len(plan.reserve_module_ids) == 1
     assert len(plan.reserve_detach_actions) == 1
     assert len(plan.final_pan_by_module) == 1
-    assert len(plan.final_tilt_by_module) == 7
+    assert len(plan.final_tilt_by_module) == 8
 
 
 def test_manipulator8_plus_one_reserve_can_target_holonomic9() -> None:

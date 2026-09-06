@@ -79,10 +79,10 @@ def test_button_test_course_is_flat_isolated_and_nav2_addressable() -> None:
     assert observation["frame_id"] == "world"
     assert observation["course_profile"] == "mobile_manipulator8_button_test"
     assert observation["button"]["center_xyz_m"] == pytest.approx(
-        [0.85, 0.475, 0.17]
+        [0.85, 0.465, 0.17]
     )
     assert observation["button"]["base_standoff_xy_m"] == pytest.approx(
-        [0.85, 0.275]
+        [0.85, 0.265]
     )
     assert observation["button"]["base_standoff_yaw_rad"] == pytest.approx(
         0.5 * 3.141592653589793
@@ -361,3 +361,91 @@ def test_parameterized_stair_geometry_and_metadata_share_one_spec() -> None:
 def test_uniform_stair_spec_rejects_unsupported_geometry(kwargs: dict) -> None:
     with pytest.raises(ValueError):
         UniformStairSpec(**kwargs)
+
+
+
+def test_button_target_sampling_is_seed_reproducible() -> None:
+    from smores_ep.isaac.obstacle_course import (
+        sample_button_target_spec,
+    )
+
+    first = sample_button_target_spec(6100)
+    repeat = sample_button_target_spec(6100)
+
+    assert first == repeat
+    assert first.seed == 6100
+
+
+def test_button_target_sampling_varies_position_and_height() -> None:
+    from smores_ep.isaac.obstacle_course import (
+        BUTTON_SAMPLE_X_RANGE_M,
+        BUTTON_SAMPLE_Y_RANGE_M,
+        BUTTON_SAMPLE_Z_RANGE_M,
+        sample_button_target_spec,
+    )
+
+    first = sample_button_target_spec(6100)
+    second = sample_button_target_spec(6101)
+
+    assert first.center_xyz_m != second.center_xyz_m
+
+    assert (
+        BUTTON_SAMPLE_X_RANGE_M[0]
+        <= first.x_m
+        <= BUTTON_SAMPLE_X_RANGE_M[1]
+    )
+    assert (
+        BUTTON_SAMPLE_Y_RANGE_M[0]
+        <= first.y_m
+        <= BUTTON_SAMPLE_Y_RANGE_M[1]
+    )
+    assert (
+        BUTTON_SAMPLE_Z_RANGE_M[0]
+        <= first.z_m
+        <= BUTTON_SAMPLE_Z_RANGE_M[1]
+    )
+
+
+def test_button_course_consumes_dynamic_xyz_target() -> None:
+    from smores_ep.isaac.obstacle_course import (
+        ButtonTargetSpec,
+        mobile_manipulator_button_test_course,
+    )
+
+    spec = ButtonTargetSpec(
+        x_m=0.72,
+        y_m=0.51,
+        z_m=0.23,
+        seed=6199,
+    )
+
+    course = mobile_manipulator_button_test_course(spec)
+    observation = course.to_observation()
+
+    assert course.button_center_xyz_m == pytest.approx(
+        (0.72, 0.51, 0.23)
+    )
+
+    # Existing convention: MM8 nominal standoff is 20 cm toward -Y.
+    assert course.base_standoff_xy_m == pytest.approx(
+        (0.72, 0.31)
+    )
+
+    assert observation["button"]["center_xyz_m"] == pytest.approx(
+        [0.72, 0.51, 0.23]
+    )
+
+
+def test_default_button_fixture_is_unchanged() -> None:
+    from smores_ep.isaac.obstacle_course import (
+        mobile_manipulator_button_test_course,
+    )
+
+    course = mobile_manipulator_button_test_course()
+
+    assert course.button_center_xyz_m == pytest.approx(
+        (0.85, 0.465, 0.170)
+    )
+    assert course.base_standoff_xy_m == pytest.approx(
+        (0.85, 0.265)
+    )

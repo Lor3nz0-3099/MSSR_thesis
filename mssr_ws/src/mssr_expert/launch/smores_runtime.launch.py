@@ -164,6 +164,16 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         simulation_command.append("--stair-test-course")
     if _as_bool(LaunchConfiguration("button_test_course").perform(context)):
         simulation_command.append("--button-test-course")
+    button_seed = (
+        LaunchConfiguration("button_seed")
+        .perform(context)
+        .strip()
+    )
+    if button_seed:
+        simulation_command.extend(
+            ("--button-seed", button_seed)
+        )
+
     if _as_bool(LaunchConfiguration("gap_test_course").perform(context)):
         simulation_command.append("--gap-test-course")
     if _as_bool(
@@ -286,6 +296,14 @@ def generate_launch_description() -> LaunchDescription:
                 default_value="false",
                 description=(
                     "Spawn the isolated MobileManipulator8 button test stage."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "button_seed",
+                default_value="",
+                description=(
+                    "Optional deterministic seed for button "
+                    "position and height."
                 ),
             ),
             DeclareLaunchArgument(

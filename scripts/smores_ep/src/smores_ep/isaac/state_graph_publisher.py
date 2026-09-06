@@ -117,9 +117,10 @@ class SmoresStateGraphPublisher:
             for module_id in sorted(self._module_roots)
         ]
         attachments = self._attachment_payloads(face_poses)
+        course_observation = self._current_course_observation()
         state_payload: dict[str, Any] = {
             "schema_version": "mssr.module_states.v2",
-                        "course": dict(self._course_observation),
+                        "course": dict(course_observation),
             "stamp": stamp_s,
             "timestamp": stamp_s,
             "robot_family": "smores_ep",
@@ -176,7 +177,7 @@ class SmoresStateGraphPublisher:
                 "latched_connection_count": len(attachments),
                 "contact_candidate_count": len(contacts),
                 "experiment_profile": experiment_profile,
-                "course": dict(self._course_observation),
+                "course": dict(course_observation),
             },
         }
         combined = {
@@ -502,6 +503,61 @@ class SmoresStateGraphPublisher:
                         }
                     )
         return candidates
+
+    def _current_course_observation(self) -> dict[str, Any]:
+        """Return course metadata enriched with runtime physical state."""
+
+        course = dict(self._course_observation)
+
+        if course.get("course_profile") != (
+            "mobile_manipulator8_button_test"
+        ):
+            return course
+
+        button_payload = course.get("button")
+        if not isinstance(button_payload, Mapping):
+            return course
+
+        nominal_center = button_payload.get("center_xyz_m")
+        if (
+            not isinstance(nominal_center, (list, tuple))
+            or len(nominal_center) < 3
+        ):
+            return course
+
+        plunger_path = (
+            "/World/MobileManipulatorButtonTestCourse/"
+            "ButtonPlunger"
+        )
+        plunger = self._stage.GetPrimAtPath(plunger_path)
+
+        if not plunger or not plunger.IsValid():
+            return course
+
+        from pxr import Usd, UsdGeom
+
+        transform = UsdGeom.Xformable(
+            plunger
+        ).ComputeLocalToWorldTransform(
+            Usd.TimeCode.Default()
+        )
+        translation = transform.ExtractTranslation()
+
+        current_center = [
+            float(translation[0]),
+            float(translation[1]),
+            float(translation[2]),
+        ]
+
+        nominal_y = float(nominal_center[1])
+        depression_m = current_center[1] - nominal_y
+
+        button = dict(button_payload)
+        button["current_center_xyz_m"] = current_center
+        button["depression_m"] = float(depression_m)
+
+        course["button"] = button
+        return course
 
     def _relative_body_transform(
         self,

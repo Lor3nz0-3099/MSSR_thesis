@@ -180,6 +180,16 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Seed selecting the RC-Car8 S-curve/slalom/loop route",
     )
     parser.add_argument(
+        "--button-seed",
+        type=int,
+        default=None,
+        help=(
+            "Seed for deterministic button position/height "
+            "randomization."
+        ),
+    )
+
+    parser.add_argument(
         "--gap-seed",
         type=int,
         default=None,
@@ -342,6 +352,7 @@ def main() -> None:
                 manual_obstacle_course=args.obstacle_course,
                 stair_test_course=args.stair_test_course,
                 button_test_course=args.button_test_course,
+                button_seed=args.button_seed,
                 gap_test_course=args.gap_test_course,
                 rc_car_planar_test_course=args.rc_car_planar_test_course,
                 rc_car_seed=args.rc_car_seed,

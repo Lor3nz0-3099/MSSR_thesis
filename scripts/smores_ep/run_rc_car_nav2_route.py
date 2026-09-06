@@ -22,6 +22,24 @@ from smores_ep.isaac.obstacle_course import (
 def parser():
     p = argparse.ArgumentParser()
     p.add_argument("--seed", type=int, required=True)
+    p.add_argument(
+        "--goal-x",
+        type=float,
+        default=None,
+        help="Explicit NavigateToPose target X in map/world frame.",
+    )
+    p.add_argument(
+        "--goal-y",
+        type=float,
+        default=None,
+        help="Explicit NavigateToPose target Y in map/world frame.",
+    )
+    p.add_argument(
+        "--goal-yaw",
+        type=float,
+        default=None,
+        help="Explicit NavigateToPose target yaw in radians.",
+    )
     p.add_argument("--action-timeout-s", type=float, default=900.0)
     p.add_argument("--result-json", type=Path)
     p.add_argument(
@@ -71,20 +89,95 @@ def main():
     )
     from std_msgs.msg import String
 
-    spec = sample_rc_car_planar_spec(
-        args.seed
+    explicit_goal_values = (
+        args.goal_x,
+        args.goal_y,
+        args.goal_yaw,
     )
 
-    layout = rc_car_planar_obstacle_layout(
-        args.seed,
-        platform_center_x_m=1.10,
-        platform_size_x_m=spec.platform_size_x_m,
-        platform_size_y_m=spec.platform_size_y_m,
+    explicit_goal_mode = any(
+        value is not None
+        for value in explicit_goal_values
     )
 
-    route_id = (
-        f"rc-car-track-{args.seed:06d}"
-    )
+    if explicit_goal_mode and not all(
+        value is not None
+        for value in explicit_goal_values
+    ):
+        raise ValueError(
+            "--goal-x, --goal-y and --goal-yaw must be supplied together"
+        )
+
+    if explicit_goal_mode:
+        gx = float(args.goal_x)
+        gy = float(args.goal_y)
+        gyaw = float(args.goal_yaw)
+
+        # Existing isolated ButtonTestCourse platform:
+        # center=(0.25, 0.0), size=(2.50, 1.80).
+        #
+        # The whole platform is free navigation space.  The button/wall
+        # lies beyond the desired pre-reconfiguration standoff and does
+        # not need a second map publisher or a duplicate Nav2 bridge.
+        platform_bounds = (
+            -1.00,
+            +1.50,
+            -0.90,
+            +0.90,
+        )
+
+        layout = {
+            "track_profile": "explicit_pose",
+            "has_curve": False,
+            "platform_bounds_xy_m": platform_bounds,
+
+            # make_map() already knows how to rasterize a start-pad.
+            # Making the existing platform the start-pad gives us the
+            # required free rectangular OccupancyGrid without creating
+            # another map implementation.
+            "start_pad_bounds_xy_m": platform_bounds,
+
+            # Retained because make_map() expects these existing fields.
+            "centerline_xy_m": (
+                (-1.00, 0.0),
+                (+1.50, 0.0),
+            ),
+            "corridor_width_m": 1.80,
+            "cone_centers_xy_m": (),
+            "cone_radius_m": 0.01,
+
+            "goal_xyyaw": (
+                gx,
+                gy,
+                gyaw,
+            ),
+
+            # Compatibility fields for the existing result structure.
+            # Physical finish detection is disabled in explicit mode.
+            "finish_x_m": gx,
+            "finish_y_m": gy,
+            "finish_yaw_rad": gyaw,
+        }
+
+        route_id = (
+            f"rc-car-explicit-{args.seed:06d}"
+        )
+
+    else:
+        spec = sample_rc_car_planar_spec(
+            args.seed
+        )
+
+        layout = rc_car_planar_obstacle_layout(
+            args.seed,
+            platform_center_x_m=1.10,
+            platform_size_x_m=spec.platform_size_x_m,
+            platform_size_y_m=spec.platform_size_y_m,
+        )
+
+        route_id = (
+            f"rc-car-track-{args.seed:06d}"
+        )
 
     class NodeImpl(Node):
 
@@ -548,6 +641,13 @@ def main():
         "track_profile":
             layout["track_profile"],
         "known_environment": layout,
+        "goal_xyyaw": [
+            float(v)
+            for v in layout["goal_xyyaw"]
+        ],
+        "explicit_goal_mode": bool(
+            explicit_goal_mode
+        ),
         "success": False,
     }
 
@@ -612,7 +712,11 @@ def main():
             False,
             False,
             0.0,
-            "Procedural RC track started.",
+            (
+                "Explicit Nav2 pose started."
+                if explicit_goal_mode
+                else "Procedural RC track started."
+            ),
         )
 
         def feedback_cb(msg):
@@ -640,7 +744,11 @@ def main():
                 False,
                 False,
                 progress,
-                "Following Nav2 track path.",
+                (
+                    "Following explicit Nav2 pose."
+                    if explicit_goal_mode
+                    else "Following Nav2 track path."
+                ),
             )
 
         send = node.client.send_goal_async(
@@ -680,7 +788,10 @@ def main():
                 timeout_sec=0.10,
             )
 
-            if node.front_reached_finish():
+            if (
+                not explicit_goal_mode
+                and node.front_reached_finish()
+            ):
                 physical_finish_success = True
 
                 metrics = node.finish_metrics()
@@ -728,7 +839,10 @@ def main():
 
         else:
             # One final physical check before declaring timeout.
-            if node.front_reached_finish():
+            if (
+                not explicit_goal_mode
+                and node.front_reached_finish()
+            ):
                 success = True
                 physical_finish_success = True
                 status = int(
@@ -778,7 +892,11 @@ def main():
             if success
             and completion_source == "physical_front_finish_line"
             else (
-                "RC track completed."
+                (
+                    "Explicit Nav2 target reached."
+                    if explicit_goal_mode
+                    else "RC track completed."
+                )
                 if success
                 else f"Nav2 status={status}"
             )

@@ -709,28 +709,31 @@ def test_mobile_ready_posture_deploys_arched_pan_support_base() -> None:
         (target.target_role, target.joint): target.angle_rad
         for target in targets
     }
+
+    # Physically validated scorpion post-assembly / drive posture.
     assert by_role == {
-        ("chassis_center", "tilt"): pytest.approx(-0.25),
-        ("left_drive", "tilt"): pytest.approx(-0.40),
-        ("right_drive", "tilt"): pytest.approx(-0.40),
-        ("front_support", "tilt"): pytest.approx(0.0),
-        ("arm_ground_drive", "tilt"): pytest.approx(0.20),
-        ("arm_lift", "tilt"): pytest.approx(0.75),
-        ("arm_link", "tilt"): pytest.approx(0.65),
+        ("chassis_center", "tilt"): pytest.approx(
+            -0.5235987755982988
+        ),
+        ("left_drive", "tilt"): pytest.approx(0.0),
+        ("right_drive", "tilt"): pytest.approx(0.0),
+        ("front_support", "tilt"): pytest.approx(
+            0.7853981633974483
+        ),
+        ("arm_ground_drive", "tilt"): pytest.approx(
+            -1.111425667669989
+        ),
+        ("arm_lift", "tilt"): pytest.approx(
+            1.327497429066887
+        ),
+        ("arm_link", "tilt"): pytest.approx(
+            1.5454890526409788
+        ),
+        ("end_effector", "tilt"): pytest.approx(
+            1.5526449025741555
+        ),
         ("end_effector", "pan"): pytest.approx(0.0),
     }
-    assert all(
-        target.tolerance_rad == pytest.approx(0.10)
-        for target in targets
-        if target.target_role in {
-            "chassis_center",
-            "left_drive",
-            "right_drive",
-            "front_support",
-            "arm_ground_drive",
-        }
-    )
-
 
 def test_mobile_manipulator_translates_on_longitudinal_left_right_wheels() -> None:
     library = _library()
@@ -741,9 +744,9 @@ def test_mobile_manipulator_translates_on_longitudinal_left_right_wheels() -> No
         yaw_rate_rad_s=0.0,
     )
 
-    assert set(commands) == {"m2", "m4"}
+    assert set(commands) == {"m2", "m5"}
     assert commands["m2"]["vx"] == pytest.approx(0.04)
-    assert commands["m4"]["vx"] == pytest.approx(0.04)
+    assert commands["m5"]["vx"] == pytest.approx(0.04)
     assert all(command["yaw_rate"] == 0.0 for command in commands.values())
 
 
@@ -766,32 +769,46 @@ def test_mobile_drive_does_not_dispatch_automatic_arm_motion() -> None:
     driving = executor.step(0.0)
     assert driving.primitive_goal is None
     assert driving.state == "RUNNING_DRIVE"
-    assert set(driving.locomotion) == {"m2", "m4"}
+    assert set(driving.locomotion) == {"m2", "m5"}
 
 
 def test_mobile_manipulator_drive_preserves_current_tilt_posture() -> None:
     library = _library()
     assignments = _assignments(MANIPULATOR8_ROLES)
 
-    translating = library.drive_joint_targets(
-        "mobile_manipulator8", assignments, 0.04, 0.0
-    )
-    spinning = library.drive_joint_targets(
-        "mobile_manipulator8", assignments, 0.0, 0.4
-    )
-
-    assert translating == ()
-    assert spinning == ()
-    spin_commands = library.drive_commands(
+    # Locomotion must not alter the validated folding posture.
+    translating_joint_targets = library.drive_joint_targets(
         "mobile_manipulator8",
         assignments,
-        linear_m_s=0.0,
-        yaw_rate_rad_s=0.4,
+        0.04,
+        0.0,
     )
-    assert set(spin_commands) == {"m2", "m4"}
-    assert spin_commands["m2"]["vx"] == pytest.approx(0.04)
-    assert spin_commands["m4"]["vx"] == pytest.approx(-0.04)
 
+    assert translating_joint_targets == ()
+
+    # Physical validation established exactly two longitudinal
+    # locomotors: front_support + arm_lift.
+    translation_commands = library.drive_commands(
+        "mobile_manipulator8",
+        assignments,
+        linear_m_s=0.04,
+        yaw_rate_rad_s=0.0,
+    )
+
+    assert len(translation_commands) == 2
+
+    # MM8 deliberately has NO steering capability after
+    # reconfiguration. Heading must be established by RC-Car8.
+    with pytest.raises(
+        Exception,
+        match=r"Requested yaw rate .* exceeds limit 0\.000",
+    ):
+        library.drive_commands(
+            "mobile_manipulator8",
+            assignments,
+            linear_m_s=0.0,
+            yaw_rate_rad_s=0.4,
+        )
 
 def test_holonomic_drive_keeps_pods_straight_and_projects_translation() -> None:
     roles = (

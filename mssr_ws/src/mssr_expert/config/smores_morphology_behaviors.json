@@ -1513,54 +1513,60 @@
           {
             "target_role": "chassis_center",
             "joint": "tilt",
-            "angle_rad": -0.25,
+            "angle_rad": -0.5235987755982988,
             "tolerance_rad": 0.1,
             "coordination_group": "base_hold"
           },
           {
             "target_role": "left_drive",
             "joint": "tilt",
-            "angle_rad": -0.4,
+            "angle_rad": 0.0,
             "tolerance_rad": 0.1,
             "coordination_group": "base_hold"
           },
           {
             "target_role": "right_drive",
             "joint": "tilt",
-            "angle_rad": -0.4,
+            "angle_rad": 0.0,
             "tolerance_rad": 0.1,
             "coordination_group": "base_hold"
           },
           {
             "target_role": "front_support",
             "joint": "tilt",
-            "angle_rad": 0.0,
+            "angle_rad": 0.7853981633974483,
             "tolerance_rad": 0.1,
             "coordination_group": "base_hold"
           },
           {
             "target_role": "arm_ground_drive",
             "joint": "tilt",
-            "angle_rad": 0.2,
+            "angle_rad": -1.111425667669989,
             "tolerance_rad": 0.1,
             "coordination_group": "base_hold"
           },
           {
             "target_role": "arm_lift",
             "joint": "tilt",
-            "angle_rad": 0.75,
+            "angle_rad": 1.327497429066887,
             "tolerance_rad": 0.2
           },
           {
             "target_role": "arm_link",
             "joint": "tilt",
-            "angle_rad": 0.65,
+            "angle_rad": 1.5454890526409788,
             "tolerance_rad": 0.2
           },
           {
             "target_role": "end_effector",
             "joint": "pan",
             "angle_rad": 0.0
+          },
+          {
+            "target_role": "end_effector",
+            "joint": "tilt",
+            "angle_rad": 1.5526449025741555,
+            "tolerance_rad": 0.2
           }
         ],
         "arm_raised": [
@@ -1752,6 +1758,100 @@
             "joint": "pan",
             "angle_rad": 0.0
           }
+        ],
+        "manipulation_ready": [
+          {
+            "target_role": "left_drive",
+            "joint": "tilt",
+            "angle_rad": -0.17453292519943295,
+            "tolerance_rad": 0.1
+          },
+          {
+            "target_role": "right_drive",
+            "joint": "tilt",
+            "angle_rad": -0.17453292519943295,
+            "tolerance_rad": 0.1
+          },
+          {
+            "target_role": "chassis_center",
+            "joint": "tilt",
+            "angle_rad": -0.17453292519943295,
+            "tolerance_rad": 0.1
+          },
+          {
+            "target_role": "front_support",
+            "joint": "tilt",
+            "angle_rad": 0.0,
+            "tolerance_rad": 0.1
+          },
+          {
+            "target_role": "arm_ground_drive",
+            "joint": "tilt",
+            "angle_rad": -0.1679006740418545,
+            "tolerance_rad": 0.1
+          },
+          {
+            "target_role": "arm_lift",
+            "joint": "tilt",
+            "angle_rad": 0.7578219612159379,
+            "tolerance_rad": 0.2
+          },
+          {
+            "target_role": "arm_link",
+            "joint": "tilt",
+            "angle_rad": 0.5815437067645106,
+            "tolerance_rad": 0.2
+          },
+          {
+            "target_role": "end_effector",
+            "joint": "tilt",
+            "angle_rad": 0.22043508452688385,
+            "tolerance_rad": 0.2
+          },
+          {
+            "target_role": "arm_ground_drive",
+            "joint": "pan",
+            "angle_rad": -0.0017453292519943296,
+            "tolerance_rad": 0.2
+          },
+          {
+            "target_role": "arm_lift",
+            "joint": "pan",
+            "angle_rad": -0.06684611035138283,
+            "tolerance_rad": 0.2
+          },
+          {
+            "target_role": "arm_link",
+            "joint": "pan",
+            "angle_rad": 0.1593485607070823,
+            "tolerance_rad": 0.2
+          },
+          {
+            "target_role": "end_effector",
+            "joint": "pan",
+            "angle_rad": 0.05777039824101231,
+            "tolerance_rad": 0.2
+          }
+        ],
+        "retreat_drive_base": [
+          {
+            "target_role": "chassis_center",
+            "joint": "tilt",
+            "angle_rad": -0.5235987755982988,
+            "tolerance_rad": 0.1
+          },
+          {
+            "target_role": "front_support",
+            "joint": "tilt",
+            "angle_rad": 0.7853981633974483,
+            "tolerance_rad": 0.1
+          },
+          {
+            "target_role": "arm_ground_drive",
+            "joint": "tilt",
+            "angle_rad": -0.7853981633974483,
+            "tolerance_rad": 0.1
+          }
         ]
       },
       "behaviors": {
@@ -1772,15 +1872,19 @@
         ],
         "lower_arm": [
           "arm_lowered"
-        ]
+        ],
+        "prepare_manipulation": [
+          "manipulation_ready"
+        ],
+        "restore_drive": ["drive_ready"]
       },
       "drive": {
         "actuation": "module_wheels",
         "preserve_current_posture": true,
         "allow_combined_translation_and_turn": false,
         "max_linear_m_s": 0.08,
-        "max_yaw_rate_rad_s": 0.6,
-        "turn_radius_m": 0.1,
+        "max_yaw_rate_rad_s": 0.0,
+        "turn_radius_m": 0.0,
         "selectors": [
           {
             "target_role": "front_support",
@@ -1789,22 +1893,10 @@
             "turn_scale": 0.0
           },
           {
-            "target_role": "arm_ground_drive",
+            "target_role": "arm_lift",
             "active_when": "translation",
             "linear_scale": 1.0,
             "turn_scale": 0.0
-          },
-          {
-            "target_role": "front_support",
-            "active_when": "pure_turn",
-            "linear_scale": 0.0,
-            "turn_scale": 1.0
-          },
-          {
-            "target_role": "arm_ground_drive",
-            "active_when": "pure_turn",
-            "linear_scale": 0.0,
-            "turn_scale": -1.0
           }
         ]
       }

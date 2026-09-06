@@ -27,6 +27,7 @@ VALID_PRIMITIVES = frozenset(
         "assisted_align_faces",
         "dock",
         "undock",
+        "gravity_settle",
         "set_pan",
         "rotate_pan_by",
         "set_tilt",
@@ -222,6 +223,44 @@ class PrimitiveGoalRequest:
                     raise PrimitiveProtocolError(
                         "snap_to_nominal must be boolean."
                     )
+
+        elif self.primitive == "gravity_settle":
+            duration_s = _finite_parameter(
+                parameters,
+                "duration_s",
+            )
+            if duration_s <= 0.0:
+                raise PrimitiveProtocolError(
+                    "duration_s must be positive."
+                )
+
+            raw_ids = parameters.get("passive_module_ids")
+            if not isinstance(raw_ids, list | tuple):
+                raise PrimitiveProtocolError(
+                    "passive_module_ids must be an array."
+                )
+
+            passive_ids = tuple(
+                str(item).strip()
+                for item in raw_ids
+            )
+
+            if (
+                not passive_ids
+                or any(not item for item in passive_ids)
+                or len(set(passive_ids)) != len(passive_ids)
+            ):
+                raise PrimitiveProtocolError(
+                    "passive_module_ids must contain distinct, "
+                    "non-empty module IDs."
+                )
+
+            if not set(self.module_ids).issubset(passive_ids):
+                raise PrimitiveProtocolError(
+                    "gravity_settle anchor module must also be passive."
+                )
+
+            parameters["passive_module_ids"] = list(passive_ids)
 
         elif self.primitive in {"set_pan", "set_tilt"}:
             parameters["angle_rad"] = _finite_parameter(

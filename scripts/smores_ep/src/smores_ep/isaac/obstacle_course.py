@@ -1092,6 +1092,69 @@ class StairTestCourse:
         }
 
 
+BUTTON_REFERENCE_CENTER_XYZ_M = (
+    0.85,
+    0.465,
+    0.170,
+)
+
+# Conservative randomization envelope for the isolated button fixture.
+# These are curriculum-generation bounds, not perception assumptions:
+# the expert will consume the actual observed XYZ at runtime.
+BUTTON_SAMPLE_X_RANGE_M = (0.55, 1.15)
+BUTTON_SAMPLE_Y_RANGE_M = (0.40, 0.55)
+BUTTON_SAMPLE_Z_RANGE_M = (0.11, 0.25)
+
+
+@dataclass(frozen=True)
+class ButtonTargetSpec:
+    """Reproducible world-frame target for one button episode."""
+
+    x_m: float = BUTTON_REFERENCE_CENTER_XYZ_M[0]
+    y_m: float = BUTTON_REFERENCE_CENTER_XYZ_M[1]
+    z_m: float = BUTTON_REFERENCE_CENTER_XYZ_M[2]
+    seed: int | None = None
+
+    def __post_init__(self) -> None:
+        values = (self.x_m, self.y_m, self.z_m)
+
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError(
+                "Button target coordinates must be finite"
+            )
+
+    @property
+    def center_xyz_m(self) -> tuple[float, float, float]:
+        return (
+            self.x_m,
+            self.y_m,
+            self.z_m,
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "seed": self.seed,
+            "x_m": self.x_m,
+            "y_m": self.y_m,
+            "z_m": self.z_m,
+        }
+
+
+def sample_button_target_spec(seed: int) -> ButtonTargetSpec:
+    """Sample one deterministic button target from ``seed``."""
+
+    import random
+
+    rng = random.Random(int(seed))
+
+    return ButtonTargetSpec(
+        x_m=rng.uniform(*BUTTON_SAMPLE_X_RANGE_M),
+        y_m=rng.uniform(*BUTTON_SAMPLE_Y_RANGE_M),
+        z_m=rng.uniform(*BUTTON_SAMPLE_Z_RANGE_M),
+        seed=int(seed),
+    )
+
+
 @dataclass(frozen=True)
 class ButtonTestCourse:
     """Flat isolated fixture for MobileManipulator8 button validation."""
@@ -1316,11 +1379,17 @@ def manual_obstacle_course() -> ManualObstacleCourse:
     )
 
 
-def mobile_manipulator_button_test_course() -> ButtonTestCourse:
+def mobile_manipulator_button_test_course(
+    spec: ButtonTargetSpec | None = None,
+) -> ButtonTestCourse:
     """Return a continuous floor with only the wall-mounted button."""
 
     platform_color = (0.24, 0.27, 0.31)
-    button_center = (0.85, 0.475, 0.170)
+    # The robot approaches from -Y and presses toward +Y.
+    # Keep 5 mm clearance from the wall at rest so the 4 mm
+    # physical plunger stroke never intersects the support.
+    spec = spec or ButtonTargetSpec()
+    button_center = spec.center_xyz_m
     return ButtonTestCourse(
         boxes=(
             CourseBox(
@@ -1332,7 +1401,7 @@ def mobile_manipulator_button_test_course() -> ButtonTestCourse:
             ),
             CourseBox(
                 "ButtonWall",
-                (button_center[0], 0.53, 0.150),
+                (button_center[0], button_center[1] + 0.065, 0.150),
                 (0.18, 0.08, 0.30),
                 (0.35, 0.37, 0.40),
                 semantic="button_support",
@@ -1532,15 +1601,57 @@ def install_snake8_stair_test_course(
 
 def install_mobile_manipulator_button_test_course(
     stage: Any,
+    spec: ButtonTargetSpec | None = None,
 ) -> ButtonTestCourse:
     """Replace the infinite floor with the isolated button fixture."""
 
-    course = mobile_manipulator_button_test_course()
+    from pxr import Gf, Sdf, UsdPhysics
+
+    course = mobile_manipulator_button_test_course(spec)
+    root_path = "/World/MobileManipulatorButtonTestCourse"
+
     _install_course_boxes(
         stage,
-        "/World/MobileManipulatorButtonTestCourse",
+        root_path,
         course.boxes,
     )
+
+    # ButtonPlunger is the only dynamic element of the fixture.
+    # body0 is intentionally omitted: USD Physics interprets the
+    # empty body relationship as a world anchor.
+    plunger_path = f"{root_path}/ButtonPlunger"
+    plunger_prim = stage.GetPrimAtPath(plunger_path)
+    if not plunger_prim or not plunger_prim.IsValid():
+        raise RuntimeError(
+            f"Button plunger prim was not created: {plunger_path}"
+        )
+
+    UsdPhysics.RigidBodyAPI.Apply(plunger_prim)
+
+    joint = UsdPhysics.PrismaticJoint.Define(
+        stage,
+        f"{root_path}/ButtonPrismaticJoint",
+    )
+    joint.CreateAxisAttr("Y")
+    joint.CreateLowerLimitAttr(0.0)
+    joint.CreateUpperLimitAttr(0.004)
+
+    joint.CreateBody1Rel().SetTargets(
+        [Sdf.Path(plunger_path)]
+    )
+
+    # World-side joint frame coincides with the nominal,
+    # unpressed plunger centre.  The body-side frame is the
+    # plunger origin, therefore joint coordinate 0 is its rest pose.
+    joint.CreateLocalPos0Attr().Set(
+        Gf.Vec3f(*course.button_center_xyz_m)
+    )
+    joint.CreateLocalRot0Attr().Set(Gf.Quatf(1.0))
+    joint.CreateLocalPos1Attr().Set(
+        Gf.Vec3f(0.0, 0.0, 0.0)
+    )
+    joint.CreateLocalRot1Attr().Set(Gf.Quatf(1.0))
+
     return course
 
 

@@ -379,7 +379,11 @@ class IsaacPrimitiveExecutor:
                 message=f"goal_id {goal.goal_id} is already active",
             )
         referenced_modules = set(goal.module_ids)
-        if goal.primitive in {PrimitiveName.SET_PAN, PrimitiveName.SET_TILT}:
+        if goal.primitive in {
+            PrimitiveName.SET_PAN,
+            PrimitiveName.SET_TILT,
+            PrimitiveName.GRAVITY_SETTLE,
+        }:
             referenced_modules.update(
                 str(item)
                 for item in goal.parameters.get(
@@ -603,6 +607,8 @@ class IsaacPrimitiveExecutor:
             return self._assisted_align_faces(runtime, now_s)
         if goal.primitive in {PrimitiveName.DOCK, PrimitiveName.UNDOCK}:
             return self._change_docking(runtime, now_s)
+        if goal.primitive is PrimitiveName.GRAVITY_SETTLE:
+            return self._gravity_settle(runtime, now_s)
         return self._move_joint(runtime, now_s)
 
     def _drive_to_pose(
@@ -2145,6 +2151,69 @@ class IsaacPrimitiveExecutor:
             message=result.message,
         )
 
+    def _gravity_settle(
+        self,
+        runtime: _ActiveGoal,
+        now_s: float,
+    ) -> tuple[dict[str, SmoresCommand], PrimitiveStatus]:
+        """Release internal posture drives and settle under gravity."""
+
+        goal = runtime.goal
+        duration_s = float(goal.parameters["duration_s"])
+        passive_ids = tuple(
+            str(item)
+            for item in goal.parameters["passive_module_ids"]
+        )
+
+        # Forget all retained PAN/TILT/structural targets for these
+        # modules.  PASSIVE is the backdrivable internal mode.
+        self._apply_passive_structure_policy(goal.parameters)
+
+        # Explicitly command PASSIVE every executor tick.  Resources
+        # also own locomotion, so stale wheel commands cannot move the
+        # morphology while it is settling.
+        commands = {
+            module_id: SmoresCommand(
+                internal_motion=InternalMotionMode.PASSIVE,
+            )
+            for module_id in passive_ids
+        }
+
+        elapsed_s = max(
+            0.0,
+            now_s - runtime.started_at_s,
+        )
+
+        if elapsed_s >= duration_s:
+            return commands, self._finish(
+                runtime,
+                PrimitiveState.SUCCEEDED,
+                now_s,
+                code="GRAVITY_SETTLED",
+                message=(
+                    f"{len(passive_ids)} module internal drives were "
+                    f"passive for {duration_s:.3f}s"
+                ),
+            )
+
+        return commands, self._make_status(
+            goal,
+            PrimitiveState.RUNNING,
+            now_s,
+            phase="gravity_settle",
+            progress=min(1.0, elapsed_s / duration_s),
+            code="GRAVITY_SETTLING",
+            message=(
+                "Internal posture drives released; "
+                "waiting for gravity settling"
+            ),
+            feedback={
+                "elapsed_s": elapsed_s,
+                "duration_s": duration_s,
+                "passive_module_ids": list(passive_ids),
+            },
+        )
+
     def _move_joint(
         self,
         runtime: _ActiveGoal,
@@ -2849,6 +2918,20 @@ class IsaacPrimitiveExecutor:
         """Resolve exclusive and shared physical-resource claims."""
 
         first = goal.module_ids[0]
+        if goal.primitive is PrimitiveName.GRAVITY_SETTLE:
+            passive_ids = tuple(
+                str(item)
+                for item in goal.parameters["passive_module_ids"]
+            )
+            return {
+                resource: "exclusive"
+                for module_id in passive_ids
+                for resource in (
+                    f"internal_motion:{module_id}",
+                    f"locomotion:{module_id}",
+                )
+            }
+
         if goal.primitive is PrimitiveName.DRIVE_TO_POSE:
             return {f"locomotion:{first}": "exclusive"}
         if goal.primitive is PrimitiveName.ALIGN_FACES:

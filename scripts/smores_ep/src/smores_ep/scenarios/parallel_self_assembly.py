@@ -361,9 +361,21 @@ def run_parallel_self_assembly_scenario(
     elif config.button_test_course:
         from smores_ep.isaac.obstacle_course import (
             install_mobile_manipulator_button_test_course,
+            sample_button_target_spec,
         )
 
-        obstacle_course = install_mobile_manipulator_button_test_course(stage)
+        button_spec = (
+            sample_button_target_spec(config.button_seed)
+            if config.button_seed is not None
+            else None
+        )
+
+        obstacle_course = (
+            install_mobile_manipulator_button_test_course(
+                stage,
+                button_spec,
+            )
+        )
     elif config.gap_test_course:
         from smores_ep.isaac.obstacle_course import (
             CoplanarGapSpec,

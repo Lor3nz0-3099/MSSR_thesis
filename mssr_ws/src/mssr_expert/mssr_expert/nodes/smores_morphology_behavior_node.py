@@ -1235,15 +1235,35 @@ class SmoresMorphologyBehaviorNode(Node):
                             item.module_id: item.target_role
                             for item in self._assignments
                         },
-                        "pan_traction_module_ids": (
-                            sorted(
-                                item.module_id
-                                for item in self._assignments
-                                if (
-                                    self._morphology_name == "rc_car8"
-                                    and item.target_role.startswith("wheel_")
-                                )
-                            )
+                        "pan_traction_module_ids": sorted(
+                            {
+                                *(
+                                    item.module_id
+                                    for item in self._assignments
+                                    if (
+                                        self._morphology_name == "rc_car8"
+                                        and item.target_role.startswith(
+                                            "wheel_"
+                                        )
+                                    )
+                                ),
+                                *(
+                                    str(module_id)
+                                    for module_id, command
+                                    in locomotion.items()
+                                    if abs(
+                                        float(
+                                            command.get(
+                                                "pan_rate_rad_s",
+                                                command.get(
+                                                    "pan_rate",
+                                                    0.0,
+                                                ),
+                                            )
+                                        )
+                                    ) > 1.0e-12
+                                ),
+                            }
                         ),
                         "task_metrics": {
                             "progress": float(progress),

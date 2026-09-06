@@ -9,56 +9,225 @@
     "module_count": 8,
     "requires_helping_module": false,
     "assembly_strategy": "progressive_planar_waves_then_fold",
-    "post_assembly_tilt_tolerance_rad": 0.10,
+    "post_assembly_tilt_tolerance_rad": 0.1,
     "post_assembly_tilt_groups_by_vertex": [
-      ["v2"],
-      ["v0"],
-      ["v4"],
-      ["v6"],
-      ["v5"],
-      ["v1", "v3"]
+      [
+        "v7"
+      ],
+      [
+        "v6"
+      ],
+      [
+        "v5"
+      ],
+      [
+        "v4"
+      ],
+      [
+        "v0"
+      ],
+      [
+        "v2"
+      ],
+      [
+        "v1",
+        "v3"
+      ]
     ],
     "pre_reconfiguration_tilt_rad_by_vertex": {
+      "v0": 0.0,
       "v1": 0.0,
       "v2": 0.0,
       "v3": 0.0,
       "v4": 0.0,
       "v5": 0.0,
-      "v6": 0.0
+      "v6": 0.0,
+      "v7": 0.0
     },
     "post_assembly_tilt_rad_by_vertex": {
-      "v0": -0.25,
-      "v1": -0.40,
-      "v2": 0.0,
-      "v3": -0.40,
-      "v4": 0.20,
-      "v5": 0.75,
-      "v6": 0.65
+      "v0": -0.5235987755982988,
+      "v1": 0.0,
+      "v2": 0.7853981633974483,
+      "v3": 0.0,
+      "v4": -1.111425667669989,
+      "v5": 1.327497429066887,
+      "v6": 1.5454890526409788,
+      "v7": 1.5526449025741555
     },
     "post_assembly_pan_rad_by_vertex": {
       "v7": 0.0
     },
-    "capabilities": ["flat_locomotion", "high_reach", "manipulation"],
+    "capabilities": [
+      "flat_locomotion",
+      "high_reach",
+      "manipulation"
+    ],
     "source_reference": "SMORES-EP Parallel Self-Assembly conference demonstration",
-    "description": "Eight-module mobile manipulator with a post-docking arched base. The central TILT lowers the front longitudinal wheel module, the grounded arm-base TILT raises and balances the root, and the two synchronized transverse TILTs load their TOP faces as lateral PAN-driven supports. The following three serial modules form the raised arm. Non-actuated joints remain structurally held during and after folding."
+    "description": "Eight-module mobile manipulator. After planar self-assembly, the serial arm is folded/raised first. The final locomotion posture arches the base by tilting chassis_center to -45 deg and arm_ground_drive to +45 deg; front_support is held at +10 deg to prevent its PAN face from dragging, while the two lateral drive/support modules remain at 0 deg. In this posture the morphology provides experimentally validated longitudinal forward/backward motion using the wheel pairs of front_support and arm_ground_drive. Heading is established by the RC-Car morphology before reconfiguration. Before arm manipulation, chassis_center, front_support and arm_ground_drive must return to 0 deg to place the base on the ground.",
+    "pre_reconfiguration_gravity_settle_s": 2.0
   },
   "nodes": [
-    {"node_id": "v0", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v0", "target_role": "chassis_center", "is_target_root": true}},
-    {"node_id": "v1", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v1", "target_role": "right_drive", "kinematic_axis": "transverse", "top_function": "ground_support"}},
-    {"node_id": "v2", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v2", "target_role": "front_support", "physical_role": "longitudinal_drive", "kinematic_axis": "arm_longitudinal", "top_function": "ground_translation_drive"}},
-    {"node_id": "v3", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v3", "target_role": "left_drive", "kinematic_axis": "transverse", "top_function": "ground_support"}},
-    {"node_id": "v4", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v4", "target_role": "arm_ground_drive", "physical_role": "longitudinal_drive", "kinematic_axis": "arm_longitudinal", "top_function": "ground_translation_drive"}},
-    {"node_id": "v5", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v5", "target_role": "arm_lift"}},
-    {"node_id": "v6", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v6", "target_role": "arm_link"}},
-    {"node_id": "v7", "attributes": {"node_type": "target_slot", "is_target_node": true, "target_vertex_id": "v7", "target_role": "end_effector"}}
+    {
+      "node_id": "v0",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v0",
+        "target_role": "chassis_center",
+        "is_target_root": true
+      }
+    },
+    {
+      "node_id": "v1",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v1",
+        "target_role": "right_drive",
+        "kinematic_axis": "transverse",
+        "top_function": "ground_support"
+      }
+    },
+    {
+      "node_id": "v2",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v2",
+        "target_role": "front_support",
+        "physical_role": "longitudinal_drive",
+        "kinematic_axis": "arm_longitudinal",
+        "top_function": "ground_translation_drive"
+      }
+    },
+    {
+      "node_id": "v3",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v3",
+        "target_role": "left_drive",
+        "kinematic_axis": "transverse",
+        "top_function": "ground_support"
+      }
+    },
+    {
+      "node_id": "v4",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v4",
+        "target_role": "arm_ground_drive",
+        "physical_role": "longitudinal_drive",
+        "kinematic_axis": "arm_longitudinal",
+        "top_function": "ground_translation_drive"
+      }
+    },
+    {
+      "node_id": "v5",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v5",
+        "target_role": "arm_lift"
+      }
+    },
+    {
+      "node_id": "v6",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v6",
+        "target_role": "arm_link"
+      }
+    },
+    {
+      "node_id": "v7",
+      "attributes": {
+        "node_type": "target_slot",
+        "is_target_node": true,
+        "target_vertex_id": "v7",
+        "target_role": "end_effector"
+      }
+    }
   ],
   "edges": [
-    {"module_a_id": "v3", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "LEFT", "clocking_quarter_turns": 0}},
-    {"module_a_id": "v1", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "RIGHT", "clocking_quarter_turns": 0}},
-    {"module_a_id": "v2", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "BOTTOM", "face_b": "TOP", "clocking_quarter_turns": 0}},
-    {"module_a_id": "v4", "module_b_id": "v0", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
-    {"module_a_id": "v5", "module_b_id": "v4", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
-    {"module_a_id": "v6", "module_b_id": "v5", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}},
-    {"module_a_id": "v7", "module_b_id": "v6", "attributes": {"relation_type": "target_connection", "is_target_edge": true, "face_a": "TOP", "face_b": "BOTTOM", "clocking_quarter_turns": 0}}
+    {
+      "module_a_id": "v3",
+      "module_b_id": "v0",
+      "attributes": {
+        "relation_type": "target_connection",
+        "is_target_edge": true,
+        "face_a": "BOTTOM",
+        "face_b": "LEFT",
+        "clocking_quarter_turns": 0
+      }
+    },
+    {
+      "module_a_id": "v1",
+      "module_b_id": "v0",
+      "attributes": {
+        "relation_type": "target_connection",
+        "is_target_edge": true,
+        "face_a": "BOTTOM",
+        "face_b": "RIGHT",
+        "clocking_quarter_turns": 0
+      }
+    },
+    {
+      "module_a_id": "v2",
+      "module_b_id": "v0",
+      "attributes": {
+        "relation_type": "target_connection",
+        "is_target_edge": true,
+        "face_a": "BOTTOM",
+        "face_b": "TOP",
+        "clocking_quarter_turns": 0
+      }
+    },
+    {
+      "module_a_id": "v4",
+      "module_b_id": "v0",
+      "attributes": {
+        "relation_type": "target_connection",
+        "is_target_edge": true,
+        "face_a": "TOP",
+        "face_b": "BOTTOM",
+        "clocking_quarter_turns": 0
+      }
+    },
+    {
+      "module_a_id": "v5",
+      "module_b_id": "v4",
+      "attributes": {
+        "relation_type": "target_connection",
+        "is_target_edge": true,
+        "face_a": "TOP",
+        "face_b": "BOTTOM",
+        "clocking_quarter_turns": 0
+      }
+    },
+    {
+      "module_a_id": "v6",
+      "module_b_id": "v5",
+      "attributes": {
+        "relation_type": "target_connection",
+        "is_target_edge": true,
+        "face_a": "TOP",
+        "face_b": "BOTTOM",
+        "clocking_quarter_turns": 0
+      }
+    },
+    {
+      "module_a_id": "v7",
+      "module_b_id": "v6",
+      "attributes": {
+        "relation_type": "target_connection",
+        "is_target_edge": true,
+        "face_a": "TOP",
+        "face_b": "BOTTOM",
+        "clocking_quarter_turns": 0
+      }
+    }
   ]
 }

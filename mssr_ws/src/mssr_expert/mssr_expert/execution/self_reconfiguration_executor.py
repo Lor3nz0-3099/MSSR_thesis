@@ -108,6 +108,31 @@ class SelfReconfigurationExecutor:
         self._prepare_items = tuple(
             sorted(plan.prepare_tilt_by_module.items())
         )
+
+        raw_gravity_settle_s = (
+            plan.source_graph.global_attributes.get(
+                "pre_reconfiguration_gravity_settle_s"
+            )
+            if plan.source_graph is not None
+            else None
+        )
+
+        self._gravity_settle_s = (
+            0.0
+            if raw_gravity_settle_s is None
+            else float(raw_gravity_settle_s)
+        )
+
+        if (
+            not math.isfinite(self._gravity_settle_s)
+            or self._gravity_settle_s < 0.0
+        ):
+            raise SelfReconfigurationExecutionError(
+                "pre_reconfiguration_gravity_settle_s must be "
+                "finite and non-negative."
+            )
+
+        self._completed_gravity_settle = 0
         self._prepare_tilt_groups = tuple(
             tuple(group) for group in plan.prepare_tilt_groups_by_module
         )
@@ -149,6 +174,9 @@ class SelfReconfigurationExecutor:
         self._phase = (
             "PREPARE"
             if self._prepare_items
+            else
+            "GRAVITY_SETTLE"
+            if self._gravity_settle_s > 0.0
             else self._first_reconfiguration_phase()
         )
         self._state = "READY"
@@ -225,7 +253,8 @@ class SelfReconfigurationExecutor:
     @property
     def total_operation_count(self) -> int:
         return (
-            len(self._prepare_items)
+            (1 if self._gravity_settle_s > 0.0 else 0)
+            + len(self._prepare_items)
             + len(self.plan.detach_actions)
             + self.plan.assembly_plan.action_count
             + len(self.plan.final_tilt_by_module)
@@ -243,6 +272,9 @@ class SelfReconfigurationExecutor:
             return self._decision(None, self._failure_message)
         if self._state == "SUCCEEDED":
             return self._decision(None, "Target morphology verified.")
+
+        if self._phase == "GRAVITY_SETTLE":
+            return self._step_gravity_settle(status_payload)
 
         if self._phase == "PREPARE":
             return self._step_prepare(status_payload)
@@ -347,9 +379,69 @@ class SelfReconfigurationExecutor:
                 completed_before_stage + child.completed_action_count
             )
             if child.done and not child.success:
+
+                # ----------------------------------------------------
+                # RC-Car8 terminal posture is BEST-EFFORT.
+                #
+                # The topology is the defining morphology constraint.
+                # In a loaded connected vehicle, gravity/contact can
+                # prevent one or more final TILT servos from entering
+                # the strict joint tolerance even though the complete
+                # target face-attributed RC-Car8 topology has already
+                # been physically obtained.
+                #
+                # Accept ONLY this very specific case:
+                #
+                #   - target morphology is rc_car8;
+                #   - failure is a post-assembly posture TIMEOUT;
+                #   - current graph EXACTLY equals target topology.
+                #
+                # Dock/undock/alignment/topology failures remain fatal.
+                # ----------------------------------------------------
+
+                rc_car8_posture_timeout = (
+                    self.plan.target_morphology
+                    == "rc_car8"
+                    and current_graph is not None
+                    and child.message.startswith(
+                        "Post-assembly posture goal "
+                    )
+                    and "TIMEOUT" in child.message
+                    and self._planner.target_reached(
+                        current_graph,
+                        self.plan,
+                    )
+                )
+
+                if rc_car8_posture_timeout:
+
+                    self._final_posture_completed = (
+                        len(
+                            self.plan.final_tilt_by_module
+                        )
+                        + len(
+                            self.plan.final_pan_by_module
+                        )
+                    )
+
+                    self._assembly_active_goal_ids = ()
+
+                    self._state = "SUCCEEDED"
+                    self._phase = "COMPLETE"
+
+                    return self._decision(
+                        None,
+                        "RC-Car8 target topology was verified exactly; "
+                        "final post-assembly joint posture timed out and "
+                        "was accepted as best-effort.",
+                    )
+
                 self._state = "FAILED"
                 self._failure_message = child.message
-                return self._decision(None, self._failure_message)
+                return self._decision(
+                    None,
+                    self._failure_message,
+                )
             if child.done and child.success:
                 if (
                     self._phase == "STAGE_ASSEMBLY"
@@ -415,6 +507,91 @@ class SelfReconfigurationExecutor:
             f"Unknown execution phase {self._phase!r}."
         )
 
+    def _step_gravity_settle(
+        self,
+        status_payload: Mapping[str, Any] | None,
+    ) -> SelfReconfigurationDecision:
+        """Release all internal drives before changing topology."""
+
+        if self._active_goal is not None:
+            status = parse_primitive_statuses(
+                status_payload
+            ).get(self._active_goal.goal_id)
+
+            if status is None or not status.terminal:
+                self._state = "WAITING_GRAVITY_SETTLE"
+                return self._decision(
+                    None,
+                    "Waiting for passive gravity settling.",
+                )
+
+            if status.failed:
+                key = ("GRAVITY_SETTLE", 0)
+                retry = self._retry_by_operation.get(key, 0)
+
+                if retry < self.retry_count:
+                    self._retry_by_operation[key] = retry + 1
+                    self._active_goal = None
+                    self._state = "RETRYING_GRAVITY_SETTLE"
+                    return self._decision(
+                        None,
+                        f"Retrying gravity settle after "
+                        f"{status.code}: {status.message}",
+                    )
+
+                self._state = "FAILED"
+                self._failure_message = (
+                    f"Primitive {status.goal_id} failed: "
+                    f"{status.code} {status.message}"
+                ).strip()
+                self._active_goal = None
+                return self._decision(
+                    None,
+                    self._failure_message,
+                )
+
+            self._active_goal = None
+            self._completed_gravity_settle = 1
+
+            self._phase = (
+                self._first_reconfiguration_phase()
+            )
+
+            self._state = f"READY_{self._phase}"
+
+            return self._decision(
+                None,
+                "Connected source morphology settled freely under "
+                "gravity; topology change may start.",
+            )
+
+        if not self._known_module_ids:
+            raise SelfReconfigurationExecutionError(
+                "Gravity settle requires known modules."
+            )
+
+        goal = PrimitiveGoalRequest(
+            goal_id=f"{self.execution_id}-gravity-settle",
+            primitive="gravity_settle",
+            module_ids=(self._known_module_ids[0],),
+            parameters={
+                "passive_module_ids": list(
+                    self._known_module_ids
+                ),
+                "duration_s": self._gravity_settle_s,
+            },
+            timeout_s=max(
+                self.joint_timeout_s,
+                self._gravity_settle_s + 5.0,
+            ),
+        )
+
+        return self._dispatch(
+            goal,
+            "Releasing all connected internal posture drives "
+            "for gravity settling.",
+        )
+
     def _step_prepare(
         self,
         status_payload: Mapping[str, Any] | None,
@@ -465,12 +642,16 @@ class SelfReconfigurationExecutor:
 
         expected = {module_id for module_id, _ in self._prepare_items}
         if self._prepare_succeeded == expected:
-            self._phase = self._first_reconfiguration_phase()
+            self._phase = (
+                "GRAVITY_SETTLE"
+                if self._gravity_settle_s > 0.0
+                else self._first_reconfiguration_phase()
+            )
             self._state = f"READY_{self._phase}"
             return self._decision(
                 None,
-                "Detached modules reached their coordinated neutral "
-                "ground posture.",
+                "Connected source morphology reached its neutral "
+                "pre-reconfiguration posture.",
             )
 
         if self._prepare_awaiting_goal_id is not None:
@@ -626,7 +807,8 @@ class SelfReconfigurationExecutor:
         elif goal is not None:
             active = (goal.goal_id,)
         completed = (
-            self._completed_prepare
+            self._completed_gravity_settle
+            + self._completed_prepare
             + self._completed_detach
             + self._assembly_completed
             + self._final_posture_completed

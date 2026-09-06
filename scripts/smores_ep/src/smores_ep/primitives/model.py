@@ -29,6 +29,7 @@ class PrimitiveName(str, Enum):
     ASSISTED_ALIGN_FACES = "assisted_align_faces"
     DOCK = "dock"
     UNDOCK = "undock"
+    GRAVITY_SETTLE = "gravity_settle"
     SET_PAN = "set_pan"
     ROTATE_PAN_BY = "rotate_pan_by"
     SET_TILT = "set_tilt"
@@ -220,6 +221,44 @@ class PrimitiveGoal:
                         "contact_quality_planar_tolerance_m"
                     ] = quality_tolerance
                     parameters["contact_quality_retry_count"] = retry_count
+        elif self.primitive is PrimitiveName.GRAVITY_SETTLE:
+            duration_s = self._finite_parameter(
+                parameters,
+                "duration_s",
+            )
+            if duration_s <= 0.0:
+                raise ValueError(
+                    "Primitive parameter 'duration_s' must be positive"
+                )
+
+            raw_ids = parameters.get("passive_module_ids")
+            if not isinstance(raw_ids, list | tuple):
+                raise ValueError(
+                    "passive_module_ids must be an array"
+                )
+
+            passive_ids = tuple(
+                str(item).strip()
+                for item in raw_ids
+            )
+
+            if (
+                not passive_ids
+                or any(not item for item in passive_ids)
+                or len(set(passive_ids)) != len(passive_ids)
+            ):
+                raise ValueError(
+                    "passive_module_ids must contain distinct, "
+                    "non-empty module IDs"
+                )
+
+            if not set(self.module_ids).issubset(passive_ids):
+                raise ValueError(
+                    "gravity_settle anchor module must also be passive"
+                )
+
+            parameters["passive_module_ids"] = list(passive_ids)
+
         elif self.primitive in {
             PrimitiveName.SET_PAN,
             PrimitiveName.SET_TILT,

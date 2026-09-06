@@ -103,25 +103,37 @@ def test_eight_module_manipulator_has_grounded_first_arm_module() -> None:
     tilt_targets = graph.global_attributes[
         "post_assembly_tilt_rad_by_vertex"
     ]
-    assert tilt_targets["v0"] == pytest.approx(-0.25)
-    assert tilt_targets["v1"] == pytest.approx(-0.40)
-    assert tilt_targets["v2"] == pytest.approx(0.0)
-    assert tilt_targets["v3"] == pytest.approx(-0.40)
-    assert tilt_targets["v4"] == pytest.approx(0.20)
+    # Physically validated final assembly / drive posture:
+    #   chassis center      v0 = -30 deg
+    #   right lateral      v1 =   0 deg
+    #   front support      v2 = +45 deg
+    #   left lateral       v3 =   0 deg
+    #   arm ground drive   v4 = -63.68 deg
+    #
+    # Before manipulation, v0/v2/v4 return to 0 deg.
+    assert tilt_targets["v0"] == pytest.approx(-math.pi / 6.0)
+    assert tilt_targets["v1"] == pytest.approx(0.0)
+    assert tilt_targets["v2"] == pytest.approx(math.pi / 4.0)
+    assert tilt_targets["v3"] == pytest.approx(0.0)
+    assert tilt_targets["v4"] == pytest.approx(math.radians(-63.68))
     assert graph.global_attributes["post_assembly_tilt_rad_by_vertex"][
         "v5"
-    ] == pytest.approx(0.75)
+    ] == pytest.approx(math.radians(76.06))
     assert graph.global_attributes["post_assembly_tilt_rad_by_vertex"][
         "v6"
-    ] == pytest.approx(0.65)
+    ] == pytest.approx(math.radians(88.55))
+    assert graph.global_attributes["post_assembly_tilt_rad_by_vertex"][
+        "v7"
+    ] == pytest.approx(math.radians(88.96))
     assert graph.global_attributes[
         "post_assembly_tilt_groups_by_vertex"
     ] == [
-        ["v2"],
-        ["v0"],
-        ["v4"],
+        ["v7"],
         ["v6"],
         ["v5"],
+        ["v4"],
+        ["v0"],
+        ["v2"],
         ["v1", "v3"],
     ]
     assert graph.global_attributes[
@@ -347,7 +359,7 @@ def test_holonomic_outer_modules_push_inward_as_one_fold_group() -> None:
         ),
         (
             "smores_mobile_manipulator8.json",
-            {"v1", "v2", "v3", "v4", "v5", "v6"},
+            {"v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7"},
         ),
     ),
 )

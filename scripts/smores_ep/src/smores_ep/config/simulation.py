@@ -360,6 +360,7 @@ class SelfAssemblySimulationConfig:
     gap_width_m: float = 0.200
     gap_near_edge_x_m: float = 0.550
     gap_seed: int | None = None
+    button_seed: int | None = None
     staging_collision_avoidance: bool = True
     staging_center_clearance_m: float = 0.110
     staging_waypoint_margin_m: float = 0.015
