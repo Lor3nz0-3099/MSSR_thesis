@@ -62,14 +62,13 @@ assets/**/cad_source/
 
 assets/smores-ep/SMORES-EP CAD inventor/
 
-Salva con Ctrl+O, Invio, Ctrl+X.
+# Generated expert datasets
+#
+# Raw/processed demonstrations are intentionally kept local because they can
+# grow to many GB.  Only datasets/README.md is versioned to document the
+# expected dataset workspace.
+datasets/**
+!datasets/README.md
 
-Non ignoriamo invece:
-
-assets/freebot/usd_physics/
-
-assets/freebot/usd_visual/
-
-assets/smores-ep/usd_physics/
-
-assets/smores-ep/usd_visual/
+# Generated analysis / visualization outputs
+figures/
