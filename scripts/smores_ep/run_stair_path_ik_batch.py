@@ -399,7 +399,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--simulation-steps", type=int, default=240_000)
     parser.add_argument("--simulation-speed-factor", type=float, default=1.0)
     parser.add_argument("--assembly-wall-timeout-s", type=float, default=600.0)
-    parser.add_argument("--behavior-wall-timeout-s", type=float, default=600.0)
+    parser.add_argument("--behavior-wall-timeout-s", type=float, default=2400.0)
     parser.add_argument(
         "--gui",
         action="store_true",

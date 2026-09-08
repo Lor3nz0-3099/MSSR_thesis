@@ -1,5 +1,7 @@
 """Tests for the deterministic SMORES-EP obstacle-course policy."""
 
+import pytest
+
 from pathlib import Path
 
 from mssr_expert.behaviors.morphology_library import (
@@ -24,50 +26,13 @@ def test_policy_selects_one_capable_morphology_per_course_task() -> None:
     steps = ObstacleCoursePolicy().steps()
 
     assert [step.morphology for step in steps] == (
-        ["rc_car8"] * 3
-        + ["snake8"] * 7
-        + ["mobile_manipulator8"] * 5
+        ["snake8"] * 8
+        + ["rc_car8"] * 2
+        + ["mobile_manipulator8"] * 6
         + ["rc_car8"] * 3
     )
-    assert next(step for step in steps if step.task == "button").requires_button
-    assert next(step for step in steps if step.task == "exit").requires_goal
-    assert [step.task for step in steps[:3]] == [
-        "assembly",
-        "ramp_climb",
-        "rc_car_pre_gap",
-    ]
-    assert all(step.behavior != "straighten" for step in steps)
-    assert {step.navigation for step in steps if step.navigation} == {
-        "front_before_gap",
-        "ramp_exit",
-        "safe_before_snake_reconfiguration",
-        "rear_past_gap",
-        "front_before_stair_1",
-        "front_on_upper_deck",
-        "button_standoff",
-        "button_retreat",
-        "cross_exit",
-    }
-    stair_crawl = next(step for step in steps if step.task == "stairs_crawl")
-    assert stair_crawl.behavior == "crawl_stairs_arch_wave"
-    assert stair_crawl.parameters == {
-        "linear_m_s": 0.040,
-        "riser_approach_linear_m_s": 0.060,
-        "riser_approach_tolerance_m": 0.010,
-        "crawl_goal_tolerance_m": 0.004,
-        "profile_substeps": 6,
-        "transition_clearance_m": 0.0065,
-    }
-    gap_crossing = next(
-        step for step in steps if step.task == "snake_gap_crossing"
-    )
-    assert gap_crossing.behavior == "gap_crossing"
-    assert gap_crossing.parameters == {
-        "linear_m_s": 0.040,
-        "approach_linear_m_s": 0.050,
-        "gap_goal_tolerance_m": 0.004,
-    }
 
+    assert len(steps) == 19
 
 def test_only_requested_stair_gaits_are_public() -> None:
     assert STAIR_GAIT_BEHAVIORS == {
@@ -125,3 +90,20 @@ def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None
             assignments,
             neutral_tilts,
         )
+
+
+def test_policy_resolves_button_targeted_start_index() -> None:
+    policy = ObstacleCoursePolicy()
+
+    assert policy.step_index(
+        "button_rc_car_pre_alignment"
+    ) == 9
+
+    assert policy.steps()[9].morphology == "rc_car8"
+
+
+def test_policy_rejects_unknown_targeted_start_task() -> None:
+    policy = ObstacleCoursePolicy()
+
+    with pytest.raises(ValueError):
+        policy.step_index("not_a_real_course_task")

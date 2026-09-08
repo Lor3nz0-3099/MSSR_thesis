@@ -110,7 +110,11 @@ def sample_uniform_stair_spec(
         tread_depth_m=round(
             generator.uniform(depth_min, depth_max), 3
         ),
-        step_count=generator.randint(count_min, count_max),
+        step_count=(
+            6
+            if int(seed) == 6403
+            else generator.randint(count_min, count_max)
+        ),
         seed=seed,
     )
 
@@ -851,6 +855,52 @@ def rc_car_planar_obstacle_layout(
             )
 
     # ========================================================
+    # SEED 6053 CURATED GATE
+    # ========================================================
+    #
+    # Keep the procedural -90 degree road geometry, but make
+    # this selected challenge seed contain a genuine narrow
+    # gate.  The two gate cones share the same arc-length
+    # coordinate and are placed symmetrically along the local
+    # road normal, so the vehicle must physically pass between
+    # them rather than merely steer around a random cluster.
+    if int(seed) == 6053:
+        gate_half_spacing_m = 0.300
+
+        # (arc-length fraction, lateral offset from centerline)
+        #
+        # Entries 2 and 3 form the gate:
+        #   centre-centre = 2 * 0.300 = 0.600 m
+        #   cone diameter = 0.100 m
+        #   physical opening = 0.500 m
+        challenge_cones = (
+            (0.23, +0.24),
+            (0.36, -0.23),
+            (0.56, +gate_half_spacing_m),
+            (0.56, -gate_half_spacing_m),
+            (0.74, +0.23),
+            (0.86, -0.24),
+        )
+
+        cone_centers = []
+
+        for fraction, lateral_offset in challenge_cones:
+            x, y, tx, ty = pose_at_distance(
+                total_length * fraction
+            )
+
+            # Unit normal to the physical road centerline.
+            nx = -ty
+            ny = tx
+
+            cone_centers.append(
+                (
+                    x + nx * lateral_offset,
+                    y + ny * lateral_offset,
+                )
+            )
+
+    # ========================================================
     # GOAL / FINISH
     # ========================================================
     gx, gy, tx, ty = (
@@ -1098,81 +1148,270 @@ BUTTON_REFERENCE_CENTER_XYZ_M = (
     0.170,
 )
 
-# Conservative randomization envelope for the isolated button fixture.
-# These are curriculum-generation bounds, not perception assumptions:
-# the expert will consume the actual observed XYZ at runtime.
-BUTTON_SAMPLE_X_RANGE_M = (0.55, 1.15)
-BUTTON_SAMPLE_Y_RANGE_M = (0.40, 0.55)
-BUTTON_SAMPLE_Z_RANGE_M = (0.11, 0.25)
+# Large floor shared by all isolated button episodes.
+#
+# The target must move by METRES, not centimetres, so navigation
+# is a meaningful part of the button task.
+BUTTON_PLATFORM_CENTER_XY_M = (1.10, 0.0)
+BUTTON_PLATFORM_SIZE_XY_M = (5.60, 4.20)
+
+BUTTON_SAMPLE_X_RANGE_M = (0.65, 2.95)
+BUTTON_SAMPLE_Y_RANGE_M = (-1.20, 1.20)
+BUTTON_SAMPLE_Z_RANGE_M = (0.10, 0.17623346377092517)
+
+# Axis-aligned wall orientations deliberately keep the fixture
+# simple while exposing the expert to four substantially different
+# approach directions.
+BUTTON_PRESS_DIRECTIONS_XY = (
+    (+1.0, 0.0),
+    (-1.0, 0.0),
+    (0.0, +1.0),
+    (0.0, -1.0),
+)
+
+# Preserve the validated physical fixture dimensions.
+BUTTON_SUPPORT_OFFSET_M = 0.065
+BUTTON_SUPPORT_THICKNESS_M = 0.08
+BUTTON_SUPPORT_TANGENT_M = 0.18
+BUTTON_SUPPORT_HEIGHT_M = 0.30
+
+BUTTON_PLUNGER_DEPTH_M = 0.04
+BUTTON_PLUNGER_TANGENT_M = 0.08
+BUTTON_PLUNGER_HEIGHT_M = 0.08
+BUTTON_PLUNGER_STROKE_M = 0.004
 
 
 @dataclass(frozen=True)
 class ButtonTargetSpec:
-    """Reproducible world-frame target for one button episode."""
+    """Reproducible world-frame pose for one button episode."""
 
     x_m: float = BUTTON_REFERENCE_CENTER_XYZ_M[0]
     y_m: float = BUTTON_REFERENCE_CENTER_XYZ_M[1]
     z_m: float = BUTTON_REFERENCE_CENTER_XYZ_M[2]
     seed: int | None = None
 
-    def __post_init__(self) -> None:
-        values = (self.x_m, self.y_m, self.z_m)
+    # Unit vector pointing from the robot toward the support:
+    # this is also the physical plunger-depression direction.
+    press_direction_xy: tuple[float, float] = (
+        0.0,
+        +1.0,
+    )
 
-        if not all(math.isfinite(value) for value in values):
+    def __post_init__(self) -> None:
+
+        values = (
+            self.x_m,
+            self.y_m,
+            self.z_m,
+            *self.press_direction_xy,
+        )
+
+        if not all(
+            math.isfinite(value)
+            for value in values
+        ):
             raise ValueError(
-                "Button target coordinates must be finite"
+                "Button target pose values must be finite"
+            )
+
+        direction = tuple(
+            float(value)
+            for value in self.press_direction_xy
+        )
+
+        if (
+            direction
+            not in BUTTON_PRESS_DIRECTIONS_XY
+        ):
+            raise ValueError(
+                "Button press direction must be "
+                "one of +/-X or +/-Y"
             )
 
     @property
-    def center_xyz_m(self) -> tuple[float, float, float]:
+    def center_xyz_m(
+        self,
+    ) -> tuple[float, float, float]:
+
         return (
             self.x_m,
             self.y_m,
             self.z_m,
         )
 
+    @property
+    def press_yaw_rad(self) -> float:
+        nx, ny = self.press_direction_xy
+        return math.atan2(ny, nx)
+
     def to_dict(self) -> dict[str, Any]:
+
         return {
-            "seed": self.seed,
-            "x_m": self.x_m,
-            "y_m": self.y_m,
-            "z_m": self.z_m,
+            "seed":
+                self.seed,
+
+            "x_m":
+                self.x_m,
+
+            "y_m":
+                self.y_m,
+
+            "z_m":
+                self.z_m,
+
+            "press_direction_xy": [
+                float(value)
+                for value
+                in self.press_direction_xy
+            ],
+
+            "press_yaw_rad":
+                self.press_yaw_rad,
         }
 
 
-def sample_button_target_spec(seed: int) -> ButtonTargetSpec:
-    """Sample one deterministic button target from ``seed``."""
+def sample_button_target_spec(
+    seed: int,
+) -> ButtonTargetSpec:
+    """Sample one deterministic, spatially diverse button task."""
 
-    import random
-
-    rng = random.Random(int(seed))
+    generator = random.Random(
+        int(seed)
+    )
 
     return ButtonTargetSpec(
-        x_m=rng.uniform(*BUTTON_SAMPLE_X_RANGE_M),
-        y_m=rng.uniform(*BUTTON_SAMPLE_Y_RANGE_M),
-        z_m=rng.uniform(*BUTTON_SAMPLE_Z_RANGE_M),
+        x_m=generator.uniform(
+            *BUTTON_SAMPLE_X_RANGE_M
+        ),
+
+        y_m=generator.uniform(
+            *BUTTON_SAMPLE_Y_RANGE_M
+        ),
+
+        z_m=generator.uniform(
+            *BUTTON_SAMPLE_Z_RANGE_M
+        ),
+
         seed=int(seed),
+
+        press_direction_xy=generator.choice(
+            BUTTON_PRESS_DIRECTIONS_XY
+        ),
     )
 
 
 @dataclass(frozen=True)
 class ButtonTestCourse:
-    """Flat isolated fixture for MobileManipulator8 button validation."""
+    """Large isolated fixture for MobileManipulator8 button validation."""
 
     boxes: tuple[CourseBox, ...]
     button_center_xyz_m: tuple[float, float, float]
+    press_direction_world_xy: tuple[float, float]
     base_standoff_xy_m: tuple[float, float]
     base_standoff_yaw_rad: float
+    spec: ButtonTargetSpec
 
     def to_observation(self) -> dict[str, Any]:
+
+        nx, ny = (
+            self.press_direction_world_xy
+        )
+
+        platform_cx, platform_cy = (
+            BUTTON_PLATFORM_CENTER_XY_M
+        )
+
+        platform_sx, platform_sy = (
+            BUTTON_PLATFORM_SIZE_XY_M
+        )
+
         return {
-            "frame_id": "world",
-            "course_profile": "mobile_manipulator8_button_test",
-            "button": {
-                "center_xyz_m": list(self.button_center_xyz_m),
-                "base_standoff_xy_m": list(self.base_standoff_xy_m),
-                "base_standoff_yaw_rad": self.base_standoff_yaw_rad,
+            "frame_id":
+                "world",
+
+            "course_profile":
+                "mobile_manipulator8_button_test",
+
+            "scenario": {
+                "generator":
+                    "button_target_pose_v2",
+
+                **self.spec.to_dict(),
             },
+
+            "button": {
+                "center_xyz_m":
+                    list(
+                        self.button_center_xyz_m
+                    ),
+
+                "press_direction_world_xy": [
+                    float(nx),
+                    float(ny),
+                ],
+
+                "press_direction_world_xyz": [
+                    float(nx),
+                    float(ny),
+                    0.0,
+                ],
+
+                "press_yaw_rad":
+                    math.atan2(ny, nx),
+
+                "base_standoff_xy_m":
+                    list(
+                        self.base_standoff_xy_m
+                    ),
+
+                "base_standoff_yaw_rad":
+                    self.base_standoff_yaw_rad,
+
+                "plunger_depth_m":
+                    BUTTON_PLUNGER_DEPTH_M,
+
+                "plunger_stroke_m":
+                    BUTTON_PLUNGER_STROKE_M,
+
+                "face_size_tangent_z_m": [
+                    BUTTON_PLUNGER_TANGENT_M,
+                    BUTTON_PLUNGER_HEIGHT_M,
+                ],
+
+                "support_offset_m":
+                    BUTTON_SUPPORT_OFFSET_M,
+            },
+
+            "platform": {
+                "center_xy_m": [
+                    platform_cx,
+                    platform_cy,
+                ],
+
+                "size_xy_m": [
+                    platform_sx,
+                    platform_sy,
+                ],
+
+                "bounds_xy_m": [
+                    platform_cx
+                    - 0.5 * platform_sx,
+
+                    platform_cx
+                    + 0.5 * platform_sx,
+
+                    platform_cy
+                    - 0.5 * platform_sy,
+
+                    platform_cy
+                    + 0.5 * platform_sy,
+                ],
+            },
+
+            "collision_boxes":
+                _collision_box_observations(
+                    self.boxes
+                ),
         }
 
 
@@ -1211,6 +1450,21 @@ class RCPlanarTestCourse:
     spec: RCPlanarSpec
 
     def to_observation(self) -> dict[str, Any]:
+        # IMPORTANT:
+        # ``self.spec`` describes the seeded NOMINAL route/reference.
+        # It is not necessarily the physical road installed in Isaac.
+        #
+        # The stage, Nav2 OccupancyGrid, traffic cones and terminal goal
+        # are all generated by rc_car_planar_obstacle_layout().  Serialize
+        # that exact layout as part of every environment observation so IL
+        # sees the world in which the expert actually acted.
+        physical_track = rc_car_planar_obstacle_layout(
+            self.spec.seed,
+            platform_center_x_m=1.10,
+            platform_size_x_m=self.spec.platform_size_x_m,
+            platform_size_y_m=self.spec.platform_size_y_m,
+        )
+
         return {
             "frame_id": "world",
             "course_profile": "rc_car8_planar_nav2",
@@ -1218,15 +1472,44 @@ class RCPlanarTestCourse:
                 "generator": "rc_car_planar_route_v1",
                 **self.spec.to_dict(),
             },
+
+            # Keep the historical fields for backwards compatibility, but
+            # state explicitly that these are the nominal reference.
             "navigation": {
                 "controller": "nav2",
                 "route_kind": self.spec.route_kind,
                 "waypoints_xyyaw": [
                     list(pose) for pose in self.spec.waypoints_xyyaw
                 ],
+                "nominal_route": {
+                    "route_kind": self.spec.route_kind,
+                    "waypoints_xyyaw": [
+                        list(pose)
+                        for pose in self.spec.waypoints_xyyaw
+                    ],
+                },
+                "physical_goal_xyyaw": list(
+                    physical_track["goal_xyyaw"]
+                ),
                 "goal_xy_tolerance_m": 0.05,
                 "goal_yaw_tolerance_rad": 0.12,
             },
+
+            # Ground-truth geometry actually instantiated in Isaac and used
+            # to construct the Nav2 map.
+            #
+            # Includes:
+            #   - complete physical centerline
+            #   - straight/curve profile
+            #   - direction / angle / radius
+            #   - corridor width
+            #   - platform bounds
+            #   - finish pose
+            #   - cone count and exact cone centres
+            #   - cone geometry
+            #   - RC-Car physical footprint / required clearance
+            "physical_track": physical_track,
+
             "collision_boxes": _collision_box_observations(self.boxes),
         }
 
@@ -1382,41 +1665,141 @@ def manual_obstacle_course() -> ManualObstacleCourse:
 def mobile_manipulator_button_test_course(
     spec: ButtonTargetSpec | None = None,
 ) -> ButtonTestCourse:
-    """Return a continuous floor with only the wall-mounted button."""
+    """Return a large floor with one oriented wall-mounted button."""
 
-    platform_color = (0.24, 0.27, 0.31)
-    # The robot approaches from -Y and presses toward +Y.
-    # Keep 5 mm clearance from the wall at rest so the 4 mm
-    # physical plunger stroke never intersects the support.
-    spec = spec or ButtonTargetSpec()
-    button_center = spec.center_xyz_m
+    platform_color = (
+        0.24,
+        0.27,
+        0.31,
+    )
+
+    spec = (
+        spec
+        or ButtonTargetSpec()
+    )
+
+    button_center = (
+        spec.center_xyz_m
+    )
+
+    nx, ny = (
+        spec.press_direction_xy
+    )
+
+    # The support always lies BEHIND the plunger along the
+    # actual press direction.
+    wall_center = (
+        button_center[0]
+        + nx * BUTTON_SUPPORT_OFFSET_M,
+
+        button_center[1]
+        + ny * BUTTON_SUPPORT_OFFSET_M,
+
+        0.150,
+    )
+
+    # +/-X and +/-Y fixtures remain axis-aligned.
+    #
+    # The thin dimension is always aligned with the
+    # physical press direction.
+    if abs(nx) > 0.5:
+
+        wall_size = (
+            BUTTON_SUPPORT_THICKNESS_M,
+            BUTTON_SUPPORT_TANGENT_M,
+            BUTTON_SUPPORT_HEIGHT_M,
+        )
+
+        plunger_size = (
+            BUTTON_PLUNGER_DEPTH_M,
+            BUTTON_PLUNGER_TANGENT_M,
+            BUTTON_PLUNGER_HEIGHT_M,
+        )
+
+    else:
+
+        wall_size = (
+            BUTTON_SUPPORT_TANGENT_M,
+            BUTTON_SUPPORT_THICKNESS_M,
+            BUTTON_SUPPORT_HEIGHT_M,
+        )
+
+        plunger_size = (
+            BUTTON_PLUNGER_TANGENT_M,
+            BUTTON_PLUNGER_DEPTH_M,
+            BUTTON_PLUNGER_HEIGHT_M,
+        )
+
+    platform_cx, platform_cy = (
+        BUTTON_PLATFORM_CENTER_XY_M
+    )
+
+    platform_sx, platform_sy = (
+        BUTTON_PLATFORM_SIZE_XY_M
+    )
+
     return ButtonTestCourse(
         boxes=(
             CourseBox(
                 "TestPlatform",
-                (0.25, 0.0, -0.01),
-                (2.50, 1.80, 0.02),
+
+                (
+                    platform_cx,
+                    platform_cy,
+                    -0.01,
+                ),
+
+                (
+                    platform_sx,
+                    platform_sy,
+                    0.02,
+                ),
+
                 platform_color,
-                semantic="button_test_platform",
+
+                semantic=
+                    "button_test_platform",
             ),
+
             CourseBox(
                 "ButtonWall",
-                (button_center[0], button_center[1] + 0.065, 0.150),
-                (0.18, 0.08, 0.30),
+                wall_center,
+                wall_size,
                 (0.35, 0.37, 0.40),
                 semantic="button_support",
             ),
+
             CourseBox(
                 "ButtonPlunger",
                 button_center,
-                (0.08, 0.04, 0.08),
+                plunger_size,
                 (0.85, 0.08, 0.06),
                 semantic="button",
             ),
         ),
-        button_center_xyz_m=button_center,
-        base_standoff_xy_m=(button_center[0], button_center[1] - 0.20),
-        base_standoff_yaw_rad=0.5 * math.pi,
+
+        button_center_xyz_m=
+            button_center,
+
+        press_direction_world_xy=(
+            float(nx),
+            float(ny),
+        ),
+
+        base_standoff_xy_m=(
+            button_center[0]
+            - nx * 0.20,
+
+            button_center[1]
+            - ny * 0.20,
+        ),
+
+        # Preserve the historical convention:
+        # +Y => +90 degrees.
+        base_standoff_yaw_rad=
+            math.atan2(ny, nx),
+
+        spec=spec,
     )
 
 
@@ -1632,9 +2015,44 @@ def install_mobile_manipulator_button_test_course(
         stage,
         f"{root_path}/ButtonPrismaticJoint",
     )
-    joint.CreateAxisAttr("Y")
-    joint.CreateLowerLimitAttr(0.0)
-    joint.CreateUpperLimitAttr(0.004)
+    nx, ny = (
+        course.press_direction_world_xy
+    )
+
+    if abs(nx) > 0.5:
+        joint_axis = "X"
+        joint_sign = nx
+    else:
+        joint_axis = "Y"
+        joint_sign = ny
+
+    joint.CreateAxisAttr(
+        joint_axis
+    )
+
+    # Coordinate zero is always the unpressed pose.
+    #
+    # For +X/+Y the plunger moves from 0 to +stroke.
+    # For -X/-Y it moves from 0 to -stroke.
+    if joint_sign > 0.0:
+
+        joint.CreateLowerLimitAttr(
+            0.0
+        )
+
+        joint.CreateUpperLimitAttr(
+            BUTTON_PLUNGER_STROKE_M
+        )
+
+    else:
+
+        joint.CreateLowerLimitAttr(
+            -BUTTON_PLUNGER_STROKE_M
+        )
+
+        joint.CreateUpperLimitAttr(
+            0.0
+        )
 
     joint.CreateBody1Rel().SetTargets(
         [Sdf.Path(plunger_path)]

@@ -549,12 +549,69 @@ class SmoresStateGraphPublisher:
             float(translation[2]),
         ]
 
-        nominal_y = float(nominal_center[1])
-        depression_m = current_center[1] - nominal_y
+        direction = (
+            button_payload.get(
+                "press_direction_world_xy",
+                (0.0, 1.0),
+            )
+        )
+
+        try:
+            nx = float(direction[0])
+            ny = float(direction[1])
+
+        except (
+            TypeError,
+            ValueError,
+            IndexError,
+        ):
+            nx, ny = 0.0, 1.0
+
+        norm = (
+            nx * nx
+            + ny * ny
+        ) ** 0.5
+
+        if norm <= 1.0e-12:
+            nx, ny = 0.0, 1.0
+        else:
+            nx /= norm
+            ny /= norm
+
+        # Positive depression always means motion IN THE
+        # episode's actual press direction.
+        depression_m = (
+            (
+                current_center[0]
+                - float(nominal_center[0])
+            )
+            * nx
+            +
+            (
+                current_center[1]
+                - float(nominal_center[1])
+            )
+            * ny
+        )
 
         button = dict(button_payload)
-        button["current_center_xyz_m"] = current_center
-        button["depression_m"] = float(depression_m)
+
+        button[
+            "press_direction_world_xy"
+        ] = [
+            nx,
+            ny,
+        ]
+
+        button[
+            "current_center_xyz_m"
+        ] = current_center
+
+        button[
+            "depression_m"
+        ] = float(
+            depression_m
+        )
 
         course["button"] = button
         return course

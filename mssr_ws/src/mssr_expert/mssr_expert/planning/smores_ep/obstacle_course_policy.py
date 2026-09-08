@@ -43,6 +43,28 @@ class ObstacleCoursePolicy:
             f"No obstacle-course morphology supports {required_capability!r}."
         )
 
+    def step_index(self, task: str) -> int:
+        """Return the unique index of one named course task."""
+
+        name = str(task).strip()
+
+        if not name:
+            raise ValueError("Course task name must not be empty.")
+
+        matches = [
+            index
+            for index, step in enumerate(self.steps())
+            if step.task == name
+        ]
+
+        if len(matches) != 1:
+            raise ValueError(
+                f"Expected exactly one course task {name!r}; "
+                f"found {len(matches)}."
+            )
+
+        return matches[0]
+
     def steps(self) -> tuple[CourseStep, ...]:
         """Return the complete morphology-aware task program."""
         snake = self.choose_morphology("ramp")
@@ -101,36 +123,92 @@ class ObstacleCoursePolicy:
                 snake,
                 navigation="front_on_upper_deck",
             ),
-            CourseStep("button_reconfiguration", manipulator),
+            # ------------------------------------------------------
+            # CAMERA-GUIDED BUTTON SUB-EXPERT
+            #
+            # The button pose is not assumed fixed: x/y/z are consumed
+            # from the live course/perception observation at runtime.
+            # ------------------------------------------------------
+
+            # First recover the fully steerable planar morphology.
             CourseStep(
-                "button_approach",
-                manipulator,
-                navigation="button_standoff",
+                "button_rc_car_reconfiguration",
+                rc_car,
             ),
+
+            # RC-Car8 performs all x/y/yaw alignment.  Its final pose is
+            # chosen for the *future* manipulator, so the MM8 arm/rear
+            # side already faces the button after reconfiguration.
             CourseStep(
-                "button",
+                "button_rc_car_pre_alignment",
+                rc_car,
+                navigation="button_pre_reconfiguration",
+            ),
+
+            # Deterministic RC-Car8 -> MobileManipulator8 transition.
+            CourseStep(
+                "button_reconfiguration",
                 manipulator,
-                "press_button",
+            ),
+
+            # MM8 cannot steer in the validated posture.  It therefore
+            # performs only signed longitudinal motion (normally reverse)
+            # to reach the manipulation standoff.
+            CourseStep(
+                "button_mm8_approach",
+                manipulator,
+                navigation="button_mm8_pre_manipulation",
+            ),
+
+            # Put the base on the ground:
+            # chassis_center, front_support, arm_ground_drive -> 0 rad.
+            CourseStep(
+                "button_manipulation_ready",
+                manipulator,
+                "prepare_manipulation",
+            ),
+
+            # Deliberate integration barrier.
+            #
+            # This stage will later contain:
+            #   camera target -> IK -> pre-press -> press -> retract.
+            # Until that controller exists it remains non-terminal.
+            CourseStep(
+                "button_press",
+                manipulator,
+                navigation="button_arm_press_pending",
                 requires_button=True,
             ),
+
+            # These stages are already defined so the complete FSM is
+            # explicit.  They become reachable once BUTTON_ARM_PRESS is
+            # implemented and physically validated.
             CourseStep(
-                "button_release",
+                "button_restore_drive",
                 manipulator,
-                "release_button",
+                "restore_drive",
             ),
             CourseStep(
-                "button_retreat",
+                "button_mm8_retreat",
                 manipulator,
-                navigation="button_retreat",
+                navigation="button_mm8_retreat",
             ),
-            # Once non-planar/manipulation tasks are over, return to the
-            # planar morphology for the final navigation segment.
-            CourseStep("exit_reconfiguration", rc_car),
+
+            # Return to the fully steerable morphology after the task.
+            CourseStep(
+                "button_return_rc_car",
+                rc_car,
+            ),
+
             CourseStep(
                 "exit",
                 rc_car,
                 navigation="cross_exit",
                 requires_goal=True,
             ),
-            CourseStep("exit_stop", rc_car, "stop"),
+            CourseStep(
+                "exit_stop",
+                rc_car,
+                "stop",
+            ),
         )

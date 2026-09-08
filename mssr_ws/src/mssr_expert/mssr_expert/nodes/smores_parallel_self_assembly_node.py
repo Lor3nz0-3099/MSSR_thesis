@@ -446,9 +446,26 @@ class SmoresParallelSelfAssemblyNode(Node):
             graph_payload=self._latest_graph_payload,
         )
 
-        self._flush_pending_transition(
-            next_graph=current_graph
+        # The executor/control loop runs in wall time, while the
+        # physical state graph advances in simulation time.  When
+        # Isaac runs below real time, many control ticks can therefore
+        # observe exactly the same physical graph.
+        #
+        # Keep polling/executing at the full control rate, but close a
+        # dataset transition only when a genuinely newer physical graph
+        # is observed.  Otherwise the same graph_t would be recorded
+        # repeatedly while waiting for primitive results.
+        pending = self._pending_transition
+
+        graph_changed = (
+            pending is not None
+            and current_graph.stamp != pending.graph.stamp
         )
+
+        if graph_changed:
+            self._flush_pending_transition(
+                next_graph=current_graph
+            )
 
         if self._terminal_reached:
             return
@@ -481,22 +498,45 @@ class SmoresParallelSelfAssemblyNode(Node):
             task_graph,
         )
 
-        self._pending_transition = (
-            _PendingTransition(
-                timestep=self._timestep,
-                observation=dict(
-                    self._latest_observation
-                ),
-                graph=current_graph,
-                task_graph=task_graph,
-                expert_output=expert_output,
+        # Normally there is one pending IL transition per distinct
+        # physical graph stamp.  Repeated 20 Hz control ticks over the
+        # same cached graph must not create duplicate dataset records.
+        #
+        # A terminal decision is the exception: primitive status may
+        # become terminal before a newer physical graph is published.
+        # Preserve that final supervision explicitly even when its
+        # graph stamp matches the preceding sample.
+        if (
+            decision.done
+            and self._pending_transition is not None
+        ):
+            self._flush_pending_transition(
+                next_graph=current_graph
             )
-        )
 
-        self._timestep += 1
+        if self._pending_transition is None:
+            self._pending_transition = (
+                _PendingTransition(
+                    timestep=self._timestep,
+                    observation=dict(
+                        self._latest_observation
+                    ),
+                    graph=current_graph,
+                    task_graph=task_graph,
+                    expert_output=expert_output,
+                )
+            )
+
+            self._timestep += 1
 
         if decision.done:
             self._terminal_reached = True
+
+            # No future graph is guaranteed after a terminal executor
+            # decision, so do not leave the final sample pending.
+            self._flush_pending_transition(
+                next_graph=current_graph
+            )
 
             if decision.success:
                 self.get_logger().info(

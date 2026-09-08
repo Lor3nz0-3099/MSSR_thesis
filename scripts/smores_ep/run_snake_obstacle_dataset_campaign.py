@@ -227,7 +227,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--simulation-steps", type=int, default=240_000)
     parser.add_argument("--simulation-speed-factor", type=float, default=1.0)
     parser.add_argument("--assembly-wall-timeout-s", type=float, default=600.0)
-    parser.add_argument("--behavior-wall-timeout-s", type=float, default=600.0)
+    parser.add_argument("--behavior-wall-timeout-s", type=float, default=2400.0)
     parser.add_argument("--behavior-dataset-log-period", type=int, default=30)
     parser.add_argument("--behavior-control-rate-hz", type=float, default=30.0)
     parser.add_argument("--record-assembly-dataset", action="store_true")

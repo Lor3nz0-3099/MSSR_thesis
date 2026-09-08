@@ -102,16 +102,76 @@ class SnakeStairConcertinaPlanner:
         # This gives one local tread support point while the neighbouring
         # modules are free to belong to the transfer arches.  It avoids
         # vertically over-constraining the rigid chain against the floor.
+        nominal_approach_run = max(
+            0.135,
+            1.70 * spacing,
+        )
+        nominal_landing_run = max(
+            0.105,
+            1.30 * spacing,
+        )
+
         approach_run = self._number(
             parameters,
             "path_approach_run_m",
-            max(0.135, 1.70 * spacing),
+            nominal_approach_run,
         )
         landing_run = self._number(
             parameters,
             "path_landing_run_m",
-            max(0.105, 1.30 * spacing),
+            nominal_landing_run,
         )
+
+        # Preserve the validated legacy path exactly whenever it
+        # fits on the tread.  Only automatically shorten the two
+        # transition runs when:
+        #
+        #   1. neither run was explicitly requested by the caller;
+        #   2. the legacy defaults would consume the whole tread.
+        #
+        # The fallback leaves a 20 mm flat support interval and
+        # preserves the legacy approach:landing timing ratio.
+        explicit_path_runs = (
+            "path_approach_run_m" in parameters
+            or "path_landing_run_m" in parameters
+        )
+
+        if (
+            not explicit_path_runs
+            and approach_run + landing_run
+            >= staircase.tread_depth_m
+        ):
+            short_tread_flat_run_m = 0.020
+            available_run = (
+                staircase.tread_depth_m
+                - short_tread_flat_run_m
+            )
+
+            nominal_total_run = (
+                nominal_approach_run
+                + nominal_landing_run
+            )
+
+            if available_run <= 0.0:
+                raise SnakeStairGaitError(
+                    "Stair tread is too short for adaptive "
+                    "wheel-centre smoothing"
+                )
+
+            scale = (
+                available_run
+                / nominal_total_run
+            )
+
+            approach_run = (
+                nominal_approach_run
+                * scale
+            )
+            landing_run = (
+                nominal_landing_run
+                * scale
+            )
+
         if not 0.080 <= approach_run <= 0.180:
             raise SnakeStairGaitError(
                 "path_approach_run_m must be in [0.080, 0.180]"

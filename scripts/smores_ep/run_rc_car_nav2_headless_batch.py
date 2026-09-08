@@ -20,6 +20,7 @@ sys.path.insert(0, str(SCRIPT_DIR / "src"))
 
 from smores_ep.isaac.obstacle_course import (  # noqa: E402
     RCPlanarSpec,
+    rc_car_planar_obstacle_layout,
     sample_rc_car_planar_spec,
 )
 
@@ -234,12 +235,25 @@ def run_episode(
     runtime_dir = args.output_dir / episode_id
     runtime_dir.mkdir(parents=True, exist_ok=False)
 
+    physical_track = rc_car_planar_obstacle_layout(
+        spec.seed,
+        platform_center_x_m=1.10,
+        platform_size_x_m=spec.platform_size_x_m,
+        platform_size_y_m=spec.platform_size_y_m,
+    )
+
     manifest = {
         "schema_version": "mssr.rc_car_nav2_episode.v1",
         "episode_id": episode_id,
         "morphology": "rc_car8",
         "task": "nav2_planar_route",
+
+        # Nominal seeded reference: retained for provenance.
         "route": spec.to_dict(),
+
+        # Exact environment used by Isaac + Nav2.
+        "physical_track": physical_track,
+
         "controller": "Nav2 NavigateThroughPoses + DWB",
         "pan_contact_profile": {
             "active_only_for_rc_car8_wheel_roles": True,

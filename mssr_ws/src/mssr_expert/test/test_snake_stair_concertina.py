@@ -666,3 +666,127 @@ def test_pd_floor_is_clamped_during_synchronized_tilt_motion() -> None:
 
     assert deforming == pytest.approx(0.010)
     assert settled >= 0.020
+
+
+@pytest.mark.parametrize(
+    ("rise_m", "tread_depth_m", "stair_count"),
+    (
+        (0.064, 0.185, 5),
+        (0.071, 0.190, 3),
+        (0.067, 0.225, 3),
+        (0.069, 0.225, 5),
+        (0.058, 0.230, 4),
+    ),
+)
+def test_global_path_ik_adapts_smoothing_for_short_treads(
+    rise_m: float,
+    tread_depth_m: float,
+    stair_count: int,
+) -> None:
+    """Short physical treads must reach PATH-IK planning.
+
+    These geometries used to be rejected before any behavior
+    transition because the legacy 135 + 105 mm smoothing runs
+    consumed the complete tread.
+    """
+
+    base = _graph()
+
+    graph = AttributedRobotGraph(
+        nodes=base.nodes,
+        edges=base.edges,
+        global_attributes={
+            **base.global_attributes,
+            "course": _course(
+                rise_m=rise_m,
+                tread_depth_m=tread_depth_m,
+                stair_count=stair_count,
+            ),
+        },
+    )
+
+    program = SnakeStairConcertinaPlanner().plan(
+        graph,
+        _assignments(),
+        {},
+    )
+
+    assert program[0].phase == "PATH_IK_PRELOAD"
+    assert program[-1].phase == "PATH_IK_UPPER_DECK_SETTLE"
+    assert any(
+        step.phase == "PATH_IK_LIFT_TAIL"
+        for step in program
+    )
+
+
+@pytest.mark.parametrize(
+    "tread_depth_m",
+    (
+        0.255,
+        0.275,
+        0.290,
+    ),
+)
+def test_legacy_stair_treads_keep_default_smoothing_runs(
+    monkeypatch,
+    tread_depth_m: float,
+) -> None:
+    """Treads already handled by the old planner keep 135/105 mm."""
+
+    captured: dict[str, float] = {}
+
+    original = WheelCenterPath
+
+    class CapturingWheelCenterPath(original):
+        def __init__(
+            self,
+            *args,
+            approach_run_m: float,
+            landing_run_m: float,
+            **kwargs,
+        ):
+            captured["approach_run_m"] = approach_run_m
+            captured["landing_run_m"] = landing_run_m
+
+            super().__init__(
+                *args,
+                approach_run_m=approach_run_m,
+                landing_run_m=landing_run_m,
+                **kwargs,
+            )
+
+    import mssr_expert.behaviors.snake_stair_concertina as module
+
+    monkeypatch.setattr(
+        module,
+        "WheelCenterPath",
+        CapturingWheelCenterPath,
+    )
+
+    base = _graph()
+
+    graph = AttributedRobotGraph(
+        nodes=base.nodes,
+        edges=base.edges,
+        global_attributes={
+            **base.global_attributes,
+            "course": _course(
+                rise_m=0.060,
+                tread_depth_m=tread_depth_m,
+                stair_count=3,
+            ),
+        },
+    )
+
+    SnakeStairConcertinaPlanner().plan(
+        graph,
+        _assignments(),
+        {},
+    )
+
+    assert captured["approach_run_m"] == pytest.approx(
+        0.135
+    )
+    assert captured["landing_run_m"] == pytest.approx(
+        0.105
+    )

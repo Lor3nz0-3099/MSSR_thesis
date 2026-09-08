@@ -49,6 +49,13 @@ from mssr_expert.planning.smores_ep.course_landmarks import (
     CourseLandmarkError,
     CourseLandmarks,
 )
+from mssr_expert.planning.smores_ep.button_task_expert import (
+    ButtonBaseTarget,
+    button_base_target,
+    button_is_physically_pressed,
+    longitudinal_tracking_error,
+    observe_button,
+)
 from mssr_expert.planning.smores_ep.obstacle_course_policy import CourseStep, ObstacleCoursePolicy
 from mssr_expert.planning.smores_ep.parallel_self_assembly_planner import ParallelSelfAssemblyPlanner
 from mssr_expert.planning.smores_ep.self_reconfiguration_planner import SmoresSelfReconfigurationPlanner
@@ -124,6 +131,7 @@ class SmoresObstacleCourseNode(Node):
         self._stair_concertina_planner = SnakeStairConcertinaPlanner()
         self._policy = ObstacleCoursePolicy()
         self._steps = self._policy.steps()
+        self._step_index = self._configured_start_step_index()
         self._assembly_planner = ParallelSelfAssemblyPlanner()
         self._reconfiguration_planner = SmoresSelfReconfigurationPlanner()
         self._graph_builder = GraphBuilder()
@@ -133,7 +141,6 @@ class SmoresObstacleCourseNode(Node):
         self._latest_observation: dict[str, Any] = {}
         self._latest_graph_payload: dict[str, Any] = {}
         self._latest_status: dict[str, Any] = {}
-        self._step_index = 0
         self._engine: Any | None = None
         self._assignment: dict[str, str] = {}
         self._source_graph: Any | None = None
@@ -166,13 +173,68 @@ class SmoresObstacleCourseNode(Node):
 
     def _declare_parameters(self) -> None:
         self.declare_parameter("episode_id", "smores_obstacle_course_0001")
+        # Empty string preserves the normal full-course run.
+        # A named task is useful for deterministic subsystem smoke tests.
+        self.declare_parameter("start_step_task", "")
         self.declare_parameter("dataset_path", "logs/datasets/smores_obstacle_course_il.jsonl")
         self.declare_parameter("control_rate_hz", 20.0)
         self.declare_parameter("dataset_log_period", 5)
         self.declare_parameter("button_contact_radius_m", 0.040)
+        self.declare_parameter("button_press_depth_m", 0.0035)
         self.declare_parameter("button_contact_speed_m_s", 0.012)
         self.declare_parameter("button_alignment_tolerance_m", 0.050)
         self.declare_parameter("button_navigation_tolerance_m", 0.025)
+        # Button pose is a live perception input and may vary by seed.
+        self.declare_parameter(
+            "button_rcar_pre_reconfiguration_standoff_m",
+            0.55,
+        )
+        self.declare_parameter(
+            "button_mm8_pre_manipulation_standoff_m",
+            0.30,
+        )
+        self.declare_parameter(
+            "button_mm8_retreat_standoff_m",
+            0.55,
+        )
+
+        # In the current course the wall/button normal is fixed while
+        # button x/z vary by seed.  -pi/2 makes the future MM8 forward
+        # axis point away from the wall, so reverse motion approaches it.
+        self.declare_parameter(
+            "button_future_mm8_forward_yaw_rad",
+            -math.pi / 2.0,
+        )
+
+        # Calibration hooks for any deterministic transform introduced by
+        # RC-Car8 -> MM8 self-reconfiguration.
+        self.declare_parameter(
+            "button_rcar_to_mm8_yaw_offset_rad",
+            0.0,
+        )
+        self.declare_parameter(
+            "button_rcar_pre_reconfiguration_lateral_bias_m",
+            0.0,
+        )
+
+        self.declare_parameter(
+            "button_mm8_lateral_tolerance_m",
+            0.050,
+        )
+        self.declare_parameter(
+            "button_mm8_heading_tolerance_rad",
+            0.15,
+        )
+        self.declare_parameter(
+            "button_mm8_longitudinal_speed_m_s",
+            0.040,
+        )
+
+        # Physical terminal condition measured on the Isaac plunger.
+        self.declare_parameter(
+            "button_depression_success_m",
+            0.0035,
+        )
         self.declare_parameter("goal_min_modules_past_exit", 4)
         self.declare_parameter("gap_approach_margin_m", 0.06)
         self.declare_parameter("gap_clearance_margin_m", 0.08)
@@ -181,6 +243,30 @@ class SmoresObstacleCourseNode(Node):
         self.declare_parameter("ramp_navigation_speed_m_s", 0.050)
         self.declare_parameter("navigation_yaw_rate_rad_s", 0.25)
         self.declare_parameter("navigation_position_tolerance_m", 0.06)
+
+    def _configured_start_step_index(self) -> int:
+        """Resolve an optional task-level entry point.
+
+        Default behaviour remains exactly the historical full course.
+        """
+
+        task = str(
+            self.get_parameter("start_step_task").value
+        ).strip()
+
+        if not task:
+            return 0
+
+        index = self._policy.step_index(task)
+
+        self.get_logger().warning(
+            "Targeted obstacle-course start enabled: "
+            f"task={task!r}, step_index={index}. "
+            "The current physical morphology must already match "
+            "the morphology required by that step."
+        )
+
+        return index
 
     def _on_state_graph(self, message: String) -> None:
         payload = string_msg_to_dict(message)
@@ -315,6 +401,40 @@ class SmoresObstacleCourseNode(Node):
 
     def _start_step(self, course_step: CourseStep, current_graph: Any) -> None:
         self._active_target = self._catalog[course_step.morphology]
+        # Targeted-start assignment bootstrap.
+        #
+        # In a normal full-course run the assignment is inherited from the
+        # previous assembly/reconfiguration step.  When starting directly
+        # from a physically pre-assembled morphology, recover the exact
+        # face-topology assignment instead.
+        if (
+            course_step.task != "assembly"
+            and not self._assignment
+        ):
+            bootstrap_assignment = (
+                self._reconfiguration_planner.configuration_assignment(
+                    current_graph,
+                    self._active_target,
+                )
+            )
+
+            if bootstrap_assignment is None:
+                raise ValueError(
+                    "Cannot bootstrap targeted course step "
+                    f"{course_step.task!r}: the current physical graph "
+                    f"does not exactly match {course_step.morphology!r}."
+                )
+
+            self._assignment = dict(
+                bootstrap_assignment.target_to_module
+            )
+            self._source_graph = self._active_target
+            self._source_assignment = bootstrap_assignment
+
+            self.get_logger().info(
+                "Recovered targeted-start morphology assignment for "
+                f"{course_step.morphology}: {self._assignment}"
+            )
         execution_id = f"{self.get_parameter('episode_id').value}-{self._step_index:02d}"
         if course_step.task == "assembly":
             result = self._assembly_planner.plan(current_graph, self._active_target)
@@ -673,23 +793,121 @@ class SmoresObstacleCourseNode(Node):
                 stair_index = len(landmarks.stair_top_heights_m) - 1
                 target_x = self._stair_target_x(landmarks, stair_index + 1)
                 return self._navigate_stair(current_graph, modules, landmarks, stair_index, target_x)
-            if mode == "button_standoff":
-                x_m, y_m, _ = landmarks.button_center_xyz_m
+            if mode == "button_pre_reconfiguration":
+                button = observe_button(self._latest_observation)
+
+                future_yaw_rad = float(
+                    self.get_parameter(
+                        "button_future_mm8_forward_yaw_rad"
+                    ).value
+                )
+
+                target = button_base_target(
+                    button.center_xyz_m,
+                    standoff_m=float(
+                        self.get_parameter(
+                            "button_rcar_pre_reconfiguration_standoff_m"
+                        ).value
+                    ),
+                    future_forward_yaw_rad=future_yaw_rad,
+                    lateral_bias_m=float(
+                        self.get_parameter(
+                            "button_rcar_pre_reconfiguration_lateral_bias_m"
+                        ).value
+                    ),
+                )
+
+                # If self-reconfiguration introduces a repeatable yaw
+                # offset, compensate it here while still targeting the
+                # desired FUTURE MM8 orientation.
+                rc_car_yaw_rad = _wrap_angle(
+                    future_yaw_rad
+                    - float(
+                        self.get_parameter(
+                            "button_rcar_to_mm8_yaw_offset_rad"
+                        ).value
+                    )
+                )
+
                 return self._navigate_pose(
                     current_graph,
                     modules,
-                    (x_m, y_m - 0.20),
-                    math.pi / 2.0,
-                    "BUTTON_STANDOFF",
+                    target.root_xy_m,
+                    rc_car_yaw_rad,
+                    "BUTTON_PRE_RECONFIGURATION",
                     position_tolerance_m=float(
                         self.get_parameter(
                             "button_navigation_tolerance_m"
                         ).value
                     ),
                 )
-            if mode == "button_retreat":
-                x_m, y_m, _ = landmarks.button_center_xyz_m
-                return self._navigate_pose(current_graph, modules, (x_m, y_m - 0.40), -math.pi / 2.0, "BUTTON_RETREAT")
+
+            if mode == "button_mm8_pre_manipulation":
+                button = observe_button(self._latest_observation)
+
+                target = button_base_target(
+                    button.center_xyz_m,
+                    standoff_m=float(
+                        self.get_parameter(
+                            "button_mm8_pre_manipulation_standoff_m"
+                        ).value
+                    ),
+                    future_forward_yaw_rad=float(
+                        self.get_parameter(
+                            "button_future_mm8_forward_yaw_rad"
+                        ).value
+                    ),
+                )
+
+                return self._navigate_button_longitudinal(
+                    current_graph,
+                    modules,
+                    target,
+                    "MM8_BUTTON_APPROACH",
+                )
+
+            if mode == "button_arm_press_pending":
+                button = observe_button(self._latest_observation)
+
+                return _NavigationDecision(
+                    "WAITING_ARM_IK",
+                    "BUTTON_ARM_PRESS",
+                    {},
+                    message=(
+                        "Manipulator base is ready. "
+                        "Arm IK/press controller is intentionally pending; "
+                        "live perceived button center="
+                        f"({button.center_xyz_m[0]:+.3f}, "
+                        f"{button.center_xyz_m[1]:+.3f}, "
+                        f"{button.center_xyz_m[2]:+.3f})m, "
+                        f"depression={button.depression_m * 1000.0:.2f}mm."
+                    ),
+                )
+
+            if mode == "button_mm8_retreat":
+                button = observe_button(self._latest_observation)
+
+                target = button_base_target(
+                    button.center_xyz_m,
+                    standoff_m=float(
+                        self.get_parameter(
+                            "button_mm8_retreat_standoff_m"
+                        ).value
+                    ),
+                    future_forward_yaw_rad=float(
+                        self.get_parameter(
+                            "button_future_mm8_forward_yaw_rad"
+                        ).value
+                    ),
+                )
+
+                return self._navigate_button_longitudinal(
+                    current_graph,
+                    modules,
+                    target,
+                    "MM8_BUTTON_RETREAT",
+                )
+
             if mode == "cross_exit":
                 exit_x_m, exit_y_m, _ = landmarks.exit_center_xyz_m
                 if self._goal_reached():
@@ -698,6 +916,113 @@ class SmoresObstacleCourseNode(Node):
             raise CourseLandmarkError(f"Unknown navigation mode {mode!r}.")
         except (CourseLandmarkError, ValueError) as error:
             return _NavigationDecision("WAITING_COURSE_GEOMETRY", "WAIT", {}, message=str(error))
+
+    def _navigate_button_longitudinal(
+        self,
+        current_graph: Any,
+        modules: Mapping[str, Mapping[str, Any]],
+        target: ButtonBaseTarget,
+        phase: str,
+    ) -> _NavigationDecision:
+        """Use only MM8's physically validated longitudinal DoF.
+
+        RC-Car8 must already have removed lateral and heading error.
+        MobileManipulator8 is deliberately not allowed to improvise a turn.
+        """
+
+        root_position, root_yaw_rad = self._root_pose(modules)
+
+        error = longitudinal_tracking_error(
+            root_position,
+            root_yaw_rad,
+            target,
+        )
+
+        lateral_tolerance_m = float(
+            self.get_parameter(
+                "button_mm8_lateral_tolerance_m"
+            ).value
+        )
+        heading_tolerance_rad = float(
+            self.get_parameter(
+                "button_mm8_heading_tolerance_rad"
+            ).value
+        )
+
+        if (
+            abs(error.lateral_m) > lateral_tolerance_m
+            or abs(error.heading_error_rad) > heading_tolerance_rad
+        ):
+            return _NavigationDecision(
+                "WAITING_MM8_PREALIGNMENT",
+                phase,
+                {},
+                message=(
+                    "MM8 cannot correct the residual pre-reconfiguration "
+                    "alignment error: "
+                    f"along={error.along_m:+.3f}m, "
+                    f"lateral={error.lateral_m:+.3f}m, "
+                    f"heading={error.heading_error_rad:+.3f}rad. "
+                    "RC-Car pre-alignment/calibration must be corrected."
+                ),
+            )
+
+        tolerance_m = float(
+            self.get_parameter(
+                "button_navigation_tolerance_m"
+            ).value
+        )
+
+        if abs(error.along_m) <= tolerance_m:
+            return _NavigationDecision(
+                "SUCCEEDED",
+                phase,
+                {},
+                True,
+                True,
+                (
+                    "Reached button-relative MM8 longitudinal target: "
+                    f"along={error.along_m:+.3f}m, "
+                    f"lateral={error.lateral_m:+.3f}m, "
+                    f"button_z={target.button_center_xyz_m[2]:.3f}m."
+                ),
+            )
+
+        speed_m_s = float(
+            self.get_parameter(
+                "button_mm8_longitudinal_speed_m_s"
+            ).value
+        )
+
+        linear_m_s = math.copysign(
+            speed_m_s,
+            error.along_m,
+        )
+
+        locomotion = self._drive_locomotion(
+            current_graph,
+            linear_m_s,
+            0.0,
+        )
+
+        motion_name = (
+            "forward"
+            if linear_m_s > 0.0
+            else "reverse"
+        )
+
+        return _NavigationDecision(
+            "RUNNING_MM8_LONGITUDINAL",
+            phase,
+            locomotion,
+            message=(
+                f"MM8 {motion_name}: "
+                f"along={error.along_m:+.3f}m, "
+                f"lateral={error.lateral_m:+.3f}m, "
+                f"target_standoff={target.standoff_m:.3f}m, "
+                f"button_z={target.button_center_xyz_m[2]:.3f}m."
+            ),
+        )
 
     def _navigate_x(
         self,
@@ -869,24 +1194,19 @@ class SmoresObstacleCourseNode(Node):
         self._step_index += 1
 
     def _button_pressed(self) -> bool:
-        if self._active_target is None:
-            return False
+        """Require actual Isaac plunger depression, never EE proximity."""
+
         try:
-            center = CourseLandmarks.from_observation(
-                self._latest_observation
-            ).button_center_xyz_m
-        except CourseLandmarkError:
+            return button_is_physically_pressed(
+                self._latest_observation,
+                threshold_m=float(
+                    self.get_parameter(
+                        "button_depression_success_m"
+                    ).value
+                ),
+            )
+        except ValueError:
             return False
-        roles = target_roles_from_graph(self._active_target)
-        end_effector = next((module_id for vertex, module_id in self._assignment.items() if roles[vertex]["target_role"] == "end_effector"), None)
-        if end_effector is None:
-            return False
-        module = extract_modules(self._latest_observation).get(end_effector)
-        if module is None:
-            return False
-        return button_contact_distance_m(module, center) <= float(
-            self.get_parameter("button_contact_radius_m").value
-        )
 
     def _approach_button_contact(
         self,

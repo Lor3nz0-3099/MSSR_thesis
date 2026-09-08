@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 import os
+import sys
 from pathlib import Path
 import signal
 import subprocess
@@ -20,11 +22,29 @@ from std_msgs.msg import String
 
 ROOT = Path(__file__).resolve().parents[2]
 
-SEED = 6100
+# Make the repository-local smores_ep package available even when
+# the caller has not exported scripts/smores_ep/src in PYTHONPATH.
+#
+# This keeps direct GUI runs and future headless campaign workers
+# independent from the interactive shell environment.
+SMORES_EP_SRC = ROOT / "scripts" / "smores_ep" / "src"
+
+if str(SMORES_EP_SRC) not in sys.path:
+    sys.path.insert(0, str(SMORES_EP_SRC))
+
+DEFAULT_SEED = 6100
+SEED = DEFAULT_SEED
+
+# Headless self_assembly_cli converts --steps 0 into only 7200
+# physics steps (= 30 simulated seconds at 240 Hz).  That is too
+# short for the complete button episode: wave 2 of RC-Car8 assembly
+# can begin near t=30 s.  Give headless runs the same explicit long
+# episode guard used by the existing batch workflows.  The expert
+# terminates the runtime normally as soon as the episode completes.
+HEADLESS_SIMULATION_STEPS = 240_000
 DOMAIN = os.environ["ROS_DOMAIN_ID"]
 
-RC_STANDOFF_M = 0.55
-RC_GOAL_YAW_RAD = -math.pi / 2.0
+RC_STANDOFF_M = 0.70
 
 # Region where we stop the folded MM8 and unfold for manipulation.
 MM8_STANDOFF_M = 0.3250
@@ -69,6 +89,84 @@ def button_xyz(state):
             return tuple(float(v) for v in xyz[:3])
 
     raise RuntimeError("Button center not found.")
+
+
+def button_press_direction_xy(state):
+    """Return normalized world-frame button press direction."""
+
+    candidates = (
+        state.get(
+            "state",
+            {},
+        ).get(
+            "course",
+            {},
+        ).get(
+            "button",
+        ),
+
+        state.get(
+            "course",
+            {},
+        ).get(
+            "button",
+        ),
+
+        state.get(
+            "global_attributes",
+            {},
+        ).get(
+            "course",
+            {},
+        ).get(
+            "button",
+        ),
+    )
+
+    for button in candidates:
+
+        if not isinstance(
+            button,
+            dict,
+        ):
+            continue
+
+        direction = (
+            button.get(
+                "press_direction_world_xy"
+            )
+        )
+
+        if (
+            isinstance(
+                direction,
+                (list, tuple),
+            )
+            and len(direction) >= 2
+        ):
+            nx = float(
+                direction[0]
+            )
+            ny = float(
+                direction[1]
+            )
+
+            norm = math.hypot(
+                nx,
+                ny,
+            )
+
+            if norm > 1.0e-12:
+                return (
+                    nx / norm,
+                    ny / norm,
+                )
+
+    # Backwards compatibility with old +Y button runs.
+    return (
+        0.0,
+        1.0,
+    )
 
 
 def graph_connections(graph):
@@ -275,6 +373,13 @@ def align_rc_rear_to_button(monitor, state_path):
 
     bx, by, bz = button_xyz(state)
 
+    (
+        press_nx,
+        press_ny,
+    ) = button_press_direction_xy(
+        state
+    )
+
     monitor.spin_until(
         lambda: monitor.odom is not None,
         10,
@@ -387,6 +492,12 @@ def align_rc_rear_to_button(monitor, state_path):
 
     return {
         "button_xyz_m": [bx, by, bz],
+
+        "press_direction_world_xy": [
+            press_nx,
+            press_ny,
+        ],
+
         "xy_before_m": [x0, y0],
         "xy_after_m": [x1, y1],
         "yaw_before_rad": yaw0,
@@ -473,6 +584,13 @@ def approach_mm8(
 
     bx, by, bz = button_xyz(state)
 
+    (
+        press_nx,
+        press_ny,
+    ) = button_press_direction_xy(
+        state
+    )
+
     monitor.spin_until(
         lambda: monitor.odom is not None,
         10,
@@ -480,8 +598,16 @@ def approach_mm8(
     )
 
     # Desired base center immediately before unfolding.
-    tx = bx
-    ty = by - standoff_m
+    # It always lies on the robot-side of the oriented button.
+    tx = (
+        bx
+        - press_nx * standoff_m
+    )
+
+    ty = (
+        by
+        - press_ny * standoff_m
+    )
 
     print()
     print("============================================================")
@@ -634,13 +760,71 @@ def approach_mm8(
 
     return {
         "button_xyz_m": [bx, by, bz],
+
+        "press_direction_world_xy": [
+            press_nx,
+            press_ny,
+        ],
+
         "target_xy_m": [tx, ty],
         "root_xy_m": [x, y],
         "root_yaw_rad": yaw,
     }
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(
+        description=(
+            "Run the validated RC-Car8 -> MobileManipulator8 "
+            "button-press expert."
+        )
+    )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=DEFAULT_SEED,
+        help=(
+            "Deterministic button-target seed "
+            f"(default: {DEFAULT_SEED})."
+        ),
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help=(
+            "Run Isaac without the GUI and close the runtime "
+            "automatically when the episode terminates."
+        ),
+    )
+    parser.add_argument(
+        "--mm8-settle-distance-m",
+        type=float,
+        default=None,
+        help=(
+            "Override the post-reconfiguration MM8/Scorpion "
+            "settle distance from the button. Default: use the "
+            "validated legacy MM8_STANDOFF_M."
+        ),
+    )
+
+    parser.add_argument(
+        "--stop-before-ik",
+        action="store_true",
+        help=(
+            "Stop after prepare_manipulation and save the complete "
+            "physical PRE-IK state graph, before issuing any IK "
+            "joint command."
+        ),
+    )
+
+    return parser.parse_args()
+
+
 def main():
+    global SEED
+
+    args = parse_args()
+    SEED = int(args.seed)
 
     run_id = time.strftime(
         f"seed-{SEED:06d}-%Y%m%d-%H%M%S"
@@ -712,11 +896,19 @@ def main():
                 "button_test_course:=true",
                 f"button_seed:={SEED}",
 
-                "headless:=false",
+                (
+                    "headless:=true"
+                    if args.headless
+                    else "headless:=false"
+                ),
                 "performance:=true",
                 "simple_visuals:=true",
 
-                "simulation_steps:=0",
+                (
+                    f"simulation_steps:={HEADLESS_SIMULATION_STEPS}"
+                    if args.headless
+                    else "simulation_steps:=0"
+                ),
                 "simulation_speed_factor:=1.0",
 
                 "actuator_effort_scale:=4.0",
@@ -849,9 +1041,30 @@ def main():
 
         bx, by, bz = button_xyz(state)
 
-        gx = bx
-        gy = by - RC_STANDOFF_M
-        gyaw = RC_GOAL_YAW_RAD
+        (
+            press_nx,
+            press_ny,
+        ) = button_press_direction_xy(
+            state
+        )
+
+        # Goal lies on the robot-side of the button.
+        gx = (
+            bx
+            - press_nx * RC_STANDOFF_M
+        )
+
+        gy = (
+            by
+            - press_ny * RC_STANDOFF_M
+        )
+
+        # RC-Car front points AWAY from the button,
+        # therefore the rear points along +press_direction.
+        gyaw = math.atan2(
+            -press_ny,
+            -press_nx,
+        )
 
         print()
         print("============================================================")
@@ -861,6 +1074,12 @@ def main():
             f"button = ({bx:+.3f},"
             f"{by:+.3f},{bz:+.3f})"
         )
+        print(
+            f"normal = "
+            f"({press_nx:+.1f},"
+            f"{press_ny:+.1f})"
+        )
+
         print(
             f"goal   = ({gx:+.3f},"
             f"{gy:+.3f},"
@@ -899,7 +1118,7 @@ def main():
             "--goal-x", str(gx),
             "--goal-y", str(gy),
             "--goal-yaw", str(gyaw),
-            "--action-timeout-s", "120",
+            "--action-timeout-s", "600",
             "--result-json",
             str(run / "nav2_result.json"),
         ]
@@ -913,7 +1132,7 @@ def main():
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 check=False,
-                timeout=135,
+                timeout=620,
             )
 
             (
@@ -1156,6 +1375,7 @@ def main():
         result_approach = approach_mm8(
             monitor,
             runtime_dir / "state_graph.json",
+            standoff_m=args.mm8_settle_distance_m,
         )
 
         (
@@ -1298,6 +1518,22 @@ def main():
             ) + "\n"
         )
 
+        pre_ik_state_path = (
+            run / "pre_ik_state_graph.json"
+        )
+
+        pre_ik_state_path.write_text(
+            json.dumps(
+                state,
+                indent=2,
+            ) + "\n"
+        )
+
+        print(
+            f"PRE-IK full state graph = "
+            f"{pre_ik_state_path}"
+        )
+
         print()
         print("============================================================")
         print(" READY FOR 5-DOF IK / LOCAL PRESS")
@@ -1352,6 +1588,18 @@ def main():
         print(
             "Nav2 / assembly / reconfiguration are STOPPED."
         )
+        if args.stop_before_ik:
+            print(
+                "5-DoF BOTTOM-face IK intentionally SKIPPED."
+            )
+            print(
+                "No IK joint command has been sent."
+            )
+            print(
+                "PRE-IK snapshot acquisition: COMPLETE"
+            )
+            return
+
         print("5-DoF BOTTOM-face IK follows.")
 
         # ========================================================
@@ -1362,12 +1610,12 @@ def main():
         #
         # q_pre:
         #   BOTTOM centre aligned with button centre,
-        #   BOTTOM normal = +Y,
+        #   BOTTOM normal = task press normal N,
         #   3 mm before the resting plunger face.
         #
         # q_press:
         #   same geometric constraint,
-        #   advanced along +Y to depress the plunger.
+        #   advanced along task press normal N to depress the plunger.
         # ========================================================
 
         print()
@@ -1382,11 +1630,90 @@ def main():
         from mssr_expert.execution.primitive_protocol import (
             PrimitiveGoalRequest as _IKPrimitiveGoalRequest,
         )
+        from mssr_expert.behaviors.morphology_dof_model import (
+            SmoresMorphologyDofAnalyzer as _IKDofAnalyzer,
+        )
+        from mssr_expert.graph.graph_features import (
+            graph_to_features as _ik_graph_to_features,
+        )
+        from mssr_expert.graph.serialization import (
+            attributed_graph_from_dict as _ik_graph_from_dict,
+            load_attributed_graph as _ik_load_graph,
+        )
+        from mssr_expert.planning.smores_ep.attributed_adapter import (
+            target_roles_from_graph as _ik_target_roles,
+        )
+        from mssr_expert.primitives.common import (
+            module_position as _ik_module_position,
+        )
         from smores_ep.config.geometry import (
             SmoresGeometry as _IKGeometry,
         )
 
         _ik_state_path = runtime_dir / "state_graph.json"
+
+        # --------------------------------------------------------
+        # Button-local task frame.
+        #
+        # N: physical press direction in world XY.
+        # T: horizontal tangent to the button face.
+        # Z: world vertical.
+        #
+        # Historical +Y button:
+        #   N=(0,+1,0), T=(-1,0,0)
+        #
+        # The same IK below now works unchanged in concept for
+        # +/-X and +/-Y fixtures.
+        # --------------------------------------------------------
+
+        _ik_task_state = read_json(
+            _ik_state_path
+        )
+
+        if not _ik_task_state:
+            raise RuntimeError(
+                "state_graph unavailable before IK task-frame setup"
+            )
+
+        (
+            _ik_press_nx,
+            _ik_press_ny,
+        ) = button_press_direction_xy(
+            _ik_task_state
+        )
+
+        _IK_TARGET_NORMAL = _np.asarray(
+            [
+                _ik_press_nx,
+                _ik_press_ny,
+                0.0,
+            ],
+            dtype=float,
+        )
+
+        _IK_FACE_TANGENT = _np.asarray(
+            [
+                -_ik_press_ny,
+                +_ik_press_nx,
+                0.0,
+            ],
+            dtype=float,
+        )
+
+        print()
+        print(
+            "Button IK task frame:"
+        )
+        print(
+            "  N = "
+            f"[{_IK_TARGET_NORMAL[0]:+.1f}, "
+            f"{_IK_TARGET_NORMAL[1]:+.1f}, 0.0]"
+        )
+        print(
+            "  T = "
+            f"[{_IK_FACE_TANGENT[0]:+.1f}, "
+            f"{_IK_FACE_TANGENT[1]:+.1f}, 0.0]"
+        )
 
         # Kinematic order from upstream TOP toward free BOTTOM.
         #
@@ -1424,7 +1751,7 @@ def main():
         # therefore the Minkowski expansion of the button rectangle
         # by this conservative effective contact half-size.
         # --------------------------------------------------------
-        _IK_EE_CONTACT_HALF_X_M = 0.0200
+        _IK_EE_CONTACT_HALF_TANGENT_M = 0.0200
         _IK_EE_CONTACT_HALF_Z_M = 0.0200
 
         # --------------------------------------------------------
@@ -1475,12 +1802,12 @@ def main():
         # non-local configurations.  Keep PRESS PAN motion local to
         # the actual PRE state while leaving PRE itself fully 5-DoF.
         _IK_PRESS_PAN_DELTA_LIMIT_RAD = math.radians(5.0)
-        _IK_PLUNGER_DEPTH_Y_M = 0.040
+        _IK_PLUNGER_DEPTH_M = 0.040
 
         # Button front face is an 80 x 80 mm rectangle in X-Z.
         # The task does NOT require the BOTTOM-face centre to hit
         # the button centre. Any point on this usable surface is valid.
-        _IK_BUTTON_HALF_X_M = 0.040
+        _IK_BUTTON_HALF_TANGENT_M = 0.040
         _IK_BUTTON_HALF_Z_M = 0.040
 
         _IK_SUCCESS_DEPRESSION_M = 0.0035
@@ -1490,6 +1817,805 @@ def main():
         _IK_NORMAL_TOL_DEG = 3.0
 
         _ik_geom = _IKGeometry()
+
+        # --------------------------------------------------------
+        # Raw manipulation dataset.
+        #
+        # One record represents ONE complete 5-DoF absolute
+        # configuration command.  The five resource-safe primitive
+        # goals used to physically execute that configuration are
+        # retained inside expert_action.primitive_sequence.
+        #
+        # Therefore the outer CLIK is naturally sub-sampled at its
+        # control-decision rate rather than logging every low-level
+        # wait/poll tick.
+        # --------------------------------------------------------
+
+        _ik_robot_graph_path = (
+            runtime_dir / "robot_graph.json"
+        )
+
+        _ik_dataset_path = (
+            run / "manipulation_dataset.jsonl"
+        )
+
+        _ik_dataset_timestep = 0
+
+        _ik_dof_analyzer = _IKDofAnalyzer()
+
+        _ik_target_graph = _ik_load_graph(
+            ROOT
+            / "mssr_ws/src/mssr_expert/config/"
+              "smores_mobile_manipulator8.json"
+        )
+
+        _ik_target_role_specs = (
+            _ik_target_roles(
+                _ik_target_graph
+            )
+        )
+
+        _ik_assignment = {}
+
+        # Runtime robot_graph nodes do not necessarily carry the
+        # target-role labels themselves. Preserve the validated
+        # role assignment explicitly in the RAW manipulation data.
+        _ik_module_to_role = {}
+
+        # ``roles`` is normally module_id -> target_role in the
+        # validated button runner. Accept the reverse orientation too
+        # so RAW role annotation does not depend on mapping direction.
+        for key, value in roles.items():
+            key = str(key)
+            value = str(value)
+
+            if key.startswith("smores_"):
+                _ik_module_to_role[key] = value
+            elif value.startswith("smores_"):
+                _ik_module_to_role[value] = key
+
+        if len(_ik_module_to_role) != 8:
+            raise RuntimeError(
+                "Incomplete MobileManipulator8 module-to-role "
+                f"mapping for RAW dataset: {_ik_module_to_role}"
+            )
+
+        for (
+            target_vertex_id,
+            role_spec,
+        ) in _ik_target_role_specs.items():
+
+            target_role = str(
+                role_spec.get(
+                    "target_role",
+                    "",
+                )
+            )
+
+            module_id = (
+                role_to_module.get(
+                    target_role
+                )
+            )
+
+            if module_id:
+                _ik_assignment[
+                    str(target_vertex_id)
+                ] = str(module_id)
+
+        if (
+            len(_ik_assignment)
+            != len(
+                _ik_target_role_specs
+            )
+        ):
+            raise RuntimeError(
+                "Cannot build complete MobileManipulator8 "
+                "target-to-module assignment for manipulation "
+                "dataset recording."
+            )
+
+        print(
+            "Manipulation raw dataset = "
+            f"{_ik_dataset_path}"
+        )
+
+        def _ik_read_robot_graph():
+
+            payload = read_json(
+                _ik_robot_graph_path
+            )
+
+            if not payload:
+                raise RuntimeError(
+                    "robot_graph unavailable during IK "
+                    "dataset recording"
+                )
+
+            return _ik_graph_from_dict(
+                payload
+            )
+
+        def _ik_button_depression(
+            state,
+        ):
+
+            try:
+                return float(
+                    state[
+                        "state"
+                    ][
+                        "course"
+                    ][
+                        "button"
+                    ].get(
+                        "depression_m",
+                        0.0,
+                    )
+                )
+            except (
+                KeyError,
+                TypeError,
+                ValueError,
+            ):
+                return 0.0
+
+        def _ik_dof_payload(
+            graph,
+        ):
+
+            inventory = (
+                _ik_dof_analyzer
+                .analyze(
+                    graph
+                )
+            )
+
+            result = []
+
+            for module in inventory.modules:
+
+                result.append(
+                    {
+                        "module_id":
+                            module.module_id,
+
+                        "target_role":
+                            _ik_module_to_role.get(
+                                module.module_id,
+                                module.target_role,
+                            ),
+
+                        "connected_faces":
+                            sorted(
+                                module.connected_faces
+                            ),
+
+                        "body_is_directly_attached":
+                            module.body_is_directly_attached,
+
+                        "ground_support_anchor":
+                            module.ground_support_anchor,
+
+                        "dofs": [
+                            {
+                                "name":
+                                    dof.name,
+
+                                "joint_kind":
+                                    dof.joint_kind,
+
+                                "affected_face":
+                                    dof.affected_face,
+
+                                "mode":
+                                    dof.mode,
+
+                                "connected":
+                                    dof.connected,
+
+                                "position_rad":
+                                    dof.position_rad,
+
+                                "lower_limit_rad":
+                                    dof.lower_limit_rad,
+
+                                "upper_limit_rad":
+                                    dof.upper_limit_rad,
+
+                                "max_effort_nm":
+                                    dof.max_effort_nm,
+
+                                "motor_mix": [
+                                    list(item)
+                                    for item
+                                    in dof.motor_mix
+                                ],
+
+                                "locomotion_capable":
+                                    dof.locomotion_capable,
+
+                                "shape_capable":
+                                    dof.shape_capable,
+                            }
+                            for dof in module.dofs
+                        ],
+                    }
+                )
+
+            return result
+
+        def _ik_dataset_observation(
+            state,
+            graph,
+            label,
+        ):
+
+            positions = {}
+
+            for node in graph.nodes:
+
+                try:
+                    positions[
+                        node.module_id
+                    ] = list(
+                        _ik_module_position(
+                            node.attributes
+                        )
+                    )
+                except (
+                    KeyError,
+                    TypeError,
+                    ValueError,
+                ):
+                    continue
+
+            course = (
+                graph.global_attributes
+                .get(
+                    "course",
+                    {},
+                )
+            )
+
+            if not isinstance(
+                course,
+                dict,
+            ):
+                course = {}
+
+            module_geometry = (
+                graph.global_attributes
+                .get(
+                    "module_geometry",
+                    {},
+                )
+            )
+
+            if not isinstance(
+                module_geometry,
+                dict,
+            ):
+                module_geometry = {}
+
+            runtime_state = (
+                state.get(
+                    "state",
+                    {},
+                )
+                if isinstance(
+                    state,
+                    dict,
+                )
+                else {}
+            )
+
+            return {
+                "schema_version":
+                    "mssr.button_manipulation_observation.v1",
+
+                "command_id":
+                    f"button-ik-{label}",
+
+                "morphology":
+                    "mobile_manipulator8",
+
+                "behavior":
+                    "button_manipulation_ik",
+
+                "task_context": {
+                    "schema_version":
+                        "mssr.behavior_task_context.v1",
+
+                    "instruction":
+                        (
+                            "Press the seeded physical button "
+                            "with end_effector.BOTTOM using the "
+                            "validated 5-DoF closed-loop IK."
+                        ),
+
+                    "morphology":
+                        "mobile_manipulator8",
+
+                    "behavior":
+                        "button_manipulation_ik",
+
+                    "success_criteria": {
+                        "physical_button_depression_m":
+                            _IK_SUCCESS_DEPRESSION_M,
+
+                        "end_effector_face":
+                            "BOTTOM",
+
+                        "preserve_connection_count":
+                            7,
+                    },
+                },
+
+                # Preserve the same stage/course information used
+                # by the other raw expert datasets.
+                "environment": {
+                    "schema_version":
+                        "mssr.environment_observation.v1",
+
+                    "source":
+                        "isaac_world_ground_truth",
+
+                    "frame_id":
+                        str(
+                            course.get(
+                                "frame_id",
+                                "world",
+                            )
+                        ),
+
+                    "stage_name":
+                        "button_expert",
+
+                    "difficulty":
+                        0.0,
+
+                    "course":
+                        dict(course),
+
+                    "module_geometry":
+                        dict(module_geometry),
+                },
+
+                # Direct aliases retained deliberately in RAW.
+                "course":
+                    dict(course),
+
+                "global_attributes":
+                    dict(
+                        graph.global_attributes
+                    ),
+
+                "module_positions_world_m":
+                    positions,
+
+                "operational_dofs":
+                    _ik_dof_payload(
+                        graph
+                    ),
+
+                # Do NOT compact this now.  It contains the detailed
+                # Isaac state used by the physical CLIK, including
+                # modules/connectors/button state.
+                "runtime_state":
+                    dict(runtime_state),
+
+                "controller": {
+                    "configuration_label":
+                        str(label),
+
+                    "end_effector_face":
+                        "BOTTOM",
+                },
+            }
+
+        def _ik_dataset_phase(
+            label,
+        ):
+
+            if label == "pre":
+                return (
+                    "BUTTON_IK_PRE",
+                    "absolute_joint_configuration",
+                )
+
+            if str(label).startswith(
+                "clik-"
+            ):
+                return (
+                    "BUTTON_CLIK_PRESS",
+                    "closed_loop_resolved_rate_dls",
+                )
+
+            if label == "pre-return":
+                return (
+                    "BUTTON_IK_RETURN",
+                    "absolute_joint_configuration",
+                )
+
+            if (
+                label
+                == "post-press-clearance"
+            ):
+                return (
+                    "BUTTON_IK_CLEARANCE",
+                    "absolute_joint_configuration",
+                )
+
+            return (
+                "BUTTON_IK",
+                "absolute_joint_configuration",
+            )
+
+        def _ik_record_configuration_transition(
+            *,
+            label,
+            q_target,
+            executed_goals,
+            state_before,
+            graph_before,
+            state_after,
+            graph_after,
+            context,
+        ):
+
+            nonlocal _ik_dataset_timestep
+
+            if not executed_goals:
+                raise RuntimeError(
+                    "Cannot record an IK configuration "
+                    "without executed primitive goals."
+                )
+
+            phase, controller = (
+                _ik_dataset_phase(
+                    str(label)
+                )
+            )
+
+            q_target_map = {
+                f"{role}.{joint}":
+                    float(
+                        q_target[index]
+                    )
+                for index, (
+                    role,
+                    joint,
+                ) in enumerate(
+                    _IK_DOF
+                )
+            }
+
+            depression_before = (
+                _ik_button_depression(
+                    state_before
+                )
+            )
+
+            depression_after = (
+                _ik_button_depression(
+                    state_after
+                )
+            )
+
+            progress = max(
+                0.0,
+                min(
+                    1.0,
+                    depression_after
+                    / max(
+                        _IK_SUCCESS_DEPRESSION_M,
+                        1.0e-12,
+                    ),
+                ),
+            )
+
+            context = dict(
+                context or {}
+            )
+
+            primitive_params = {
+                "configuration_label":
+                    str(label),
+
+                "controller":
+                    controller,
+
+                "q_target_rad":
+                    q_target_map,
+
+                "primitive_count":
+                    len(
+                        executed_goals
+                    ),
+
+                **context,
+            }
+
+            task_metrics = {
+                "phase":
+                    phase,
+
+                "progress":
+                    progress,
+
+                "button_depression_before_m":
+                    depression_before,
+
+                "button_depression_after_m":
+                    depression_after,
+
+                "button_success_threshold_m":
+                    _IK_SUCCESS_DEPRESSION_M,
+
+                "controller":
+                    controller,
+
+                **context,
+            }
+
+            observation_before = (
+                _ik_dataset_observation(
+                    state_before,
+                    graph_before,
+                    str(label),
+                )
+            )
+
+            observation_after = (
+                _ik_dataset_observation(
+                    state_after,
+                    graph_after,
+                    str(label),
+                )
+            )
+
+            active_primitive = (
+                "clik_joint_configuration"
+                if str(label).startswith(
+                    "clik-"
+                )
+                else
+                "ik_joint_configuration"
+            )
+
+            record = {
+                "schema_version":
+                    "mssr.expert_transition.v3",
+
+                "episode_id":
+                    run_id,
+
+                "timestep":
+                    int(
+                        _ik_dataset_timestep
+                    ),
+
+                "stamp":
+                    graph_before.stamp,
+
+                "stage_id":
+                    int(
+                        _ik_dataset_timestep
+                    ),
+
+                "stage_name":
+                    "button_expert",
+
+                "task_type":
+                    "button_manipulation_ik",
+
+                "difficulty":
+                    0.0,
+
+                "fsm_state":
+                    phase,
+
+                "is_first":
+                    _ik_dataset_timestep == 0,
+
+                # This is a RAW manipulation stream, not the
+                # episode-terminal record.
+                "is_last":
+                    False,
+
+                "is_terminal":
+                    False,
+
+                "action_valid":
+                    True,
+
+                "reward":
+                    0.0,
+
+                "discount":
+                    1.0,
+
+                "observation":
+                    observation_before,
+
+                "observation_t_plus_1":
+                    observation_after,
+
+                "graph_t":
+                    graph_before.to_dict(),
+
+                "target_graph":
+                    _ik_target_graph.to_dict(),
+
+                "task_graph_t":
+                    graph_before.to_dict(),
+
+                "assignment_target_to_module":
+                    dict(
+                        _ik_assignment
+                    ),
+
+                "graph_t_plus_1":
+                    graph_after.to_dict(),
+
+                "attributed_graph":
+                    graph_before.to_dict(),
+
+                "attributed_task_graph":
+                    graph_before.to_dict(),
+
+                "graph_features":
+                    _ik_graph_to_features(
+                        graph_before
+                    ),
+
+                "expert_action": {
+                    "locomotion": {},
+
+                    "magnetic": [],
+
+                    # The physical actuator transport remains the
+                    # already-validated set_tilt/set_pan protocol.
+                    #
+                    # At the learning decision level, however, one
+                    # CLIK outer step is one full 5-DoF target.
+                    "primitive_goal":
+                        None,
+
+                    "joint_configuration": {
+                        "schema_version":
+                            "mssr.joint_configuration_action.v1",
+
+                        "dofs": [
+                            f"{role}.{joint}"
+                            for role, joint
+                            in _IK_DOF
+                        ],
+
+                        "target_rad":
+                            q_target_map,
+                    },
+
+                    # Exact low-level commands that were actually
+                    # sent to Isaac for this configuration.
+                    "primitive_sequence": [
+                        dict(goal)
+                        for goal
+                        in executed_goals
+                    ],
+                },
+
+                "supervision": {
+                    "label_source":
+                        "deterministic_expert",
+
+                    "executed_action_source":
+                        "deterministic_expert",
+
+                    "expert_intervention":
+                        False,
+
+                    "valid_for_behavior_cloning":
+                        True,
+                },
+
+                "expert_annotation": {
+                    "fsm_state":
+                        phase,
+
+                    "active_primitive":
+                        active_primitive,
+
+                    "primitive_params":
+                        primitive_params,
+
+                    "task_metrics":
+                        task_metrics,
+
+                    "debug": {
+                        "message":
+                            (
+                                "One complete validated 5-DoF "
+                                "configuration execution."
+                            ),
+
+                        "command_id":
+                            f"button-ik-{label}",
+
+                        "morphology":
+                            "mobile_manipulator8",
+
+                        "behavior":
+                            "button_manipulation_ik",
+                    },
+                },
+
+                "active_primitive":
+                    active_primitive,
+
+                "primitive_params":
+                    primitive_params,
+
+                "module_roles":
+                    dict(roles),
+
+                "attachment_modes":
+                    {},
+
+                "task_metrics":
+                    task_metrics,
+
+                "success":
+                    False,
+
+                "done":
+                    False,
+
+                "debug": {
+                    "message":
+                        (
+                            "One complete validated 5-DoF "
+                            "configuration execution."
+                        ),
+
+                    "command_id":
+                        f"button-ik-{label}",
+
+                    "morphology":
+                        "mobile_manipulator8",
+
+                    "behavior":
+                        "button_manipulation_ik",
+                },
+            }
+
+            with _ik_dataset_path.open(
+                "a",
+                encoding="utf-8",
+            ) as stream:
+                stream.write(
+                    json.dumps(
+                        record,
+                        separators=(
+                            ",",
+                            ":",
+                        ),
+                    )
+                    + "\n"
+                )
+
+            print(
+                "IL manipulation sample "
+                f"{_ik_dataset_timestep}: "
+                f"{phase} | "
+                f"primitive_sequence="
+                f"{len(executed_goals)} | "
+                f"depression="
+                f"{depression_after*1000:.3f} mm"
+            )
+
+            _ik_dataset_timestep += 1
 
         def _ik_read_state():
 
@@ -1675,19 +2801,25 @@ def main():
             normal,
         ):
 
-            normal = _ik_normalize(normal)
+            normal = _ik_normalize(
+                normal
+            )
+
+            alignment = float(
+                _np.clip(
+                    normal
+                    @ _IK_TARGET_NORMAL,
+                    -1.0,
+                    +1.0,
+                )
+            )
 
             return math.degrees(
                 math.acos(
-                    float(
-                        _np.clip(
-                            normal[1],
-                            -1.0,
-                            +1.0,
-                        )
-                    )
+                    alignment
                 )
             )
+
 
         def _ik_build_reference(state):
 
@@ -1916,73 +3048,100 @@ def main():
             center,
             target_center,
         ):
-            """Residual to the admissible button-face region.
+            """Residual to the admissible finite button-face region.
 
-            X and Z are surface-overlap inequality constraints.
-            The BOTTOM centre may lie outside the button rectangle
-            as long as its effective contact patch still overlaps it.
-
-            Y remains an equality constraint because it defines
-            PRE-CONTACT / PRESS depth.
+            T and Z are surface-overlap inequality constraints.
+            N is the PRE/PRESS depth equality.
             """
 
-            x = float(center[0])
-            y = float(center[1])
-            z = float(center[2])
-
-            contact_center_x_min = (
-                button_x_min
-                - _IK_EE_CONTACT_HALF_X_M
-            )
-            contact_center_x_max = (
-                button_x_max
-                + _IK_EE_CONTACT_HALF_X_M
+            center = _np.asarray(
+                center,
+                dtype=float,
             )
 
-            contact_center_z_min = (
+            target_center = _np.asarray(
+                target_center,
+                dtype=float,
+            )
+
+            tangent = float(
+                center
+                @ _IK_FACE_TANGENT
+            )
+
+            normal_coordinate = float(
+                center
+                @ _IK_TARGET_NORMAL
+            )
+
+            z = float(
+                center[2]
+            )
+
+            contact_t_min = (
+                button_t_min
+                - _IK_EE_CONTACT_HALF_TANGENT_M
+            )
+
+            contact_t_max = (
+                button_t_max
+                + _IK_EE_CONTACT_HALF_TANGENT_M
+            )
+
+            contact_z_min = (
                 button_z_min
                 - _IK_EE_CONTACT_HALF_Z_M
             )
-            contact_center_z_max = (
+
+            contact_z_max = (
                 button_z_max
                 + _IK_EE_CONTACT_HALF_Z_M
             )
 
-            if x < contact_center_x_min:
-                error_x = (
-                    x
-                    - contact_center_x_min
+            if tangent < contact_t_min:
+                error_t = (
+                    tangent
+                    - contact_t_min
                 )
-            elif x > contact_center_x_max:
-                error_x = (
-                    x
-                    - contact_center_x_max
-                )
-            else:
-                error_x = 0.0
 
-            if z < contact_center_z_min:
+            elif tangent > contact_t_max:
+                error_t = (
+                    tangent
+                    - contact_t_max
+                )
+
+            else:
+                error_t = 0.0
+
+            if z < contact_z_min:
                 error_z = (
                     z
-                    - contact_center_z_min
+                    - contact_z_min
                 )
-            elif z > contact_center_z_max:
+
+            elif z > contact_z_max:
                 error_z = (
                     z
-                    - contact_center_z_max
+                    - contact_z_max
                 )
+
             else:
                 error_z = 0.0
 
-            error_y = (
-                y
-                - float(target_center[1])
+            target_normal_coordinate = float(
+                target_center
+                @ _IK_TARGET_NORMAL
+            )
+
+            error_n = (
+                normal_coordinate
+                - target_normal_coordinate
             )
 
             return _np.asarray(
                 [
-                    error_x,
-                    error_y,
+                    error_t,
+                    error_n,
                     error_z,
                 ],
                 dtype=float,
@@ -2029,7 +3188,7 @@ def main():
             #   nx = 0
             #   nz = 0
             #
-            # ny is constrained to the +Y hemisphere
+            # alignment with N is constrained to the target hemisphere
             # by the line search.
             return _np.asarray(
                 [
@@ -2038,7 +3197,10 @@ def main():
                     error[2],
                     (
                         _IK_ORIENTATION_LEVER_M
-                        * normal[0]
+                        * float(
+                            normal
+                            @ _IK_FACE_TANGENT
+                        )
                     ),
                     (
                         _IK_ORIENTATION_LEVER_M
@@ -2144,7 +3306,10 @@ def main():
                     <= _IK_POSITION_TOL_M
                     and normal_error
                     <= _IK_NORMAL_TOL_DEG
-                    and normal[1] > 0.0
+                    and float(
+                        normal
+                        @ _IK_TARGET_NORMAL
+                    ) > 0.0
                 ):
                     return {
                         "success": True,
@@ -2276,7 +3441,10 @@ def main():
                     )
 
                     # Reject the antiparallel normal branch.
-                    if trial_normal[1] <= 0.0:
+                    if float(
+                        trial_normal
+                        @ _IK_TARGET_NORMAL
+                    ) <= 0.0:
                         continue
 
                     trial_residual = (
@@ -2551,7 +3719,22 @@ def main():
         def _ik_command_configuration(
             label,
             q_target,
+            dataset_context=None,
         ):
+
+            dataset_context = dict(
+                dataset_context or {}
+            )
+
+            dataset_state_before = (
+                _ik_read_state()
+            )
+
+            dataset_graph_before = (
+                _ik_read_robot_graph()
+            )
+
+            executed_goals = []
 
             print()
             print(
@@ -2595,9 +3778,22 @@ def main():
                                 math.radians(
                                     0.6
                                 ),
+
+                            **(
+                                {
+                                    "max_servo_speed_rad_s":
+                                        0.12
+                                }
+                                if joint == "pan"
+                                else {}
+                            ),
                         },
                         timeout_s=20.0,
                     )
+                )
+
+                executed_goals.append(
+                    request.to_dict()
                 )
 
                 message = _IKString()
@@ -2830,6 +4026,26 @@ def main():
                             f"max velocity "
                             f"{max(velocities):.3f} rad/s)"
                         )
+
+                        dataset_state_after = (
+                            _ik_read_state()
+                        )
+
+                        dataset_graph_after = (
+                            _ik_read_robot_graph()
+                        )
+
+                        _ik_record_configuration_transition(
+                            label=str(label),
+                            q_target=q_target,
+                            executed_goals=executed_goals,
+                            state_before=dataset_state_before,
+                            graph_before=dataset_graph_before,
+                            state_after=dataset_state_after,
+                            graph_after=dataset_graph_after,
+                            context=dataset_context,
+                        )
+
                         return
 
                 else:
@@ -2847,24 +4063,7 @@ def main():
             q_pre_actual,
             press_target,
         ):
-            """Closed-loop Cartesian press from the physical q_pre.
-
-            This is a resolved-rate CLIK outer loop implemented over
-            the existing absolute joint-position primitive transport.
-
-            Every iteration:
-
-              1. reads the REAL state graph;
-              2. advances a small Cartesian trajectory reference;
-              3. builds a local Jacobian around the REAL q;
-              4. computes DLS resolved-rate motion;
-              5. adds a nullspace posture objective;
-              6. integrates qdot into one small q target;
-              7. executes it;
-              8. reads physical feedback again.
-
-            Physical button depression is the terminal success signal.
-            """
+            """Closed-loop Cartesian press along button normal N."""
 
             q_pre_actual = _np.asarray(
                 q_pre_actual,
@@ -2878,59 +4077,66 @@ def main():
             )
 
             initial_center = _np.asarray(
-                initial_bottom["position_world"],
+                initial_bottom[
+                    "position_world"
+                ],
                 dtype=float,
             )
 
-            start_y = float(
-                initial_center[1]
+            start_s = float(
+                initial_center
+                @ _IK_TARGET_NORMAL
             )
 
-            goal_y = float(
-                press_target[1]
+            goal_s = float(
+                _np.asarray(
+                    press_target,
+                    dtype=float,
+                )
+                @ _IK_TARGET_NORMAL
             )
 
-            if goal_y <= start_y:
+            if goal_s <= start_s:
                 return {
                     "success": False,
                     "reason":
-                        "press target is not ahead of physical PRE",
-                    "depression_m": 0.0,
-                    "state": pre_state,
-                    "samples": [],
+                        "press target is not ahead of PRE "
+                        "along button normal N",
+                    "depression_m":
+                        0.0,
+                    "state":
+                        pre_state,
+                    "samples":
+                        [],
                 }
 
-            # ----------------------------------------------------
-            # Desired geometric trajectory.
-            #
-            # A sequence of 2 mm Cartesian references represents
-            # one continuous approach along +Y.  Unlike the old
-            # waypoint IK, these are not solved independently:
-            # q evolves continuously through the feedback loop.
-            # ----------------------------------------------------
+            # 2-mm Cartesian references along N.
+            path_s = []
 
-            path_y = []
-
-            y = (
-                start_y
+            s = (
+                start_s
                 + _CLIK_CARTESIAN_STEP_M
             )
 
-            while y < goal_y:
-                path_y.append(
-                    float(y)
+            while s < goal_s:
+                path_s.append(
+                    float(s)
                 )
-                y += _CLIK_CARTESIAN_STEP_M
 
-            path_y.append(
-                float(goal_y)
+                s += (
+                    _CLIK_CARTESIAN_STEP_M
+                )
+
+            path_s.append(
+                float(goal_s)
             )
 
             path_index = 0
             samples = []
 
-            best_y = start_y
+            best_s = start_s
             stall_steps = 0
+
             last_state = pre_state
             last_depression = 0.0
 
@@ -2945,20 +4151,20 @@ def main():
                 "------------------------------------------------------------"
             )
             print(
-                f"physical PRE y = "
-                f"{start_y:+.5f} m"
+                f"physical PRE N = "
+                f"{start_s:+.5f} m"
             )
             print(
-                f"PRESS goal y   = "
-                f"{goal_y:+.5f} m"
+                f"PRESS goal N   = "
+                f"{goal_s:+.5f} m"
             )
             print(
                 f"path distance   = "
-                f"{(goal_y-start_y)*1000:.2f} mm"
+                f"{(goal_s-start_s)*1000:.2f} mm"
             )
             print(
                 f"trajectory refs = "
-                f"{len(path_y)}"
+                f"{len(path_s)}"
             )
             print(
                 "controller      = "
@@ -2968,6 +4174,7 @@ def main():
             for control_step in range(
                 _CLIK_MAX_CONTROL_STEPS
             ):
+
                 state = _ik_read_state()
                 last_state = state
 
@@ -2988,7 +4195,9 @@ def main():
                     )
                 )
 
-                last_depression = depression
+                last_depression = (
+                    depression
+                )
 
                 bottom_live = _ik_connector(
                     state,
@@ -3010,19 +4219,6 @@ def main():
                         ],
                         dtype=float,
                     )
-                )
-
-                q_live = _np.asarray(
-                    [
-                        _ik_joint_value(
-                            state,
-                            role,
-                            joint,
-                        )
-                        for role, joint
-                        in _IK_DOF
-                    ],
-                    dtype=float,
                 )
 
                 if (
@@ -3048,11 +4244,14 @@ def main():
                             samples,
                     }
 
-                if normal_live[1] <= 0.0:
+                if float(
+                    normal_live
+                    @ _IK_TARGET_NORMAL
+                ) <= 0.0:
                     return {
                         "success": False,
                         "reason":
-                            "BOTTOM normal left +Y hemisphere",
+                            "BOTTOM normal left target hemisphere",
                         "depression_m":
                             depression,
                         "state":
@@ -3061,50 +4260,59 @@ def main():
                             samples,
                     }
 
-                # The PRESS trajectory is monotonic along +Y.
-                #
-                # A physical command can legitimately overshoot a
-                # 2-mm Cartesian reference.  Do not require the EE
-                # to land inside a narrow symmetric tolerance around
-                # each waypoint: once a waypoint has been reached or
-                # crossed, advance to the next one.
+                current_s = float(
+                    center_live
+                    @ _IK_TARGET_NORMAL
+                )
+
                 while (
                     path_index
-                    < len(path_y) - 1
-                    and float(center_live[1])
+                    < len(path_s) - 1
+                    and current_s
                     >= (
-                        float(path_y[path_index])
+                        float(
+                            path_s[
+                                path_index
+                            ]
+                        )
                         - _CLIK_WAYPOINT_TOL_M
                     )
                 ):
                     path_index += 1
 
-                desired_y = float(
-                    path_y[path_index]
+                desired_s = float(
+                    path_s[
+                        path_index
+                    ]
                 )
 
+                # Keep target tangent/Z coordinates and change
+                # only its coordinate along N.
                 desired = _np.asarray(
-                    [
-                        float(press_target[0]),
-                        desired_y,
-                        float(press_target[2]),
-                    ],
+                    press_target,
                     dtype=float,
+                ).copy()
+
+                desired += (
+                    desired_s
+                    - float(
+                        desired
+                        @ _IK_TARGET_NORMAL
+                    )
+                ) * _IK_TARGET_NORMAL
+
+                # Re-linearize about REAL current state.
+                reference = (
+                    _ik_build_reference(
+                        state
+                    )
                 )
 
-                # ------------------------------------------------
-                # Re-linearize around the REAL current robot state.
-                # This is the feedback step that the previous
-                # open-loop q_press solution did not have.
-                # ------------------------------------------------
-
-                reference = _ik_build_reference(
-                    state
+                q = (
+                    reference[
+                        "q_ref"
+                    ].copy()
                 )
-
-                q = reference[
-                    "q_ref"
-                ].copy()
 
                 residual = _ik_residual(
                     reference,
@@ -3138,17 +4346,6 @@ def main():
                     else None
                 )
 
-                # ------------------------------------------------
-                # Cartesian closed-loop desired rate.
-                #
-                # residual = current - desired.
-                # Therefore -Kp*residual reduces pose error.
-                #
-                # +Y feed-forward supplies the desired trajectory
-                # velocity.  Once physical contact is detected the
-                # feed-forward speed is reduced.
-                # ------------------------------------------------
-
                 task_rate = (
                     -_CLIK_KP_S_INV
                     * residual
@@ -3165,17 +4362,11 @@ def main():
                     else _CLIK_FREE_SPEED_M_S
                 )
 
-                if (
-                    float(center_live[1])
-                    < desired_y
-                ):
+                # Residual component 1 is coordinate N.
+                if current_s < desired_s:
                     task_rate[1] += (
                         forward_speed
                     )
-
-                # ------------------------------------------------
-                # Damped pseudoinverse.
-                # ------------------------------------------------
 
                 task_system = (
                     jacobian
@@ -3199,6 +4390,7 @@ def main():
                             ),
                         )
                     )
+
                 except _np.linalg.LinAlgError:
                     return {
                         "success": False,
@@ -3217,16 +4409,6 @@ def main():
                     @ task_rate
                 )
 
-                # ------------------------------------------------
-                # Nullspace redundancy objective.
-                #
-                # 1. Stay close to the comfortable physical q_pre.
-                #    With the base moved closer, q_pre should be
-                #    naturally less extended.
-                #
-                # 2. Softly bias joints away from hard limits.
-                # ------------------------------------------------
-
                 qdot_null = (
                     -_CLIK_NULL_PRE_GAIN_S_INV
                     * (
@@ -3239,8 +4421,11 @@ def main():
                     lower,
                     upper,
                 ) in enumerate(
-                    reference["limits"]
+                    reference[
+                        "limits"
+                    ]
                 ):
+
                     if (
                         lower is None
                         or upper is None
@@ -3303,14 +4488,7 @@ def main():
                     * _CLIK_INTEGRATION_DT_S
                 )
 
-                # ------------------------------------------------
-                # Small line search purely for kinematic safety:
-                # do not cross into the opposite normal branch.
-                # ------------------------------------------------
-
                 q_next = None
-                predicted_center = None
-                predicted_normal = None
 
                 for scale in (
                     1.0,
@@ -3318,6 +4496,7 @@ def main():
                     0.25,
                     0.125,
                 ):
+
                     trial = (
                         q
                         + scale
@@ -3328,41 +4507,42 @@ def main():
                         lower,
                         upper,
                     ) in enumerate(
-                        reference["limits"]
+                        reference[
+                            "limits"
+                        ]
                     ):
+
                         if lower is not None:
                             trial[index] = max(
-                                float(trial[index]),
+                                float(
+                                    trial[index]
+                                ),
                                 float(lower),
                             )
 
                         if upper is not None:
                             trial[index] = min(
-                                float(trial[index]),
+                                float(
+                                    trial[index]
+                                ),
                                 float(upper),
                             )
 
                     (
-                        trial_center,
+                        _,
                         trial_normal,
                     ) = _ik_fk(
                         reference,
                         trial,
                     )
 
-                    if (
-                        trial_normal[1]
-                        <= 0.0
-                    ):
+                    if float(
+                        trial_normal
+                        @ _IK_TARGET_NORMAL
+                    ) <= 0.0:
                         continue
 
                     q_next = trial
-                    predicted_center = (
-                        trial_center
-                    )
-                    predicted_normal = (
-                        trial_normal
-                    )
                     break
 
                 if q_next is None:
@@ -3392,9 +4572,9 @@ def main():
                 print(
                     f"CLIK {control_step:02d} "
                     f"wp={path_index+1:02d}/"
-                    f"{len(path_y):02d} "
-                    f"y={center_live[1]:+.5f}->"
-                    f"{desired_y:+.5f} "
+                    f"{len(path_s):02d} "
+                    f"N={current_s:+.5f}->"
+                    f"{desired_s:+.5f} "
                     f"dep={depression*1000:.2f}mm "
                     f"rank={rank} "
                     f"dqmax={max_delta_deg:.2f}deg"
@@ -3403,17 +4583,55 @@ def main():
                 _ik_command_configuration(
                     f"clik-{control_step:02d}",
                     q_next,
+                    dataset_context={
+                        "control_step":
+                            int(control_step),
+
+                        "waypoint_index":
+                            int(path_index),
+
+                        "desired_normal_coordinate_m":
+                            float(
+                                desired_s
+                            ),
+
+                        "press_direction_world_xy": [
+                            float(
+                                _IK_TARGET_NORMAL[0]
+                            ),
+                            float(
+                                _IK_TARGET_NORMAL[1]
+                            ),
+                        ],
+
+                        "depression_before_m":
+                            float(depression),
+
+                        "jacobian_rank":
+                            int(rank),
+
+                        "jacobian_condition":
+                            condition,
+
+                        "qdot_rad_s": [
+                            float(value)
+                            for value
+                            in qdot
+                        ],
+
+                        "max_delta_deg":
+                            max_delta_deg,
+                    },
                 )
 
                 time.sleep(
                     _CLIK_POST_COMMAND_SETTLE_S
                 )
 
-                # ------------------------------------------------
-                # Physical feedback after executing this q step.
-                # ------------------------------------------------
+                state_after = (
+                    _ik_read_state()
+                )
 
-                state_after = _ik_read_state()
                 last_state = state_after
 
                 bottom_after = _ik_connector(
@@ -3459,6 +4677,11 @@ def main():
                     depression_after
                 )
 
+                current_s_after = float(
+                    center_after
+                    @ _IK_TARGET_NORMAL
+                )
+
                 samples.append(
                     {
                         "control_step":
@@ -3467,8 +4690,22 @@ def main():
                         "waypoint_index":
                             int(path_index),
 
-                        "desired_y_m":
-                            float(desired_y),
+                        "desired_normal_coordinate_m":
+                            float(
+                                desired_s
+                            ),
+
+                        "normal_coordinate_m":
+                            current_s_after,
+
+                        "press_direction_world_xy": [
+                            float(
+                                _IK_TARGET_NORMAL[0]
+                            ),
+                            float(
+                                _IK_TARGET_NORMAL[1]
+                            ),
+                        ],
 
                         "center_xyz_m": [
                             float(value)
@@ -3527,37 +4764,31 @@ def main():
                             samples,
                     }
 
-                # ------------------------------------------------
-                # Progress the geometric trajectory only when the
-                # REAL EE has reached the current local reference.
-                # ------------------------------------------------
-
                 while (
                     path_index
-                    < len(path_y) - 1
-                    and float(center_after[1])
+                    < len(path_s) - 1
+                    and current_s_after
                     >= (
-                        float(path_y[path_index])
+                        float(
+                            path_s[
+                                path_index
+                            ]
+                        )
                         - _CLIK_WAYPOINT_TOL_M
                     )
                 ):
                     path_index += 1
 
-                # ------------------------------------------------
-                # Stall detector.
-                # ------------------------------------------------
-
-                current_y = float(
-                    center_after[1]
-                )
-
                 if (
-                    current_y
-                    > best_y
+                    current_s_after
+                    > best_s
                     + _CLIK_MIN_PROGRESS_M
                 ):
-                    best_y = current_y
+                    best_s = (
+                        current_s_after
+                    )
                     stall_steps = 0
+
                 else:
                     stall_steps += 1
 
@@ -3613,24 +4844,20 @@ def main():
             dtype=float,
         )
 
-        rest_front_y = (
-            button_center[1]
-            - 0.5
-            * _IK_PLUNGER_DEPTH_Y_M
+        # Robot-side resting face of the physical plunger.
+        rest_front_center = (
+            button_center
+            - (
+                0.5
+                * _IK_PLUNGER_DEPTH_M
+            )
+            * _IK_TARGET_NORMAL
         )
 
-        # --------------------------------------------------------
-        # Contact target = REGION on the button face, not its centre.
-        #
-        # Project the CURRENT BOTTOM-face centre onto the button's
-        # X-Z rectangle. Therefore:
-        #
-        #   - if BOTTOM x/z is already over the button, preserve it;
-        #   - if it lies outside, use the nearest point on the face.
-        #
-        # This avoids wasting arm reach trying to hit the geometric
-        # centre when an off-centre face-to-face press is equally valid.
-        # --------------------------------------------------------
+        rest_front_s = float(
+            rest_front_center
+            @ _IK_TARGET_NORMAL
+        )
 
         bottom0 = _ik_connector(
             state0,
@@ -3639,18 +4866,25 @@ def main():
         )
 
         bottom0_center = _np.asarray(
-            bottom0["position_world"],
+            bottom0[
+                "position_world"
+            ],
             dtype=float,
         )
 
-        button_x_min = (
-            button_center[0]
-            - _IK_BUTTON_HALF_X_M
+        button_t_center = float(
+            button_center
+            @ _IK_FACE_TANGENT
         )
 
-        button_x_max = (
-            button_center[0]
-            + _IK_BUTTON_HALF_X_M
+        button_t_min = (
+            button_t_center
+            - _IK_BUTTON_HALF_TANGENT_M
+        )
+
+        button_t_max = (
+            button_t_center
+            + _IK_BUTTON_HALF_TANGENT_M
         )
 
         button_z_min = (
@@ -3663,11 +4897,16 @@ def main():
             + _IK_BUTTON_HALF_Z_M
         )
 
-        contact_x = float(
+        bottom_t = float(
+            bottom0_center
+            @ _IK_FACE_TANGENT
+        )
+
+        contact_t = float(
             _np.clip(
-                bottom0_center[0],
-                button_x_min,
-                button_x_max,
+                bottom_t,
+                button_t_min,
+                button_t_max,
             )
         )
 
@@ -3679,50 +4918,70 @@ def main():
             )
         )
 
-        pre_target = _np.asarray(
-            [
-                contact_x,
-                (
-                    rest_front_y
-                    - _IK_PRE_GAP_M
-                ),
-                contact_z,
-            ],
-            dtype=float,
+        # Build the closest admissible point on the finite
+        # resting button face.
+        contact_face = (
+            rest_front_center.copy()
         )
 
-        press_target = _np.asarray(
-            [
-                contact_x,
-                (
-                    rest_front_y
-                    + _IK_PRESS_DEPTH_M
-                ),
-                contact_z,
-            ],
-            dtype=float,
+        contact_face += (
+            contact_t
+            - float(
+                contact_face
+                @ _IK_FACE_TANGENT
+            )
+        ) * _IK_FACE_TANGENT
+
+        contact_face[2] = (
+            contact_z
+        )
+
+        pre_target = (
+            contact_face
+            - _IK_PRE_GAP_M
+            * _IK_TARGET_NORMAL
+        )
+
+        press_target = (
+            contact_face
+            + _IK_PRESS_DEPTH_M
+            * _IK_TARGET_NORMAL
         )
 
         print()
-        print("BUTTON CONTACT REGION:")
         print(
-            f"  X = "
-            f"[{button_x_min:+.5f}, "
-            f"{button_x_max:+.5f}]"
+            "BUTTON CONTACT REGION:"
         )
         print(
-            f"  Z = "
+            "  N = "
+            f"[{_IK_TARGET_NORMAL[0]:+.1f}, "
+            f"{_IK_TARGET_NORMAL[1]:+.1f}, "
+            "0.0]"
+        )
+        print(
+            "  T = "
+            f"[{_IK_FACE_TANGENT[0]:+.1f}, "
+            f"{_IK_FACE_TANGENT[1]:+.1f}, "
+            "0.0]"
+        )
+        print(
+            f"  T interval = "
+            f"[{button_t_min:+.5f}, "
+            f"{button_t_max:+.5f}]"
+        )
+        print(
+            f"  Z interval = "
             f"[{button_z_min:+.5f}, "
             f"{button_z_max:+.5f}]"
         )
         print(
-            f"  current BOTTOM x/z = "
-            f"({bottom0_center[0]:+.5f}, "
+            f"  current BOTTOM T/Z = "
+            f"({bottom_t:+.5f}, "
             f"{bottom0_center[2]:+.5f})"
         )
         print(
-            f"  selected contact x/z = "
-            f"({contact_x:+.5f}, "
+            f"  selected contact T/Z = "
+            f"({contact_t:+.5f}, "
             f"{contact_z:+.5f})"
         )
 
@@ -3743,7 +5002,7 @@ def main():
 
         plan = {
             "schema_version":
-                "mssr.bottom_face_clik.v3",
+                "mssr.bottom_face_clik.v4",
 
             "dofs": [
                 f"{role}.{joint}"
@@ -3757,14 +5016,31 @@ def main():
             "contact_model":
                 "finite_surface_overlap",
 
-            "bottom_contact_half_extent_x_m":
-                _IK_EE_CONTACT_HALF_X_M,
+            "bottom_contact_half_extent_tangent_m":
+                _IK_EE_CONTACT_HALF_TANGENT_M,
 
             "bottom_contact_half_extent_z_m":
                 _IK_EE_CONTACT_HALF_Z_M,
 
-            "target_normal":
-                [0.0, 1.0, 0.0],
+            "target_normal": [
+                float(
+                    _IK_TARGET_NORMAL[0]
+                ),
+                float(
+                    _IK_TARGET_NORMAL[1]
+                ),
+                0.0,
+            ],
+
+            "button_face_tangent_world": [
+                float(
+                    _IK_FACE_TANGENT[0]
+                ),
+                float(
+                    _IK_FACE_TANGENT[1]
+                ),
+                0.0,
+            ],
 
             "pre_gap_m":
                 _IK_PRE_GAP_M,
@@ -3807,7 +5083,8 @@ def main():
             _ik_node.destroy_node()
 
             success = False
-            runtime = None
+            if not args.headless:
+                runtime = None
             raise SystemExit(1)
 
         # One absolute movement to q_pre.
@@ -3961,7 +5238,8 @@ def main():
             _ik_node.destroy_node()
 
             success = False
-            runtime = None
+            if not args.headless:
+                runtime = None
             raise SystemExit(1)
 
         press_bottom = _ik_connector(
@@ -4051,21 +5329,22 @@ def main():
             dtype=float,
         )
 
-        clearance_target = _np.asarray(
-            [
-                float(
-                    clearance_center0[0]
-                ),
-                float(
-                    rest_front_y
-                    - _IK_POST_PRESS_CLEARANCE_M
-                ),
-                float(
-                    clearance_center0[2]
-                ),
-            ],
-            dtype=float,
+        clearance_normal_coordinate = (
+            rest_front_s
+            - _IK_POST_PRESS_CLEARANCE_M
         )
+
+        clearance_target = (
+            clearance_center0.copy()
+        )
+
+        clearance_target += (
+            clearance_normal_coordinate
+            - float(
+                clearance_center0
+                @ _IK_TARGET_NORMAL
+            )
+        ) * _IK_TARGET_NORMAL
 
         print()
         print(
@@ -4078,8 +5357,8 @@ def main():
             "------------------------------------------------------------"
         )
         print(
-            f"current BOTTOM y = "
-            f"{clearance_center0[1]:+.5f} m"
+            f"current BOTTOM N = "
+            f"{float(clearance_center0 @ _IK_TARGET_NORMAL):+.5f} m"
         )
         print(
             f"clearance target = "
@@ -4087,8 +5366,8 @@ def main():
             f"from resting button face"
         )
         print(
-            f"target BOTTOM y  = "
-            f"{clearance_target[1]:+.5f} m"
+            f"target BOTTOM N = "
+            f"{clearance_normal_coordinate:+.5f} m"
         )
 
         clearance_solution = _ik_solve(
@@ -4143,7 +5422,8 @@ def main():
             _ik_node.destroy_node()
 
             success = False
-            runtime = None
+            if not args.headless:
+                runtime = None
             raise SystemExit(1)
 
         _ik_command_configuration(
@@ -4163,7 +5443,16 @@ def main():
 
         result = {
             "schema_version":
-                "mssr.button_bottom_face_press.v3",
+                "mssr.button_bottom_face_press.v4",
+
+            "press_direction_world_xy": [
+                float(
+                    _IK_TARGET_NORMAL[0]
+                ),
+                float(
+                    _IK_TARGET_NORMAL[1]
+                ),
+            ],
 
             "success":
                 bool(
@@ -4462,8 +5751,11 @@ def main():
 
         success = True
 
-        # Deliberately leave runtime process alive.
-        runtime = None
+        # Interactive reference runs preserve Isaac for inspection.
+        # Headless campaign runs keep the process handle so the
+        # finally block can terminate it cleanly.
+        if not args.headless:
+            runtime = None
 
     finally:
 
@@ -4471,7 +5763,7 @@ def main():
         stop_process(nav2)
         stop_process(reconfig)
 
-        if not success:
+        if args.headless or not success:
             stop_process(runtime)
 
         monitor.destroy_node()

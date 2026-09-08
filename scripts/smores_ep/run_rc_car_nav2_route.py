@@ -14,6 +14,8 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPT_DIR / "src"))
 
 from smores_ep.isaac.obstacle_course import (
+    BUTTON_PLATFORM_CENTER_XY_M,
+    BUTTON_PLATFORM_SIZE_XY_M,
     rc_car_planar_obstacle_layout,
     sample_rc_car_planar_spec,
 )
@@ -113,17 +115,28 @@ def main():
         gy = float(args.goal_y)
         gyaw = float(args.goal_yaw)
 
-        # Existing isolated ButtonTestCourse platform:
-        # center=(0.25, 0.0), size=(2.50, 1.80).
-        #
-        # The whole platform is free navigation space.  The button/wall
-        # lies beyond the desired pre-reconfiguration standoff and does
-        # not need a second map publisher or a duplicate Nav2 bridge.
+        # Explicit button navigation uses the exact same
+        # large floor instantiated by ButtonTestCourse.
+        platform_cx, platform_cy = (
+            BUTTON_PLATFORM_CENTER_XY_M
+        )
+
+        platform_sx, platform_sy = (
+            BUTTON_PLATFORM_SIZE_XY_M
+        )
+
         platform_bounds = (
-            -1.00,
-            +1.50,
-            -0.90,
-            +0.90,
+            platform_cx
+            - 0.5 * platform_sx,
+
+            platform_cx
+            + 0.5 * platform_sx,
+
+            platform_cy
+            - 0.5 * platform_sy,
+
+            platform_cy
+            + 0.5 * platform_sy,
         )
 
         layout = {
@@ -139,10 +152,18 @@ def main():
 
             # Retained because make_map() expects these existing fields.
             "centerline_xy_m": (
-                (-1.00, 0.0),
-                (+1.50, 0.0),
+                (
+                    platform_bounds[0],
+                    platform_cy,
+                ),
+                (
+                    platform_bounds[1],
+                    platform_cy,
+                ),
             ),
-            "corridor_width_m": 1.80,
+
+            "corridor_width_m":
+                platform_sy,
             "cone_centers_xy_m": (),
             "cone_radius_m": 0.01,
 
