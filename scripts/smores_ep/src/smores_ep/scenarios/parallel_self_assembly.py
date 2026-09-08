@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import time
 from pathlib import Path
@@ -336,7 +337,31 @@ def run_parallel_self_assembly_scenario(
         PHYSICS_ROOT,
     )
     obstacle_course = None
-    if config.manual_obstacle_course:
+    if config.composite_mission_path is not None:
+        from smores_ep.isaac.obstacle_course import (
+            install_composite_obstacle_course,
+        )
+
+        mission = json.loads(
+            config.composite_mission_path.read_text(encoding="utf-8")
+        )
+        seed_catalog = json.loads(
+            config.composite_seed_catalog_path.read_text(encoding="utf-8")
+        )
+        if seed_catalog.get("schema_version") != "mssr.composite_seed_catalog.v1":
+            raise ValueError("Unsupported composite seed catalog schema")
+        raw_validated = seed_catalog.get("validated_seeds", {})
+        if not isinstance(raw_validated, Mapping):
+            raise ValueError("Composite seed catalog is malformed")
+        obstacle_course = install_composite_obstacle_course(
+            stage,
+            mission,
+            {
+                str(task_type): frozenset(int(seed) for seed in seeds)
+                for task_type, seeds in raw_validated.items()
+            },
+        )
+    elif config.manual_obstacle_course:
         from smores_ep.isaac.obstacle_course import (
             install_manual_obstacle_course,
         )
@@ -402,7 +427,12 @@ def run_parallel_self_assembly_scenario(
             ),
         )
     layout = self_assembly_spawn_layout(config)
-    if config.manual_obstacle_course:
+    if config.composite_mission_path is not None:
+        layout = {
+            module_id: (x_m - 1.50, y_m, z_m, yaw_deg)
+            for module_id, (x_m, y_m, z_m, yaw_deg) in layout.items()
+        }
+    elif config.manual_obstacle_course:
         layout = {
             module_id: (
                 x_m - 2.0,
@@ -525,7 +555,9 @@ def run_parallel_self_assembly_scenario(
 
     if not config.headless:
         course_extent_m = (
-            2.4
+            6.0
+            if config.composite_mission_path is not None
+            else 2.4
             if config.manual_obstacle_course
             else 1.8
             if config.stair_test_course
@@ -548,7 +580,9 @@ def run_parallel_self_assembly_scenario(
                 max(0.46, 0.85 * camera_extent_m),
             ],
             target=(
-                [1.25, 0.0, 0.08]
+                [2.0, 0.0, 0.20]
+                if config.composite_mission_path is not None
+                else [1.25, 0.0, 0.08]
                 if config.manual_obstacle_course
                 else [1.0, 0.0, 0.10]
                 if config.stair_test_course

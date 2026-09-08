@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import math
 import random
-from typing import Any
+from typing import Any, Mapping
 
 
 REFERENCE_STAIR_RISE_M = 0.065
@@ -1056,6 +1056,477 @@ class CourseBox:
     collidable: bool = True
     semantic: str = "terrain"
     pitch_deg: float = 0.0
+    yaw_deg: float = 0.0
+
+
+@dataclass(frozen=True)
+class CompositeButtonFixture:
+    """One independently pressable button in a composite course."""
+
+    task_id: str
+    plunger_name: str
+    center_xyz_m: tuple[float, float, float]
+    press_direction_world_xy: tuple[float, float]
+
+
+@dataclass(frozen=True)
+class CompositeNavigationCone:
+    """One translated physical cone belonging to a flat-navigation task."""
+
+    task_id: str
+    center_xyz_m: tuple[float, float, float]
+    radius_m: float
+    height_m: float
+
+
+@dataclass(frozen=True)
+class CompositeObstacleCourse:
+    """Ordered seeded obstacles on a non-descending support surface."""
+
+    boxes: tuple[CourseBox, ...]
+    tasks: tuple[Mapping[str, Any], ...]
+    buttons: tuple[CompositeButtonFixture, ...]
+    navigation_cones: tuple[CompositeNavigationCone, ...]
+    final_floor_height_m: float
+    goal_center_xyz_m: tuple[float, float, float]
+
+    def to_observation(self) -> dict[str, Any]:
+        return {
+            "frame_id": "world",
+            "course_profile": "composite_mission_v1",
+            "mission": {
+                "schema_version": "mssr.composite_mission.v1",
+                "tasks": [dict(task) for task in self.tasks],
+                "goal": {"center_xyz_m": list(self.goal_center_xyz_m)},
+                "final_floor_height_m": self.final_floor_height_m,
+            },
+            "navigation_cones": [
+                {
+                    "task_id": cone.task_id,
+                    "center_xyz_m": list(cone.center_xyz_m),
+                    "radius_m": cone.radius_m,
+                    "height_m": cone.height_m,
+                }
+                for cone in self.navigation_cones
+            ],
+            "collision_boxes": _collision_box_observations(self.boxes),
+        }
+
+
+def _support_box(
+    name: str,
+    start_x_m: float,
+    end_x_m: float,
+    top_height_m: float,
+    width_m: float,
+    semantic: str,
+) -> CourseBox:
+    """Return a solid support whose top is exactly ``top_height_m``."""
+
+    bottom_height_m = -0.02
+    return CourseBox(
+        name,
+        (
+            0.5 * (start_x_m + end_x_m),
+            0.0,
+            0.5 * (top_height_m + bottom_height_m),
+        ),
+        (
+            end_x_m - start_x_m,
+            width_m,
+            top_height_m - bottom_height_m,
+        ),
+        (0.24, 0.27, 0.31),
+        semantic=semantic,
+    )
+
+
+def composite_obstacle_course(
+    mission: Mapping[str, Any],
+    validated_seeds: Mapping[str, set[int] | frozenset[int]],
+) -> CompositeObstacleCourse:
+    """Build a physical course exclusively from validated seeded fixtures.
+
+    Staircases may repeat.  Every staircase is translated to the current
+    support height, and all later platforms remain at its upper-deck height;
+    the generated course therefore never asks an expert to descend stairs.
+    """
+
+    if mission.get("schema_version") != "mssr.composite_mission.v1":
+        raise ValueError("Unsupported composite mission schema")
+    raw_tasks = mission.get("tasks")
+    if not isinstance(raw_tasks, list) or not raw_tasks:
+        raise ValueError("Composite mission tasks must be a non-empty array")
+
+    travel_width_m = 1.20
+    button_width_m = 1.40
+    cursor_x_m = -0.80
+    floor_height_m = 0.0
+    boxes: list[CourseBox] = [
+        _support_box(
+            "CompositeStartPlatform",
+            -2.20,
+            cursor_x_m,
+            floor_height_m,
+            travel_width_m,
+            "composite_start_platform",
+        )
+    ]
+    tasks: list[dict[str, Any]] = []
+    buttons: list[CompositeButtonFixture] = []
+    navigation_cones: list[CompositeNavigationCone] = []
+    seen_ids: set[str] = set()
+
+    def require_seed(task_type: str, raw: Mapping[str, Any]) -> int:
+        if "seed" not in raw:
+            raise ValueError(f"Composite {task_type} task requires a seed")
+        seed = int(raw["seed"])
+        if seed not in validated_seeds.get(task_type, frozenset()):
+            raise ValueError(
+                f"Seed {seed} is not validated for task type {task_type!r}"
+            )
+        return seed
+
+    for index, raw in enumerate(raw_tasks):
+        if not isinstance(raw, Mapping):
+            raise ValueError(f"Composite mission task {index} must be an object")
+        task_type = str(raw.get("type", "")).strip()
+        if task_type not in {"flat_navigation", "gap", "stairs", "button"}:
+            raise ValueError(f"Unsupported composite obstacle {task_type!r}")
+        task_id = str(raw.get("task_id", f"{task_type}-{index:02d}")).strip()
+        if not task_id or task_id in seen_ids:
+            raise ValueError(f"Invalid or duplicate composite task_id {task_id!r}")
+        seen_ids.add(task_id)
+        safe_id = "".join(
+            character if character.isalnum() else "_" for character in task_id
+        )
+        seed = require_seed(task_type, raw)
+
+        if task_type == "flat_navigation":
+            spec = sample_rc_car_planar_spec(seed)
+            layout = rc_car_planar_obstacle_layout(seed)
+            source_centerline = [
+                (float(point[0]), float(point[1]))
+                for point in layout["centerline_xy_m"]
+            ]
+            first_x, first_y = source_centerline[0]
+            offset_x_m = cursor_x_m - first_x
+            offset_y_m = -first_y
+            route_xy = [
+                (x_m + offset_x_m, y_m + offset_y_m)
+                for x_m, y_m in source_centerline
+            ]
+            end_x_m = max(point[0] for point in route_xy) + 0.80
+            if math.hypot(
+                route_xy[-1][0] - end_x_m,
+                route_xy[-1][1],
+            ) > 1.0e-6:
+                route_xy.append((end_x_m, 0.0))
+            translated_route = [
+                list(pose) for pose in _route_points_with_yaw(tuple(route_xy))
+            ]
+            road_width_m = float(layout["corridor_width_m"])
+            for segment, (start, end) in enumerate(
+                zip(route_xy[:-1], route_xy[1:])
+            ):
+                dx = end[0] - start[0]
+                dy = end[1] - start[1]
+                length_m = math.hypot(dx, dy)
+                if length_m <= 1.0e-6:
+                    continue
+                boxes.append(
+                    CourseBox(
+                        f"{safe_id}_Road{segment + 1:02d}",
+                        (
+                            0.5 * (start[0] + end[0]),
+                            0.5 * (start[1] + end[1]),
+                            0.5 * (floor_height_m - 0.02),
+                        ),
+                        (length_m + 0.04, road_width_m, floor_height_m + 0.02),
+                        (0.22, 0.24, 0.27),
+                        semantic="flat_navigation_road",
+                        yaw_deg=math.degrees(math.atan2(dy, dx)),
+                    )
+                )
+            translated_cones = [
+                [
+                    float(point[0]) + offset_x_m,
+                    float(point[1]) + offset_y_m,
+                ]
+                for point in layout["cone_centers_xy_m"]
+            ]
+            cone_radius_m = float(layout["cone_radius_m"])
+            cone_height_m = float(layout["cone_height_m"])
+            navigation_cones.extend(
+                CompositeNavigationCone(
+                    task_id,
+                    (
+                        point[0],
+                        point[1],
+                        floor_height_m + 0.5 * cone_height_m,
+                    ),
+                    cone_radius_m,
+                    cone_height_m,
+                )
+                for point in translated_cones
+            )
+            half_width_m = 0.5 * road_width_m + 0.15
+            platform_bounds = [
+                min(point[0] for point in route_xy) - half_width_m,
+                max(point[0] for point in route_xy) + half_width_m,
+                min(point[1] for point in route_xy) - half_width_m,
+                max(point[1] for point in route_xy) + half_width_m,
+            ]
+            tasks.append(
+                {
+                    "task_id": task_id,
+                    "type": task_type,
+                    "seed": seed,
+                    "parameters": {
+                        "route_kind": spec.route_kind,
+                        "waypoints_xyyaw": translated_route,
+                        "cone_centers_xy_m": translated_cones,
+                        "cone_radius_m": cone_radius_m,
+                        "cone_height_m": cone_height_m,
+                        "corridor_width_m": road_width_m,
+                        "platform_bounds_xy_m": platform_bounds,
+                        "floor_height_m": floor_height_m,
+                    },
+                }
+            )
+            cursor_x_m = end_x_m
+            continue
+
+        if task_type == "gap":
+            spec = sample_coplanar_gap_spec(seed)
+            near_edge_x_m = cursor_x_m + 1.05
+            far_edge_x_m = near_edge_x_m + spec.width_m
+            landing_end_x_m = far_edge_x_m + 1.35
+            boxes.extend(
+                (
+                    _support_box(
+                        f"{safe_id}_NearBank",
+                        cursor_x_m,
+                        near_edge_x_m,
+                        floor_height_m,
+                        travel_width_m,
+                        "gap_test_near_bank",
+                    ),
+                    _support_box(
+                        f"{safe_id}_FarBank",
+                        far_edge_x_m,
+                        landing_end_x_m,
+                        floor_height_m,
+                        travel_width_m,
+                        "gap_test_far_bank",
+                    ),
+                )
+            )
+            tasks.append(
+                {
+                    "task_id": task_id,
+                    "type": task_type,
+                    "seed": seed,
+                    "parameters": {
+                        "gap": {
+                            "near_edge_x_m": near_edge_x_m,
+                            "far_edge_x_m": far_edge_x_m,
+                            "bank_height_m": floor_height_m,
+                        },
+                        "floor_height_m": floor_height_m,
+                    },
+                }
+            )
+            cursor_x_m = landing_end_x_m
+            continue
+
+        if task_type == "stairs":
+            spec = sample_uniform_stair_spec(seed)
+            if not 2 <= spec.step_count <= 6:
+                raise ValueError(
+                    f"Validated composite stairs require 2-6 steps, got {spec.step_count}"
+                )
+            first_riser_x_m = cursor_x_m + 1.05
+            boxes.append(
+                _support_box(
+                    f"{safe_id}_StairApproach",
+                    cursor_x_m,
+                    first_riser_x_m,
+                    floor_height_m,
+                    travel_width_m,
+                    "stair_test_start",
+                )
+            )
+            top_heights_m = tuple(
+                floor_height_m + spec.rise_m * (step + 1)
+                for step in range(spec.step_count)
+            )
+            for step, top_height_m in enumerate(top_heights_m):
+                start_x_m = first_riser_x_m + step * spec.tread_depth_m
+                boxes.append(
+                    _support_box(
+                        f"{safe_id}_Stair{step + 1:02d}",
+                        start_x_m,
+                        start_x_m + spec.tread_depth_m,
+                        top_height_m,
+                        spec.width_m,
+                        "stair_test_riser",
+                    )
+                )
+            upper_start_x_m = (
+                first_riser_x_m + spec.step_count * spec.tread_depth_m
+            )
+            upper_end_x_m = upper_start_x_m + spec.upper_deck_length_m
+            boxes.append(
+                _support_box(
+                    f"{safe_id}_UpperDeck",
+                    upper_start_x_m,
+                    upper_end_x_m,
+                    top_heights_m[-1],
+                    travel_width_m,
+                    "stair_test_upper_deck",
+                )
+            )
+            tasks.append(
+                {
+                    "task_id": task_id,
+                    "type": task_type,
+                    "seed": seed,
+                    "parameters": {
+                        "stairs": {
+                            "base_height_m": floor_height_m,
+                            "first_riser_x_m": first_riser_x_m,
+                            "riser_depth_m": spec.tread_depth_m,
+                            "top_heights_m": list(top_heights_m),
+                        },
+                        "floor_height_m": floor_height_m,
+                        "upper_deck_height_m": top_heights_m[-1],
+                    },
+                }
+            )
+            floor_height_m = top_heights_m[-1]
+            cursor_x_m = upper_end_x_m
+            continue
+
+        spec = sample_button_target_spec(seed)
+        nx, ny = spec.press_direction_xy
+        platform_end_x_m = cursor_x_m + 2.80
+        boxes.append(
+            _support_box(
+                f"{safe_id}_ButtonPlatform",
+                cursor_x_m,
+                platform_end_x_m,
+                floor_height_m,
+                button_width_m,
+                "button_test_platform",
+            )
+        )
+        button_center = (
+            cursor_x_m + 1.55,
+            (0.45 * ny if abs(ny) > 0.5 else 0.0),
+            floor_height_m + spec.center_xyz_m[2],
+        )
+        wall_center = (
+            button_center[0] + nx * BUTTON_SUPPORT_OFFSET_M,
+            button_center[1] + ny * BUTTON_SUPPORT_OFFSET_M,
+            floor_height_m + 0.150,
+        )
+        if abs(nx) > 0.5:
+            wall_size = (
+                BUTTON_SUPPORT_THICKNESS_M,
+                BUTTON_SUPPORT_TANGENT_M,
+                BUTTON_SUPPORT_HEIGHT_M,
+            )
+            plunger_size = (
+                BUTTON_PLUNGER_DEPTH_M,
+                BUTTON_PLUNGER_TANGENT_M,
+                BUTTON_PLUNGER_HEIGHT_M,
+            )
+        else:
+            wall_size = (
+                BUTTON_SUPPORT_TANGENT_M,
+                BUTTON_SUPPORT_THICKNESS_M,
+                BUTTON_SUPPORT_HEIGHT_M,
+            )
+            plunger_size = (
+                BUTTON_PLUNGER_TANGENT_M,
+                BUTTON_PLUNGER_DEPTH_M,
+                BUTTON_PLUNGER_HEIGHT_M,
+            )
+        plunger_name = f"{safe_id}_ButtonPlunger"
+        boxes.extend(
+            (
+                CourseBox(
+                    f"{safe_id}_ButtonWall",
+                    wall_center,
+                    wall_size,
+                    (0.35, 0.37, 0.40),
+                    semantic="button_support",
+                ),
+                CourseBox(
+                    plunger_name,
+                    button_center,
+                    plunger_size,
+                    (0.85, 0.08, 0.06),
+                    semantic="button",
+                ),
+            )
+        )
+        buttons.append(
+            CompositeButtonFixture(
+                task_id,
+                plunger_name,
+                button_center,
+                (float(nx), float(ny)),
+            )
+        )
+        tasks.append(
+            {
+                "task_id": task_id,
+                "type": task_type,
+                "seed": seed,
+                "parameters": {
+                    "button": {
+                        "center_xyz_m": list(button_center),
+                        "press_direction_world_xy": [float(nx), float(ny)],
+                        "plunger_path": (
+                            f"/World/CompositeObstacleCourse/{plunger_name}"
+                        ),
+                        "plunger_stroke_m": BUTTON_PLUNGER_STROKE_M,
+                    },
+                    "floor_height_m": floor_height_m,
+                },
+            }
+        )
+        cursor_x_m = platform_end_x_m
+
+    goal_x_m = cursor_x_m + 1.10
+    boxes.append(
+        _support_box(
+            "CompositeGoalPlatform",
+            cursor_x_m,
+            goal_x_m + 0.50,
+            floor_height_m,
+            travel_width_m,
+            "goal_platform",
+        )
+    )
+    goal = (goal_x_m, 0.0, floor_height_m)
+    tasks.append(
+        {
+            "task_id": "goal",
+            "type": "goal",
+            "parameters": {"center_xyz_m": list(goal)},
+        }
+    )
+    return CompositeObstacleCourse(
+        boxes=tuple(boxes),
+        tasks=tuple(tasks),
+        buttons=tuple(buttons),
+        navigation_cones=tuple(navigation_cones),
+        final_floor_height_m=floor_height_m,
+        goal_center_xyz_m=goal,
+    )
 
 
 def _collision_box_observations(
@@ -1070,6 +1541,7 @@ def _collision_box_observations(
             "size_xyz_m": list(box.size_xyz_m),
             "semantic": box.semantic,
             "pitch_deg": box.pitch_deg,
+            "yaw_deg": box.yaw_deg,
         }
         for box in boxes
         if box.collidable
@@ -1946,6 +2418,8 @@ def _install_course_boxes(
         )
         cube.CreateSizeAttr(1.0)
         cube.AddTranslateOp().Set(Gf.Vec3d(*element.center_xyz_m))
+        if element.yaw_deg:
+            cube.AddRotateZOp().Set(element.yaw_deg)
         if element.pitch_deg:
             cube.AddRotateYOp().Set(element.pitch_deg)
         cube.AddScaleOp().Set(Gf.Vec3f(*element.size_xyz_m))
@@ -1963,11 +2437,117 @@ def _install_course_boxes(
             )
 
 
+def _install_composite_navigation_cones(
+    stage: Any,
+    root_path: str,
+    cones: tuple[CompositeNavigationCone, ...],
+) -> None:
+    """Install visible cone meshes and stable cylindrical colliders."""
+
+    from pxr import Gf, Sdf, UsdGeom, UsdPhysics
+
+    cones_root = f"{root_path}/NavigationCones"
+    UsdGeom.Xform.Define(stage, cones_root)
+    for index, item in enumerate(cones, start=1):
+        safe_task = "".join(
+            character if character.isalnum() else "_"
+            for character in item.task_id
+        )
+        cone_root = f"{cones_root}/{safe_task}_Cone{index:02d}"
+        visual = UsdGeom.Cone.Define(stage, f"{cone_root}/visual")
+        visual.CreateAxisAttr(UsdGeom.Tokens.z)
+        visual.CreateRadiusAttr(item.radius_m)
+        visual.CreateHeightAttr(item.height_m)
+        visual.CreateDisplayColorAttr([Gf.Vec3f(1.0, 0.30, 0.02)])
+        visual.GetPrim().CreateAttribute(
+            "mssr:obstacleSemantic",
+            Sdf.ValueTypeNames.String,
+        ).Set("navigation_cone")
+        UsdGeom.Xformable(visual).AddTranslateOp().Set(
+            Gf.Vec3d(*item.center_xyz_m)
+        )
+
+        collider = UsdGeom.Cylinder.Define(stage, f"{cone_root}/collision")
+        collider.CreateAxisAttr(UsdGeom.Tokens.z)
+        collider.CreateRadiusAttr(item.radius_m)
+        collider.CreateHeightAttr(item.height_m)
+        collider.CreateVisibilityAttr(UsdGeom.Tokens.invisible)
+        UsdGeom.Xformable(collider).AddTranslateOp().Set(
+            Gf.Vec3d(*item.center_xyz_m)
+        )
+        UsdPhysics.CollisionAPI.Apply(collider.GetPrim())
+
+
 def install_manual_obstacle_course(stage: Any) -> ManualObstacleCourse:
     """Replace the infinite floor with the manual, segmented course."""
 
     course = manual_obstacle_course()
     _install_course_boxes(stage, "/World/ManualObstacleCourse", course.boxes)
+    return course
+
+
+def _install_button_prismatic_joint(
+    stage: Any,
+    *,
+    root_path: str,
+    plunger_name: str,
+    center_xyz_m: tuple[float, float, float],
+    press_direction_world_xy: tuple[float, float],
+    joint_name: str,
+) -> None:
+    """Make one course plunger independently depressible."""
+
+    from pxr import Gf, Sdf, UsdPhysics
+
+    plunger_path = f"{root_path}/{plunger_name}"
+    plunger_prim = stage.GetPrimAtPath(plunger_path)
+    if not plunger_prim or not plunger_prim.IsValid():
+        raise RuntimeError(f"Button plunger prim was not created: {plunger_path}")
+    UsdPhysics.RigidBodyAPI.Apply(plunger_prim)
+    joint = UsdPhysics.PrismaticJoint.Define(
+        stage,
+        f"{root_path}/{joint_name}",
+    )
+    nx, ny = press_direction_world_xy
+    joint_axis, joint_sign = ("X", nx) if abs(nx) > 0.5 else ("Y", ny)
+    joint.CreateAxisAttr(joint_axis)
+    if joint_sign > 0.0:
+        joint.CreateLowerLimitAttr(0.0)
+        joint.CreateUpperLimitAttr(BUTTON_PLUNGER_STROKE_M)
+    else:
+        joint.CreateLowerLimitAttr(-BUTTON_PLUNGER_STROKE_M)
+        joint.CreateUpperLimitAttr(0.0)
+    joint.CreateBody1Rel().SetTargets([Sdf.Path(plunger_path)])
+    joint.CreateLocalPos0Attr().Set(Gf.Vec3f(*center_xyz_m))
+    joint.CreateLocalRot0Attr().Set(Gf.Quatf(1.0))
+    joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0.0, 0.0, 0.0))
+    joint.CreateLocalRot1Attr().Set(Gf.Quatf(1.0))
+
+
+def install_composite_obstacle_course(
+    stage: Any,
+    mission: Mapping[str, Any],
+    validated_seeds: Mapping[str, set[int] | frozenset[int]],
+) -> CompositeObstacleCourse:
+    """Install an ordered multi-obstacle course and all button joints."""
+
+    course = composite_obstacle_course(mission, validated_seeds)
+    root_path = "/World/CompositeObstacleCourse"
+    _install_course_boxes(stage, root_path, course.boxes)
+    _install_composite_navigation_cones(
+        stage,
+        root_path,
+        course.navigation_cones,
+    )
+    for index, fixture in enumerate(course.buttons):
+        _install_button_prismatic_joint(
+            stage,
+            root_path=root_path,
+            plunger_name=fixture.plunger_name,
+            center_xyz_m=fixture.center_xyz_m,
+            press_direction_world_xy=fixture.press_direction_world_xy,
+            joint_name=f"ButtonPrismaticJoint{index + 1:02d}",
+        )
     return course
 
 

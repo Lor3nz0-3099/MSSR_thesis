@@ -34,6 +34,7 @@ if str(SMORES_EP_SRC) not in sys.path:
 
 DEFAULT_SEED = 6100
 SEED = DEFAULT_SEED
+BUTTON_TASK_ID = ""
 
 # Headless self_assembly_cli converts --steps 0 into only 7200
 # physics steps (= 30 simulated seconds at 240 Hz).  That is too
@@ -68,60 +69,62 @@ def read_json(path: Path):
     return obj if isinstance(obj, dict) else None
 
 
-def button_xyz(state):
-    candidates = (
+def button_candidates(state):
+    """Yield legacy and task-addressed composite button observations."""
+
+    candidates = [
         state.get("state", {}).get("course", {}).get("button"),
         state.get("course", {}).get("button"),
         state.get("global_attributes", {})
              .get("course", {}).get("button"),
+    ]
+    courses = (
+        state.get("state", {}).get("course", {}),
+        state.get("course", {}),
+        state.get("global_attributes", {}).get("course", {}),
     )
+    for course in courses:
+        if not isinstance(course, dict):
+            continue
+        mission = course.get("mission", {})
+        tasks = mission.get("tasks", []) if isinstance(mission, dict) else []
+        if not isinstance(tasks, list):
+            continue
+        for task in tasks:
+            if not isinstance(task, dict) or task.get("type") != "button":
+                continue
+            if BUTTON_TASK_ID and str(task.get("task_id", "")) != BUTTON_TASK_ID:
+                continue
+            parameters = task.get("parameters", {})
+            if isinstance(parameters, dict):
+                candidates.append(parameters.get("button"))
+    return tuple(candidates)
 
-    for button in candidates:
+
+def selected_button(state):
+    """Return the addressed live button object in either course schema."""
+
+    for button in button_candidates(state):
         if not isinstance(button, dict):
             continue
-
-        xyz = (
-            button.get("current_center_xyz_m")
-            or button.get("center_xyz_m")
-        )
-
+        xyz = button.get("current_center_xyz_m") or button.get("center_xyz_m")
         if isinstance(xyz, (list, tuple)) and len(xyz) >= 3:
-            return tuple(float(v) for v in xyz[:3])
+            return button
+    raise RuntimeError(
+        f"Button {BUTTON_TASK_ID!r} not found in the live course observation"
+    )
 
-    raise RuntimeError("Button center not found.")
+
+def button_xyz(state):
+    button = selected_button(state)
+    xyz = button.get("current_center_xyz_m") or button.get("center_xyz_m")
+    return tuple(float(v) for v in xyz[:3])
 
 
 def button_press_direction_xy(state):
     """Return normalized world-frame button press direction."""
 
-    candidates = (
-        state.get(
-            "state",
-            {},
-        ).get(
-            "course",
-            {},
-        ).get(
-            "button",
-        ),
-
-        state.get(
-            "course",
-            {},
-        ).get(
-            "button",
-        ),
-
-        state.get(
-            "global_attributes",
-            {},
-        ).get(
-            "course",
-            {},
-        ).get(
-            "button",
-        ),
-    )
+    candidates = button_candidates(state)
 
     for button in candidates:
 
@@ -345,7 +348,7 @@ def wait_assembly(graph_path, runtime):
 
     while time.monotonic() < deadline:
 
-        if runtime.poll() is not None:
+        if runtime is not None and runtime.poll() is not None:
             raise RuntimeError("Runtime exited during assembly.")
 
         graph = read_json(graph_path)
@@ -816,15 +819,44 @@ def parse_args():
             "joint command."
         ),
     )
+    parser.add_argument(
+        "--external-runtime-dir",
+        type=Path,
+        help=(
+            "Attach to an already-running composite runtime. The robot must "
+            "currently have the validated RC-Car8 topology."
+        ),
+    )
+    parser.add_argument(
+        "--button-task-id",
+        default="",
+        help="Select one button from course.mission.tasks in composite mode.",
+    )
+    parser.add_argument(
+        "--dataset-path",
+        type=Path,
+        help="Append every button sub-stage to this composite JSONL dataset.",
+    )
+    parser.add_argument(
+        "--episode-id",
+        default="",
+        help="Episode identifier used when appending to a composite dataset.",
+    )
 
     return parser.parse_args()
 
 
 def main():
-    global SEED
+    global BUTTON_TASK_ID, SEED
 
     args = parse_args()
     SEED = int(args.seed)
+    BUTTON_TASK_ID = str(args.button_task_id).strip()
+    if args.external_runtime_dir is not None and not BUTTON_TASK_ID:
+        raise SystemExit(
+            "--external-runtime-dir requires --button-task-id so repeated "
+            "buttons cannot be confused"
+        )
 
     run_id = time.strftime(
         f"seed-{SEED:06d}-%Y%m%d-%H%M%S"
@@ -837,11 +869,23 @@ def main():
         / run_id
     )
 
-    runtime_dir = run / "runtime"
-
-    runtime_dir.mkdir(
-        parents=True,
-        exist_ok=False,
+    run.mkdir(parents=True, exist_ok=False)
+    runtime_dir = (
+        args.external_runtime_dir.expanduser().resolve()
+        if args.external_runtime_dir is not None
+        else run / "runtime"
+    )
+    if args.external_runtime_dir is None:
+        runtime_dir.mkdir(parents=True, exist_ok=False)
+    elif not (runtime_dir / "state_graph.json").is_file():
+        raise SystemExit(
+            f"External runtime has no state_graph.json: {runtime_dir}"
+        )
+    episode_id = str(args.episode_id).strip() or run_id
+    dataset_path = (
+        args.dataset_path.expanduser().resolve()
+        if args.dataset_path is not None
+        else run / "button_dataset.jsonl"
     )
 
     Path(
@@ -884,7 +928,10 @@ def main():
             run / "runtime.log"
         ).open("w")
 
-        runtime = subprocess.Popen(
+        runtime = (
+            None
+            if args.external_runtime_dir is not None
+            else subprocess.Popen(
             [
                 "ros2", "launch",
                 "mssr_expert",
@@ -916,11 +963,9 @@ def main():
                 "tilt_effort_scale:=8.0",
 
                 "behavior_dataset_path:="
-                + str(
-                    run / "behavior_dataset.jsonl"
-                ),
+                + str(dataset_path),
                 "behavior_dataset_episode_id:="
-                + run_id,
+                + episode_id,
                 "behavior_dataset_stage_name:="
                 + "button_expert",
                 "behavior_dataset_difficulty:=0.0",
@@ -936,6 +981,7 @@ def main():
             stdout=runtime_log,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            )
         )
 
         # Isaac Sim cold startup can legitimately take longer than
@@ -946,7 +992,7 @@ def main():
 
         while time.monotonic() < deadline:
 
-            if runtime.poll() is not None:
+            if runtime is not None and runtime.poll() is not None:
                 raise RuntimeError(
                     "Runtime exited during startup."
                 )
@@ -977,7 +1023,10 @@ def main():
             run / "assembly.log"
         ).open("w")
 
-        assembly = subprocess.Popen(
+        assembly = (
+            None
+            if args.external_runtime_dir is not None
+            else subprocess.Popen(
             [
                 "ros2", "run",
                 "mssr_expert",
@@ -997,19 +1046,18 @@ def main():
                 + run_id + "-assembly",
 
                 "-p",
-                "episode_id:=" + run_id,
+                "episode_id:=" + episode_id,
 
                 "-p",
                 "dataset_path:="
-                + str(
-                    run / "assembly_dataset.jsonl"
-                ),
+                + str(dataset_path),
             ],
             cwd=ROOT,
             env=env,
             stdout=assembly_log,
             stderr=subprocess.STDOUT,
             start_new_session=True,
+            )
         )
 
         wait_assembly(
@@ -1017,8 +1065,9 @@ def main():
             runtime,
         )
 
-        # Let final post-assembly posture settle.
-        time.sleep(8)
+        # Let final post-assembly posture settle. An attached composite
+        # orchestrator already verified the RC-Car8 physical topology.
+        time.sleep(1 if args.external_runtime_dir is not None else 8)
 
         stop_process(assembly)
         assembly = None
@@ -1253,6 +1302,8 @@ def main():
                 "-p", "source_graph_path:=auto",
                 "-p",
                 "target_morphology:=mobile_manipulator8",
+                "-p", "episode_id:=" + episode_id,
+                "-p", "dataset_path:=" + str(dataset_path),
             ],
             cwd=ROOT,
             env=env,
@@ -1835,9 +1886,7 @@ def main():
             runtime_dir / "robot_graph.json"
         )
 
-        _ik_dataset_path = (
-            run / "manipulation_dataset.jsonl"
-        )
+        _ik_dataset_path = dataset_path
 
         _ik_dataset_timestep = 0
 
@@ -1941,23 +1990,8 @@ def main():
         ):
 
             try:
-                return float(
-                    state[
-                        "state"
-                    ][
-                        "course"
-                    ][
-                        "button"
-                    ].get(
-                        "depression_m",
-                        0.0,
-                    )
-                )
-            except (
-                KeyError,
-                TypeError,
-                ValueError,
-            ):
+                return float(selected_button(state).get("depression_m", 0.0))
+            except (RuntimeError, TypeError, ValueError):
                 return 0.0
 
         def _ik_dof_payload(
@@ -2389,7 +2423,7 @@ def main():
                     "mssr.expert_transition.v3",
 
                 "episode_id":
-                    run_id,
+                    episode_id,
 
                 "timestep":
                     int(
@@ -4178,15 +4212,7 @@ def main():
                 state = _ik_read_state()
                 last_state = state
 
-                button_live = (
-                    state[
-                        "state"
-                    ][
-                        "course"
-                    ][
-                        "button"
-                    ]
-                )
+                button_live = selected_button(state)
 
                 depression = float(
                     button_live.get(
@@ -4656,15 +4682,7 @@ def main():
                     )
                 )
 
-                button_after = (
-                    state_after[
-                        "state"
-                    ][
-                        "course"
-                    ][
-                        "button"
-                    ]
-                )
+                button_after = selected_button(state_after)
 
                 depression_after = float(
                     button_after.get(
@@ -4827,15 +4845,7 @@ def main():
 
         state0 = _ik_read_state()
 
-        button0 = (
-            state0[
-                "state"
-            ][
-                "course"
-            ][
-                "button"
-            ]
-        )
+        button0 = selected_button(state0)
 
         button_center = _np.asarray(
             button0[
@@ -5598,6 +5608,8 @@ def main():
                 "--ros-args",
                 "-p", "source_graph_path:=auto",
                 "-p", "target_morphology:=rc_car8",
+                "-p", "episode_id:=" + episode_id,
+                "-p", "dataset_path:=" + str(dataset_path),
             ],
             cwd=ROOT,
             env=env,

@@ -36,6 +36,8 @@ class DatasetLogger:
         assignment: Mapping[str, str] | None = None,
         next_graph: AttributedRobotGraph | None = None,
         next_observation: Mapping[str, Any] | None = None,
+        episode_done: bool | None = None,
+        episode_success: bool | None = None,
     ) -> None:
         """Log one expert transition with current, target and task graphs.
 
@@ -46,6 +48,14 @@ class DatasetLogger:
 
         effective_task_graph = task_graph or graph
         assignment = assignment or {}
+        terminal = bool(expert_output.done) if episode_done is None else bool(
+            episode_done
+        )
+        terminal_success = (
+            bool(expert_output.success)
+            if episode_success is None
+            else bool(episode_success)
+        )
         record = {
             "schema_version": "mssr.expert_transition.v3",
             "episode_id": episode_id,
@@ -57,15 +67,15 @@ class DatasetLogger:
             "difficulty": float(difficulty),
             "fsm_state": expert_output.fsm_state,
             "is_first": int(timestep) == 0,
-            "is_last": bool(expert_output.done),
-            "is_terminal": bool(expert_output.done),
-            "action_valid": not bool(expert_output.done),
+            "is_last": terminal,
+            "is_terminal": terminal,
+            "action_valid": not terminal,
             "reward": (
                 1.0
-                if expert_output.done and expert_output.success
+                if terminal and terminal_success
                 else 0.0
             ),
-            "discount": 0.0 if expert_output.done else 1.0,
+            "discount": 0.0 if terminal else 1.0,
             "observation": dict(observation),
             "observation_t_plus_1": (
                 dict(next_observation)
@@ -104,9 +114,7 @@ class DatasetLogger:
                 "label_source": "deterministic_expert",
                 "executed_action_source": "deterministic_expert",
                 "expert_intervention": False,
-                "valid_for_behavior_cloning": not bool(
-                    expert_output.done
-                ),
+                "valid_for_behavior_cloning": not terminal,
             },
             "expert_annotation": {
                 "fsm_state": expert_output.fsm_state,
@@ -120,8 +128,8 @@ class DatasetLogger:
             "module_roles": dict(expert_output.module_roles),
             "attachment_modes": dict(expert_output.attachment_modes),
             "task_metrics": dict(expert_output.task_metrics),
-            "success": expert_output.success,
-            "done": expert_output.done,
+            "success": terminal_success if terminal else expert_output.success,
+            "done": terminal,
             "debug": dict(expert_output.debug),
         }
         with self.path.open("a", encoding="utf-8") as stream:

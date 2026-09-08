@@ -347,6 +347,8 @@ class SelfAssemblySimulationConfig:
     outer_yaw_deg: float = 25.0
     spawn_radius_m: float = 0.34
     manual_obstacle_course: bool = False
+    composite_mission_path: Path | None = None
+    composite_seed_catalog_path: Path | None = None
     stair_test_course: bool = False
     button_test_course: bool = False
     gap_test_course: bool = False
@@ -375,6 +377,7 @@ class SelfAssemblySimulationConfig:
         if sum(
             (
                 self.manual_obstacle_course,
+                self.composite_mission_path is not None,
                 self.stair_test_course,
                 self.button_test_course,
                 self.gap_test_course,
@@ -461,3 +464,10 @@ class SelfAssemblySimulationConfig:
             )
         ):
             raise ValueError("Primitive channel paths cannot be empty")
+        if self.composite_mission_path is not None and (
+            self.composite_seed_catalog_path is None
+            or not str(self.composite_seed_catalog_path)
+        ):
+            raise ValueError(
+                "Composite missions require a validated seed catalog"
+            )

@@ -134,6 +134,47 @@ def neutral_tilt_override(
     return result
 
 
+def graph_with_command_course(
+    graph: AttributedRobotGraph,
+    parameters: Mapping[str, Any],
+) -> AttributedRobotGraph:
+    """Overlay the active composite-task geometry onto a graph snapshot.
+
+    A composite course can contain several gaps and staircases.  The physical
+    graph consequently carries the whole mission, while a gait planner needs
+    the geometry of exactly one active obstacle under ``course.gap`` or
+    ``course.stairs``.  Keeping this adapter at the command boundary avoids
+    teaching the validated gait planners about mission scheduling.
+    """
+
+    obstacle_updates = {
+        key: dict(value)
+        for key in ("gap", "stairs")
+        if isinstance((value := parameters.get(key)), Mapping)
+    }
+    if not obstacle_updates:
+        return graph
+
+    global_attributes = dict(graph.global_attributes)
+    existing_course = global_attributes.get("course", {})
+    course = (
+        dict(existing_course)
+        if isinstance(existing_course, Mapping)
+        else {}
+    )
+    course.update(obstacle_updates)
+    global_attributes["course"] = course
+    global_attributes["active_composite_task_id"] = str(
+        parameters.get("task_id", "")
+    )
+    return AttributedRobotGraph(
+        stamp=graph.stamp,
+        nodes=graph.nodes,
+        edges=graph.edges,
+        global_attributes=global_attributes,
+    )
+
+
 def dof_inventory_observation(
     inventory: MorphologyDofInventory,
 ) -> list[dict[str, Any]]:
@@ -244,6 +285,7 @@ def behavior_environment_observation(
 def behavior_task_context(
     decision: MorphologyBehaviorDecision,
     graph: AttributedRobotGraph,
+    parameters: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Describe the goal that explains the expert's local action."""
 
@@ -290,8 +332,11 @@ def behavior_task_context(
     else:
         instruction = f"Execute the {decision.behavior} behavior."
         success_criteria = {"behavior_terminal_success": True}
+    parameters = parameters or {}
     return {
         "schema_version": "mssr.behavior_task_context.v1",
+        "task_id": str(parameters.get("task_id", "")),
+        "task_type": str(parameters.get("task_type", "morphology_behavior")),
         "instruction": instruction,
         "morphology": decision.morphology,
         "behavior": decision.behavior,
@@ -375,6 +420,7 @@ class SmoresMorphologyBehaviorNode(Node):
         self._dof_inventory = MorphologyDofInventory(())
         self._dof_signature: tuple[tuple[str, str, str], ...] = ()
         self._last_terminal_command_id = ""
+        self._active_command_parameters: dict[str, Any] = {}
         self._latest_cmd_vel = (0.0, 0.0, 0.0)
         self._last_cmd_vel_s: float | None = None
         self._cmd_vel_output_active = False
@@ -799,9 +845,13 @@ class SmoresMorphologyBehaviorNode(Node):
                     planner = self._stair_gait_planner.plan_arch_wave
                 elif command.behavior == "crawl_stairs_spatial_concertina":
                     planner = self._stair_concertina_planner.plan
+                planning_graph = graph_with_command_course(
+                    self._latest_robot_graph,
+                    command.parameters,
+                )
                 if command.behavior == "crawl_stairs_spatial_concertina":
                     program_override = planner(
-                        self._latest_robot_graph,
+                        planning_graph,
                         self._assignments,
                         command.parameters,
                         neutral_tilts,
@@ -811,7 +861,7 @@ class SmoresMorphologyBehaviorNode(Node):
                     # 70a3bdc validated planner interface.  Do not layer later
                     # neutral/compliance arguments onto the historical gait.
                     program_override = planner(
-                        self._latest_robot_graph,
+                        planning_graph,
                         self._assignments,
                         command.parameters,
                     )
@@ -821,6 +871,7 @@ class SmoresMorphologyBehaviorNode(Node):
                 neutral_tilts,
                 program_override,
             )
+            self._active_command_parameters = dict(command.parameters)
             self._last_terminal_command_id = ""
             self._publish_status(
                 command.command_id,
@@ -924,7 +975,10 @@ class SmoresMorphologyBehaviorNode(Node):
         logger = self._behavior_dataset_logger
         if logger is None:
             return
-        current_graph = self._latest_robot_graph
+        current_graph = graph_with_command_course(
+            self._latest_robot_graph,
+            self._active_command_parameters,
+        )
         episode_id = str(
             self.get_parameter("behavior_dataset_episode_id").value
         ).strip() or decision.command_id
@@ -967,6 +1021,7 @@ class SmoresMorphologyBehaviorNode(Node):
             "task_context": behavior_task_context(
                 decision,
                 current_graph,
+                self._active_command_parameters,
             ),
             "environment": behavior_environment_observation(
                 current_graph,

@@ -1,67 +1,42 @@
-# SMORES-EP eight-module obstacle-course runbook
+# SMORES-EP composite obstacle-course runbook
 
-This runbook keeps all eight physical modules in the connected robot through
-the complete route. The implemented morphology sequence is:
+The current course is mission-driven and contains no ramp. An episode may
+contain repeated, reordered `flat_navigation`, `gap`, `stairs`, and `button`
+tasks made only from validated seeds. The generator appends one terminal goal.
+Staircases have 2–6 ascending steps; their upper deck and every later obstacle
+are physically contiguous at the accumulated height, so Snake8 is never asked
+to descend.
 
-```text
-RC Car8 -> Snake8 -> MobileManipulator8 -> RC Car8
-```
+Capabilities come from the target-graph JSON files. The planner selects
+RC-Car8 for Nav2, Snake8 for gaps and stairs, and MobileManipulator8 for the
+validated button expert. Consecutive gaps/stairs retain Snake8. Buttons use the
+validated RC-Car8 → MobileManipulator8 → RC-Car8 pipeline.
 
-RC Car8 starts on a lower rear platform and climbs a physical ramp before the
-gap platform. It then reconfigures to Snake8 while all modules remain on the
-near platform. Snake8 spans the compact gap with its rigid serial train gait,
-then supplies the articulated stair gait. This avoids the previous
-Snake8-to-Bridge8 face-replacement transition at the gap edge.
-
-All direct transitions among `snake8`, `bridge8`, `mobile_manipulator8` and
-`rc_car8` are planner-tested with eight assigned modules and no reserves.
-
-## Unified task-achievement node
-
-`mssr_smores_obstacle_course_node` executes the full route in one ROS 2
-process. It composes the existing parallel self-assembly executor,
-self-reconfiguration executor and morphology behavior executor; no manual
-handoff between behavior commands is required. Its capability policy selects
-`RC Car8` for the initial ramp and final exit, `Snake8` for the gap and
-stairs, and `MobileManipulator8` for the button.
-
-Isaac is the authority for course geometry. Its state graph exports the gap
-edges, stair heights and riser spacing, button center and exit pose. The node
-uses live module poses with those landmarks: RC Car8 climbs the ramp and
-stops before the gap, then reconfigures safely to Snake8. The Snake8 train
-spans and clears the gap, verifies each stair-height progression, aligns the
-manipulator at a button stand-off pose, and crosses the exit plane with RC
-Car8. Snake8 also exposes the direct `straighten` behavior used by the
-manual posture smoke test below.
-
-Closed-loop approach phases run at `0.05 m/s` and the bridge crossing uses
-`0.03 m/s`; these are below the configured morphology speed limits while
-being substantially faster than the previous defaults.
-
-The node verifies the button geometrically: the module assigned to the
-`end_effector` role must be within `button_contact_radius_m` of the plunger
-center. It verifies the finish only when at least
-`goal_min_modules_past_exit` modules have crossed the Isaac-exported exit
-plane. A failed or interrupted route is discarded; only a full successful
-episode is appended to the JSONL dataset, retaining the task graph, selected
-morphology and expert action for IL.
-
-After starting Isaac and the file bridge as below, run:
+Validate a generated stage program without Isaac:
 
 ```bash
-cd ~/MSSR_thesis
-source /opt/ros/humble/setup.bash
-source mssr_ws/install/setup.bash
-ros2 run mssr_expert mssr_smores_obstacle_course_node --ros-args \
-  -p episode_id:=course-0001 \
-  -p dataset_path:=$PWD/logs/datasets/course-0001.jsonl
+python3 scripts/smores_ep/run_composite_course.py \
+  --episode composite-0016 \
+  --plan-only
 ```
 
-Do not start `mssr_smores_morphology_behavior_node`,
-`mssr_smores_self_assembly_node`, or
-`mssr_smores_self_reconfiguration_node` for the same run: they would publish
-competing action and primitive-goal streams. Restart Isaac after rebuilding so
-its state publisher includes the course landmarks, rear platform and ramp.
+Execute one full episode in the GUI:
+
+```bash
+python3 scripts/smores_ep/run_composite_course.py \
+  --episode composite-0001 \
+  --execute
+```
+
+The runner keeps one runtime alive, checks each stable morphology against the
+physical face topology, uses `NavigateThroughPoses` for curved route segments,
+and declares episode success only after the final Nav2 goal. Artifacts are
+stored under `logs/composite_course/`; the JSONL stream is normalized into one
+episode-wide timeline while retaining skill-local terminal outcomes.
+
+The remainder of this document is retained only as a low-level diagnostic
+reference for launching individual nodes. Its former fixed-course sequence is
+deprecated and is not the composite policy.
 
 ### SMORES literature basis
 

@@ -129,7 +129,9 @@ class SmoresObstacleCourseNode(Node):
         self._gap_gait_planner = SnakeGapGaitPlanner()
         self._stair_gait_planner = SnakeStairGaitPlanner()
         self._stair_concertina_planner = SnakeStairConcertinaPlanner()
-        self._policy = ObstacleCoursePolicy()
+        self._policy = ObstacleCoursePolicy.from_morphology_catalog(
+            self._catalog
+        )
         self._steps = self._policy.steps()
         self._step_index = self._configured_start_step_index()
         self._assembly_planner = ParallelSelfAssemblyPlanner()
@@ -1304,8 +1306,7 @@ class SmoresObstacleCourseNode(Node):
         }))
 
     def _finish(self, success: bool, current_graph: Any, message: str) -> None:
-        if success:
-            for (
+        for record_index, (
                 graph,
                 task_graph,
                 output,
@@ -1314,17 +1315,35 @@ class SmoresObstacleCourseNode(Node):
                 target_graph,
                 assignment,
                 observation,
-            ) in self._pending_records:
-                self._dataset_logger.log_step(
+            ) in enumerate(self._pending_records):
+            is_last = record_index == len(self._pending_records) - 1
+            next_graph = (
+                self._pending_records[record_index + 1][0]
+                if not is_last
+                else current_graph
+            )
+            next_observation = (
+                self._pending_records[record_index + 1][7]
+                if not is_last
+                else dict(self._latest_observation)
+            )
+            self._dataset_logger.log_step(
                     episode_id=str(self.get_parameter("episode_id").value), timestep=timestep,
                     observation=observation, graph=graph, expert_output=output,
                     stage_name="smores_obstacle_course", stage_id=timestep, task_type=task,
                     difficulty=1.0, task_graph=task_graph, target_graph=target_graph,
-                    assignment=assignment,
+                    assignment=assignment, next_graph=next_graph,
+                    next_observation=next_observation,
+                    episode_done=is_last,
+                    episode_success=success if is_last else None,
                 )
+        if success:
             self.get_logger().info(f"{message} Wrote {len(self._pending_records)} IL transitions.")
         else:
-            self.get_logger().error(f"Obstacle course failed; discarded {len(self._pending_records)} incomplete transitions: {message}")
+            self.get_logger().error(
+                "Obstacle course failed; wrote "
+                f"{len(self._pending_records)} transitions: {message}"
+            )
         self._terminal = True
 
 

@@ -18,6 +18,7 @@ from mssr_expert.behaviors.snake_stair_gait import (
     SnakeStairGaitPlanner,
     UniformStaircase,
 )
+from mssr_expert.behaviors.snake_stair_path_ik import WheelCenterPath
 from mssr_expert.graph.attributed_robot_graph import (
     AttributedRobotGraph,
     GraphNode,
@@ -101,6 +102,25 @@ def test_uniform_staircase_recognizes_the_shared_course_geometry() -> None:
     assert stairs.rise_m == pytest.approx(0.065)
     assert stairs.tread_depth_m == pytest.approx(0.28)
     assert stairs.top_heights_m == pytest.approx((0.065, 0.13, 0.195))
+
+
+def test_stair_path_translates_to_an_elevated_base() -> None:
+    course = _course()
+    course["stairs"]["base_height_m"] = 0.30
+    course["stairs"]["top_heights_m"] = [0.365, 0.430, 0.495]
+    stairs = UniformStaircase.from_course(course)
+    path = WheelCenterPath(
+        staircase=stairs,
+        wheel_radius_m=0.03106,
+        corner_clearance_radius_m=0.040,
+        approach_run_m=0.135,
+        landing_run_m=0.105,
+    )
+
+    assert stairs.base_height_m == pytest.approx(0.30)
+    assert stairs.rise_m == pytest.approx(0.065)
+    assert path.height_m(0.0) == pytest.approx(0.33106)
+    assert path.support_height_m(10.0) == pytest.approx(0.52606)
 
 
 def test_profiles_hold_two_risers_when_chain_spans_two_steps() -> None:

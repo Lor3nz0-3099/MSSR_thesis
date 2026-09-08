@@ -9,7 +9,7 @@
     "module_count": 8,
     "requires_helping_module": false,
     "assembly_strategy": "progressive_planar_waves",
-    "capabilities": ["flat_train_locomotion", "adaptive_stair_climb", "gap_approach"],
+    "capabilities": ["climb_stairs", "cross_gap", "flat_train_locomotion", "adaptive_stair_climb", "gap_approach"],
     "source_reference": "Eight-module extension of the SMORES-EP serial snake/stair-climber",
     "description": "Eight-module TOP-BOTTOM serial chain. Obstacle postures are supplied by the morphology behavior library; all eight modules remain assigned to the connected robot."
   },

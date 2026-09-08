@@ -7,7 +7,7 @@
     "task_type": "parallel_self_assembly",
     "morphology_name": "rc_car8",
     "module_count": 8,
-    "capabilities": ["flat_locomotion", "differential_drive", "heavy_push"],
+    "capabilities": ["flat_navigation", "flat_locomotion", "differential_drive", "heavy_push"],
     "requires_helping_module": false,
     "assembly_strategy": "progressive_planar_waves_then_fold",
     "coordinate_post_assembly_tilts": true,

@@ -1,214 +1,321 @@
-"""Task-level morphology policy for the SMORES-EP obstacle course.
+"""Library-driven high-level policy for composite SMORES-EP missions.
 
-The capability mapping follows the SMORES-EP morphology literature stored in
-``references/SMORES-EP.pdf``, ``references/design and characterization of the
-EP-Face Connector.pdf`` and ``references/chao_smores_reconfiguration_2019.pdf``.
+The policy owns only task semantics. Morphology capabilities remain in the
+installed target graphs and executable behaviors remain in the morphology
+behavior library, avoiding a second morphology registry in Python.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Mapping
+from dataclasses import dataclass, field
+import json
+from pathlib import Path
+from typing import Any, Iterable, Mapping, Sequence
+
+
+@dataclass(frozen=True)
+class TaskRequirement:
+    """Capability and existing expert required by one semantic task type."""
+
+    capability: str
+    behavior: str | None = None
+    execution_kind: str = "behavior"
+
+
+@dataclass(frozen=True)
+class MissionTask:
+    """One ordered task supplied by the simulator course description."""
+
+    task_id: str
+    task_type: str
+    parameters: Mapping[str, Any] = field(default_factory=dict)
+
+    @classmethod
+    def from_mapping(cls, payload: Mapping[str, Any], index: int) -> "MissionTask":
+        task_type = str(payload.get("type", payload.get("task_type", ""))).strip()
+        if not task_type:
+            raise ValueError(f"Mission task {index} has no semantic type")
+        task_id = str(payload.get("task_id", f"{task_type}-{index:02d}")).strip()
+        if not task_id:
+            raise ValueError(f"Mission task {index} has an empty task_id")
+        parameters = payload.get("parameters", {})
+        if not isinstance(parameters, Mapping):
+            raise ValueError(f"Mission task {task_id!r} parameters must be an object")
+        normalized_parameters = dict(parameters)
+        if "seed" in payload:
+            normalized_parameters.setdefault("seed", int(payload["seed"]))
+        return cls(task_id, task_type, normalized_parameters)
 
 
 @dataclass(frozen=True)
 class CourseStep:
-    """One morphology transition or operational behavior in the course."""
+    """Resolved high-level decision for a single mission task."""
 
     task: str
+    task_type: str
+    capability: str
     morphology: str
     behavior: str | None = None
-    parameters: Mapping[str, float] | None = None
+    execution_kind: str = "behavior"
+    parameters: Mapping[str, Any] = field(default_factory=dict)
     navigation: str | None = None
     requires_button: bool = False
     requires_goal: bool = False
 
 
-class ObstacleCoursePolicy:
-    """Select the lowest-complexity morphology that satisfies each task."""
+@dataclass(frozen=True)
+class ValidatedSeedCatalog:
+    """Allowlist backed by the canonical expert dataset manifest."""
 
-    _CAPABILITIES = {
-        "snake8": frozenset({"assembly", "ramp", "gap", "stairs", "train"}),
-        "bridge8": frozenset({"gap", "train"}),
-        "mobile_manipulator8": frozenset({"button", "train"}),
-        "rc_car8": frozenset({"exit", "train"}),
-    }
-    _PREFERENCE = ("snake8", "bridge8", "mobile_manipulator8", "rc_car8")
+    seeds_by_task_type: Mapping[str, frozenset[int]]
 
-    def choose_morphology(self, required_capability: str) -> str:
-        """Return the preferred available morphology for one task capability."""
-        for morphology in self._PREFERENCE:
-            if required_capability in self._CAPABILITIES[morphology]:
-                return morphology
-        raise ValueError(
-            f"No obstacle-course morphology supports {required_capability!r}."
-        )
+    @classmethod
+    def load(cls, path: Path) -> "ValidatedSeedCatalog":
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if payload.get("schema_version") != "mssr.composite_seed_catalog.v1":
+            raise ValueError("Unsupported composite seed catalog schema")
+        raw = payload.get("validated_seeds")
+        if not isinstance(raw, Mapping):
+            raise ValueError("Composite seed catalog has no validated_seeds")
+        result: dict[str, frozenset[int]] = {}
+        for task_type, values in raw.items():
+            if not isinstance(values, list) or not values:
+                raise ValueError(f"Seed list for {task_type!r} is empty")
+            seeds = frozenset(int(value) for value in values)
+            if len(seeds) != len(values) or min(seeds) < 0:
+                raise ValueError(f"Seed list for {task_type!r} is invalid")
+            result[str(task_type)] = seeds
+        return cls(result)
 
-    def step_index(self, task: str) -> int:
-        """Return the unique index of one named course task."""
-
-        name = str(task).strip()
-
-        if not name:
-            raise ValueError("Course task name must not be empty.")
-
-        matches = [
-            index
-            for index, step in enumerate(self.steps())
-            if step.task == name
-        ]
-
-        if len(matches) != 1:
+    def require(self, task_type: str, seed: int) -> None:
+        allowed = self.seeds_by_task_type.get(task_type, frozenset())
+        if int(seed) not in allowed:
             raise ValueError(
-                f"Expected exactly one course task {name!r}; "
-                f"found {len(matches)}."
+                f"Seed {seed} is not validated for task type {task_type!r}"
             )
 
-        return matches[0]
+
+class ObstacleCoursePolicy:
+    """Select morphologies directly from target-graph capabilities."""
+
+    TASK_REQUIREMENTS: Mapping[str, TaskRequirement] = {
+        "flat_navigation": TaskRequirement(
+            "flat_navigation", execution_kind="nav2"
+        ),
+        "gap": TaskRequirement("cross_gap", "gap_crossing"),
+        "stairs": TaskRequirement(
+            "climb_stairs", "crawl_stairs_spatial_concertina"
+        ),
+        "button": TaskRequirement(
+            "press_button", execution_kind="button_expert"
+        ),
+        "goal": TaskRequirement(
+            "flat_navigation", execution_kind="nav2_goal"
+        ),
+    }
+
+    def __init__(self, morphology_capabilities: Mapping[str, Iterable[str]]) -> None:
+        normalized: dict[str, frozenset[str]] = {}
+        for morphology, capabilities in morphology_capabilities.items():
+            name = str(morphology).strip()
+            values = frozenset(str(item).strip() for item in capabilities)
+            if not name or not values or "" in values:
+                raise ValueError("Morphology capability catalog is malformed")
+            normalized[name] = values
+        if not normalized:
+            raise ValueError("Morphology capability catalog is empty")
+        self._capabilities = normalized
+
+    @classmethod
+    def from_morphology_catalog(
+        cls,
+        catalog: Mapping[str, Any],
+    ) -> "ObstacleCoursePolicy":
+        capabilities: dict[str, tuple[str, ...]] = {}
+        for name, graph in catalog.items():
+            attributes = getattr(graph, "global_attributes", None)
+            if not isinstance(attributes, Mapping):
+                raise ValueError(f"Morphology {name!r} has no global attributes")
+            raw = attributes.get("capabilities", ())
+            if not isinstance(raw, (list, tuple, set, frozenset)):
+                raise ValueError(f"Morphology {name!r} capabilities must be a sequence")
+            capabilities[str(name)] = tuple(str(item) for item in raw)
+        return cls(capabilities)
+
+    @property
+    def supported_task_types(self) -> tuple[str, ...]:
+        return tuple(self.TASK_REQUIREMENTS)
+
+    def choose_morphology(
+        self,
+        required_capability: str,
+        current_morphology: str | None = None,
+    ) -> str:
+        capability = str(required_capability).strip()
+        if not capability:
+            raise ValueError("Required capability must not be empty")
+        if (
+            current_morphology in self._capabilities
+            and capability in self._capabilities[current_morphology]
+        ):
+            return str(current_morphology)
+        candidates = sorted(
+            morphology
+            for morphology, capabilities in self._capabilities.items()
+            if capability in capabilities
+        )
+        if not candidates:
+            raise ValueError(f"No target morphology provides {capability!r}")
+        return candidates[0]
+
+    def resolve(
+        self,
+        task: MissionTask,
+        current_morphology: str | None = None,
+    ) -> CourseStep:
+        try:
+            requirement = self.TASK_REQUIREMENTS[task.task_type]
+        except KeyError as error:
+            raise ValueError(f"Unsupported mission task type {task.task_type!r}") from error
+        morphology = self.choose_morphology(
+            requirement.capability,
+            current_morphology=current_morphology,
+        )
+        return CourseStep(
+            task=task.task_id,
+            task_type=task.task_type,
+            capability=requirement.capability,
+            morphology=morphology,
+            behavior=requirement.behavior,
+            execution_kind=requirement.execution_kind,
+            parameters=dict(task.parameters),
+        )
+
+    def plan(
+        self,
+        tasks: Sequence[MissionTask | Mapping[str, Any]],
+        current_morphology: str | None = None,
+    ) -> tuple[CourseStep, ...]:
+        if not tasks:
+            raise ValueError("Composite mission must contain at least one task")
+        seen_ids: set[str] = set()
+        steps: list[CourseStep] = []
+        selected = current_morphology
+        for index, raw in enumerate(tasks):
+            task = raw if isinstance(raw, MissionTask) else MissionTask.from_mapping(raw, index)
+            if task.task_id in seen_ids:
+                raise ValueError(f"Duplicate mission task_id {task.task_id!r}")
+            seen_ids.add(task.task_id)
+            step = self.resolve(task, current_morphology=selected)
+            steps.append(step)
+            selected = step.morphology
+        if steps[-1].task_type != "goal":
+            raise ValueError("Composite mission must terminate with a goal task")
+        return tuple(steps)
 
     def steps(self) -> tuple[CourseStep, ...]:
-        """Return the complete morphology-aware task program."""
-        snake = self.choose_morphology("ramp")
-        manipulator = self.choose_morphology("button")
-        rc_car = self.choose_morphology("exit")
+        """Return the legacy fixed-course expansion without the ramp.
 
+        New composite runs use :meth:`plan` with simulator-provided tasks.
+        This method keeps the existing ROS entry point operational while it
+        is migrated to the task-driven executor.
+        """
+
+        snake = self.choose_morphology("cross_gap")
+        manipulator = self.choose_morphology("press_button")
+        rc_car = self.choose_morphology("flat_navigation")
+        stair_parameters = {
+            "linear_m_s": 0.040,
+            "crawl_goal_tolerance_m": 0.012,
+            "path_corner_safety_m": 0.020,
+            "trajectory_step_m": 0.005,
+        }
         return (
-            # Non-planar terrain starts directly in Snake8.  RC-Car8 is not
-            # asked to negotiate the ramp after the physical validation
-            # showed a morphology/breakover limitation rather than a control
-            # or friction limitation.
-            CourseStep("assembly", snake),
+            CourseStep("assembly", "assembly", "flat_navigation", rc_car),
             CourseStep(
-                "ramp_climb",
-                snake,
-                navigation="ramp_exit",
-            ),
-            CourseStep(
-                "snake_gap_approach",
-                snake,
+                "gap_approach", "gap", "cross_gap", snake,
                 navigation="front_before_gap",
             ),
             CourseStep(
-                "snake_gap_crossing",
-                snake,
-                "gap_crossing",
-                {
+                "gap_crossing", "gap", "cross_gap", snake,
+                "gap_crossing", parameters={
                     "linear_m_s": 0.040,
                     "approach_linear_m_s": 0.050,
                     "gap_goal_tolerance_m": 0.004,
                 },
             ),
             CourseStep(
-                "gap_clearance",
-                snake,
+                "gap_clearance", "gap", "cross_gap", snake,
                 navigation="rear_past_gap",
             ),
             CourseStep(
-                "stairs_approach",
-                snake,
+                "stairs_approach", "stairs", "climb_stairs", snake,
                 navigation="front_before_stair_1",
             ),
             CourseStep(
-                "stairs_crawl",
-                snake,
+                "stairs_crawl", "stairs", "climb_stairs", snake,
                 "crawl_stairs_spatial_concertina",
-                {
-                    "linear_m_s": 0.040,
-                    "crawl_goal_tolerance_m": 0.012,
-                    "path_corner_safety_m": 0.020,
-                    "trajectory_step_m": 0.005,
-                },
+                parameters=stair_parameters,
             ),
             CourseStep(
-                "upper_deck_clearance",
-                snake,
+                "upper_deck_clearance", "stairs", "climb_stairs", snake,
                 navigation="front_on_upper_deck",
             ),
-            # ------------------------------------------------------
-            # CAMERA-GUIDED BUTTON SUB-EXPERT
-            #
-            # The button pose is not assumed fixed: x/y/z are consumed
-            # from the live course/perception observation at runtime.
-            # ------------------------------------------------------
-
-            # First recover the fully steerable planar morphology.
             CourseStep(
-                "button_rc_car_reconfiguration",
-                rc_car,
+                "button_rc_car_reconfiguration", "button", "flat_navigation", rc_car,
             ),
-
-            # RC-Car8 performs all x/y/yaw alignment.  Its final pose is
-            # chosen for the *future* manipulator, so the MM8 arm/rear
-            # side already faces the button after reconfiguration.
             CourseStep(
-                "button_rc_car_pre_alignment",
-                rc_car,
+                "button_rc_car_pre_alignment", "button", "flat_navigation", rc_car,
                 navigation="button_pre_reconfiguration",
             ),
-
-            # Deterministic RC-Car8 -> MobileManipulator8 transition.
             CourseStep(
-                "button_reconfiguration",
-                manipulator,
+                "button_reconfiguration", "button", "press_button", manipulator,
             ),
-
-            # MM8 cannot steer in the validated posture.  It therefore
-            # performs only signed longitudinal motion (normally reverse)
-            # to reach the manipulation standoff.
             CourseStep(
-                "button_mm8_approach",
-                manipulator,
+                "button_mm8_approach", "button", "press_button", manipulator,
                 navigation="button_mm8_pre_manipulation",
             ),
-
-            # Put the base on the ground:
-            # chassis_center, front_support, arm_ground_drive -> 0 rad.
             CourseStep(
-                "button_manipulation_ready",
-                manipulator,
+                "button_manipulation_ready", "button", "press_button", manipulator,
                 "prepare_manipulation",
             ),
-
-            # Deliberate integration barrier.
-            #
-            # This stage will later contain:
-            #   camera target -> IK -> pre-press -> press -> retract.
-            # Until that controller exists it remains non-terminal.
             CourseStep(
-                "button_press",
-                manipulator,
-                navigation="button_arm_press_pending",
-                requires_button=True,
+                "button_press", "button", "press_button", manipulator,
+                navigation="button_arm_press_pending", requires_button=True,
             ),
-
-            # These stages are already defined so the complete FSM is
-            # explicit.  They become reachable once BUTTON_ARM_PRESS is
-            # implemented and physically validated.
             CourseStep(
-                "button_restore_drive",
-                manipulator,
+                "button_restore_drive", "button", "press_button", manipulator,
                 "restore_drive",
             ),
             CourseStep(
-                "button_mm8_retreat",
-                manipulator,
+                "button_mm8_retreat", "button", "press_button", manipulator,
                 navigation="button_mm8_retreat",
             ),
-
-            # Return to the fully steerable morphology after the task.
             CourseStep(
-                "button_return_rc_car",
-                rc_car,
-            ),
-
-            CourseStep(
-                "exit",
-                rc_car,
-                navigation="cross_exit",
-                requires_goal=True,
+                "button_return_rc_car", "button", "flat_navigation", rc_car,
             ),
             CourseStep(
-                "exit_stop",
-                rc_car,
-                "stop",
+                "exit", "goal", "flat_navigation", rc_car,
+                navigation="cross_exit", requires_goal=True,
+            ),
+            CourseStep(
+                "exit_stop", "goal", "flat_navigation", rc_car, "stop",
             ),
         )
+
+    def step_index(self, task: str) -> int:
+        matches = [
+            index for index, step in enumerate(self.steps())
+            if step.task == str(task).strip()
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"Expected exactly one course task {task!r}; found {len(matches)}"
+            )
+        return matches[0]
+
+    @staticmethod
+    def requires_reconfiguration(
+        current_morphology: str | None,
+        selected_morphology: str,
+    ) -> bool:
+        return current_morphology != selected_morphology

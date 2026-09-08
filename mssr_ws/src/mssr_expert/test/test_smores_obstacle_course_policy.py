@@ -1,109 +1,97 @@
-"""Tests for the deterministic SMORES-EP obstacle-course policy."""
-
-import pytest
+"""Tests for the library-driven composite mission policy."""
 
 from pathlib import Path
 
-from mssr_expert.behaviors.morphology_library import (
-    AssignedModule,
-    MorphologyLibrary,
-)
-from mssr_expert.behaviors.snake_stair_registry import STAIR_GAIT_BEHAVIORS
-from mssr_expert.execution.morphology_behavior_executor import (
-    MorphologyBehaviorExecutor,
-    MorphologyCommand,
-)
+import pytest
+
 from mssr_expert.graph.serialization import load_attributed_graph
-from mssr_expert.planning.smores_ep.attributed_adapter import (
-    target_roles_from_graph,
-)
 from mssr_expert.planning.smores_ep.obstacle_course_policy import (
+    MissionTask,
     ObstacleCoursePolicy,
+    ValidatedSeedCatalog,
 )
 
 
-def test_policy_selects_one_capable_morphology_per_course_task() -> None:
-    steps = ObstacleCoursePolicy().steps()
+PACKAGE_ROOT = Path(__file__).parents[1]
 
-    assert [step.morphology for step in steps] == (
-        ["snake8"] * 8
-        + ["rc_car8"] * 2
-        + ["mobile_manipulator8"] * 6
-        + ["rc_car8"] * 3
-    )
 
-    assert len(steps) == 19
-
-def test_only_requested_stair_gaits_are_public() -> None:
-    assert STAIR_GAIT_BEHAVIORS == {
-        "crawl_stairs_arch_wave",
-        "crawl_stairs_spatial_concertina",
+def _catalog() -> dict:
+    return {
+        name: load_attributed_graph(
+            PACKAGE_ROOT / "config" / f"smores_{name}.json"
+        )
+        for name in ("rc_car8", "snake8", "mobile_manipulator8")
     }
-    assert "crawl_stairs" not in STAIR_GAIT_BEHAVIORS
 
 
-def test_every_course_behavior_accepts_its_target_roles_and_parameters() -> None:
-    package_root = Path(__file__).parents[1]
-    library = MorphologyLibrary.load(
-        package_root / "config" / "smores_morphology_behaviors.json"
+def _policy() -> ObstacleCoursePolicy:
+    return ObstacleCoursePolicy.from_morphology_catalog(_catalog())
+
+
+def test_policy_reads_capabilities_from_target_graphs() -> None:
+    policy = _policy()
+
+    assert policy.choose_morphology("flat_navigation") == "rc_car8"
+    assert policy.choose_morphology("cross_gap") == "snake8"
+    assert policy.choose_morphology("climb_stairs") == "snake8"
+    assert policy.choose_morphology("press_button") == "mobile_manipulator8"
+
+
+def test_policy_keeps_a_compatible_current_morphology() -> None:
+    policy = _policy()
+    tasks = (
+        MissionTask("gap-a", "gap", {"seed": 4100}),
+        MissionTask("stairs-a", "stairs", {"seed": 6403}),
+        MissionTask("gap-b", "gap", {"seed": 4102}),
+        MissionTask("goal", "goal", {"x_m": 10.0}),
     )
-    policy = ObstacleCoursePolicy()
 
-    for step in policy.steps():
-        if step.behavior is None:
-            continue
-        if step.behavior in {
-            "crawl_stairs_arch_wave",
-            "crawl_stairs_spatial_concertina",
-            "gap_crossing",
-        }:
-            # This behavior is generated from live world poses and course
-            # landmarks by SnakeStairGaitPlanner, rather than loaded from the
-            # static morphology library.
-            continue
-        target_graph = load_attributed_graph(
-            package_root / "config" / f"smores_{step.morphology}.json"
-        )
-        roles = target_roles_from_graph(target_graph)
-        assignments = tuple(
-            AssignedModule(
-                module_id=f"module_{vertex}",
-                target_vertex_id=vertex,
-                target_role=str(attributes["target_role"]),
+    steps = policy.plan(tasks)
+
+    assert [step.morphology for step in steps] == [
+        "snake8",
+        "snake8",
+        "snake8",
+        "rc_car8",
+    ]
+    assert not policy.requires_reconfiguration("snake8", "snake8")
+
+
+def test_ramp_is_not_a_supported_task() -> None:
+    policy = _policy()
+
+    assert "ramp" not in policy.supported_task_types
+    with pytest.raises(ValueError, match="Unsupported"):
+        policy.resolve(MissionTask("forbidden", "ramp"))
+
+
+def test_mission_requires_a_terminal_goal_and_unique_ids() -> None:
+    policy = _policy()
+
+    with pytest.raises(ValueError, match="terminate with a goal"):
+        policy.plan((MissionTask("gap", "gap"),))
+    with pytest.raises(ValueError, match="Duplicate"):
+        policy.plan(
+            (
+                MissionTask("same", "gap"),
+                MissionTask("same", "goal"),
             )
-            for vertex, attributes in sorted(roles.items())
-        )
-        executor = MorphologyBehaviorExecutor(library)
-        neutral_tilts = (
-            {assignment.module_id: 0.1 for assignment in assignments}
-            if library.uses_captured_neutral(step.morphology)
-            else {}
-        )
-
-        executor.start(
-            MorphologyCommand(
-                command_id=f"course-{step.task}",
-                morphology=step.morphology,
-                behavior=step.behavior,
-                parameters=step.parameters or {},
-            ),
-            assignments,
-            neutral_tilts,
         )
 
 
-def test_policy_resolves_button_targeted_start_index() -> None:
-    policy = ObstacleCoursePolicy()
+def test_seed_catalog_accepts_only_canonical_validated_seeds() -> None:
+    catalog = ValidatedSeedCatalog.load(
+        PACKAGE_ROOT / "config" / "smores_composite_seed_catalog.json"
+    )
 
-    assert policy.step_index(
-        "button_rc_car_pre_alignment"
-    ) == 9
+    catalog.require("stairs", 6403)
+    catalog.require("button", 6251)
+    with pytest.raises(ValueError, match="not validated"):
+        catalog.require("stairs", 6402)
 
-    assert policy.steps()[9].morphology == "rc_car8"
 
+def test_legacy_expansion_contains_no_ramp() -> None:
+    steps = _policy().steps()
 
-def test_policy_rejects_unknown_targeted_start_task() -> None:
-    policy = ObstacleCoursePolicy()
-
-    with pytest.raises(ValueError):
-        policy.step_index("not_a_real_course_task")
+    assert all("ramp" not in step.task_type for step in steps)
+    assert steps[0].morphology == "rc_car8"

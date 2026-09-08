@@ -60,7 +60,8 @@
     "capabilities": [
       "flat_locomotion",
       "high_reach",
-      "manipulation"
+      "manipulation",
+      "press_button"
     ],
     "source_reference": "SMORES-EP Parallel Self-Assembly conference demonstration",
     "description": "Eight-module mobile manipulator. After planar self-assembly, the serial arm is folded/raised first. The final locomotion posture arches the base by tilting chassis_center to -45 deg and arm_ground_drive to +45 deg; front_support is held at +10 deg to prevent its PAN face from dragging, while the two lateral drive/support modules remain at 0 deg. In this posture the morphology provides experimentally validated longitudinal forward/backward motion using the wheel pairs of front_support and arm_ground_drive. Heading is established by the RC-Car morphology before reconfiguration. Before arm manipulation, chassis_center, front_support and arm_ground_drive must return to 0 deg to place the base on the ground.",

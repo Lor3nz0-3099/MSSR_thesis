@@ -42,8 +42,19 @@ def parser():
         default=None,
         help="Explicit NavigateToPose target yaw in radians.",
     )
+    p.add_argument(
+        "--route-json",
+        type=Path,
+        help=(
+            "Composite-task JSON containing waypoints_xyyaw. Nav2 follows "
+            "all poses with NavigateThroughPoses, including real curves."
+        ),
+    )
     p.add_argument("--action-timeout-s", type=float, default=900.0)
     p.add_argument("--result-json", type=Path)
+    p.add_argument("--dataset-path", type=Path)
+    p.add_argument("--episode-id", default="")
+    p.add_argument("--task-id", default="")
     p.add_argument(
         "--status-topic",
         default="/mssr/nav2/route_status",
@@ -73,6 +84,24 @@ def point_segment_distance(px, py, ax, ay, bx, by):
     return math.hypot(px - qx, py - qy)
 
 
+def load_composite_route(path: Path) -> tuple[tuple[float, float, float], ...]:
+    """Load and validate a composite Nav2 waypoint sequence."""
+
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    raw = payload.get("waypoints_xyyaw") if isinstance(payload, dict) else None
+    if not isinstance(raw, list) or len(raw) < 2:
+        raise ValueError("--route-json requires at least two waypoints_xyyaw")
+    route: list[tuple[float, float, float]] = []
+    for index, item in enumerate(raw):
+        if not isinstance(item, (list, tuple)) or len(item) != 3:
+            raise ValueError(f"Route waypoint {index} must be [x, y, yaw]")
+        pose = tuple(float(value) for value in item)
+        if not all(math.isfinite(value) for value in pose):
+            raise ValueError(f"Route waypoint {index} contains a non-finite value")
+        route.append(pose)
+    return tuple(route)
+
+
 def main():
     args = parser().parse_args()
 
@@ -80,7 +109,7 @@ def main():
 
     from action_msgs.msg import GoalStatus
     from geometry_msgs.msg import PoseStamped, Twist
-    from nav2_msgs.action import NavigateToPose
+    from nav2_msgs.action import NavigateThroughPoses, NavigateToPose
     from nav_msgs.msg import OccupancyGrid, Odometry
     from rclpy.action import ActionClient
     from rclpy.node import Node
@@ -102,6 +131,11 @@ def main():
         for value in explicit_goal_values
     )
 
+    if args.route_json is not None and explicit_goal_mode:
+        raise ValueError(
+            "--route-json cannot be combined with explicit --goal-* options"
+        )
+
     if explicit_goal_mode and not all(
         value is not None
         for value in explicit_goal_values
@@ -110,7 +144,70 @@ def main():
             "--goal-x, --goal-y and --goal-yaw must be supplied together"
         )
 
-    if explicit_goal_mode:
+    composite_route = (
+        load_composite_route(args.route_json)
+        if args.route_json is not None
+        else ()
+    )
+    composite_payload = (
+        json.loads(args.route_json.read_text(encoding="utf-8"))
+        if args.route_json is not None
+        else {}
+    )
+    explicit_route_mode = bool(composite_route)
+
+    if explicit_route_mode:
+        margin_m = 0.75
+        xs = [pose[0] for pose in composite_route]
+        ys = [pose[1] for pose in composite_route]
+        default_bounds = (
+            min(xs) - margin_m,
+            max(xs) + margin_m,
+            min(ys) - margin_m,
+            max(ys) + margin_m,
+        )
+        raw_bounds = composite_payload.get("platform_bounds_xy_m")
+        platform_bounds = (
+            tuple(float(value) for value in raw_bounds)
+            if isinstance(raw_bounds, list) and len(raw_bounds) == 4
+            else default_bounds
+        )
+        raw_cones = composite_payload.get("cone_centers_xy_m", [])
+        cone_centers = (
+            tuple((float(point[0]), float(point[1])) for point in raw_cones)
+            if isinstance(raw_cones, list)
+            else ()
+        )
+        gx, gy, gyaw = composite_route[-1]
+        layout = {
+            "track_profile": "composite_waypoints",
+            "has_curve": any(
+                abs(composite_route[index][2] - composite_route[index - 1][2])
+                > 1.0e-3
+                for index in range(1, len(composite_route))
+            ),
+            "platform_bounds_xy_m": platform_bounds,
+            "start_pad_bounds_xy_m": (
+                composite_route[0][0] - 0.55,
+                composite_route[0][0] + 0.30,
+                composite_route[0][1] - 0.60,
+                composite_route[0][1] + 0.60,
+            ),
+            "centerline_xy_m": tuple((x, y) for x, y, _ in composite_route),
+            "corridor_width_m": float(
+                composite_payload.get("corridor_width_m", 1.10)
+            ),
+            "cone_centers_xy_m": cone_centers,
+            "cone_radius_m": float(
+                composite_payload.get("cone_radius_m", 0.05)
+            ),
+            "goal_xyyaw": (gx, gy, gyaw),
+            "finish_x_m": gx,
+            "finish_y_m": gy,
+            "finish_yaw_rad": gyaw,
+        }
+        route_id = f"rc-car-composite-{args.seed:06d}"
+    elif explicit_goal_mode:
         gx = float(args.goal_x)
         gy = float(args.goal_y)
         gyaw = float(args.goal_yaw)
@@ -209,8 +306,8 @@ def main():
 
             self.client = ActionClient(
                 self,
-                NavigateToPose,
-                "navigate_to_pose",
+                NavigateThroughPoses if explicit_route_mode else NavigateToPose,
+                "navigate_through_poses" if explicit_route_mode else "navigate_to_pose",
             )
 
             self.cmd_pub = self.create_publisher(
@@ -220,11 +317,27 @@ def main():
             )
 
             self._odom_pose = None
+            self._robot_graph = None
+            self._latest_cmd_vel = (0.0, 0.0)
+            self._dataset_timestep = 0
+            self._feedback_count = 0
 
             self.create_subscription(
                 Odometry,
                 "/odom",
                 self._on_odom,
+                20,
+            )
+            self.create_subscription(
+                String,
+                "/mssr/robot_graph",
+                self._on_robot_graph,
+                10,
+            )
+            self.create_subscription(
+                Twist,
+                "/cmd_vel",
+                self._on_cmd_vel,
                 20,
             )
 
@@ -356,6 +469,69 @@ def main():
                 float(msg.pose.pose.position.y),
                 yaw,
             )
+
+        def _on_robot_graph(self, msg):
+            try:
+                payload = json.loads(msg.data)
+            except (TypeError, json.JSONDecodeError):
+                return
+            if isinstance(payload, dict):
+                self._robot_graph = payload
+
+        def _on_cmd_vel(self, msg):
+            self._latest_cmd_vel = (
+                float(msg.linear.x),
+                float(msg.angular.z),
+            )
+
+        def record_dataset(self, progress, done, success, message):
+            if args.dataset_path is None or self._robot_graph is None:
+                return
+            x_m, y_m, yaw_rad = self._odom_pose or (0.0, 0.0, 0.0)
+            linear_m_s, yaw_rate_rad_s = self._latest_cmd_vel
+            record = {
+                "schema_version": "mssr.expert_transition.v3",
+                "episode_id": args.episode_id or route_id,
+                "timestep": self._dataset_timestep,
+                "stage_id": self._dataset_timestep,
+                "stage_name": "composite_nav2",
+                "task_type": "flat_navigation",
+                "fsm_state": "NAV2_ROUTE",
+                "is_first": self._dataset_timestep == 0,
+                "is_last": bool(done),
+                "is_terminal": bool(done),
+                "action_valid": not bool(done),
+                "done": bool(done),
+                "success": bool(success),
+                "reward": 1.0 if done and success else 0.0,
+                "discount": 0.0 if done else 1.0,
+                "graph_t": self._robot_graph,
+                "observation": {
+                    "schema_version": "mssr.nav2_observation.v1",
+                    "task_id": args.task_id,
+                    "route_id": route_id,
+                    "pose_xyyaw": [x_m, y_m, yaw_rad],
+                    "goal_xyyaw": list(layout["goal_xyyaw"]),
+                    "waypoints_xyyaw": [list(pose) for pose in composite_route],
+                    "progress": float(progress),
+                },
+                "expert_action": {
+                    "controller": "nav2",
+                    "cmd_vel": {
+                        "linear_x_m_s": linear_m_s,
+                        "angular_z_rad_s": yaw_rate_rad_s,
+                    },
+                },
+                "task_metrics": {
+                    "task_id": args.task_id,
+                    "progress": float(progress),
+                    "message": str(message),
+                },
+            }
+            args.dataset_path.parent.mkdir(parents=True, exist_ok=True)
+            with args.dataset_path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, separators=(",", ":")) + "\n")
+            self._dataset_timestep += 1
 
         def finish_metrics(self):
             """Physical RC-Car8 front position relative to finish line."""
@@ -667,8 +843,9 @@ def main():
             for v in layout["goal_xyyaw"]
         ],
         "explicit_goal_mode": bool(
-            explicit_goal_mode
+            explicit_goal_mode or explicit_route_mode
         ),
+        "waypoints_xyyaw": [list(pose) for pose in composite_route],
         "success": False,
     }
 
@@ -700,7 +877,11 @@ def main():
             timeout_sec=60.0
         ):
             raise RuntimeError(
-                "NavigateToPose unavailable"
+                (
+                    "NavigateThroughPoses unavailable"
+                    if explicit_route_mode
+                    else "NavigateToPose unavailable"
+                )
             )
 
         gx, gy, gyaw = [
@@ -708,26 +889,22 @@ def main():
             for v in layout["goal_xyyaw"]
         ]
 
-        goal = NavigateToPose.Goal()
+        def stamped_pose(x_m, y_m, yaw_rad):
+            pose = PoseStamped()
+            pose.header.frame_id = "map"
+            pose.header.stamp = node.get_clock().now().to_msg()
+            pose.pose.position.x = x_m
+            pose.pose.position.y = y_m
+            pose.pose.orientation.z = math.sin(0.5 * yaw_rad)
+            pose.pose.orientation.w = math.cos(0.5 * yaw_rad)
+            return pose
 
-        goal.pose = PoseStamped()
-        goal.pose.header.frame_id = "map"
-        goal.pose.header.stamp = (
-            node.get_clock()
-            .now()
-            .to_msg()
-        )
-
-        goal.pose.pose.position.x = gx
-        goal.pose.pose.position.y = gy
-
-        goal.pose.pose.orientation.z = (
-            math.sin(0.5 * gyaw)
-        )
-
-        goal.pose.pose.orientation.w = (
-            math.cos(0.5 * gyaw)
-        )
+        if explicit_route_mode:
+            goal = NavigateThroughPoses.Goal()
+            goal.poses = [stamped_pose(*pose) for pose in composite_route]
+        else:
+            goal = NavigateToPose.Goal()
+            goal.pose = stamped_pose(gx, gy, gyaw)
 
         node.status(
             False,
@@ -736,6 +913,8 @@ def main():
             (
                 "Explicit Nav2 pose started."
                 if explicit_goal_mode
+                else "Composite Nav2 waypoint route started."
+                if explicit_route_mode
                 else "Procedural RC track started."
             ),
         )
@@ -768,9 +947,14 @@ def main():
                 (
                     "Following explicit Nav2 pose."
                     if explicit_goal_mode
+                    else "Following composite Nav2 waypoints."
+                    if explicit_route_mode
                     else "Following Nav2 track path."
                 ),
             )
+            node._feedback_count += 1
+            if node._feedback_count % 5 == 0:
+                node.record_dataset(progress, False, False, "Nav2 route active")
 
         send = node.client.send_goal_async(
             goal,
@@ -810,7 +994,7 @@ def main():
             )
 
             if (
-                not explicit_goal_mode
+                not (explicit_goal_mode or explicit_route_mode)
                 and node.front_reached_finish()
             ):
                 physical_finish_success = True
@@ -861,7 +1045,7 @@ def main():
         else:
             # One final physical check before declaring timeout.
             if (
-                not explicit_goal_mode
+                not (explicit_goal_mode or explicit_route_mode)
                 and node.front_reached_finish()
             ):
                 success = True
@@ -916,6 +1100,8 @@ def main():
                 (
                     "Explicit Nav2 target reached."
                     if explicit_goal_mode
+                    else "Composite Nav2 waypoint route completed."
+                    if explicit_route_mode
                     else "RC track completed."
                 )
                 if success
@@ -935,6 +1121,13 @@ def main():
                 node,
                 timeout_sec=0.06,
             )
+
+        node.record_dataset(
+            1.0 if success else 0.0,
+            True,
+            success,
+            message,
+        )
 
         result["success"] = success
         result["status"] = status

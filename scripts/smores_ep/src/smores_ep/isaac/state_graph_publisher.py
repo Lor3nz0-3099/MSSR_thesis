@@ -509,6 +509,35 @@ class SmoresStateGraphPublisher:
 
         course = dict(self._course_observation)
 
+        if course.get("course_profile") == "composite_mission_v1":
+            mission = course.get("mission")
+            if not isinstance(mission, Mapping):
+                return course
+            raw_tasks = mission.get("tasks")
+            if not isinstance(raw_tasks, list):
+                return course
+            tasks: list[dict[str, Any]] = []
+            for raw_task in raw_tasks:
+                if not isinstance(raw_task, Mapping):
+                    continue
+                task = dict(raw_task)
+                parameters = task.get("parameters")
+                if not isinstance(parameters, Mapping):
+                    tasks.append(task)
+                    continue
+                updated_parameters = dict(parameters)
+                button = updated_parameters.get("button")
+                if isinstance(button, Mapping):
+                    updated_parameters["button"] = (
+                        self._runtime_button_observation(button)
+                    )
+                task["parameters"] = updated_parameters
+                tasks.append(task)
+            updated_mission = dict(mission)
+            updated_mission["tasks"] = tasks
+            course["mission"] = updated_mission
+            return course
+
         if course.get("course_profile") != (
             "mobile_manipulator8_button_test"
         ):
@@ -615,6 +644,49 @@ class SmoresStateGraphPublisher:
 
         course["button"] = button
         return course
+
+    def _runtime_button_observation(
+        self,
+        button_payload: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Add live position and depression to one composite button."""
+
+        result = dict(button_payload)
+        nominal = button_payload.get("center_xyz_m")
+        plunger_path = button_payload.get("plunger_path")
+        if (
+            not isinstance(nominal, (list, tuple))
+            or len(nominal) < 3
+            or not isinstance(plunger_path, str)
+        ):
+            return result
+        plunger = self._stage.GetPrimAtPath(plunger_path)
+        if not plunger or not plunger.IsValid():
+            return result
+        from pxr import Usd, UsdGeom
+
+        transform = UsdGeom.Xformable(plunger).ComputeLocalToWorldTransform(
+            Usd.TimeCode.Default()
+        )
+        translation = transform.ExtractTranslation()
+        current = [float(translation[index]) for index in range(3)]
+        direction = button_payload.get("press_direction_world_xy", (0.0, 1.0))
+        try:
+            nx, ny = float(direction[0]), float(direction[1])
+        except (TypeError, ValueError, IndexError):
+            nx, ny = 0.0, 1.0
+        norm = (nx * nx + ny * ny) ** 0.5
+        if norm <= 1.0e-12:
+            nx, ny = 0.0, 1.0
+        else:
+            nx, ny = nx / norm, ny / norm
+        result["press_direction_world_xy"] = [nx, ny]
+        result["current_center_xyz_m"] = current
+        result["depression_m"] = float(
+            (current[0] - float(nominal[0])) * nx
+            + (current[1] - float(nominal[1])) * ny
+        )
+        return result
 
     def _relative_body_transform(
         self,

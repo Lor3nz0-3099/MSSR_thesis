@@ -160,6 +160,18 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         simulation_command.append("--simple-visuals")
     if _as_bool(LaunchConfiguration("obstacle_course").perform(context)):
         simulation_command.append("--obstacle-course")
+    composite_mission = LaunchConfiguration(
+        "composite_mission"
+    ).perform(context).strip()
+    if composite_mission:
+        simulation_command.extend(
+            (
+                "--composite-mission",
+                composite_mission,
+                "--composite-seed-catalog",
+                LaunchConfiguration("composite_seed_catalog").perform(context),
+            )
+        )
     if _as_bool(LaunchConfiguration("stair_test_course").perform(context)):
         simulation_command.append("--stair-test-course")
     if _as_bool(LaunchConfiguration("button_test_course").perform(context)):
@@ -285,6 +297,20 @@ def generate_launch_description() -> LaunchDescription:
                 "obstacle_course",
                 default_value="false",
                 description="Spawn the physical gap and stair course in Isaac.",
+            ),
+            DeclareLaunchArgument(
+                "composite_mission",
+                default_value="",
+                description="Path to an ordered composite mission JSON file.",
+            ),
+            DeclareLaunchArgument(
+                "composite_seed_catalog",
+                default_value=str(
+                    repository_root
+                    / "mssr_ws/src/mssr_expert/config/"
+                    "smores_composite_seed_catalog.json"
+                ),
+                description="Allowlist of seeds validated by expert_v1.",
             ),
             DeclareLaunchArgument(
                 "stair_test_course",

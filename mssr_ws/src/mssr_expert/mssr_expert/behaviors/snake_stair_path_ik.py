@@ -104,8 +104,8 @@ class WheelCenterPath:
         return self._height_with_bias(x_m, self.transition_bias)
 
     def _height_with_bias(self, x_m: float, bias: float) -> float:
-        height = self.wheel_radius_m
-        lower_top = 0.0
+        height = self.staircase.base_height_m + self.wheel_radius_m
+        lower_top = self.staircase.base_height_m
         apex_extra = (
             self.corner_clearance_radius_m - self.wheel_radius_m
         )
@@ -177,7 +177,7 @@ class WheelCenterPath:
 
         if not math.isfinite(x_m):
             raise SnakeStairGaitError("Path query X must be finite")
-        top_z = 0.0
+        top_z = self.staircase.base_height_m
         for edge_x, candidate_top_z in zip(
             self.riser_edges_m,
             self.staircase.top_heights_m,

@@ -30,6 +30,7 @@ class UniformStaircase:
     tread_depth_m: float
     top_heights_m: tuple[float, ...]
     rise_m: float
+    base_height_m: float = 0.0
 
     @classmethod
     def from_course(cls, course: Mapping[str, Any]) -> "UniformStaircase":
@@ -44,17 +45,21 @@ class UniformStaircase:
             heights = tuple(
                 float(value) for value in stairs["top_heights_m"]
             )
+            base_height = float(stairs.get("base_height_m", 0.0))
         except (KeyError, TypeError, ValueError) as error:
             raise SnakeStairGaitError("Invalid stair landmarks") from error
         if not heights or depth <= 0.0 or not all(
-            math.isfinite(value) for value in (first, depth, *heights)
+            math.isfinite(value)
+            for value in (first, depth, base_height, *heights)
         ):
             raise SnakeStairGaitError(
                 "Stair dimensions must be positive and finite"
             )
         rises = tuple(
             upper - lower
-            for lower, upper in zip((0.0, *heights[:-1]), heights)
+            for lower, upper in zip(
+                (base_height, *heights[:-1]), heights
+            )
         )
         if min(rises) <= 0.0:
             raise SnakeStairGaitError("Stair heights must increase strictly")
@@ -63,7 +68,7 @@ class UniformStaircase:
             raise SnakeStairGaitError(
                 "Snake8 gait requires uniform stair rises"
             )
-        return cls(first, depth, heights, rise)
+        return cls(first, depth, heights, rise, base_height)
 
 
 class SnakeStairGaitPlanner:

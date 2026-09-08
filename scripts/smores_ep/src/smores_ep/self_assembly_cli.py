@@ -128,6 +128,18 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "task-achievement course"
         ),
     )
+    course_group.add_argument(
+        "--composite-mission",
+        type=Path,
+        default=None,
+        help="JSON mission containing ordered validated obstacle seeds",
+    )
+    parser.add_argument(
+        "--composite-seed-catalog",
+        type=Path,
+        default=None,
+        help="Installed allowlist for composite obstacle seeds",
+    )
     parser.add_argument(
         "--stair-seed",
         type=int,
@@ -350,6 +362,8 @@ def main() -> None:
                 outer_yaw_deg=args.outer_yaw_deg,
                 spawn_radius_m=args.spawn_radius,
                 manual_obstacle_course=args.obstacle_course,
+                composite_mission_path=args.composite_mission,
+                composite_seed_catalog_path=args.composite_seed_catalog,
                 stair_test_course=args.stair_test_course,
                 button_test_course=args.button_test_course,
                 button_seed=args.button_seed,
