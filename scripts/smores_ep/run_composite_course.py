@@ -66,12 +66,50 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--plan-only", action="store_true")
     parser.add_argument(
-        "--execute",
-        action="store_true",
-        help="Execute the planned assembly/reconfiguration/expert stages.",
+        "--stop-after-stage",
+        type=int,
+        default=None,
+        help=(
+            "Diagnostic mode: stop stage execution immediately after "
+            "the selected stage ID. In GUI mode Isaac remains open "
+            "for inspection."
+        ),
     )
-    parser.add_argument("--ros-domain-id", default="241")
+
+    execution_mode = parser.add_mutually_exclusive_group()
+    execution_mode.add_argument(
+        "--execute",
+        dest="execute",
+        action="store_true",
+        help=(
+            "Execute the planned assembly/reconfiguration/expert stages "
+            "(default; retained for backwards compatibility)."
+        ),
+    )
+    execution_mode.add_argument(
+        "--preview-only",
+        dest="execute",
+        action="store_false",
+        help="Launch the composite world without executing the planned stages.",
+    )
+    parser.set_defaults(execute=True)
+
+    parser.add_argument("--ros-domain-id", default="0")
+    parser.add_argument(
+        "--reconfiguration-executor",
+        choices=("legacy", "v2"),
+        default="legacy",
+        help="Select the reconfiguration node explicitly; legacy remains default.",
+    )
     return parser
+
+
+def transition_executable(is_assembly: bool, reconfiguration_executor: str) -> str:
+    if is_assembly:
+        return "mssr_smores_self_assembly_node"
+    if reconfiguration_executor == "v2":
+        return "mssr_smores_deterministic_reconfiguration_node"
+    return "mssr_smores_self_reconfiguration_node"
 
 
 def _object(path: Path) -> dict[str, Any]:
@@ -166,6 +204,10 @@ def wait_for_topology(
     target_name: str,
     runtime: subprocess.Popen[Any],
     timeout_s: float = 540.0,
+    *,
+    transition_log_path: Path | None = None,
+    transition_process: subprocess.Popen[Any] | None = None,
+    is_assembly: bool = False,
 ) -> None:
     target = load_attributed_graph(TARGET_CONFIGS[target_name])
     matcher = SmoresSelfReconfigurationPlanner()
@@ -174,6 +216,49 @@ def wait_for_topology(
     while time.monotonic() < deadline:
         if runtime.poll() is not None:
             raise RuntimeError("Runtime exited during topology transition")
+
+        # A transition may fail before the target topology is ever reached.
+        # Do not wait for the topology timeout if the expert has already
+        # reported a terminal failure.
+        if transition_log_path is not None:
+            try:
+                transition_content = transition_log_path.read_text(
+                    encoding="utf-8",
+                    errors="replace",
+                )
+            except OSError:
+                transition_content = ""
+
+            failure_marker = (
+                "Parallel self-assembly failed:"
+                if is_assembly
+                else "Self-reconfiguration failed:"
+            )
+
+            if failure_marker in transition_content:
+                failure_lines = [
+                    line.strip()
+                    for line in transition_content.splitlines()
+                    if failure_marker in line
+                ]
+                detail = (
+                    failure_lines[-1]
+                    if failure_lines
+                    else failure_marker
+                )
+                raise RuntimeError(
+                    "Transition expert reported failure before target "
+                    f"topology {target_name!r}: {detail}"
+                )
+
+        if (
+            transition_process is not None
+            and transition_process.poll() is not None
+        ):
+            raise RuntimeError(
+                "Transition expert exited before target topology "
+                f"{target_name!r} was reached"
+            )
         try:
             payload = json.loads(graph_path.read_text(encoding="utf-8"))
             graph = attributed_graph_from_dict(payload)
@@ -210,6 +295,60 @@ def run_logged(
         )
 
 
+def wait_for_transition_terminal(
+    log_path: Path,
+    process: subprocess.Popen[Any],
+    *,
+    is_assembly: bool,
+    timeout_s: float = 180.0,
+) -> None:
+    """Wait until the transition expert reports its real terminal state.
+
+    Topology can become correct before final PAN/TILT posture primitives
+    complete.  The composite must not kill the owning expert at that point,
+    otherwise those backend primitives remain active and leak resources into
+    the following behavior stage.
+    """
+
+    success_marker = (
+        "Parallel self-assembly completed."
+        if is_assembly
+        else "Self-reconfiguration completed."
+    )
+    failure_marker = (
+        "Parallel self-assembly failed:"
+        if is_assembly
+        else "Self-reconfiguration failed:"
+    )
+
+    deadline = time.monotonic() + timeout_s
+
+    while time.monotonic() < deadline:
+        try:
+            content = log_path.read_text(
+                encoding="utf-8",
+                errors="replace",
+            )
+        except OSError:
+            content = ""
+
+        if success_marker in content:
+            return
+
+        if failure_marker in content:
+            tail = "\n".join(content.splitlines()[-30:])
+            raise RuntimeError(
+                "Transition expert reported failure:\n" + tail
+            )
+
+        time.sleep(0.2)
+
+    raise TimeoutError(
+        "Timed out waiting for transition expert terminal state: "
+        f"{success_marker}"
+    )
+
+
 def start_transition(
     stage: Any,
     *,
@@ -218,13 +357,10 @@ def start_transition(
     dataset_path: Path,
     episode_id: str,
     environment: Mapping[str, str],
+    reconfiguration_executor: str = "legacy",
 ) -> None:
     is_assembly = stage.kind == "assembly"
-    executable = (
-        "mssr_smores_self_assembly_node"
-        if is_assembly
-        else "mssr_smores_self_reconfiguration_node"
-    )
+    executable = transition_executable(is_assembly, reconfiguration_executor)
     command = ["ros2", "run", "mssr_expert", executable, "--ros-args"]
     if is_assembly:
         command.extend(
@@ -259,11 +395,19 @@ def start_transition(
                 runtime_dir / "robot_graph.json",
                 stage.target_morphology,
                 runtime,
+                transition_log_path=log_path,
+                transition_process=process,
+                is_assembly=is_assembly,
             )
-            # Topology matching becomes true at the final docking event. Keep
-            # the owning expert alive while its validated post-assembly/fold
-            # posture settles and its terminal task graph is published.
-            time.sleep(8.0 if is_assembly else 5.0)
+            # Topology becomes valid at the final docking event, but final
+            # posture primitives (PAN/TILT normalization/folding) may still
+            # own backend resources.  Do not advance to the next composite
+            # stage until the expert itself reports terminal success.
+            wait_for_transition_terminal(
+                log_path,
+                process,
+                is_assembly=is_assembly,
+            )
         finally:
             stop_process(process)
 
@@ -271,26 +415,53 @@ def start_transition(
 def wait_nav2(environment: Mapping[str, str], timeout_s: float = 75.0) -> None:
     deadline = time.monotonic() + timeout_s
     required = ("/bt_navigator", "/planner_server", "/controller_server")
+    last_status = "no lifecycle response received"
+
     while time.monotonic() < deadline:
         active = True
+
         for node in required:
-            result = subprocess.run(
-                ["ros2", "lifecycle", "get", node],
-                cwd=ROOT,
-                env=dict(environment),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                timeout=5,
-                check=False,
-            )
-            if result.returncode != 0 or "active" not in result.stdout.lower():
+            remaining_s = deadline - time.monotonic()
+            if remaining_s <= 0.0:
                 active = False
                 break
+
+            try:
+                result = subprocess.run(
+                    ["ros2", "lifecycle", "get", node],
+                    cwd=ROOT,
+                    env=dict(environment),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    timeout=min(5.0, remaining_s),
+                    check=False,
+                )
+            except subprocess.TimeoutExpired:
+                last_status = f"{node}: lifecycle probe timed out"
+                active = False
+                break
+
+            output = result.stdout.strip()
+            if result.returncode != 0 or "active" not in output.lower():
+                last_status = (
+                    f"{node}: returncode={result.returncode}, "
+                    f"output={output!r}"
+                )
+                active = False
+                break
+
         if active:
             return
-        time.sleep(1)
-    raise TimeoutError("Nav2 did not become active")
+
+        remaining_s = deadline - time.monotonic()
+        if remaining_s > 0.0:
+            time.sleep(min(1.0, remaining_s))
+
+    raise TimeoutError(
+        f"Nav2 did not become active within {timeout_s:.1f}s; "
+        f"last_status={last_status}"
+    )
 
 
 def execute_navigation(
@@ -347,17 +518,127 @@ def execute_navigation(
                             "platform_bounds_xy_m": stage.parameters.get(
                                 "platform_bounds_xy_m"
                             ),
+                            "start_pad_bounds_xy_m": stage.parameters.get(
+                                "start_pad_bounds_xy_m"
+                            ),
+                            "vehicle_footprint": stage.parameters.get(
+                                "vehicle_footprint"
+                            ),
+                            "free_rectangles_xy_m": stage.parameters.get(
+                                "navigation_free_rectangles_xy_m",
+                                [],
+                            ),
                         },
                         indent=2,
                     )
                     + "\n",
                     encoding="utf-8",
                 )
-                route_command.extend(("--route-json", str(route_path)))
-            else:
-                gx, gy, _ = stage.parameters["center_xyz_m"]
+                navigation_goal = stage.parameters.get(
+                    "navigation_goal_xyyaw",
+                    stage.parameters["waypoints_xyyaw"][-1],
+                )
+
+                if (
+                    not isinstance(navigation_goal, (list, tuple))
+                    or len(navigation_goal) != 3
+                ):
+                    raise ValueError(
+                        "navigation_goal_xyyaw must contain x, y, yaw"
+                    )
+
+                gx, gy, gyaw = (
+                    float(value) for value in navigation_goal
+                )
+
+                print(
+                    "  Nav2 explicit goal: "
+                    f"({gx:.3f}, {gy:.3f}, yaw={gyaw:.3f})",
+                    flush=True,
+                )
+
                 route_command.extend(
-                    ("--goal-x", str(gx), "--goal-y", str(gy), "--goal-yaw", "0.0")
+                    (
+                        "--route-json", str(route_path),
+                        "--goal-x", str(gx),
+                        "--goal-y", str(gy),
+                        "--goal-yaw", str(gyaw),
+                    )
+                )
+
+                accept_position = stage.parameters.get(
+                    "navigation_accept_position_m"
+                )
+                accept_yaw = stage.parameters.get(
+                    "navigation_accept_yaw_rad"
+                )
+
+                if (
+                    accept_position is not None
+                    and accept_yaw is not None
+                ):
+                    route_command.extend(
+                        (
+                            "--accept-position-m",
+                            str(float(accept_position)),
+                            "--accept-yaw-rad",
+                            str(float(accept_yaw)),
+                        )
+                    )
+
+                    print(
+                        "  Nav2 coarse acceptance: "
+                        f"position<={float(accept_position):.3f}m, "
+                        f"yaw<={float(accept_yaw):.3f}rad",
+                        flush=True,
+                    )
+            else:
+                raw_goal = stage.parameters.get("goal_xyyaw")
+
+                if (
+                    isinstance(raw_goal, (list, tuple))
+                    and len(raw_goal) == 3
+                ):
+                    gx, gy, gyaw = (
+                        float(value) for value in raw_goal
+                    )
+                else:
+                    gx, gy, _ = stage.parameters[
+                        "center_xyz_m"
+                    ]
+                    gyaw = 0.0
+
+                navigation_map = stage.parameters.get(
+                    "navigation_map"
+                )
+
+                if isinstance(navigation_map, Mapping):
+                    route_path = (
+                        runtime_dir
+                        / f"stage-{stage.stage_id:02d}-route.json"
+                    )
+                    route_path.write_text(
+                        json.dumps(
+                            dict(navigation_map),
+                            indent=2,
+                        )
+                        + "\n",
+                        encoding="utf-8",
+                    )
+
+                    # run_rc_car_nav2_route supports using a
+                    # composite map together with an explicit
+                    # NavigateToPose goal.
+                    route_command.extend(
+                        ("--route-json", str(route_path))
+                    )
+
+                route_command.extend(
+                    (
+                        "--goal-x", str(gx),
+                        "--goal-y", str(gy),
+                        "--goal-yaw", str(gyaw),
+                    )
                 )
             run_logged(
                 route_command,
@@ -369,49 +650,100 @@ def execute_navigation(
             stop_process(nav2)
 
 
-def normalize_dataset(path: Path, episode_id: str, success: bool) -> None:
+def normalize_dataset(
+    path: Path,
+    episode_id: str,
+    success: bool,
+) -> None:
+    """Normalize an episode JSONL with bounded memory usage."""
     if not path.is_file():
         return
-    records: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        try:
-            record = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(record, dict):
-            records.append(record)
-    for index, record in enumerate(records):
-        terminal = index == len(records) - 1
-        record["skill_done"] = bool(record.get("done", False))
-        record["skill_success"] = bool(record.get("success", False))
-        record["episode_id"] = episode_id
-        record["timestep"] = index
-        record["is_first"] = index == 0
-        record["is_last"] = terminal
-        record["is_terminal"] = terminal
-        record["episode_done"] = terminal
-        record["episode_success"] = bool(success) if terminal else False
-        record["done"] = terminal
-        record["success"] = bool(success) if terminal else False
-        record["reward"] = 1.0 if terminal and success else 0.0
-        if index + 1 < len(records):
-            following = records[index + 1]
-            following_graph = following.get("graph_t")
-            if isinstance(following_graph, Mapping):
-                record["graph_t_plus_1"] = following_graph
-                record["next_graph"] = following_graph
-            following_observation = following.get(
-                "observation_t",
-                following.get("observation"),
-            )
-            if isinstance(following_observation, Mapping):
-                record["observation_t_plus_1"] = following_observation
-                record["next_observation"] = following_observation
-    path.write_text(
-        "".join(json.dumps(record, separators=(",", ":")) + "\n" for record in records),
-        encoding="utf-8",
-    )
 
+    temp_path = path.with_name(path.name + ".normalizing")
+
+    def valid_records():
+        with path.open("r", encoding="utf-8") as source:
+            for line in source:
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+
+                if isinstance(record, dict):
+                    yield record
+
+    records = iter(valid_records())
+    record = next(records, None)
+    index = 0
+
+    try:
+        with temp_path.open("w", encoding="utf-8") as destination:
+            while record is not None:
+                following = next(records, None)
+                terminal = following is None
+
+                record["skill_done"] = bool(
+                    record.get("done", False)
+                )
+                record["skill_success"] = bool(
+                    record.get("success", False)
+                )
+                record["episode_id"] = episode_id
+                record["timestep"] = index
+                record["is_first"] = index == 0
+                record["is_last"] = terminal
+                record["is_terminal"] = terminal
+                record["episode_done"] = terminal
+                record["episode_success"] = (
+                    bool(success) if terminal else False
+                )
+                record["done"] = terminal
+                record["success"] = (
+                    bool(success) if terminal else False
+                )
+                record["reward"] = (
+                    1.0 if terminal and success else 0.0
+                )
+
+                if following is not None:
+                    following_graph = following.get("graph_t")
+
+                    if isinstance(following_graph, Mapping):
+                        record["graph_t_plus_1"] = following_graph
+                        record["next_graph"] = following_graph
+
+                    following_observation = following.get(
+                        "observation_t",
+                        following.get("observation"),
+                    )
+
+                    if isinstance(
+                        following_observation,
+                        Mapping,
+                    ):
+                        record["observation_t_plus_1"] = (
+                            following_observation
+                        )
+                        record["next_observation"] = (
+                            following_observation
+                        )
+
+                destination.write(
+                    json.dumps(
+                        record,
+                        separators=(",", ":"),
+                    )
+                    + "\n"
+                )
+
+                record = following
+                index += 1
+
+        temp_path.replace(path)
+
+    except BaseException:
+        temp_path.unlink(missing_ok=True)
+        raise
 
 def execute_stages(
     stages: tuple[Any, ...],
@@ -422,7 +754,9 @@ def execute_stages(
     episode_id: str,
     environment: Mapping[str, str],
     headless: bool,
-) -> None:
+    stop_after_stage: int | None = None,
+    reconfiguration_executor: str = "legacy",
+) -> bool:
     completed_button_tasks: set[str] = set()
     for stage in stages:
         print(
@@ -440,6 +774,7 @@ def execute_stages(
                 dataset_path=dataset_path,
                 episode_id=episode_id,
                 environment=environment,
+                reconfiguration_executor=reconfiguration_executor,
             )
         elif stage.kind == "behavior":
             run_logged(
@@ -464,6 +799,29 @@ def execute_stages(
                 episode_id=episode_id,
                 environment=environment,
             )
+        elif stage.kind == "gap_rc_alignment":
+            command = [
+                sys.executable,
+                str(
+                    ROOT
+                    / "scripts"
+                    / "smores_ep"
+                    / "run_gap_rc_alignment.py"
+                ),
+                "--target-yaw-rad",
+                str(stage.parameters.get("target_yaw_rad", 0.0)),
+            ]
+
+            run_logged(
+                command,
+                environment=environment,
+                log_path=(
+                    runtime_dir
+                    / f"stage-{stage.stage_id:02d}-gap-alignment.log"
+                ),
+                timeout_s=120,
+            )
+
         elif stage.kind == "button_rc_alignment":
             command = [
                 sys.executable,
@@ -486,6 +844,19 @@ def execute_stages(
         elif stage.kind != "button_expert":
             raise RuntimeError(f"Unsupported composite stage kind {stage.kind!r}")
 
+        if (
+            stop_after_stage is not None
+            and stage.stage_id == stop_after_stage
+        ):
+            print(
+                f"STOP-AFTER-STAGE reached: {stage.stage_id:02d} "
+                f"{stage.task_id} {stage.kind}",
+                flush=True,
+            )
+            return False
+
+    return True
+
 
 def main() -> int:
     args = argument_parser().parse_args()
@@ -496,6 +867,16 @@ def main() -> int:
         ObstacleCoursePolicy(morphology_capabilities())
     )
     stages = planner.build(course.tasks)
+
+    if (
+        args.stop_after_stage is not None
+        and args.stop_after_stage
+        not in {stage.stage_id for stage in stages}
+    ):
+        raise ValueError(
+            f"Unknown --stop-after-stage {args.stop_after_stage}; "
+            f"valid IDs are 0..{len(stages) - 1}"
+        )
 
     print(
         f"episode={args.episode} obstacles={len(mission['tasks'])} "
@@ -594,7 +975,7 @@ def main() -> int:
             print("Composite GUI ready; close Isaac to end the command.")
             return runtime.wait()
         dataset_path = runtime_dir / "dataset.jsonl"
-        execute_stages(
+        completed_all_stages = execute_stages(
             stages,
             runtime=runtime,
             runtime_dir=runtime_dir,
@@ -602,7 +983,24 @@ def main() -> int:
             episode_id=args.episode,
             environment=environment,
             headless=args.headless,
+            stop_after_stage=args.stop_after_stage,
+            reconfiguration_executor=args.reconfiguration_executor,
         )
+
+        if not completed_all_stages:
+            print(
+                "Composite execution intentionally paused after "
+                f"stage {args.stop_after_stage:02d}.",
+                flush=True,
+            )
+            if not args.headless:
+                print(
+                    "Isaac remains open for inspection; "
+                    "close the GUI to exit."
+                )
+                return runtime.wait()
+            return 0
+
         success = True
         normalize_dataset(dataset_path, args.episode, True)
         print(f"COMPOSITE MISSION SUCCEEDED: final goal reached; dataset={dataset_path}")

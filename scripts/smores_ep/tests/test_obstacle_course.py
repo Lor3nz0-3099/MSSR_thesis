@@ -1,5 +1,6 @@
 
 from __future__ import annotations
+import math
 
 import pytest
 
@@ -449,3 +450,384 @@ def test_default_button_fixture_is_unchanged() -> None:
     assert course.base_standoff_xy_m == pytest.approx(
         (0.85, 0.265)
     )
+
+
+def test_composite_gap_rc_button_follows_compact_single_curve_layout() -> None:
+    from smores_ep.isaac.obstacle_course import composite_obstacle_course
+
+    mission = {
+        "schema_version": "mssr.composite_mission.v1",
+        "episode_id": "layout-c05",
+        "tasks": [
+            {"task_id": "gap-1", "type": "gap", "seed": 4100},
+            {"task_id": "rc-1", "type": "flat_navigation", "seed": 5100},
+            {"task_id": "button-1", "type": "button", "seed": 6101},
+        ],
+    }
+    validated = {
+        "gap": frozenset({4100}),
+        "flat_navigation": frozenset({5100}),
+        "button": frozenset({6101}),
+    }
+
+    course = composite_obstacle_course(mission, validated)
+    tasks = {task["task_id"]: task for task in course.tasks}
+
+    gap = tasks["gap-1"]["parameters"]["gap"]
+
+    # Spawn/assembly area must no longer be followed by a very long
+    # empty approach before the first gap.
+    assert gap["near_edge_x_m"] < 0.0
+
+    route = tasks["rc-1"]["parameters"]["waypoints_xyyaw"]
+
+    # RC starts on the lower lane and finishes on the offset upper lane.
+    assert route[0][1] == pytest.approx(0.0)
+    assert route[-1][1] > 0.50
+
+    # Regression for the old artificial return-to-y=0 point:
+    # the RC task ends where its single physical curve actually ends.
+    assert route[-1][1] != pytest.approx(0.0)
+
+    button = tasks["button-1"]["parameters"]["button"]
+    button_platform = next(
+        box
+        for box in course.boxes
+        if box.semantic == "button_test_platform"
+    )
+
+    # The final button platform continues from the RC upper lane.
+    assert button_platform.center_xyz_m[1] == pytest.approx(route[-1][1])
+
+    # Seed 6101 presses along -X.  Therefore the robot must finish on
+    # the +X side of the button before RC -> MM8 and the final press.
+    # The button is still in the terminal platform, but is slightly
+    # behind the RC endpoint along X by design.
+    press_direction = button["press_direction_world_xy"]
+
+    assert press_direction[0] < -0.5
+    assert abs(press_direction[1]) < 0.5
+
+    assert button["center_xyz_m"][1] == pytest.approx(route[-1][1])
+
+    button_standoff_x_m = (
+        route[-1][0] - button["center_xyz_m"][0]
+    )
+
+    assert 0.0 < button_standoff_x_m < 0.40
+
+    # Button is the terminal platform: do not create another detached
+    # goal platform after it.
+    assert not any(
+        box.name == "CompositeGoalPlatform"
+        for box in course.boxes
+    )
+
+    half_x = 0.5 * button_platform.size_xyz_m[0]
+    platform_min_x = button_platform.center_xyz_m[0] - half_x
+    platform_max_x = button_platform.center_xyz_m[0] + half_x
+
+    # Both the RC endpoint and the synthetic final goal remain inside
+    # the same physical terminal button platform.
+    assert platform_min_x <= route[-1][0] <= platform_max_x
+    assert (
+        platform_min_x
+        <= button["center_xyz_m"][0]
+        <= platform_max_x
+    )
+    assert platform_min_x <= course.goal_center_xyz_m[0] <= platform_max_x
+    assert course.goal_center_xyz_m[1] == pytest.approx(route[-1][1])
+
+
+def test_composite_repeated_rc_curves_alternate_lanes_instead_of_drifting() -> None:
+    from smores_ep.isaac.obstacle_course import composite_obstacle_course
+
+    mission = {
+        "schema_version": "mssr.composite_mission.v1",
+        "episode_id": "layout-repeated-rc",
+        "tasks": [
+            {"task_id": "rc-1", "type": "flat_navigation", "seed": 5100},
+            {"task_id": "rc-2", "type": "flat_navigation", "seed": 5100},
+            {"task_id": "button-1", "type": "button", "seed": 6101},
+        ],
+    }
+    validated = {
+        "flat_navigation": frozenset({5100}),
+        "button": frozenset({6101}),
+    }
+
+    course = composite_obstacle_course(mission, validated)
+    tasks = {task["task_id"]: task for task in course.tasks}
+
+    first = tasks["rc-1"]["parameters"]["waypoints_xyyaw"]
+    second = tasks["rc-2"]["parameters"]["waypoints_xyyaw"]
+
+    assert first[-1][1] > 0.50
+
+    # Second task starts from the first task's lane...
+    assert second[0][1] == pytest.approx(first[-1][1])
+
+    # ...then mirrors the same validated curve instead of moving yet
+    # farther away from the course.
+    assert abs(second[-1][1]) < 0.15
+
+
+def test_composite_c05_rc_exit_handoff_starts_button_platform_at_course_end() -> None:
+    from smores_ep.isaac.obstacle_course import composite_obstacle_course
+
+    mission = {
+        "schema_version": "mssr.composite_mission.v1",
+        "episode_id": "composite-c05",
+        "tasks": [
+            {"task_id": "gap-1", "type": "gap", "seed": 4100},
+            {"task_id": "rc-1", "type": "flat_navigation", "seed": 5100},
+            {"task_id": "button-1", "type": "button", "seed": 6101},
+        ],
+    }
+
+    validated = {
+        "gap": frozenset({4100}),
+        "flat_navigation": frozenset({5100}),
+        "button": frozenset({6101}),
+    }
+
+    course = composite_obstacle_course(mission, validated)
+
+    rc_task = next(
+        task for task in course.tasks
+        if task["task_id"] == "rc-1"
+    )
+    params = rc_task["parameters"]
+
+    route = params["waypoints_xyyaw"]
+    goal = params["navigation_goal_xyyaw"]
+
+    button_platform = next(
+        box for box in course.boxes
+        if box.semantic == "button_test_platform"
+    )
+
+    cx, cy, _ = button_platform.center_xyz_m
+    sx, sy, _ = button_platform.size_xyz_m
+
+    button_left_x = float(cx) - 0.5 * float(sx)
+    button_right_x = float(cx) + 0.5 * float(sx)
+    button_low_y = float(cy) - 0.5 * float(sy)
+    button_high_y = float(cy) + 0.5 * float(sy)
+
+    # Keep the original longitudinal X placement of the button stage.
+    # The button platform is moved only in Y.
+    assert button_left_x == pytest.approx(route[-1][0] - 0.90)
+
+    # C05 exits the RC curve at yaw ~= +pi/2, so "behind/in depth" is +Y.
+    # The near Y edge of the button platform starts exactly where the
+    # RC course ends.
+    assert button_low_y == pytest.approx(route[-1][1])
+
+    # C05 uses both coordinates selected directly with RViz
+    # Publish Point.  Do not mix them with route-derived coordinates.
+    assert goal[0] == pytest.approx(2.317791700363159)
+    assert goal[1] == pytest.approx(0.9919289946556091)
+
+    # NavigateToPose still requires a yaw field, but completion is
+    # position-only for this handoff.
+    assert goal[2] == pytest.approx(route[-1][2])
+    assert params["navigation_accept_position_m"] == pytest.approx(0.10)
+    assert params["navigation_accept_yaw_rad"] == pytest.approx(
+        3.141592653589793
+    )
+
+    # The clicked goal remains laterally inside the platform X span,
+    # while its Y lies before the near edge of the button platform.
+    assert button_left_x <= goal[0] <= button_right_x
+    assert goal[1] < button_low_y
+
+    # The platform itself remains available to the following button expert
+    # through the extended navigation map.
+    assert button_low_y <= float(cy) <= button_high_y
+
+def test_composite_c05_rc_map_includes_button_platform() -> None:
+    from smores_ep.isaac.obstacle_course import composite_obstacle_course
+
+    mission = {
+        "schema_version": "mssr.composite_mission.v1",
+        "episode_id": "composite-c05",
+        "tasks": [
+            {"task_id": "gap-1", "type": "gap", "seed": 4100},
+            {"task_id": "rc-1", "type": "flat_navigation", "seed": 5100},
+            {"task_id": "button-1", "type": "button", "seed": 6101},
+        ],
+    }
+
+    validated = {
+        "gap": frozenset({4100}),
+        "flat_navigation": frozenset({5100}),
+        "button": frozenset({6101}),
+    }
+
+    course = composite_obstacle_course(mission, validated)
+
+    rc_task = next(
+        task for task in course.tasks
+        if task["task_id"] == "rc-1"
+    )
+    params = rc_task["parameters"]
+
+    button_platform = next(
+        box for box in course.boxes
+        if box.semantic == "button_test_platform"
+    )
+
+    cx, cy, _ = button_platform.center_xyz_m
+    sx, sy, _ = button_platform.size_xyz_m
+
+    button_bounds = [
+        float(cx) - 0.5 * float(sx),
+        float(cx) + 0.5 * float(sx),
+        float(cy) - 0.5 * float(sy),
+        float(cy) + 0.5 * float(sy),
+    ]
+
+    free_rectangles = params.get(
+        "navigation_free_rectangles_xy_m",
+        [],
+    )
+
+    assert any(
+        all(
+            actual == pytest.approx(expected)
+            for actual, expected in zip(rectangle, button_bounds)
+        )
+        for rectangle in free_rectangles
+    )
+
+    map_bounds = params["platform_bounds_xy_m"]
+
+    assert map_bounds[0] <= button_bounds[0]
+    assert map_bounds[1] >= button_bounds[1]
+    assert map_bounds[2] <= button_bounds[2]
+    assert map_bounds[3] >= button_bounds[3]
+
+    gx, gy, _ = params["navigation_goal_xyyaw"]
+
+    # The exact clicked goal remains inside the mapped area and
+    # before the near Y edge of the button platform.
+    assert button_bounds[0] <= gx <= button_bounds[1]
+    assert gy < button_bounds[2]
+    assert map_bounds[0] <= gx <= map_bounds[1]
+    assert map_bounds[2] <= gy <= map_bounds[3]
+
+    # The OccupancyGrid must nevertheless include both the exit goal and
+    # the complete shifted button platform.
+    assert map_bounds[0] <= gx <= map_bounds[1]
+    assert map_bounds[2] <= gy <= map_bounds[3]
+
+
+def test_composite_c05_rc_uses_exact_clicked_rviz_goal() -> None:
+    from smores_ep.isaac.obstacle_course import composite_obstacle_course
+
+    mission = {
+        "schema_version": "mssr.composite_mission.v1",
+        "episode_id": "composite-c05",
+        "tasks": [
+            {"task_id": "gap-1", "type": "gap", "seed": 4100},
+            {"task_id": "rc-1", "type": "flat_navigation", "seed": 5100},
+            {"task_id": "button-1", "type": "button", "seed": 6101},
+        ],
+    }
+
+    validated = {
+        "gap": frozenset({4100}),
+        "flat_navigation": frozenset({5100}),
+        "button": frozenset({6101}),
+    }
+
+    course = composite_obstacle_course(mission, validated)
+
+    params = next(
+        task for task in course.tasks
+        if task["task_id"] == "rc-1"
+    )["parameters"]
+
+    route = params["waypoints_xyyaw"]
+    goal = params["navigation_goal_xyyaw"]
+
+    # Exact point selected with RViz Publish Point.
+    assert goal[0] == pytest.approx(2.317791700363159)
+    assert goal[1] == pytest.approx(0.9919289946556091)
+
+    # Yaw remains only a NavigateToPose placeholder.
+    assert goal[2] == pytest.approx(route[-1][2])
+
+    assert "navigation_via_xyyaw" not in params
+    assert params["navigation_accept_position_m"] == pytest.approx(0.10)
+    assert params["navigation_accept_yaw_rad"] == pytest.approx(
+        3.141592653589793
+    )
+
+
+def test_composite_c05_moves_only_rc_cone5() -> None:
+    from smores_ep.isaac.obstacle_course import composite_obstacle_course
+
+    def build(episode_id: str):
+        mission = {
+            "schema_version": "mssr.composite_mission.v1",
+            "episode_id": episode_id,
+            "tasks": [
+                {"task_id": "gap-1", "type": "gap", "seed": 4100},
+                {"task_id": "rc-1", "type": "flat_navigation", "seed": 5100},
+                {"task_id": "button-1", "type": "button", "seed": 6101},
+            ],
+        }
+
+        validated = {
+            "gap": frozenset({4100}),
+            "flat_navigation": frozenset({5100}),
+            "button": frozenset({6101}),
+        }
+
+        return composite_obstacle_course(mission, validated)
+
+    c05 = build("composite-c05")
+    control = build("not-composite-c05")
+
+    c05_rc = next(
+        task for task in c05.tasks
+        if task["task_id"] == "rc-1"
+    )
+    control_rc = next(
+        task for task in control.tasks
+        if task["task_id"] == "rc-1"
+    )
+
+    c05_cones = c05_rc["parameters"]["cone_centers_xy_m"]
+    control_cones = control_rc["parameters"]["cone_centers_xy_m"]
+
+    assert len(c05_cones) >= 5
+    assert len(control_cones) >= 5
+
+    # C05 alone moves cone 5 to the manually selected Isaac X.
+    assert c05_cones[4][0] == pytest.approx(2.63851)
+
+    # Preserve cone 5 Y exactly.
+    assert c05_cones[4][1] == pytest.approx(control_cones[4][1])
+
+    # Only cone 5 changes; cones 1-4 and 6+ remain untouched.
+    for index in range(len(c05_cones)):
+        if index == 4:
+            continue
+        assert c05_cones[index] == pytest.approx(control_cones[index])
+
+    # The generic seed-5100 layout must remain unchanged.
+    assert control_cones[4][0] != pytest.approx(2.63851)
+
+    # Physical composite cone and navigation metadata must agree.
+    physical = [
+        cone for cone in c05.navigation_cones
+        if cone.task_id == "rc-1"
+    ]
+
+    assert len(physical) == len(c05_cones)
+    assert physical[4].center_xyz_m[0] == pytest.approx(2.63851)
+    assert physical[4].center_xyz_m[1] == pytest.approx(c05_cones[4][1])
+    assert physical[4].center_xyz_m[2] == pytest.approx(0.085)

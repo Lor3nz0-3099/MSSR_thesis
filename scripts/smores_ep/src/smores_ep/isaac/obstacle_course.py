@@ -1120,6 +1120,8 @@ def _support_box(
     top_height_m: float,
     width_m: float,
     semantic: str,
+    *,
+    center_y_m: float = 0.0,
 ) -> CourseBox:
     """Return a solid support whose top is exactly ``top_height_m``."""
 
@@ -1128,7 +1130,7 @@ def _support_box(
         name,
         (
             0.5 * (start_x_m + end_x_m),
-            0.0,
+            center_y_m,
             0.5 * (top_height_m + bottom_height_m),
         ),
         (
@@ -1160,7 +1162,9 @@ def composite_obstacle_course(
 
     travel_width_m = 1.20
     button_width_m = 1.40
-    cursor_x_m = -0.80
+    cursor_x_m = -1.05
+    cursor_y_m = 0.0
+    flat_navigation_index = 0
     floor_height_m = 0.0
     boxes: list[CourseBox] = [
         _support_box(
@@ -1176,6 +1180,8 @@ def composite_obstacle_course(
     buttons: list[CompositeButtonFixture] = []
     navigation_cones: list[CompositeNavigationCone] = []
     seen_ids: set[str] = set()
+    last_rc_navigation_map: dict[str, Any] | None = None
+    last_rc_navigation_task: dict[str, Any] | None = None
 
     def require_seed(task_type: str, raw: Mapping[str, Any]) -> int:
         if "seed" not in raw:
@@ -1211,21 +1217,85 @@ def composite_obstacle_course(
             ]
             first_x, first_y = source_centerline[0]
             offset_x_m = cursor_x_m - first_x
-            offset_y_m = -first_y
+
+            curve_sign = (
+                +1.0
+                if flat_navigation_index % 2 == 0
+                else -1.0
+            )
+            flat_navigation_index += 1
+
             route_xy = [
-                (x_m + offset_x_m, y_m + offset_y_m)
+                (
+                    x_m + offset_x_m,
+                    cursor_y_m
+                    + curve_sign * (y_m - first_y),
+                )
                 for x_m, y_m in source_centerline
             ]
-            end_x_m = max(point[0] for point in route_xy) + 0.80
-            if math.hypot(
-                route_xy[-1][0] - end_x_m,
-                route_xy[-1][1],
-            ) > 1.0e-6:
-                route_xy.append((end_x_m, 0.0))
+
+            diagnostic_route_length = raw.get(
+                "diagnostic_route_length_m"
+            )
+
+            if diagnostic_route_length is not None:
+                diagnostic_route_length_m = float(
+                    diagnostic_route_length
+                )
+
+                if (
+                    not math.isfinite(diagnostic_route_length_m)
+                    or not 0.01 <= diagnostic_route_length_m <= 1.0
+                ):
+                    raise ValueError(
+                        "diagnostic_route_length_m must be between "
+                        "0.01 and 1.0 m"
+                    )
+
+                start_x_m, start_y_m = route_xy[0]
+                next_x_m, next_y_m = route_xy[1]
+
+                direction_x_m = next_x_m - start_x_m
+                direction_y_m = next_y_m - start_y_m
+                direction_norm_m = math.hypot(
+                    direction_x_m,
+                    direction_y_m,
+                )
+
+                if direction_norm_m <= 1.0e-9:
+                    raise ValueError(
+                        "Diagnostic RC-Car route has zero initial tangent"
+                    )
+
+                route_xy = [
+                    (start_x_m, start_y_m),
+                    (
+                        start_x_m
+                        + diagnostic_route_length_m
+                        * direction_x_m
+                        / direction_norm_m,
+                        start_y_m
+                        + diagnostic_route_length_m
+                        * direction_y_m
+                        / direction_norm_m,
+                    ),
+                ]
+
+            # Preserve the real endpoint of the validated RC-Car route.
+            # Do not append an artificial +X segment after the 90-deg bend.
+            end_x_m = route_xy[-1][0]
+            end_y_m = route_xy[-1][1]
             translated_route = [
                 list(pose) for pose in _route_points_with_yaw(tuple(route_xy))
             ]
-            road_width_m = float(layout["corridor_width_m"])
+            # Seed 5100 was validated with a 0.84 m navigation corridor.
+            # Keep that proven geometry inside the composite instead of
+            # using the later 1.10 m generic width.
+            road_width_m = (
+                0.84
+                if int(seed) == 5100
+                else float(layout["corridor_width_m"])
+            )
             for segment, (start, end) in enumerate(
                 zip(route_xy[:-1], route_xy[1:])
             ):
@@ -1248,13 +1318,40 @@ def composite_obstacle_course(
                         yaw_deg=math.degrees(math.atan2(dy, dx)),
                     )
                 )
-            translated_cones = [
-                [
-                    float(point[0]) + offset_x_m,
-                    float(point[1]) + offset_y_m,
+            translated_cones = (
+                []
+                if diagnostic_route_length is not None
+                else [
+                    [
+                        float(point[0]) + offset_x_m,
+                        cursor_y_m
+                        + curve_sign
+                        * (float(point[1]) - first_y),
+                    ]
+                    for point in layout["cone_centers_xy_m"]
                 ]
-                for point in layout["cone_centers_xy_m"]
-            ]
+            )
+
+            # C05-only clearance adjustment.
+            # Move only RC cone 5 along world X while preserving Y.
+            # Because this is applied before both navigation_cones and
+            # task metadata are created, Isaac and Nav2 stay consistent.
+            if (
+                str(mission.get("episode_id", "")) == "composite-c05"
+                and task_id == "rc-1"
+                and int(seed) == 5100
+                and diagnostic_route_length is None
+            ):
+                if len(translated_cones) < 5:
+                    raise RuntimeError(
+                        "C05 cone-5 override requires at least five cones"
+                    )
+
+                translated_cones[4] = [
+                    2.63851,
+                    float(translated_cones[4][1]),
+                ]
+
             cone_radius_m = float(layout["cone_radius_m"])
             cone_height_m = float(layout["cone_height_m"])
             navigation_cones.extend(
@@ -1277,6 +1374,55 @@ def composite_obstacle_course(
                 min(point[1] for point in route_xy) - half_width_m,
                 max(point[1] for point in route_xy) + half_width_m,
             ]
+
+            # The robot is assembled on CompositeStartPlatform before Nav2
+            # starts. Include that entire physical support in the free map.
+            start_pad_bounds_xy_m = [
+                route_xy[0][0] - 1.40,
+                route_xy[0][0],
+                route_xy[0][1] - 0.5 * travel_width_m,
+                route_xy[0][1] + 0.5 * travel_width_m,
+            ]
+
+            platform_bounds = [
+                min(platform_bounds[0], start_pad_bounds_xy_m[0]),
+                max(platform_bounds[1], start_pad_bounds_xy_m[1]),
+                min(platform_bounds[2], start_pad_bounds_xy_m[2]),
+                max(platform_bounds[3], start_pad_bounds_xy_m[3]),
+            ]
+            requested_accept_position = raw.get(
+                "navigation_accept_position_m"
+            )
+            requested_accept_yaw = raw.get(
+                "navigation_accept_yaw_rad"
+            )
+
+            if requested_accept_position is not None:
+                requested_accept_position = float(
+                    requested_accept_position
+                )
+
+                if (
+                    not math.isfinite(requested_accept_position)
+                    or requested_accept_position <= 0.0
+                ):
+                    raise ValueError(
+                        "navigation_accept_position_m must be positive"
+                    )
+
+            if requested_accept_yaw is not None:
+                requested_accept_yaw = float(
+                    requested_accept_yaw
+                )
+
+                if (
+                    not math.isfinite(requested_accept_yaw)
+                    or not 0.0 < requested_accept_yaw <= math.pi
+                ):
+                    raise ValueError(
+                        "navigation_accept_yaw_rad must be in (0, pi]"
+                    )
+
             tasks.append(
                 {
                     "task_id": task_id,
@@ -1290,18 +1436,226 @@ def composite_obstacle_course(
                         "cone_height_m": cone_height_m,
                         "corridor_width_m": road_width_m,
                         "platform_bounds_xy_m": platform_bounds,
+                        "start_pad_bounds_xy_m": start_pad_bounds_xy_m,
+                        "vehicle_footprint": dict(
+                            layout["vehicle_footprint"]
+                        ),
                         "floor_height_m": floor_height_m,
                     },
                 }
             )
+
+            if requested_accept_position is not None:
+                tasks[-1]["parameters"][
+                    "navigation_accept_position_m"
+                ] = requested_accept_position
+
+            if requested_accept_yaw is not None:
+                tasks[-1]["parameters"][
+                    "navigation_accept_yaw_rad"
+                ] = requested_accept_yaw
+
+            last_rc_navigation_task = tasks[-1]
+
+            last_rc_navigation_map = {
+                "waypoints_xyyaw": [
+                    list(pose) for pose in translated_route
+                ],
+                "cone_centers_xy_m": [
+                    list(point) for point in translated_cones
+                ],
+                "cone_radius_m": cone_radius_m,
+                "corridor_width_m": road_width_m,
+                "platform_bounds_xy_m": list(platform_bounds),
+                "start_pad_bounds_xy_m": list(
+                    start_pad_bounds_xy_m
+                ),
+                "vehicle_footprint": dict(
+                    layout["vehicle_footprint"]
+                ),
+            }
+
             cursor_x_m = end_x_m
+            cursor_y_m = end_y_m
             continue
 
         if task_type == "gap":
             spec = sample_coplanar_gap_spec(seed)
-            near_edge_x_m = cursor_x_m + 1.05
+
+            # The validated RC-Car route finishes while pointing along +Y.
+            # In the composite course that point must not remain on the edge
+            # of the support: give the vehicle a full square turning area.
+            reconfiguration_pad_half_m = 0.60
+            reconfiguration_pad_start_x_m = (
+                cursor_x_m - reconfiguration_pad_half_m
+            )
+            reconfiguration_pad_end_x_m = (
+                cursor_x_m + reconfiguration_pad_half_m
+            )
+
+            boxes.append(
+                _support_box(
+                    f"{safe_id}_ReconfigurationPad",
+                    reconfiguration_pad_start_x_m,
+                    reconfiguration_pad_end_x_m,
+                    floor_height_m,
+                    2.0 * reconfiguration_pad_half_m,
+                    "gap_reconfiguration_pad",
+                    center_y_m=cursor_y_m,
+                )
+            )
+
+            # RC-Car8 will later move here before self-reconfiguration.
+            # The gap expert operates along world +X, therefore the target
+            # Snake8 orientation is yaw=0.  For seed 5100 this corresponds
+            # to a -90 degree turn from the curve exit yaw (+pi/2).
+            reconfiguration_pose_xyyaw = [
+                cursor_x_m + 0.45,
+                cursor_y_m,
+                0.0,
+            ]
+
+            # The isolated RC-Car seed originally finishes at the
+            # end of the curve. In the composite course that goal
+            # lies behind the final cone relative to the gap.
+            #
+            # Keep the original centerline/map geometry, but make
+            # the preceding RC-Car NavigateToPose aim directly at
+            # the safe reconfiguration pad.
+            if last_rc_navigation_task is not None:
+                last_rc_navigation_task["parameters"][
+                    "navigation_goal_xyyaw"
+                ] = list(reconfiguration_pose_xyyaw)
+
+                # Nav2 only needs to bring RC-Car8 into the
+                # pre-reconfiguration region. Precise heading is handled
+                # by a dedicated local reverse-arc alignment afterwards,
+                # exactly as for the button approach.
+                last_rc_navigation_task["parameters"].setdefault(
+                    "navigation_accept_position_m",
+                    0.12,
+                )
+                last_rc_navigation_task["parameters"].setdefault(
+                    "navigation_accept_yaw_rad",
+                    math.radians(25.0),
+                )
+
+            near_edge_x_m = cursor_x_m + 0.75
             far_edge_x_m = near_edge_x_m + spec.width_m
-            landing_end_x_m = far_edge_x_m + 1.35
+            landing_end_x_m = far_edge_x_m + 0.80
+
+            # The preceding RC-Car navigation now finishes on the
+            # reconfiguration pad. Extend its free-space map over
+            # the actual physical support up to the near edge of
+            # the gap. Previously the old curve bounds ended at
+            # x ~= 1.55, making the new goal unreachable for the
+            # complete RC-Car footprint.
+            if last_rc_navigation_task is not None:
+                rc_bounds = list(
+                    last_rc_navigation_task["parameters"][
+                        "platform_bounds_xy_m"
+                    ]
+                )
+
+                rc_bounds[0] = min(
+                    rc_bounds[0],
+                    reconfiguration_pad_start_x_m,
+                )
+                rc_bounds[1] = max(
+                    rc_bounds[1],
+                    near_edge_x_m,
+                )
+                rc_bounds[2] = min(
+                    rc_bounds[2],
+                    cursor_y_m - reconfiguration_pad_half_m,
+                )
+                rc_bounds[3] = max(
+                    rc_bounds[3],
+                    cursor_y_m + reconfiguration_pad_half_m,
+                )
+
+                last_rc_navigation_task["parameters"][
+                    "platform_bounds_xy_m"
+                ] = rc_bounds
+
+                # platform_bounds only changes the OccupancyGrid
+                # dimensions. Explicitly mark the real physical
+                # reconfiguration pad / near bank as navigable.
+                last_rc_navigation_task["parameters"][
+                    "navigation_free_rectangles_xy_m"
+                ] = [
+                    [
+                        reconfiguration_pad_start_x_m,
+                        near_edge_x_m,
+                        cursor_y_m - reconfiguration_pad_half_m,
+                        cursor_y_m + reconfiguration_pad_half_m,
+                    ]
+                ]
+
+            reconfiguration_navigation = None
+
+            if last_rc_navigation_map is not None:
+                pad_bounds_xy_m = [
+                    reconfiguration_pad_start_x_m,
+                    reconfiguration_pad_end_x_m,
+                    cursor_y_m - reconfiguration_pad_half_m,
+                    cursor_y_m + reconfiguration_pad_half_m,
+                ]
+
+                previous_bounds = list(
+                    last_rc_navigation_map[
+                        "platform_bounds_xy_m"
+                    ]
+                )
+
+                reconfiguration_navigation = dict(
+                    last_rc_navigation_map
+                )
+
+                # Only two centerline points are needed for this
+                # local alignment map. NavigateToPose still chooses
+                # the actual trajectory autonomously.
+                reconfiguration_navigation[
+                    "waypoints_xyyaw"
+                ] = [
+                    list(
+                        last_rc_navigation_map[
+                            "waypoints_xyyaw"
+                        ][-1]
+                    ),
+                    list(reconfiguration_pose_xyyaw),
+                ]
+
+                reconfiguration_navigation[
+                    "platform_bounds_xy_m"
+                ] = [
+                    min(
+                        previous_bounds[0],
+                        pad_bounds_xy_m[0],
+                    ),
+                    max(
+                        previous_bounds[1],
+                        near_edge_x_m,
+                    ),
+                    min(
+                        previous_bounds[2],
+                        pad_bounds_xy_m[2],
+                    ),
+                    max(
+                        previous_bounds[3],
+                        pad_bounds_xy_m[3],
+                    ),
+                ]
+
+                # The full square pad is free space for turning.
+                reconfiguration_navigation[
+                    "start_pad_bounds_xy_m"
+                ] = pad_bounds_xy_m
+
+                reconfiguration_navigation[
+                    "corridor_width_m"
+                ] = travel_width_m
+
             boxes.extend(
                 (
                     _support_box(
@@ -1311,6 +1665,7 @@ def composite_obstacle_course(
                         floor_height_m,
                         travel_width_m,
                         "gap_test_near_bank",
+                        center_y_m=cursor_y_m,
                     ),
                     _support_box(
                         f"{safe_id}_FarBank",
@@ -1319,6 +1674,7 @@ def composite_obstacle_course(
                         floor_height_m,
                         travel_width_m,
                         "gap_test_far_bank",
+                        center_y_m=cursor_y_m,
                     ),
                 )
             )
@@ -1333,6 +1689,18 @@ def composite_obstacle_course(
                             "far_edge_x_m": far_edge_x_m,
                             "bank_height_m": floor_height_m,
                         },
+                        "reconfiguration_pad_bounds_xy_m": [
+                            reconfiguration_pad_start_x_m,
+                            reconfiguration_pad_end_x_m,
+                            cursor_y_m - reconfiguration_pad_half_m,
+                            cursor_y_m + reconfiguration_pad_half_m,
+                        ],
+                        "reconfiguration_pose_xyyaw": (
+                            reconfiguration_pose_xyyaw
+                        ),
+                        "reconfiguration_navigation": (
+                            reconfiguration_navigation
+                        ),
                         "floor_height_m": floor_height_m,
                     },
                 }
@@ -1346,7 +1714,7 @@ def composite_obstacle_course(
                 raise ValueError(
                     f"Validated composite stairs require 2-6 steps, got {spec.step_count}"
                 )
-            first_riser_x_m = cursor_x_m + 1.05
+            first_riser_x_m = cursor_x_m + 0.35
             boxes.append(
                 _support_box(
                     f"{safe_id}_StairApproach",
@@ -1355,6 +1723,7 @@ def composite_obstacle_course(
                     floor_height_m,
                     travel_width_m,
                     "stair_test_start",
+                    center_y_m=cursor_y_m,
                 )
             )
             top_heights_m = tuple(
@@ -1371,6 +1740,7 @@ def composite_obstacle_course(
                         top_height_m,
                         spec.width_m,
                         "stair_test_riser",
+                        center_y_m=cursor_y_m,
                     )
                 )
             upper_start_x_m = (
@@ -1385,6 +1755,7 @@ def composite_obstacle_course(
                     top_heights_m[-1],
                     travel_width_m,
                     "stair_test_upper_deck",
+                    center_y_m=cursor_y_m,
                 )
             )
             tasks.append(
@@ -1410,20 +1781,128 @@ def composite_obstacle_course(
 
         spec = sample_button_target_spec(seed)
         nx, ny = spec.press_direction_xy
-        platform_end_x_m = cursor_x_m + 2.80
+
+        # The button continues naturally on the lane reached by the
+        # preceding obstacle / RC curve.  No artificial second lateral turn.
+        button_lane_y_m = cursor_y_m
+
+        # C05 keeps the original button-stage X placement but moves the
+        # complete button fixture only along +Y.  The near Y edge of the
+        # platform coincides with the end of the RC course, giving the
+        # button expert a full platform in front of the forward-only RC-Car.
+        if (
+            str(mission.get("episode_id", "")).strip() == "composite-c05"
+            and last_rc_navigation_task is not None
+            and str(
+                last_rc_navigation_task.get("task_id", "")
+            ).strip() == "rc-1"
+        ):
+            rc_route_for_button = last_rc_navigation_task[
+                "parameters"
+            ]["waypoints_xyyaw"]
+            rc_course_end_y_m = float(
+                rc_route_for_button[-1][1]
+            )
+            button_lane_y_m = (
+                rc_course_end_y_m + 0.5 * button_width_m
+            )
+
+        # Compact terminal platform with enough room for RC -> MM8
+        # reconfiguration, alignment and button press.
+        # The button area overlaps the lateral bridge and is much shorter
+        # than the previous 2.80 m straight platform.
+        platform_start_x_m = cursor_x_m - 0.90
+        platform_end_x_m = platform_start_x_m + 1.90
+
         boxes.append(
             _support_box(
                 f"{safe_id}_ButtonPlatform",
-                cursor_x_m,
+                platform_start_x_m,
                 platform_end_x_m,
                 floor_height_m,
                 button_width_m,
                 "button_test_platform",
+                center_y_m=button_lane_y_m,
             )
         )
+
+        # C05-specific Nav2 handoff: keep every obstacle and behavior
+        # unchanged, but send rc-1 into the large free area on the right
+        # side of the terminal platform.  Button alignment starts later.
+        if (
+            str(mission.get("episode_id", "")).strip() == "composite-c05"
+            and last_rc_navigation_task is not None
+            and str(last_rc_navigation_task.get("task_id", "")).strip()
+            == "rc-1"
+        ):
+            rc_parameters = last_rc_navigation_task["parameters"]
+            rc_route = rc_parameters["waypoints_xyyaw"]
+
+            # rc-1 ends at a dedicated exit/handoff pose just to the
+            # right of the final cone.  Do not make the first Nav2 goal
+            # double as the button approach goal: the existing button
+            # expert takes over navigation after this point.
+            # C05 handoff selected directly with RViz Publish Point.
+            # Keep both coordinates from the same click.
+            route_end_yaw_rad = rc_route[-1][2]
+            rc_parameters["navigation_goal_xyyaw"] = [
+                2.317791700363159,
+                0.9919289946556091,
+                # Placeholder required by NavigateToPose.  Completion is
+                # position-only, so final yaw is intentionally irrelevant.
+                float(route_end_yaw_rad),
+            ]
+            rc_parameters["navigation_accept_position_m"] = 0.10
+            rc_parameters["navigation_accept_yaw_rad"] = math.pi
+
+            # The button platform already exists physically in Isaac.
+            # Add the same rectangle to rc-1's navigation map so Nav2 can
+            # plan continuously from the RC course into the terminal zone.
+            button_nav_bounds = [
+                float(min(platform_start_x_m, platform_end_x_m)),
+                float(max(platform_start_x_m, platform_end_x_m)),
+                float(button_lane_y_m - 0.5 * button_width_m),
+                float(button_lane_y_m + 0.5 * button_width_m),
+            ]
+
+            navigation_free_rectangles = [
+                list(rectangle)
+                for rectangle in rc_parameters.get(
+                    "navigation_free_rectangles_xy_m",
+                    [],
+                )
+            ]
+            navigation_free_rectangles.append(button_nav_bounds)
+            rc_parameters[
+                "navigation_free_rectangles_xy_m"
+            ] = navigation_free_rectangles
+
+            map_bounds = [
+                float(value)
+                for value in rc_parameters["platform_bounds_xy_m"]
+            ]
+            rc_parameters["platform_bounds_xy_m"] = [
+                min(map_bounds[0], button_nav_bounds[0]),
+                max(map_bounds[1], button_nav_bounds[1]),
+                min(map_bounds[2], button_nav_bounds[2]),
+                max(map_bounds[3], button_nav_bounds[3]),
+            ]
+
+        # Leave the validated RC-Car standoff side inside the platform for
+        # either +/-X-oriented buttons.
+        if nx < -0.5:
+            button_x_m = platform_start_x_m + 0.65
+        elif nx > 0.5:
+            button_x_m = platform_end_x_m - 0.65
+        else:
+            button_x_m = 0.5 * (
+                platform_start_x_m + platform_end_x_m
+            )
+
         button_center = (
-            cursor_x_m + 1.55,
-            (0.45 * ny if abs(ny) > 0.5 else 0.0),
+            button_x_m,
+            button_lane_y_m
+            + (0.45 * ny if abs(ny) > 0.5 else 0.0),
             floor_height_m + spec.center_xyz_m[2],
         )
         wall_center = (
@@ -1499,19 +1978,28 @@ def composite_obstacle_course(
             }
         )
         cursor_x_m = platform_end_x_m
+        cursor_y_m = button_lane_y_m
 
-    goal_x_m = cursor_x_m + 1.10
-    boxes.append(
-        _support_box(
-            "CompositeGoalPlatform",
-            cursor_x_m,
-            goal_x_m + 0.50,
-            floor_height_m,
-            travel_width_m,
-            "goal_platform",
+    last_task_type = str(raw_tasks[-1].get("type", "")).strip()
+
+    if last_task_type == "button":
+        # The button platform itself is the physical end of the course.
+        goal_x_m = cursor_x_m - 0.35
+    else:
+        goal_x_m = cursor_x_m + 0.55
+        boxes.append(
+            _support_box(
+                "CompositeGoalPlatform",
+                cursor_x_m,
+                goal_x_m + 0.35,
+                floor_height_m,
+                travel_width_m,
+                "goal_platform",
+                center_y_m=cursor_y_m,
+            )
         )
-    )
-    goal = (goal_x_m, 0.0, floor_height_m)
+
+    goal = (goal_x_m, cursor_y_m, floor_height_m)
     tasks.append(
         {
             "task_id": "goal",
