@@ -344,4 +344,3 @@ def test_physx_pan_target_preserves_unwrapped_continuous_branch() -> None:
     # choice belongs to DynamicDriveController, not this PhysX writer.
     assert position_values[1] == pytest.approx(requested_pan)
     assert reader.target_positions()[1] == pytest.approx(requested_pan)
-

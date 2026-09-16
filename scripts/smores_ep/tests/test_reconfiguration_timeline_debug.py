@@ -53,4 +53,3 @@ def test_curve_is_time_bounded_in_simulation_not_goal_bounded() -> None:
     # The diagnostic must not fail merely because Nav2 did not reach
     # the exact route goal.
     assert 'raise RuntimeError(f"curved Nav2 route failed rc={route_rc}")' not in text
-

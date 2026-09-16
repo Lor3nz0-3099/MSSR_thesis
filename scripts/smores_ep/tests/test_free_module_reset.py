@@ -297,4 +297,3 @@ def test_gravity_settle_invalidates_stale_behavior_command_sources_once(tmp_path
     assert len(second.statuses) == 1
     assert second.statuses[0].goal_id == "legacy-handoff-settle"
     assert second.statuses[0].state is PrimitiveState.RUNNING
-
