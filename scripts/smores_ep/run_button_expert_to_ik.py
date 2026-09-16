@@ -32,6 +32,14 @@ SMORES_EP_SRC = ROOT / "scripts" / "smores_ep" / "src"
 if str(SMORES_EP_SRC) not in sys.path:
     sys.path.insert(0, str(SMORES_EP_SRC))
 
+from smores_ep.control.button_ik_math import (
+    bounded_normal_waypoint,
+    bounded_position_waypoint,
+    orientation_residual,
+    shortest_angular_delta,
+    vector_angle_deg,
+)
+
 DEFAULT_SEED = 6100
 SEED = DEFAULT_SEED
 BUTTON_TASK_ID = ""
@@ -272,6 +280,60 @@ class Monitor(Node):
         return float(p.x), float(p.y), yaw
 
 
+def set_behavior_dataset_context(
+    env,
+    *,
+    dataset_path,
+    stage_name=None,
+):
+    parameters = [
+        (
+            "behavior_dataset_path",
+            (
+                "''"
+                if dataset_path is None
+                else str(dataset_path)
+            ),
+        ),
+    ]
+
+    if stage_name is not None:
+        parameters.append(
+            (
+                "behavior_dataset_stage_name",
+                str(stage_name),
+            )
+        )
+
+    for name, value in parameters:
+        result = subprocess.run(
+            [
+                "ros2",
+                "param",
+                "set",
+                "/smores_morphology_behavior_node",
+                name,
+                value,
+            ],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+            timeout=15,
+        )
+
+        if (
+            result.returncode != 0
+            or "successful" not in result.stdout.lower()
+        ):
+            raise RuntimeError(
+                "Could not set morphology behavior dataset "
+                f"parameter {name!r}: {result.stdout.strip()}"
+            )
+
+
 def behavior(env, name, timeout=90.0):
 
     command = [
@@ -312,34 +374,59 @@ def wait_nav2(env):
         "/controller_server",
     )
 
+    last_status = "no lifecycle response"
+
     while time.monotonic() < deadline:
         okay = True
 
         for node in required:
-            result = subprocess.run(
-                ["ros2", "lifecycle", "get", node],
-                cwd=ROOT,
-                env=env,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                check=False,
-                timeout=5,
-            )
+            remaining_s = deadline - time.monotonic()
+
+            if remaining_s <= 0.0:
+                okay = False
+                break
+
+            try:
+                result = subprocess.run(
+                    ["ros2", "lifecycle", "get", node],
+                    cwd=ROOT,
+                    env=env,
+                    text=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    check=False,
+                    timeout=min(5.0, remaining_s),
+                )
+            except subprocess.TimeoutExpired:
+                last_status = f"{node}: lifecycle probe timed out"
+                okay = False
+                break
+
+            output = result.stdout.strip()
 
             if (
                 result.returncode != 0
-                or "active" not in result.stdout.lower()
+                or "active" not in output.lower()
             ):
+                last_status = (
+                    f"{node}: returncode={result.returncode}, "
+                    f"output={output!r}"
+                )
                 okay = False
                 break
 
         if okay:
             return
 
-        time.sleep(1)
+        remaining_s = deadline - time.monotonic()
 
-    raise TimeoutError("Nav2 did not become ACTIVE.")
+        if remaining_s > 0.0:
+            time.sleep(min(1.0, remaining_s))
+
+    raise TimeoutError(
+        "Nav2 did not become ACTIVE within 60 s; "
+        f"last_status={last_status}"
+    )
 
 
 def wait_assembly(graph_path, runtime):
@@ -838,9 +925,27 @@ def parse_args():
         help="Append every button sub-stage to this composite JSONL dataset.",
     )
     parser.add_argument(
+        "--dataset-layout-json",
+        type=Path,
+        help=(
+            "Composite-only JSON mapping button sub-stages to distinct "
+            "raw dataset paths. Legacy --dataset-path remains supported."
+        ),
+    )
+    parser.add_argument(
         "--episode-id",
         default="",
         help="Episode identifier used when appending to a composite dataset.",
+    )
+    parser.add_argument(
+        "--dataset-log-period",
+        type=int,
+        default=1,
+        help=(
+            "Log every Nth control tick instead of every tick. Raise this "
+            "for a smoother GUI inspection run; keep it at 1 for real "
+            "dataset campaigns."
+        ),
     )
 
     return parser.parse_args()
@@ -887,6 +992,68 @@ def main():
         if args.dataset_path is not None
         else run / "button_dataset.jsonl"
     )
+
+    if args.dataset_layout_json is not None:
+        dataset_layout_path = (
+            args.dataset_layout_json.expanduser().resolve()
+        )
+        dataset_layout = json.loads(
+            dataset_layout_path.read_text(encoding="utf-8")
+        )
+        if not isinstance(dataset_layout, dict):
+            raise SystemExit(
+                "--dataset-layout-json must contain a JSON object"
+            )
+
+        required_dataset_layout_keys = (
+            "rc_behavior",
+            "rc_to_mm8_reconfiguration",
+            "mm8_behavior",
+            "manipulation",
+            "mm8_to_rc_reconfiguration",
+        )
+        missing_dataset_layout_keys = [
+            key
+            for key in required_dataset_layout_keys
+            if not isinstance(dataset_layout.get(key), str)
+            or not str(dataset_layout[key]).strip()
+        ]
+        if missing_dataset_layout_keys:
+            raise SystemExit(
+                "--dataset-layout-json is missing valid paths for: "
+                + ", ".join(missing_dataset_layout_keys)
+            )
+
+        def _resolve_dataset_layout_path(key):
+            candidate = Path(str(dataset_layout[key])).expanduser()
+            if not candidate.is_absolute():
+                candidate = dataset_layout_path.parent / candidate
+            return candidate.resolve()
+
+        rc_behavior_dataset_path = _resolve_dataset_layout_path(
+            "rc_behavior"
+        )
+        rc_to_mm8_dataset_path = _resolve_dataset_layout_path(
+            "rc_to_mm8_reconfiguration"
+        )
+        mm8_behavior_dataset_path = _resolve_dataset_layout_path(
+            "mm8_behavior"
+        )
+        manipulation_dataset_path = _resolve_dataset_layout_path(
+            "manipulation"
+        )
+        mm8_to_rc_dataset_path = _resolve_dataset_layout_path(
+            "mm8_to_rc_reconfiguration"
+        )
+    else:
+        # Legacy standalone/backward-compatible mode: preserve the
+        # historical single-file behavior until the individual writers
+        # below are migrated to their dedicated variables.
+        rc_behavior_dataset_path = dataset_path
+        rc_to_mm8_dataset_path = dataset_path
+        mm8_behavior_dataset_path = dataset_path
+        manipulation_dataset_path = dataset_path
+        mm8_to_rc_dataset_path = dataset_path
 
     Path(
         "/tmp/mssr_button_current_run"
@@ -963,13 +1130,13 @@ def main():
                 "tilt_effort_scale:=8.0",
 
                 "behavior_dataset_path:="
-                + str(dataset_path),
+                + str(rc_behavior_dataset_path),
                 "behavior_dataset_episode_id:="
                 + episode_id,
                 "behavior_dataset_stage_name:="
                 + "button_expert",
                 "behavior_dataset_difficulty:=0.0",
-                "behavior_dataset_log_period:=1",
+                f"behavior_dataset_log_period:={args.dataset_log_period}",
                 "behavior_control_rate_hz:=10.0",
 
                 f"ros_domain_id:={DOMAIN}",
@@ -1070,6 +1237,12 @@ def main():
         time.sleep(1 if args.external_runtime_dir is not None else 8)
 
         stop_process(assembly)
+
+        set_behavior_dataset_context(
+            env,
+            dataset_path=rc_behavior_dataset_path,
+            stage_name="button_rc_behavior",
+        )
         assembly = None
 
         print("RC-Car8 READY.")
@@ -1293,6 +1466,11 @@ def main():
 
         monitor.reconfiguration = None
 
+        set_behavior_dataset_context(
+            env,
+            dataset_path=None,
+        )
+
         reconfig = subprocess.Popen(
             [
                 "ros2", "run",
@@ -1303,7 +1481,7 @@ def main():
                 "-p",
                 "target_morphology:=mobile_manipulator8",
                 "-p", "episode_id:=" + episode_id,
-                "-p", "dataset_path:=" + str(dataset_path),
+                "-p", "dataset_path:=" + str(rc_to_mm8_dataset_path),
             ],
             cwd=ROOT,
             env=env,
@@ -1340,6 +1518,12 @@ def main():
 
         stop_process(reconfig)
         reconfig = None
+
+        set_behavior_dataset_context(
+            env,
+            dataset_path=mm8_behavior_dataset_path,
+            stage_name="button_mm8_behavior",
+        )
 
         time.sleep(2)
 
@@ -1398,18 +1582,19 @@ def main():
         )
 
         # ========================================================
-        # 5. SCORPION
+        # 5. SCORPION HOLD
+        #
+        # RC-Car8 -> MobileManipulator8 already terminates in the
+        # validated drive_ready / Scorpion posture.  Do not issue a
+        # second posture command before locomotion: preserve exactly
+        # the physical configuration produced by self-reconfiguration.
         # ========================================================
 
         print()
         print("============================================================")
-        print(" PHASE 5 — SCORPION DRIVE POSTURE")
+        print(" PHASE 5 — SCORPION PRESERVED FROM RECONFIGURATION")
+        print(" no posture command")
         print("============================================================")
-
-        behavior(
-            env,
-            "restore_drive",
-        )
 
         time.sleep(1)
 
@@ -1680,6 +1865,7 @@ def main():
         from std_msgs.msg import String as _IKString
         from mssr_expert.execution.primitive_protocol import (
             PrimitiveGoalRequest as _IKPrimitiveGoalRequest,
+            TERMINAL_STATES as _IK_TERMINAL_STATES,
         )
         from mssr_expert.behaviors.morphology_dof_model import (
             SmoresMorphologyDofAnalyzer as _IKDofAnalyzer,
@@ -1866,15 +2052,33 @@ def main():
         _IK_ORIENTATION_LEVER_M = 0.055
         _IK_POSITION_TOL_M = 0.0020
         _IK_NORMAL_TOL_DEG = 3.0
+        _IK_NORMAL_DEADBAND_DEG = 30.0
+        _PREORIENT_TILT_SCAN_STEP_DEG = 2.0
+        _PREORIENT_MIN_IMPROVEMENT_DEG = 5.0
+        _PREORIENT_MIN_MOVE_DEG = 1.0
+
+        # PRE is reached through local task-space waypoints, always
+        # re-linearized from the physical state after the previous
+        # command.  This makes the approach independent from the
+        # post-reconfiguration PAN reference captured at docking.
+        _PRE_POSITION_STEP_M = 0.015
+        _PRE_NORMAL_STEP_RAD = math.radians(15.0)
+        _PRE_JOINT_STEP_MAX_RAD = math.radians(6.0)
+        _PRE_MAX_CONTROL_STEPS = 40
+        _PRE_STALL_STEPS = 8
+        _PRE_PROGRESS_EPS = 1.0e-5
+        _PRE_POST_COMMAND_SETTLE_S = 0.10
 
         _ik_geom = _IKGeometry()
 
         # --------------------------------------------------------
         # Raw manipulation dataset.
         #
-        # One record represents ONE complete 5-DoF absolute
-        # configuration command.  The five resource-safe primitive
-        # goals used to physically execute that configuration are
+        # One record represents ONE complete 5-DoF configuration
+        # command.  TILT targets are absolute; PAN targets are sent
+        # as physical ROTATE_PAN_BY deltas so IK remains independent
+        # from the reconfiguration PAN reference offset.  The five
+        # resource-safe primitive goals used to physically execute it are
         # retained inside expert_action.primitive_sequence.
         #
         # Therefore the outer CLIK is naturally sub-sampled at its
@@ -1886,7 +2090,7 @@ def main():
             runtime_dir / "robot_graph.json"
         )
 
-        _ik_dataset_path = dataset_path
+        _ik_dataset_path = manipulation_dataset_path
 
         _ik_dataset_timestep = 0
 
@@ -2664,6 +2868,86 @@ def main():
 
             return state
 
+        def _ik_goal_status(goal_id):
+            """Look up one goal's admission/terminal status by id.
+
+            The previous joint's own goal can still be releasing its
+            ``internal_motion:<module>`` resource by the time the next
+            joint is published; without this check a REJECTED
+            (RESOURCE_BUSY) goal was silently treated as accepted and
+            the caller just watched a joint that was never actually
+            commanded until it timed out.
+            """
+
+            payload = read_json(
+                runtime_dir / "primitive_status.json"
+            )
+
+            if not payload:
+                return None
+
+            for status in payload.get(
+                "statuses", ()
+            ):
+                if status.get("goal_id") == goal_id:
+                    return status
+
+            return None
+
+        def _ik_wait_goal_terminal(
+            goal_id,
+            label,
+            role,
+            joint,
+            timeout_s=20.0,
+        ):
+            """Wait until Isaac has released the primitive resource.
+
+            Reaching the requested physical joint angle is not enough:
+            the primitive may still own ``internal_motion:<module>``.
+            The following joint/configuration must not be admitted until
+            the previous goal has published a terminal status.
+            """
+
+            deadline = time.monotonic() + float(timeout_s)
+
+            while time.monotonic() < deadline:
+
+                rclpy.spin_once(
+                    _ik_node,
+                    timeout_sec=0.05,
+                )
+
+                status = _ik_goal_status(goal_id)
+
+                if status is None:
+                    continue
+
+                state = str(
+                    status.get("state", "")
+                ).lower()
+
+                if state not in _IK_TERMINAL_STATES:
+                    continue
+
+                if state == "succeeded":
+                    return status
+
+                raise RuntimeError(
+                    f"{label}: {role}.{joint} "
+                    f"primitive ended in {state}: "
+                    f"{status.get('message', '')}"
+                )
+
+            latest = _ik_goal_status(goal_id)
+
+            raise RuntimeError(
+                f"{label}: {role}.{joint} reached its "
+                "physical target but primitive did not become "
+                f"terminal within {timeout_s:.1f}s; "
+                f"latest_status={latest}"
+            )
+
         def _ik_modules(state):
 
             return {
@@ -2833,25 +3117,18 @@ def main():
 
         def _ik_normal_angle_deg(
             normal,
+            target_normal=None,
         ):
 
-            normal = _ik_normalize(
-                normal
+            target = (
+                _IK_TARGET_NORMAL
+                if target_normal is None
+                else _ik_normalize(target_normal)
             )
 
-            alignment = float(
-                _np.clip(
-                    normal
-                    @ _IK_TARGET_NORMAL,
-                    -1.0,
-                    +1.0,
-                )
-            )
-
-            return math.degrees(
-                math.acos(
-                    alignment
-                )
+            return vector_angle_deg(
+                normal,
+                target,
             )
 
 
@@ -3200,6 +3477,7 @@ def main():
             reference,
             q,
             target_center,
+            target_normal=None,
         ):
 
             center, normal = _ik_fk(
@@ -3214,46 +3492,48 @@ def main():
                 )
             )
 
-            # Five task residual components:
-            #
-            #   x: zero anywhere inside button X interval
-            #   y: PRE/PRESS plane equality
-            #   z: zero anywhere inside button Z interval
-            #   nx = 0
-            #   nz = 0
-            #
-            # alignment with N is constrained to the target hemisphere
-            # by the line search.
-            return _np.asarray(
-                [
-                    error[0],
-                    error[1],
-                    error[2],
-                    (
-                        _IK_ORIENTATION_LEVER_M
-                        * float(
-                            normal
-                            @ _IK_FACE_TANGENT
-                        )
-                    ),
-                    (
-                        _IK_ORIENTATION_LEVER_M
-                        * normal[2]
-                    ),
-                ],
-                dtype=float,
+            target = (
+                _IK_TARGET_NORMAL
+                if target_normal is None
+                else _ik_normalize(target_normal)
             )
+
+            # Six residual components for five DoFs are intentional:
+            # three finite-region position constraints plus the full
+            # 3-D normal-vector difference.  Unlike the former
+            # tangent/Z-only orientation residual, this has a unique
+            # zero at +target_normal and therefore does not confuse
+            # the desired and antiparallel normal branches.
+            orientation = orientation_residual(
+                normal,
+                target,
+                lever_m=_IK_ORIENTATION_LEVER_M,
+            )
+
+            return _np.concatenate(
+                (error, orientation)
+            ).astype(float)
 
         def _ik_jacobian(
             reference,
             q,
             target_center,
+            target_normal=None,
         ):
 
             step = math.radians(0.25)
 
+            residual_size = int(
+                _ik_residual(
+                    reference,
+                    q,
+                    target_center,
+                    target_normal,
+                ).shape[0]
+            )
+
             jacobian = _np.zeros(
-                (5, 5),
+                (residual_size, 5),
                 dtype=float,
             )
 
@@ -3270,11 +3550,13 @@ def main():
                         reference,
                         plus,
                         target_center,
+                        target_normal,
                     )
                     - _ik_residual(
                         reference,
                         minus,
                         target_center,
+                        target_normal,
                     )
                 ) / (2.0 * step)
 
@@ -3284,7 +3566,14 @@ def main():
             state,
             target_center,
             label,
+            target_normal=None,
         ):
+
+            target = (
+                _IK_TARGET_NORMAL
+                if target_normal is None
+                else _ik_normalize(target_normal)
+            )
 
             reference = _ik_build_reference(
                 state
@@ -3297,6 +3586,7 @@ def main():
 
             best_q = q.copy()
             best_cost = float("inf")
+            initial_cost = None
 
             first_rank = None
             first_condition = None
@@ -3307,11 +3597,15 @@ def main():
                     reference,
                     q,
                     target_center,
+                    target,
                 )
 
                 cost = float(
                     residual @ residual
                 )
+
+                if initial_cost is None:
+                    initial_cost = cost
 
                 if cost < best_cost:
                     best_cost = cost
@@ -3324,14 +3618,15 @@ def main():
 
                 position_error = float(
                     _ik_region_position_error(
-                                center,
-                                target_center,
-                            )
+                        center,
+                        target_center,
+                    )
                 )
 
                 normal_error = (
                     _ik_normal_angle_deg(
-                        normal
+                        normal,
+                        target,
                     )
                 )
 
@@ -3340,16 +3635,16 @@ def main():
                     <= _IK_POSITION_TOL_M
                     and normal_error
                     <= _IK_NORMAL_TOL_DEG
-                    and float(
-                        normal
-                        @ _IK_TARGET_NORMAL
-                    ) > 0.0
                 ):
                     return {
                         "success": True,
                         "label": label,
                         "iterations":
                             iteration + 1,
+                        "initial_cost":
+                            float(initial_cost),
+                        "best_cost":
+                            float(cost),
                         "q":
                             q.copy(),
                         "reference":
@@ -3358,6 +3653,8 @@ def main():
                             center,
                         "normal":
                             normal,
+                        "target_normal":
+                            target.copy(),
                         "position_error_m":
                             position_error,
                         "normal_error_deg":
@@ -3372,6 +3669,7 @@ def main():
                     reference,
                     q,
                     target_center,
+                    target,
                 )
 
                 if first_rank is None:
@@ -3469,23 +3767,12 @@ def main():
                                 )
                             )
 
-                    _, trial_normal = _ik_fk(
-                        reference,
-                        trial,
-                    )
-
-                    # Reject the antiparallel normal branch.
-                    if float(
-                        trial_normal
-                        @ _IK_TARGET_NORMAL
-                    ) <= 0.0:
-                        continue
-
                     trial_residual = (
                         _ik_residual(
                             reference,
                             trial,
                             target_center,
+                            target,
                         )
                     )
 
@@ -3520,20 +3807,28 @@ def main():
                 "success": False,
                 "label": label,
                 "iterations": 120,
+                "initial_cost": float(
+                    initial_cost
+                    if initial_cost is not None
+                    else best_cost
+                ),
+                "best_cost": float(best_cost),
                 "q": best_q,
                 "reference": reference,
                 "center": center,
                 "normal": normal,
+                "target_normal": target.copy(),
                 "position_error_m":
                     float(
                         _ik_region_position_error(
-                                center,
-                                target_center,
-                            )
+                            center,
+                            target_center,
+                        )
                     ),
                 "normal_error_deg":
                     _ik_normal_angle_deg(
-                        normal
+                        normal,
+                        target,
                     ),
                 "jacobian_rank":
                     first_rank,
@@ -3754,7 +4049,17 @@ def main():
             label,
             q_target,
             dataset_context=None,
+            only_dofs=None,
         ):
+
+            selected_dofs = (
+                None
+                if only_dofs is None
+                else {
+                    (str(role), str(joint))
+                    for role, joint in only_dofs
+                }
+            )
 
             dataset_context = dict(
                 dataset_context or {}
@@ -3781,75 +4086,148 @@ def main():
                 joint,
             ) in enumerate(_IK_DOF):
 
+                if (
+                    selected_dofs is not None
+                    and (role, joint) not in selected_dofs
+                ):
+                    continue
+
                 target = float(
                     q_target[index]
                 )
 
-                request = (
-                    _IKPrimitiveGoalRequest(
-                        goal_id=(
-                            f"button-ik-"
-                            f"{label}-"
-                            f"{role}-"
-                            f"{joint}-"
-                            f"{time.time_ns()}"
-                        ),
-                        primitive=(
-                            "set_tilt"
-                            if joint == "tilt"
-                            else "set_pan"
-                        ),
-                        module_ids=(
-                            role_to_module[
-                                role
-                            ],
-                        ),
-                        parameters={
-                            "angle_rad":
-                                target,
-
-                            "tolerance_rad":
-                                math.radians(
-                                    0.6
-                                ),
-
-                            **(
-                                {
-                                    "max_servo_speed_rad_s":
-                                        0.12
-                                }
-                                if joint == "pan"
-                                else {}
-                            ),
-                        },
-                        timeout_s=20.0,
-                    )
-                )
-
-                executed_goals.append(
-                    request.to_dict()
-                )
-
-                message = _IKString()
-
-                message.data = json.dumps(
-                    request.to_dict()
-                )
-
-                _ik_goal_pub.publish(
-                    message
-                )
-
                 # PAN and TILT of one SMORES module share the
-                # ``internal_motion:<module>`` primitive resource.
-                # Therefore another primitive for the same module
-                # must not be admitted while the previous one is
-                # still active.
-                #
-                # q_target is still ONE mathematically computed
-                # absolute IK configuration.  We simply execute its
-                # primitive goals resource-safely; there are no
-                # physical probes or IK recomputations here.
+                # ``internal_motion:<module>`` primitive resource, so
+                # this joint's goal can arrive before the previous
+                # joint on the same module has finished releasing it
+                # and be REJECTED (RESOURCE_BUSY) outright. Retry with
+                # a fresh goal_id instead of silently waiting on a
+                # joint that was never actually commanded.
+                status = None
+
+                for attempt in range(20):
+
+                    if joint == "pan":
+                        # IK q values are physical joint angles.  SET_PAN is
+                        # intentionally relative to the docking reference
+                        # after reconfiguration, so it cannot be used here
+                        # for an absolute physical IK target.  Re-read the
+                        # actual physical PAN immediately before admission
+                        # and command only the wrapped physical delta.
+                        pan_state = _ik_read_state()
+                        pan_module = _ik_module(
+                            pan_state,
+                            role,
+                        )
+                        pan_actual = float(
+                            pan_module["actuators"]["pan"][
+                                "position_rad"
+                            ]
+                        )
+                        pan_delta = shortest_angular_delta(
+                            pan_actual,
+                            target,
+                        )
+                        primitive_name = "rotate_pan_by"
+                        primitive_parameters = {
+                            "delta_rad": pan_delta,
+
+                            # Cartesian IK cares about physical orientation,
+                            # not which unwrapped 2*pi PAN branch represents it.
+                            # Keep ordinary ROTATE_PAN_BY multi-turn semantics
+                            # unchanged everywhere else.
+                            "periodic_equivalent": True,
+
+                            "tolerance_rad": math.radians(0.6),
+                            "max_servo_speed_rad_s": 0.12,
+                        }
+                    else:
+                        primitive_name = "set_tilt"
+                        primitive_parameters = {
+                            "angle_rad": target,
+                            "tolerance_rad": math.radians(0.6),
+                        }
+
+                    request = (
+                        _IKPrimitiveGoalRequest(
+                            goal_id=(
+                                f"button-ik-"
+                                f"{label}-"
+                                f"{role}-"
+                                f"{joint}-"
+                                f"{time.time_ns()}"
+                            ),
+                            primitive=primitive_name,
+                            module_ids=(
+                                role_to_module[
+                                    role
+                                ],
+                            ),
+                            parameters=primitive_parameters,
+                            timeout_s=20.0,
+                        )
+                    )
+
+                    executed_goals.append(
+                        request.to_dict()
+                    )
+
+                    message = _IKString()
+
+                    message.data = json.dumps(
+                        request.to_dict()
+                    )
+
+                    _ik_goal_pub.publish(
+                        message
+                    )
+
+                    admission_deadline = (
+                        time.monotonic() + 2.0
+                    )
+
+                    status = None
+
+                    while (
+                        time.monotonic()
+                        < admission_deadline
+                    ):
+                        rclpy.spin_once(
+                            _ik_node,
+                            timeout_sec=0.05,
+                        )
+                        status = _ik_goal_status(
+                            request.goal_id
+                        )
+                        if status is not None:
+                            break
+
+                    if (
+                        status is not None
+                        and status.get("state")
+                        == "rejected"
+                    ):
+                        print(
+                            f"  {role}.{joint}: "
+                            f"goal rejected "
+                            f"({status.get('message', '')}); "
+                            "retrying"
+                        )
+                        time.sleep(0.2)
+                        continue
+
+                    break
+
+                else:
+                    raise RuntimeError(
+                        f"{label}: {role}.{joint} "
+                        "goal was repeatedly rejected"
+                    )
+
+                # q_target is expressed in PHYSICAL joint coordinates.
+                # TILT is executed as an absolute target; PAN is converted
+                # above into a physical relative delta from the live state.
+                # Higher-level PRE/CLIK loops decide when to re-linearize.
                 joint_deadline = (
                     time.monotonic()
                     + 20.0
@@ -3950,10 +4328,17 @@ def main():
                         f"did not reach its absolute target"
                     )
 
-                # Allow the primitive executor to publish its
-                # terminal state and release internal_motion before
-                # admitting another joint primitive.
-                time.sleep(0.15)
+                # Position tolerance and primitive lifetime are
+                # different contracts.  Do not reuse the module's
+                # internal_motion resource until the admitted primitive
+                # itself reports a terminal success and releases it.
+                _ik_wait_goal_terminal(
+                    request.goal_id,
+                    label,
+                    role,
+                    joint,
+                    timeout_s=20.0,
+                )
 
             deadline = (
                 time.monotonic()
@@ -3981,6 +4366,12 @@ def main():
                     role,
                     joint,
                 ) in enumerate(_IK_DOF):
+
+                    if (
+                        selected_dofs is not None
+                        and (role, joint) not in selected_dofs
+                    ):
+                        continue
 
                     module = _ik_module(
                         state,
@@ -4091,6 +4482,477 @@ def main():
                 f"{label} absolute configuration "
                 f"did not settle"
             )
+
+        def _ik_plan_end_effector_tilt_preorientation(
+            state,
+        ):
+            """Virtual scan of end-effector TILT only."""
+
+            reference = _ik_build_reference(state)
+
+            tilt_dof = ("end_effector", "tilt")
+            tilt_index = _IK_DOF.index(
+                tilt_dof
+            )
+
+            q_ref = _np.asarray(
+                reference["q_ref"],
+                dtype=float,
+            ).copy()
+
+            current_tilt = float(
+                q_ref[tilt_index]
+            )
+
+            lower = -0.5 * math.pi
+            upper = +0.5 * math.pi
+
+            current_tilt = float(
+                _np.clip(
+                    current_tilt,
+                    lower,
+                    upper,
+                )
+            )
+
+            def score(candidate):
+                q_trial = q_ref.copy()
+
+                q_trial[tilt_index] = float(
+                    candidate
+                )
+
+                _, normal_trial = _ik_fk(
+                    reference,
+                    q_trial,
+                )
+
+                return float(
+                    _ik_normal_angle_deg(
+                        _ik_normalize(
+                            _np.asarray(
+                                normal_trial,
+                                dtype=float,
+                            )
+                        ),
+                        _IK_TARGET_NORMAL,
+                    )
+                )
+
+            current_error = float(
+                score(current_tilt)
+            )
+
+            step = math.radians(
+                _PREORIENT_TILT_SCAN_STEP_DEG
+            )
+
+            candidates = {
+                float(lower),
+                float(upper),
+                float(current_tilt),
+            }
+
+            value = float(lower)
+
+            while value <= upper + 1.0e-12:
+                candidates.add(
+                    float(
+                        _np.clip(
+                            value,
+                            lower,
+                            upper,
+                        )
+                    )
+                )
+                value += step
+
+            scored = sorted(
+                (
+                    float(score(candidate)),
+                    abs(
+                        float(candidate)
+                        - current_tilt
+                    ),
+                    float(candidate),
+                )
+                for candidate in candidates
+            )
+
+            (
+                best_error,
+                _,
+                best_tilt,
+            ) = scored[0]
+
+            improvement = float(
+                current_error - best_error
+            )
+
+            movement_deg = abs(
+                math.degrees(
+                    best_tilt
+                    - current_tilt
+                )
+            )
+
+            should_move = bool(
+                current_error
+                > _IK_NORMAL_DEADBAND_DEG
+                and improvement
+                >= _PREORIENT_MIN_IMPROVEMENT_DEG
+                and movement_deg
+                >= _PREORIENT_MIN_MOVE_DEG
+            )
+
+            q_target = q_ref.copy()
+            q_target[tilt_index] = float(
+                best_tilt
+            )
+
+            return {
+                "should_move":
+                    should_move,
+                "current_tilt_rad":
+                    float(current_tilt),
+                "target_tilt_rad":
+                    float(best_tilt),
+                "movement_deg":
+                    float(movement_deg),
+                "current_normal_error_deg":
+                    float(current_error),
+                "predicted_normal_error_deg":
+                    float(best_error),
+                "improvement_deg":
+                    float(improvement),
+                "q_target":
+                    q_target,
+            }
+
+        def _ik_clik_pre(
+            pre_target,
+        ):
+            """Reach PRE through live task-space waypoints.
+
+            Every control step starts from the physical state read back
+            from Isaac, builds a bounded Cartesian/normal waypoint, solves
+            a local 5-DoF IK problem, executes only a bounded joint step,
+            then re-reads and re-linearizes.  No stale post-reconfiguration
+            PAN reference is used.
+            """
+
+            samples = []
+            best_metric = float("inf")
+            stall_steps = 0
+            last_state = _ik_read_state()
+
+            print()
+            print(
+                "------------------------------------------------------------"
+            )
+            print(
+                "CLOSED-LOOP PRE TRAJECTORY"
+            )
+            print(
+                "------------------------------------------------------------"
+            )
+            print(
+                f"position waypoint max = "
+                f"{_PRE_POSITION_STEP_M*1000:.1f} mm"
+            )
+            print(
+                f"normal waypoint max   = "
+                f"{math.degrees(_PRE_NORMAL_STEP_RAD):.1f} deg"
+            )
+            print(
+                f"joint step max        = "
+                f"{math.degrees(_PRE_JOINT_STEP_MAX_RAD):.1f} deg"
+            )
+
+            for control_step in range(
+                _PRE_MAX_CONTROL_STEPS
+            ):
+                state = _ik_read_state()
+                last_state = state
+
+                bottom = _ik_connector(
+                    state,
+                    "end_effector",
+                    "BOTTOM",
+                )
+                center = _np.asarray(
+                    bottom["position_world"],
+                    dtype=float,
+                )
+                normal = _ik_normalize(
+                    _np.asarray(
+                        bottom["outward_normal_world"],
+                        dtype=float,
+                    )
+                )
+
+                final_position_error = float(
+                    _ik_region_position_error(
+                        center,
+                        pre_target,
+                    )
+                )
+                final_normal_error = float(
+                    _ik_normal_angle_deg(
+                        normal,
+                        _IK_TARGET_NORMAL,
+                    )
+                )
+
+                if (
+                    final_position_error
+                    <= _IK_POSITION_TOL_M
+                    and final_normal_error
+                    <= _IK_NORMAL_DEADBAND_DEG
+                ):
+                    return {
+                        "success": True,
+                        "reason": "physical PRE reached",
+                        "state": state,
+                        "samples": samples,
+                    }
+
+                desired_center = bounded_position_waypoint(
+                    center,
+                    pre_target,
+                    max_step_m=_PRE_POSITION_STEP_M,
+                )
+                orientation_in_deadband = (
+                    final_normal_error
+                    <= _IK_NORMAL_DEADBAND_DEG
+                )
+
+                if orientation_in_deadband:
+                    # Task-space cone: once the BOTTOM face points
+                    # sufficiently toward the button, perfect
+                    # parallelism is unnecessary.  Preserve the
+                    # admissible live normal instead of rewarding
+                    # further alignment toward zero angular error.
+                    desired_normal = normal.copy()
+                else:
+                    desired_normal = bounded_normal_waypoint(
+                        normal,
+                        _IK_TARGET_NORMAL,
+                        max_angle_rad=_PRE_NORMAL_STEP_RAD,
+                    )
+
+                solution = _ik_solve(
+                    state,
+                    desired_center,
+                    f"PRE-WP-{control_step:02d}",
+                    target_normal=desired_normal,
+                )
+
+                # At a rank-deficient pose a local solve may not satisfy
+                # the waypoint tolerance exactly in one mathematical pass.
+                # It is still useful if its best residual is strictly lower
+                # than the residual at the live starting state; execute only
+                # a bounded physical step and re-linearize afterwards.
+                solver_progress = (
+                    math.isfinite(float(solution["best_cost"]))
+                    and float(solution["best_cost"])
+                    < float(solution["initial_cost"])
+                    - 1.0e-12
+                )
+
+                if (
+                    not solution["success"]
+                    and not solver_progress
+                ):
+                    return {
+                        "success": False,
+                        "reason": (
+                            "local PRE IK made no residual progress "
+                            f"at control step {control_step}"
+                        ),
+                        "state": state,
+                        "samples": samples,
+                    }
+
+                q_actual = _np.asarray(
+                    solution["reference"]["q_ref"],
+                    dtype=float,
+                ).copy()
+                q_candidate = _np.asarray(
+                    solution["q"],
+                    dtype=float,
+                ).copy()
+                q_step = q_actual.copy()
+
+                for index, (role, joint) in enumerate(_IK_DOF):
+                    if joint == "pan":
+                        delta = shortest_angular_delta(
+                            float(q_actual[index]),
+                            float(q_candidate[index]),
+                        )
+                    else:
+                        delta = float(
+                            q_candidate[index]
+                            - q_actual[index]
+                        )
+
+                    delta = float(
+                        _np.clip(
+                            delta,
+                            -_PRE_JOINT_STEP_MAX_RAD,
+                            +_PRE_JOINT_STEP_MAX_RAD,
+                        )
+                    )
+                    q_step[index] = (
+                        float(q_actual[index])
+                        + delta
+                    )
+
+                    lower, upper = solution["reference"]["limits"][index]
+                    if lower is not None:
+                        q_step[index] = max(
+                            float(q_step[index]),
+                            float(lower),
+                        )
+                    if upper is not None:
+                        q_step[index] = min(
+                            float(q_step[index]),
+                            float(upper),
+                        )
+
+                max_delta_deg = float(
+                    _np.max(
+                        _np.abs(
+                            _np.degrees(q_step - q_actual)
+                        )
+                    )
+                )
+
+                print(
+                    f"PRE {control_step:02d} "
+                    f"pos={final_position_error*1000:.1f}mm "
+                    f"normal={final_normal_error:.1f}deg "
+                    f"wp_normal={vector_angle_deg(desired_normal, _IK_TARGET_NORMAL):.1f}deg "
+                    f"rank={solution['jacobian_rank']} "
+                    f"dqmax={max_delta_deg:.2f}deg"
+                )
+
+                _ik_command_configuration(
+                    f"pre-{control_step:02d}",
+                    q_step,
+                    dataset_context={
+                        "control_step": int(control_step),
+                        "controller": "closed_loop_pre_waypoint",
+                        "desired_center_xyz_m": [
+                            float(value)
+                            for value in desired_center
+                        ],
+                        "desired_normal_world": [
+                            float(value)
+                            for value in desired_normal
+                        ],
+                        "final_position_error_before_m":
+                            final_position_error,
+                        "final_normal_error_before_deg":
+                            final_normal_error,
+                        "jacobian_rank":
+                            solution["jacobian_rank"],
+                        "jacobian_condition":
+                            solution["jacobian_condition"],
+                        "max_delta_deg": max_delta_deg,
+                    },
+                )
+
+                time.sleep(
+                    _PRE_POST_COMMAND_SETTLE_S
+                )
+
+                state_after = _ik_read_state()
+                last_state = state_after
+                bottom_after = _ik_connector(
+                    state_after,
+                    "end_effector",
+                    "BOTTOM",
+                )
+                center_after = _np.asarray(
+                    bottom_after["position_world"],
+                    dtype=float,
+                )
+                normal_after = _ik_normalize(
+                    _np.asarray(
+                        bottom_after["outward_normal_world"],
+                        dtype=float,
+                    )
+                )
+                position_after = float(
+                    _ik_region_position_error(
+                        center_after,
+                        pre_target,
+                    )
+                )
+                normal_after_deg = float(
+                    _ik_normal_angle_deg(
+                        normal_after,
+                        _IK_TARGET_NORMAL,
+                    )
+                )
+                normal_excess_deg = max(
+                    0.0,
+                    normal_after_deg
+                    - _IK_NORMAL_DEADBAND_DEG,
+                )
+
+                metric = (
+                    position_after
+                    + _IK_ORIENTATION_LEVER_M
+                    * math.radians(normal_excess_deg)
+                )
+
+                samples.append({
+                    "control_step": int(control_step),
+                    "center_xyz_m": [
+                        float(value)
+                        for value in center_after
+                    ],
+                    "normal_world": [
+                        float(value)
+                        for value in normal_after
+                    ],
+                    "position_error_m": position_after,
+                    "normal_error_deg": normal_after_deg,
+                    "normal_excess_deg": normal_excess_deg,
+                    "orientation_in_deadband": bool(
+                        normal_after_deg
+                        <= _IK_NORMAL_DEADBAND_DEG
+                    ),
+                    "max_delta_deg": max_delta_deg,
+                    "solver_success": bool(solution["success"]),
+                    "solver_initial_cost":
+                        float(solution["initial_cost"]),
+                    "solver_best_cost":
+                        float(solution["best_cost"]),
+                })
+
+                if metric < best_metric - _PRE_PROGRESS_EPS:
+                    best_metric = metric
+                    stall_steps = 0
+                else:
+                    stall_steps += 1
+
+                if stall_steps >= _PRE_STALL_STEPS:
+                    return {
+                        "success": False,
+                        "reason": "closed-loop PRE progress stalled",
+                        "state": state_after,
+                        "samples": samples,
+                    }
+
+            return {
+                "success": False,
+                "reason": "closed-loop PRE maximum control steps reached",
+                "state": last_state,
+                "samples": samples,
+            }
 
         def _ik_clik_press(
             pre_state,
@@ -4996,23 +5858,17 @@ def main():
         )
 
         # --------------------------------------------------------
-        # 8A. Solve PRE from the actual manipulation_ready state.
+        # 8A. CLOSED-LOOP PRE TRAJECTORY
+        #
+        # PRE is not a one-shot q target anymore.  The controller
+        # repeatedly reads the REAL state, creates a bounded position
+        # and normal waypoint, solves locally, executes a bounded step,
+        # and re-linearizes from the new physical state.
         # --------------------------------------------------------
-
-        pre_solution = _ik_solve(
-            state0,
-            pre_target,
-            "PRE-CONTACT",
-        )
-
-        _ik_print_solution(
-            pre_solution,
-            pre_target,
-        )
 
         plan = {
             "schema_version":
-                "mssr.bottom_face_clik.v4",
+                "mssr.bottom_face_clik.v5",
 
             "dofs": [
                 f"{role}.{joint}"
@@ -5033,22 +5889,14 @@ def main():
                 _IK_EE_CONTACT_HALF_Z_M,
 
             "target_normal": [
-                float(
-                    _IK_TARGET_NORMAL[0]
-                ),
-                float(
-                    _IK_TARGET_NORMAL[1]
-                ),
+                float(_IK_TARGET_NORMAL[0]),
+                float(_IK_TARGET_NORMAL[1]),
                 0.0,
             ],
 
             "button_face_tangent_world": [
-                float(
-                    _IK_FACE_TANGENT[0]
-                ),
-                float(
-                    _IK_FACE_TANGENT[1]
-                ),
+                float(_IK_FACE_TANGENT[0]),
+                float(_IK_FACE_TANGENT[1]),
                 0.0,
             ],
 
@@ -5057,15 +5905,160 @@ def main():
 
             "press_depth_m":
                 _IK_PRESS_DEPTH_M,
-
-            "pre":
-                _ik_plan_payload(
-                    pre_solution,
-                    pre_target,
-                ),
         }
 
-        if not pre_solution["success"]:
+        preorient_state = _ik_read_state()
+
+        preorient_plan = _ik_plan_end_effector_tilt_preorientation(
+            preorient_state
+        )
+
+        print()
+        print(
+            "------------------------------------------------------------"
+        )
+        print(
+            "PRE-ORIENT TILT — END EFFECTOR ONLY"
+        )
+        print(
+            "------------------------------------------------------------"
+        )
+        print("PAN command = NONE")
+        print(
+            "current TILT = "
+            f"{math.degrees(preorient_plan['current_tilt_rad']):+.2f} deg"
+        )
+        print(
+            "selected TILT = "
+            f"{math.degrees(preorient_plan['target_tilt_rad']):+.2f} deg"
+        )
+        print(
+            "normal error current   = "
+            f"{preorient_plan['current_normal_error_deg']:.2f} deg"
+        )
+        print(
+            "normal error predicted = "
+            f"{preorient_plan['predicted_normal_error_deg']:.2f} deg"
+        )
+        print(
+            "predicted improvement  = "
+            f"{preorient_plan['improvement_deg']:.2f} deg"
+        )
+
+        if preorient_plan["should_move"]:
+            pan_before_preorient = float(
+                _ik_module(
+                    preorient_state,
+                    "end_effector",
+                )["actuators"]["pan"][
+                    "position_rad"
+                ]
+            )
+
+            _ik_command_configuration(
+                "PRE-ORIENT TILT",
+                preorient_plan["q_target"],
+                only_dofs={("end_effector", "tilt")},
+            )
+
+            preorient_after = _ik_read_state()
+
+            pan_after_preorient = float(
+                _ik_module(
+                    preorient_after,
+                    "end_effector",
+                )["actuators"]["pan"][
+                    "position_rad"
+                ]
+            )
+
+            bottom_after = _ik_connector(
+                preorient_after,
+                "end_effector",
+                "BOTTOM",
+            )
+
+            actual_error = float(
+                _ik_normal_angle_deg(
+                    _ik_normalize(
+                        _np.asarray(
+                            bottom_after[
+                                "outward_normal_world"
+                            ],
+                            dtype=float,
+                        )
+                    ),
+                    _IK_TARGET_NORMAL,
+                )
+            )
+
+            pan_drift_deg = math.degrees(
+                shortest_angular_delta(
+                    pan_before_preorient,
+                    pan_after_preorient,
+                )
+            )
+
+            print(
+                "normal error actual    = "
+                f"{actual_error:.2f} deg"
+            )
+            print(
+                "PAN physical drift     = "
+                f"{pan_drift_deg:+.3f} deg "
+                "(NO PAN primitive)"
+            )
+
+        else:
+            print(
+                "PRE-ORIENT skipped: TILT-only does not "
+                "provide enough useful improvement, or the "
+                "face is already inside the 30 deg cone."
+            )
+
+        print(
+            "PRE-ORIENT complete -> CLOSED-LOOP PRE"
+        )
+        print()
+
+        pre_result = _ik_clik_pre(
+            pre_target,
+        )
+
+        plan["pre"] = {
+            "controller":
+                "closed_loop_task_space_waypoints",
+
+            "success":
+                bool(pre_result["success"]),
+
+            "reason":
+                pre_result["reason"],
+
+            "target_center_xyz_m": [
+                float(value)
+                for value in pre_target
+            ],
+
+            "target_normal": [
+                float(value)
+                for value in _IK_TARGET_NORMAL
+            ],
+
+            "position_waypoint_max_m":
+                _PRE_POSITION_STEP_M,
+
+            "normal_waypoint_max_deg":
+                math.degrees(_PRE_NORMAL_STEP_RAD),
+
+            "joint_step_max_deg":
+                math.degrees(_PRE_JOINT_STEP_MAX_RAD),
+
+            "samples":
+                pre_result["samples"],
+        }
+
+        if not pre_result["success"]:
 
             (
                 run
@@ -5079,13 +6072,12 @@ def main():
 
             print()
             print(
-                "PRE IK DID NOT CONVERGE."
+                "CLOSED-LOOP PRE DID NOT CONVERGE."
             )
-
             print(
-                "No IK joint target was sent."
+                "reason = "
+                + str(pre_result["reason"])
             )
-
             print(
                 "Runtime left open for inspection."
             )
@@ -5097,15 +6089,9 @@ def main():
                 runtime = None
             raise SystemExit(1)
 
-        # One absolute movement to q_pre.
-        _ik_command_configuration(
-            "pre",
-            pre_solution["q"],
-        )
-
-        time.sleep(0.8)
-
         # Record the REAL settled pre-contact joint state.
+        pre_state = pre_result["state"]
+
         pre_state = _ik_read_state()
 
         q_pre_actual = _np.asarray(
@@ -5609,7 +6595,7 @@ def main():
                 "-p", "source_graph_path:=auto",
                 "-p", "target_morphology:=rc_car8",
                 "-p", "episode_id:=" + episode_id,
-                "-p", "dataset_path:=" + str(dataset_path),
+                "-p", "dataset_path:=" + str(mm8_to_rc_dataset_path),
             ],
             cwd=ROOT,
             env=env,

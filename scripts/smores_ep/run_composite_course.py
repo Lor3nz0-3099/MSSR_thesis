@@ -464,11 +464,52 @@ def wait_nav2(environment: Mapping[str, str], timeout_s: float = 75.0) -> None:
     )
 
 
+
+def set_behavior_dataset_context(
+    *,
+    environment: Mapping[str, str],
+    dataset_path: Path,
+    stage_name: str,
+) -> None:
+    parameters = (
+        ("behavior_dataset_path", str(dataset_path)),
+        ("behavior_dataset_stage_name", str(stage_name)),
+    )
+
+    for name, value in parameters:
+        result = subprocess.run(
+            [
+                "ros2",
+                "param",
+                "set",
+                "/smores_morphology_behavior_node",
+                name,
+                value,
+            ],
+            cwd=ROOT,
+            env=dict(environment),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=15,
+        )
+
+        if (
+            result.returncode != 0
+            or "successful" not in result.stdout.lower()
+        ):
+            raise RuntimeError(
+                "Failed to set morphology behavior dataset parameter "
+                f"{name}={value!r}: "
+                f"stdout={result.stdout.strip()!r} "
+                f"stderr={result.stderr.strip()!r}"
+            )
+
+
 def execute_navigation(
     stage: Any,
     *,
     runtime_dir: Path,
-    dataset_path: Path,
     episode_id: str,
     environment: Mapping[str, str],
 ) -> None:
@@ -494,7 +535,6 @@ def execute_navigation(
                 "--seed", str(stage.parameters.get("seed", 0)),
                 "--action-timeout-s", "900",
                 "--result-json", str(result_path),
-                "--dataset-path", str(dataset_path),
                 "--episode-id", episode_id,
                 "--task-id", stage.task_id,
             ]
@@ -750,7 +790,7 @@ def execute_stages(
     *,
     runtime: subprocess.Popen[Any],
     runtime_dir: Path,
-    dataset_path: Path,
+    dataset_manifest: Any,
     episode_id: str,
     environment: Mapping[str, str],
     headless: bool,
@@ -767,38 +807,128 @@ def execute_stages(
         if stage.task_id in completed_button_tasks:
             continue
         if stage.kind in {"assembly", "reconfiguration"}:
-            start_transition(
-                stage,
-                runtime=runtime,
-                runtime_dir=runtime_dir,
-                dataset_path=dataset_path,
-                episode_id=episode_id,
-                environment=environment,
-                reconfiguration_executor=reconfiguration_executor,
+            stream = dataset_manifest.register(
+                stage_id=stage.stage_id,
+                task_id=stage.task_id,
+                phase=stage.kind,
+                producer=(
+                    "self_assembly"
+                    if stage.kind == "assembly"
+                    else "self_reconfiguration"
+                ),
+                action_space="module_primitives",
+                source_morphology=stage.source_morphology,
+                target_morphology=stage.target_morphology,
+                intended_for_behavior_cloning=True,
             )
+            try:
+                start_transition(
+                    stage,
+                    runtime=runtime,
+                    runtime_dir=runtime_dir,
+                    dataset_path=stream.path,
+                    episode_id=episode_id,
+                    environment=environment,
+                    reconfiguration_executor=reconfiguration_executor,
+                )
+            except BaseException:
+                dataset_manifest.finalize_stage(
+                    stage.stage_id,
+                    success=False,
+                )
+                raise
+            else:
+                dataset_manifest.finalize_stage(
+                    stage.stage_id,
+                    success=True,
+                )
         elif stage.kind == "behavior":
-            run_logged(
-                [
-                    "ros2", "run", "mssr_expert",
-                    "mssr_smores_morphology_command_client",
-                    "--morphology", stage.target_morphology,
-                    "--behavior", str(stage.behavior),
-                    "--command-id", f"{episode_id}-stage-{stage.stage_id:02d}",
-                    "--parameters-json", json.dumps(dict(stage.parameters)),
-                    "--timeout-s", "900",
-                ],
-                environment=environment,
-                log_path=runtime_dir / f"stage-{stage.stage_id:02d}-behavior.log",
-                timeout_s=930,
+            stream = dataset_manifest.register(
+                stage_id=stage.stage_id,
+                task_id=stage.task_id,
+                phase="behavior",
+                producer="morphology_behavior_node",
+                action_space="module_locomotion",
+                source_morphology=stage.source_morphology,
+                target_morphology=stage.target_morphology,
+                intended_for_behavior_cloning=True,
             )
+            try:
+                set_behavior_dataset_context(
+                    environment=environment,
+                    dataset_path=stream.path,
+                    stage_name=(
+                        f"composite-{stage.stage_id:02d}-"
+                        f"{stage.task_id}-behavior"
+                    ),
+                )
+                run_logged(
+                    [
+                        "ros2", "run", "mssr_expert",
+                        "mssr_smores_morphology_command_client",
+                        "--morphology", stage.target_morphology,
+                        "--behavior", str(stage.behavior),
+                        "--command-id",
+                        f"{episode_id}-stage-{stage.stage_id:02d}",
+                        "--parameters-json",
+                        json.dumps(dict(stage.parameters)),
+                        "--timeout-s", "900",
+                    ],
+                    environment=environment,
+                    log_path=(
+                        runtime_dir
+                        / f"stage-{stage.stage_id:02d}-behavior.log"
+                    ),
+                    timeout_s=930,
+                )
+            except BaseException:
+                dataset_manifest.finalize_stage(
+                    stage.stage_id,
+                    success=False,
+                )
+                raise
+            else:
+                dataset_manifest.finalize_stage(
+                    stage.stage_id,
+                    success=True,
+                )
         elif stage.kind in {"nav2", "nav2_goal"}:
-            execute_navigation(
-                stage,
-                runtime_dir=runtime_dir,
-                dataset_path=dataset_path,
-                episode_id=episode_id,
-                environment=environment,
+            stream = dataset_manifest.register(
+                stage_id=stage.stage_id,
+                task_id=stage.task_id,
+                phase="behavior",
+                producer="morphology_behavior_node",
+                action_space="module_locomotion",
+                source_morphology=stage.source_morphology,
+                target_morphology=stage.target_morphology,
+                intended_for_behavior_cloning=True,
             )
+            try:
+                set_behavior_dataset_context(
+                    environment=environment,
+                    dataset_path=stream.path,
+                    stage_name=(
+                        f"composite-{stage.stage_id:02d}-"
+                        f"{stage.task_id}-{stage.kind}"
+                    ),
+                )
+                execute_navigation(
+                    stage,
+                    runtime_dir=runtime_dir,
+                    episode_id=episode_id,
+                    environment=environment,
+                )
+            except BaseException:
+                dataset_manifest.finalize_stage(
+                    stage.stage_id,
+                    success=False,
+                )
+                raise
+            else:
+                dataset_manifest.finalize_stage(
+                    stage.stage_id,
+                    success=True,
+                )
         elif stage.kind == "gap_rc_alignment":
             command = [
                 sys.executable,
@@ -823,23 +953,127 @@ def execute_stages(
             )
 
         elif stage.kind == "button_rc_alignment":
+            button_stream_specs = (
+                (
+                    "rc_behavior",
+                    "morphology_behavior_node",
+                    "module_locomotion",
+                    "rc_car8",
+                    "rc_car8",
+                ),
+                (
+                    "rc_to_mm8_reconfiguration",
+                    "self_reconfiguration",
+                    "module_primitives",
+                    "rc_car8",
+                    "mobile_manipulator8",
+                ),
+                (
+                    "mm8_behavior",
+                    "morphology_behavior_node",
+                    "module_locomotion",
+                    "mobile_manipulator8",
+                    "mobile_manipulator8",
+                ),
+                (
+                    "manipulation",
+                    "button_expert",
+                    "manipulation_5dof",
+                    "mobile_manipulator8",
+                    "mobile_manipulator8",
+                ),
+                (
+                    "mm8_to_rc_reconfiguration",
+                    "self_reconfiguration",
+                    "module_primitives",
+                    "mobile_manipulator8",
+                    "rc_car8",
+                ),
+            )
+
+            button_streams = {}
+
+            for (
+                phase,
+                producer,
+                action_space,
+                source_morphology,
+                target_morphology,
+            ) in button_stream_specs:
+                button_streams[phase] = dataset_manifest.register(
+                    stage_id=stage.stage_id,
+                    task_id=stage.task_id,
+                    phase=phase,
+                    producer=producer,
+                    action_space=action_space,
+                    source_morphology=source_morphology,
+                    target_morphology=target_morphology,
+                    intended_for_behavior_cloning=True,
+                )
+
+            dataset_layout_path = (
+                runtime_dir
+                / f"stage-{stage.stage_id:02d}-button-dataset-layout.json"
+            )
+
+            dataset_layout_path.write_text(
+                json.dumps(
+                    {
+                        phase: str(stream.path)
+                        for phase, stream in button_streams.items()
+                    },
+                    indent=2,
+                    sort_keys=True,
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
             command = [
                 sys.executable,
-                str(ROOT / "scripts" / "smores_ep" / "run_button_expert_to_ik.py"),
-                "--seed", str(stage.parameters["seed"]),
-                "--external-runtime-dir", str(runtime_dir),
-                "--button-task-id", stage.task_id,
-                "--dataset-path", str(dataset_path),
-                "--episode-id", episode_id,
+                str(
+                    ROOT
+                    / "scripts"
+                    / "smores_ep"
+                    / "run_button_expert_to_ik.py"
+                ),
+                "--seed",
+                str(stage.parameters["seed"]),
+                "--external-runtime-dir",
+                str(runtime_dir),
+                "--button-task-id",
+                stage.task_id,
+                "--dataset-layout-json",
+                str(dataset_layout_path),
+                "--episode-id",
+                episode_id,
             ]
+
             if headless:
                 command.append("--headless")
-            run_logged(
-                command,
-                environment=environment,
-                log_path=runtime_dir / f"stage-{stage.stage_id:02d}-button.log",
-                timeout_s=1800,
-            )
+
+            try:
+                run_logged(
+                    command,
+                    environment=environment,
+                    log_path=(
+                        runtime_dir
+                        / f"stage-{stage.stage_id:02d}-button.log"
+                    ),
+                    timeout_s=1800,
+                )
+            except BaseException:
+                dataset_manifest.finalize_stage(
+                    stage.stage_id,
+                    success=False,
+                )
+                raise
+            else:
+                dataset_manifest.finalize_stage(
+                    stage.stage_id,
+                    success=True,
+                )
+
             completed_button_tasks.add(stage.task_id)
         elif stage.kind != "button_expert":
             raise RuntimeError(f"Unsupported composite stage kind {stage.kind!r}")
@@ -902,6 +1136,14 @@ def main() -> int:
         else ROOT / "logs" / "composite_course" / f"{args.episode}-{stamp}"
     )
     runtime_dir.mkdir(parents=True, exist_ok=False)
+
+    from smores_ep.dataset.composite_dataset import CompositeDatasetManifest
+
+    dataset_manifest = CompositeDatasetManifest(
+        runtime_dir=runtime_dir,
+        episode_id=args.episode,
+    )
+
     mission_path = runtime_dir / "mission.json"
     mission_path.write_text(
         json.dumps(mission, indent=2, sort_keys=True) + "\n",
@@ -949,7 +1191,7 @@ def main() -> int:
         "actuator_effort_scale:=4.0",
         "wheel_friction_scale:=1.50",
         "tilt_effort_scale:=8.0",
-        f"behavior_dataset_path:={runtime_dir / 'dataset.jsonl'}",
+        "behavior_dataset_path:=",
         f"behavior_dataset_episode_id:={args.episode}",
         f"ros_domain_id:={args.ros_domain_id}",
         "rmw_implementation:=rmw_cyclonedds_cpp",
@@ -974,12 +1216,11 @@ def main() -> int:
         if not args.execute:
             print("Composite GUI ready; close Isaac to end the command.")
             return runtime.wait()
-        dataset_path = runtime_dir / "dataset.jsonl"
         completed_all_stages = execute_stages(
             stages,
             runtime=runtime,
             runtime_dir=runtime_dir,
-            dataset_path=dataset_path,
+            dataset_manifest=dataset_manifest,
             episode_id=args.episode,
             environment=environment,
             headless=args.headless,
@@ -1001,18 +1242,26 @@ def main() -> int:
                 return runtime.wait()
             return 0
 
+        dataset_manifest.finalize_episode(success=True)
         success = True
-        normalize_dataset(dataset_path, args.episode, True)
-        print(f"COMPOSITE MISSION SUCCEEDED: final goal reached; dataset={dataset_path}")
+
+        manifest_path = runtime_dir / "dataset_manifest.json"
+
+        print(
+            "COMPOSITE MISSION SUCCEEDED: final goal reached; "
+            f"dataset_manifest={manifest_path}"
+        )
         if not args.headless:
             print("Isaac remains open for inspection; close the GUI to exit.")
             return runtime.wait()
         return 0
     finally:
-        if not success:
-            normalize_dataset(runtime_dir / "dataset.jsonl", args.episode, False)
+        if args.execute and not success:
+            dataset_manifest.finalize_episode(success=False)
+
         if args.headless or not success:
             stop_process(runtime)
+
         runtime_log.close()
 
 

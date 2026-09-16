@@ -7,6 +7,8 @@ import time
 from pathlib import Path
 from typing import Any, Mapping
 
+from rcl_interfaces.msg import SetParametersResult
+
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from rclpy.executors import ExternalShutdownException
@@ -28,7 +30,6 @@ from mssr_expert.behaviors.morphology_locomotion import (
     coherent_planar_train_commands,
     validate_locomotion_dofs,
 )
-from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitPlanner
 from mssr_expert.behaviors.snake_stair_registry import STAIR_GAIT_BEHAVIORS
 from mssr_expert.behaviors.snake_stair_concertina import (
     SnakeStairConcertinaPlanner,
@@ -406,7 +407,6 @@ class SmoresMorphologyBehaviorNode(Node):
             package_share / "config"
         )
         self._topology_matcher = SmoresSelfReconfigurationPlanner()
-        self._stair_gait_planner = SnakeStairGaitPlanner()
         self._stair_concertina_planner = SnakeStairConcertinaPlanner()
         self._gap_gait_planner = SnakeGapGaitPlanner()
         self._morphology_name = ""
@@ -446,6 +446,10 @@ class SmoresMorphologyBehaviorNode(Node):
             AttributedRobotGraph | None,
             Mapping[str, str],
         ] | None = None
+        self._behavior_dataset_pending_decision = None
+        self.add_on_set_parameters_callback(
+            self._on_behavior_dataset_parameters
+        )
 
         self._odom_publisher = self.create_publisher(
             Odometry,
@@ -841,8 +845,6 @@ class SmoresMorphologyBehaviorNode(Node):
                     )
                 if command.behavior == "gap_crossing":
                     planner = self._gap_gait_planner.plan
-                elif command.behavior == "crawl_stairs_arch_wave":
-                    planner = self._stair_gait_planner.plan_arch_wave
                 elif command.behavior == "crawl_stairs_spatial_concertina":
                     planner = self._stair_concertina_planner.plan
                 planning_graph = graph_with_command_course(
@@ -857,9 +859,8 @@ class SmoresMorphologyBehaviorNode(Node):
                         neutral_tilts,
                     )
                 else:
-                    # ``crawl_stairs_arch_wave`` is intentionally the exact
-                    # 70a3bdc validated planner interface.  Do not layer later
-                    # neutral/compliance arguments onto the historical gait.
+                    # gap_crossing uses its dedicated three-argument
+                    # planner interface.
                     program_override = planner(
                         planning_graph,
                         self._assignments,
@@ -931,6 +932,7 @@ class SmoresMorphologyBehaviorNode(Node):
         )
         self._publish_actions(
             locomotion,
+            command_id=decision.command_id,
             fsm_state=decision.state,
             phase=decision.phase,
             active_primitive=(
@@ -965,6 +967,173 @@ class SmoresMorphologyBehaviorNode(Node):
         if decision.done:
             self._last_terminal_command_id = decision.command_id
 
+    def _build_behavior_dataset_observation(
+        self,
+        decision,
+        current_graph,
+        *,
+        stage_name,
+        difficulty,
+    ):
+        positions: dict[str, list[float]] = {}
+        for node in current_graph.nodes:
+            try:
+                positions[node.module_id] = list(
+                    module_position(node.attributes)
+                )
+            except (KeyError, TypeError, ValueError):
+                continue
+
+        return {
+            "schema_version": (
+                "mssr.morphology_behavior_observation.v1"
+            ),
+            "command_id": decision.command_id,
+            "morphology": decision.morphology,
+            "behavior": decision.behavior,
+            "task_context": behavior_task_context(
+                decision,
+                current_graph,
+                self._active_command_parameters,
+            ),
+            "environment": behavior_environment_observation(
+                current_graph,
+                stage_name=stage_name,
+                difficulty=difficulty,
+            ),
+            "course": current_graph.global_attributes.get(
+                "course",
+                {},
+            ),
+            "module_positions_world_m": positions,
+            "operational_dofs": dof_inventory_observation(
+                self._dof_inventory
+            ),
+        }
+
+    def _flush_behavior_dataset_pending(self):
+        if self._behavior_dataset_pending is None:
+            return
+
+        logger = self._behavior_dataset_logger
+        decision = self._behavior_dataset_pending_decision
+
+        if logger is None or decision is None:
+            raise RuntimeError(
+                "Cannot flush behavior dataset pending transition "
+                "without its logger and decision"
+            )
+
+        current_graph = graph_with_command_course(
+            self._latest_robot_graph,
+            self._active_command_parameters,
+        )
+        episode_id = str(
+            self.get_parameter(
+                "behavior_dataset_episode_id"
+            ).value
+        ).strip() or decision.command_id
+        stage_name = str(
+            self.get_parameter(
+                "behavior_dataset_stage_name"
+            ).value
+        )
+        difficulty = float(
+            self.get_parameter(
+                "behavior_dataset_difficulty"
+            ).value
+        )
+
+        observation = self._build_behavior_dataset_observation(
+            decision,
+            current_graph,
+            stage_name=stage_name,
+            difficulty=difficulty,
+        )
+
+        (
+            previous_observation,
+            graph,
+            previous_output,
+            previous_target_graph,
+            previous_assignment,
+        ) = self._behavior_dataset_pending
+
+        logger.log_step(
+            episode_id=episode_id,
+            timestep=self._behavior_dataset_timestep,
+            observation=previous_observation,
+            graph=graph,
+            expert_output=previous_output,
+            stage_name=stage_name,
+            stage_id=self._behavior_dataset_timestep,
+            task_type=decision.behavior,
+            difficulty=difficulty,
+            target_graph=previous_target_graph,
+            assignment=previous_assignment,
+            next_graph=current_graph,
+            next_observation=observation,
+        )
+        self._behavior_dataset_timestep += 1
+        self._behavior_dataset_pending = None
+        self._behavior_dataset_pending_decision = None
+
+    def _on_behavior_dataset_parameters(self, parameters):
+        current_path = str(
+            self.get_parameter(
+                "behavior_dataset_path"
+            ).value
+        ).strip()
+
+        for parameter in parameters:
+            if parameter.name != "behavior_dataset_path":
+                continue
+
+            requested_path = str(parameter.value).strip()
+            if requested_path == current_path:
+                break
+
+            try:
+                self._flush_behavior_dataset_pending()
+            except Exception as exc:
+                return SetParametersResult(
+                    successful=False,
+                    reason=str(exc),
+                )
+            break
+
+        return SetParametersResult(successful=True)
+
+    def _refresh_behavior_dataset_logger(self):
+        requested_text = str(
+            self.get_parameter("behavior_dataset_path").value
+        ).strip()
+        requested_path = Path(requested_text) if requested_text else None
+
+        current_logger = self._behavior_dataset_logger
+        current_path = (
+            Path(current_logger.path)
+            if current_logger is not None
+            else None
+        )
+
+        if current_path == requested_path:
+            return current_logger
+
+        if self._behavior_dataset_pending is not None:
+            raise RuntimeError(
+                "Cannot switch behavior dataset path with a pending transition"
+            )
+
+        self._behavior_dataset_logger = (
+            DatasetLogger(requested_path)
+            if requested_path is not None
+            else None
+        )
+        self._behavior_dataset_timestep = 0
+        self._behavior_dataset_tick = 0
+        return self._behavior_dataset_logger
+
     def _record_behavior_transition(
         self,
         decision: MorphologyBehaviorDecision,
@@ -972,7 +1141,7 @@ class SmoresMorphologyBehaviorNode(Node):
     ) -> None:
         """Record graph-conditioned expert transitions for obstacle IL."""
 
-        logger = self._behavior_dataset_logger
+        logger = self._refresh_behavior_dataset_logger()
         if logger is None:
             return
         current_graph = graph_with_command_course(
@@ -1003,38 +1172,12 @@ class SmoresMorphologyBehaviorNode(Node):
             item.target_vertex_id: item.module_id
             for item in self._assignments
         }
-        positions: dict[str, list[float]] = {}
-        for node in current_graph.nodes:
-            try:
-                positions[node.module_id] = list(
-                    module_position(node.attributes)
-                )
-            except (KeyError, TypeError, ValueError):
-                continue
-        observation = {
-            "schema_version": (
-                "mssr.morphology_behavior_observation.v1"
-            ),
-            "command_id": decision.command_id,
-            "morphology": decision.morphology,
-            "behavior": decision.behavior,
-            "task_context": behavior_task_context(
-                decision,
-                current_graph,
-                self._active_command_parameters,
-            ),
-            "environment": behavior_environment_observation(
-                current_graph,
-                stage_name=stage_name,
-                difficulty=difficulty,
-            ),
-            # Retained as a direct alias for consumers of early datasets.
-            "course": current_graph.global_attributes.get("course", {}),
-            "module_positions_world_m": positions,
-            "operational_dofs": dof_inventory_observation(
-                self._dof_inventory
-            ),
-        }
+        observation = self._build_behavior_dataset_observation(
+            decision,
+            current_graph,
+            stage_name=stage_name,
+            difficulty=difficulty,
+        )
 
         if self._behavior_dataset_pending is not None:
             (
@@ -1061,6 +1204,7 @@ class SmoresMorphologyBehaviorNode(Node):
             )
             self._behavior_dataset_timestep += 1
             self._behavior_dataset_pending = None
+            self._behavior_dataset_pending_decision = None
 
         if not should_sample:
             return
@@ -1095,6 +1239,7 @@ class SmoresMorphologyBehaviorNode(Node):
             target_graph,
             assignment,
         )
+        self._behavior_dataset_pending_decision = decision
 
     def _step_cmd_vel(self) -> bool:
         """Forward Nav2 body twists and record graph-conditioned IL labels."""
@@ -1204,18 +1349,6 @@ class SmoresMorphologyBehaviorNode(Node):
                 else "/cmd_vel watchdog expired; locomotion stopped."
             )
 
-        self._publish_actions(
-            locomotion,
-            fsm_state=fsm_state,
-            phase=phase,
-            active_primitive="cmd_vel",
-            progress=progress,
-            success=success,
-            done=done,
-            message=message,
-            task_type="nav2_planar_route",
-        )
-
         episode_id = str(
             self.get_parameter(
                 "behavior_dataset_episode_id"
@@ -1228,6 +1361,19 @@ class SmoresMorphologyBehaviorNode(Node):
                 if episode_id
                 else "nav2-planar-route"
             )
+
+        self._publish_actions(
+            locomotion,
+            command_id=route_id,
+            fsm_state=fsm_state,
+            phase=phase,
+            active_primitive="cmd_vel",
+            progress=progress,
+            success=success,
+            done=done,
+            message=message,
+            task_type="nav2_planar_route",
+        )
 
         nav_decision = MorphologyBehaviorDecision(
             command_id=route_id,
@@ -1259,6 +1405,7 @@ class SmoresMorphologyBehaviorNode(Node):
         self,
         locomotion: Mapping[str, Mapping[str, float]],
         *,
+        command_id: str,
         fsm_state: str,
         phase: str,
         active_primitive: str,
@@ -1337,7 +1484,7 @@ class SmoresMorphologyBehaviorNode(Node):
                         },
                         "success": bool(success),
                         "done": bool(done),
-                        "debug": {"message": message},
+                        "debug": {"command_id": command_id, "message": message},
                     },
                 }
             )
