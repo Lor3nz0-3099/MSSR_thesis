@@ -151,8 +151,9 @@ def test_gap_program_has_requested_geometric_sequence_without_timers() -> None:
     program = SnakeGapGaitPlanner().plan(_graph(), _assignments(), {})
 
     phases = tuple(step.phase for step in program)
-    assert phases[:4] == (
+    assert phases[:5] == (
         "RESTORE_GAP_NEUTRAL",
+        "PRELIFT_GAP_HEAD_70DEG",
         "APPROACH_HEAD_TO_NEAR_EDGE",
         "FOLLOW_GAP_PROFILE_01",
         "FOLLOW_GAP_PROFILE_02",
@@ -610,12 +611,26 @@ def test_wave_is_low_bidirectional_and_migrates_from_head_to_tail() -> None:
         if step.phase.startswith("FOLLOW_GAP_PROFILE_")
     )
 
+    # snake_head (m7) is deliberately held at +70 deg throughout
+    # the traveling profile.  The remaining articulated wave stays low.
+    assert all(
+        state["m7"] == pytest.approx(math.radians(70.0))
+        for state in profile_states
+    )
     assert max(
-        abs(value) for state in profile_states for value in state.values()
+        abs(state[f"m{index}"])
+        for state in profile_states
+        for index in range(7)
     ) < 0.75
     assert any(
-        any(value > 1e-6 for value in state.values())
-        and any(value < -1e-6 for value in state.values())
+        any(
+            state[f"m{index}"] > 1e-6
+            for index in range(7)
+        )
+        and any(
+            state[f"m{index}"] < -1e-6
+            for index in range(7)
+        )
         for state in profile_states
     )
 

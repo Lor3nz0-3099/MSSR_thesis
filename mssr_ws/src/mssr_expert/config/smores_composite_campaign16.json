@@ -1,101 +1,241 @@
 {
   "schema_version": "mssr.composite_campaign.v1",
-  "description": "Sixteen deterministic missions composed only from expert_v1 validated seeds. Goal is appended by the course generator.",
+  "description": "Balanced short composite curriculum: 10 three-obstacle courses using only validated seeds. composite-0001 is retained as the long end-to-end stress reference.",
   "episodes": [
-    {"episode_id": "composite-0001", "tasks": [
-      {"task_id": "curve-1", "type": "flat_navigation", "seed": 5100},
-      {"task_id": "gap-1", "type": "gap", "seed": 4100},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 6403},
-      {"task_id": "button-1", "type": "button", "seed": 6101}
-    ]},
-    {"episode_id": "composite-0002", "tasks": [
-      {"task_id": "button-1", "type": "button", "seed": 6103},
-      {"task_id": "curve-1", "type": "flat_navigation", "seed": 5101},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 6403},
-      {"task_id": "gap-1", "type": "gap", "seed": 4102}
-    ]},
-    {"episode_id": "composite-0003", "tasks": [
-      {"task_id": "stairs-1", "type": "stairs", "seed": 3102},
-      {"task_id": "gap-1", "type": "gap", "seed": 4103},
-      {"task_id": "button-1", "type": "button", "seed": 6107}
-    ]},
-    {"episode_id": "composite-0004", "tasks": [
-      {"task_id": "gap-1", "type": "gap", "seed": 4104},
-      {"task_id": "gap-2", "type": "gap", "seed": 4105},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 3104},
-      {"task_id": "button-1", "type": "button", "seed": 6251}
-    ]},
-    {"episode_id": "composite-0005", "tasks": [
-      {"task_id": "curve-1", "type": "flat_navigation", "seed": 5102},
-      {"task_id": "button-1", "type": "button", "seed": 8568},
-      {"task_id": "button-2", "type": "button", "seed": 8936},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 3105}
-    ]},
-    {"episode_id": "composite-0006", "tasks": [
-      {"task_id": "stairs-1", "type": "stairs", "seed": 6403},
-      {"task_id": "curve-1", "type": "flat_navigation", "seed": 5103},
-      {"task_id": "gap-1", "type": "gap", "seed": 4106},
-      {"task_id": "stairs-2", "type": "stairs", "seed": 6922}
-    ]},
-    {"episode_id": "composite-0007", "tasks": [
-      {"task_id": "button-1", "type": "button", "seed": 9974},
-      {"task_id": "gap-1", "type": "gap", "seed": 4107},
-      {"task_id": "gap-2", "type": "gap", "seed": 4108},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 3106}
-    ]},
-    {"episode_id": "composite-0008", "tasks": [
-      {"task_id": "curve-1", "type": "flat_navigation", "seed": 5104},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 3107},
-      {"task_id": "button-1", "type": "button", "seed": 6101},
-      {"task_id": "gap-1", "type": "gap", "seed": 4109}
-    ]},
-    {"episode_id": "composite-0009", "tasks": [
-      {"task_id": "stairs-1", "type": "stairs", "seed": 3292},
-      {"task_id": "stairs-2", "type": "stairs", "seed": 4007},
-      {"task_id": "gap-1", "type": "gap", "seed": 4110}
-    ]},
-    {"episode_id": "composite-0010", "tasks": [
-      {"task_id": "gap-1", "type": "gap", "seed": 4111},
-      {"task_id": "button-1", "type": "button", "seed": 6103},
-      {"task_id": "curve-1", "type": "flat_navigation", "seed": 5105},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 4047}
-    ]},
-    {"episode_id": "composite-0011", "tasks": [
-      {"task_id": "button-1", "type": "button", "seed": 6107},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 4676},
-      {"task_id": "gap-1", "type": "gap", "seed": 4303},
-      {"task_id": "button-2", "type": "button", "seed": 6251}
-    ]},
-    {"episode_id": "composite-0012", "tasks": [
-      {"task_id": "curve-1", "type": "flat_navigation", "seed": 6000},
-      {"task_id": "gap-1", "type": "gap", "seed": 5855},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 4689},
-      {"task_id": "stairs-2", "type": "stairs", "seed": 6922}
-    ]},
-    {"episode_id": "composite-0013", "tasks": [
-      {"task_id": "stairs-1", "type": "stairs", "seed": 3108},
-      {"task_id": "button-1", "type": "button", "seed": 8568},
-      {"task_id": "gap-1", "type": "gap", "seed": 5998},
-      {"task_id": "curve-1", "type": "flat_navigation", "seed": 6001}
-    ]},
-    {"episode_id": "composite-0014", "tasks": [
-      {"task_id": "gap-1", "type": "gap", "seed": 6911},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 3109},
-      {"task_id": "gap-2", "type": "gap", "seed": 7564},
-      {"task_id": "button-1", "type": "button", "seed": 8936}
-    ]},
-    {"episode_id": "composite-0015", "tasks": [
-      {"task_id": "button-1", "type": "button", "seed": 9974},
-      {"task_id": "curve-1", "type": "flat_navigation", "seed": 6053},
-      {"task_id": "stairs-1", "type": "stairs", "seed": 3110},
-      {"task_id": "gap-1", "type": "gap", "seed": 12398}
-    ]},
-    {"episode_id": "composite-0016", "tasks": [
-      {"task_id": "stairs-1", "type": "stairs", "seed": 6403},
-      {"task_id": "gap-1", "type": "gap", "seed": 14544},
-      {"task_id": "button-1", "type": "button", "seed": 6101},
-      {"task_id": "stairs-2", "type": "stairs", "seed": 6922},
-      {"task_id": "button-2", "type": "button", "seed": 6251}
-    ]}
+    {
+      "episode_id": "composite-0001",
+      "tasks": [
+        {
+          "task_id": "curve-1",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4100
+        },
+        {
+          "task_id": "stairs-1",
+          "type": "stairs",
+          "seed": 3104
+        },
+        {
+          "task_id": "button-1",
+          "type": "button",
+          "seed": 6101
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c01",
+      "description": "Balanced baseline: RC path -> moderate gap -> moderate stairs.",
+      "tasks": [
+        {
+          "task_id": "rc-1",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4103
+        },
+        {
+          "task_id": "stairs-1",
+          "type": "stairs",
+          "seed": 3104
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c02",
+      "description": "GUI priority: easy stairs -> RC path -> validated button. Button is the difficult capability.",
+      "tasks": [
+        {
+          "task_id": "stairs-1",
+          "type": "stairs",
+          "seed": 3102
+        },
+        {
+          "task_id": "rc-1",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "button-1",
+          "type": "button",
+          "seed": 6101
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c03",
+      "description": "Two RC paths -> validated button; isolates repeated navigation before manipulation.",
+      "tasks": [
+        {
+          "task_id": "rc-1",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "rc-2",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "button-1",
+          "type": "button",
+          "seed": 6101
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c04",
+      "description": "GUI priority: tough-but-not-extreme stairs -> RC path -> easy gap.",
+      "tasks": [
+        {
+          "task_id": "stairs-1",
+          "type": "stairs",
+          "seed": 4689
+        },
+        {
+          "task_id": "rc-1",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4106
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c05",
+      "description": "Highest GUI priority: easy gap -> RC path -> validated button. The difficult part is the two morphology transitions plus button.",
+      "tasks": [
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4106
+        },
+        {
+          "task_id": "rc-1",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "button-1",
+          "type": "button",
+          "seed": 6101
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c06",
+      "description": "GUI priority: RC path -> tough-but-not-extreme gap -> RC path.",
+      "tasks": [
+        {
+          "task_id": "rc-1",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4104
+        },
+        {
+          "task_id": "rc-2",
+          "type": "flat_navigation",
+          "seed": 5100
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c07",
+      "description": "Repeated stairs: easy -> tough-but-not-extreme -> easy.",
+      "tasks": [
+        {
+          "task_id": "stairs-1",
+          "type": "stairs",
+          "seed": 3102
+        },
+        {
+          "task_id": "stairs-2",
+          "type": "stairs",
+          "seed": 4689
+        },
+        {
+          "task_id": "stairs-3",
+          "type": "stairs",
+          "seed": 3102
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c08",
+      "description": "Repeated gaps: easy -> tough-but-not-extreme -> easy.",
+      "tasks": [
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4106
+        },
+        {
+          "task_id": "gap-2",
+          "type": "gap",
+          "seed": 4104
+        },
+        {
+          "task_id": "gap-3",
+          "type": "gap",
+          "seed": 4106
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c09",
+      "description": "Repeated validated RC navigation x3; no morphology difficulty.",
+      "tasks": [
+        {
+          "task_id": "rc-1",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "rc-2",
+          "type": "flat_navigation",
+          "seed": 5100
+        },
+        {
+          "task_id": "rc-3",
+          "type": "flat_navigation",
+          "seed": 5100
+        }
+      ]
+    },
+    {
+      "episode_id": "composite-c10",
+      "description": "Alternating Snake skills: easy gap -> tough stairs -> easy gap.",
+      "tasks": [
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4106
+        },
+        {
+          "task_id": "stairs-1",
+          "type": "stairs",
+          "seed": 4689
+        },
+        {
+          "task_id": "gap-2",
+          "type": "gap",
+          "seed": 4106
+        }
+      ]
+    }
   ]
 }

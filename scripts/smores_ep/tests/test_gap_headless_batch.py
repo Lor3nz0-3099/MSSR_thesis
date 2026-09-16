@@ -90,7 +90,7 @@ def test_far_bank_metric_rejects_unsupported_or_broken_chain(
     assert result["all_modules_on_far_bank"] is False
 
 
-def test_far_bank_metric_rejects_non_neutral_tilt_profile() -> None:
+def test_far_bank_metric_reports_non_neutral_tilt_without_rejecting_crossing() -> None:
     payload = _graph(0.85)
     payload["nodes"][0]["attributes"]["actuators"]["tilt"][
         "position_rad"
@@ -98,4 +98,13 @@ def test_far_bank_metric_rejects_non_neutral_tilt_profile() -> None:
 
     result = batch.evaluate_far_bank_result(payload, CoplanarGapSpec())
 
-    assert result["all_modules_on_far_bank"] is False
+    assert result["all_modules_on_far_bank"] is True
+
+    tilt_positions = [
+        node["attributes"]["actuators"]["tilt"]["position_rad"]
+        for node in payload["nodes"]
+    ]
+    expected_spread = max(tilt_positions) - min(tilt_positions)
+
+    assert result["tilt_spread_rad"] == pytest.approx(expected_spread)
+    assert result["tilt_spread_rad"] > result["maximum_tilt_spread_rad"]

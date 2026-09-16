@@ -37,10 +37,10 @@ def test_measured_wheels_straddle_body_symmetrically() -> None:
     assert geometry.track_width_m == pytest.approx(0.070410, abs=1.0e-6)
 
 
-def test_both_driving_wheels_use_the_62_mm_cad_diameter() -> None:
+def test_both_driving_wheels_use_the_calibrated_63_mm_diameter() -> None:
     geometry = SmoresGeometry()
     assert 2.0 * geometry.wheel_radius_m == pytest.approx(
-        0.06212,
+        0.06300,
         abs=2.0e-5,
     )
 

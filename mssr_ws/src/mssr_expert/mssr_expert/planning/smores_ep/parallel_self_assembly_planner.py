@@ -11,6 +11,9 @@ from mssr_expert.graph.attributed_robot_graph import (
     GraphNode,
 )
 from mssr_expert.graph.task_graph import TaskGraphBuilder
+from mssr_expert.planning.smores_ep.partial_assembly import (
+    PartialAssemblySeed, PartialAssemblyError, validate_partial_assembly_seed,
+)
 from mssr_expert.planning.smores_ep.assembly_sequence import (
     ParallelAssemblyPlan,
     generate_parallel_assembly_plan,
@@ -114,10 +117,12 @@ class ParallelSelfAssemblyPlanner:
         self,
         current_graph: AttributedRobotGraph,
         target_graph: AttributedRobotGraph,
+        *,
+        partial: PartialAssemblySeed | None = None,
     ) -> ParallelSelfAssemblyPlanningResult:
         """Generate a complete deterministic parallel assembly plan."""
 
-        if self.require_disconnected_modules:
+        if self.require_disconnected_modules and partial is None:
             self._validate_modules_are_disconnected(current_graph)
 
         physical_poses = self._extract_physical_poses(current_graph)
@@ -138,6 +143,14 @@ class ParallelSelfAssemblyPlanner:
             target_tree,
             root_id=self._declared_target_root(target_graph),
         )
+
+        if partial is not None:
+            try:
+                validate_partial_assembly_seed(
+                    partial, current_graph, target_tree, rooted_target_tree.root_id,
+                )
+            except PartialAssemblyError as exc:
+                raise ParallelSelfAssemblyPlannerError(str(exc)) from exc
 
         conditioned_target_graph = self._mark_target_root(
             target_graph,
@@ -162,11 +175,15 @@ class ParallelSelfAssemblyPlanner:
             for module_id, pose in sorted(physical_poses.items())
         )
 
-        physical_root_id = choose_physical_root(
-            module_positions
+        physical_root_id = (
+            partial.anchored_target_to_module[rooted_target_tree.root_id]
+            if partial is not None else choose_physical_root(module_positions)
         )
 
         assignment = assign_modules_to_targets(
+            fixed_target_to_module=(
+                partial.anchored_target_to_module if partial is not None else None
+            ),
             physical_poses=physical_poses,
             physical_root_id=physical_root_id,
             target=unfolded_target,
@@ -208,8 +225,12 @@ class ParallelSelfAssemblyPlanner:
         assembly_plan = generate_parallel_assembly_plan(
             tree=rooted_target_tree,
             assignment=assignment,
+            completed_target_edges=(partial.completed_target_edges if partial is not None else ()),
         )
-        self._validate_helper_metadata(target_graph, assembly_plan)
+        # Helper metadata describes the full target, including preserved edges.
+        full_plan = (generate_parallel_assembly_plan(rooted_target_tree, assignment)
+                     if partial is not None else assembly_plan)
+        self._validate_helper_metadata(target_graph, full_plan)
 
         layout_pose_by_module = self._layout_poses(
             physical_poses=physical_poses,
@@ -217,7 +238,16 @@ class ParallelSelfAssemblyPlanner:
             target=unfolded_target,
             assignment=assignment,
             rooted_tree=rooted_target_tree,
+            anchored_target_to_module=(
+                partial.anchored_target_to_module if partial is not None else None
+            ),
         )
+
+        if partial is not None:
+            layout_pose_by_module = {
+                module_id: pose for module_id, pose in layout_pose_by_module.items()
+                if module_id in partial.free_module_ids
+            }
 
         task_graph = self._task_graph_builder.build(
             current_graph=current_graph,
@@ -333,6 +363,7 @@ class ParallelSelfAssemblyPlanner:
         target: UnfoldedPlanarConfiguration,
         assignment: AssignmentResult,
         rooted_tree: RootedSmoresTree,
+        anchored_target_to_module: Mapping[str, str] | None = None,
     ) -> dict[str, PlanarPose]:
         """Place the unfolded target around the physical root with clearance."""
 
@@ -342,24 +373,41 @@ class ParallelSelfAssemblyPlanner:
             target.root_id: target_root,
         }
         for edge in rooted_tree.edges:
+            if anchored_target_to_module and edge.child_vertex in anchored_target_to_module:
+                observed = physical_poses[anchored_target_to_module[edge.child_vertex]]
+                dx = observed.x_m - physical_root.x_m
+                dy = observed.y_m - physical_root.y_m
+                cosine = math.cos(physical_root.yaw_rad)
+                sine = math.sin(physical_root.yaw_rad)
+                staged_by_target[edge.child_vertex] = PlanarPose(
+                    target_root.x_m + cosine * dx + sine * dy,
+                    target_root.y_m - sine * dx + cosine * dy,
+                    normalize_angle(observed.yaw_rad - physical_root.yaw_rad + target_root.yaw_rad),
+                )
+                continue
             exact_parent = target.poses_by_vertex[edge.parent_vertex]
             exact_child = target.poses_by_vertex[edge.child_vertex]
             staged_parent = staged_by_target[edge.parent_vertex]
-            direction = exact_parent.yaw_rad + FACE_ANGLE_RAD[edge.parent_face]
+            # Carry the nominal relative connection into the observed parent
+            # frame, including every free descendant of a preserved anchor.
+            yaw_offset = staged_parent.yaw_rad - exact_parent.yaw_rad
+            cosine = math.cos(yaw_offset)
+            sine = math.sin(yaw_offset)
+            dx = exact_child.x_m - exact_parent.x_m
+            dy = exact_child.y_m - exact_parent.y_m
+            direction = staged_parent.yaw_rad + FACE_ANGLE_RAD[edge.parent_face]
             staged_by_target[edge.child_vertex] = PlanarPose(
                 x_m=(
                     staged_parent.x_m
-                    + exact_child.x_m
-                    - exact_parent.x_m
+                    + cosine * dx - sine * dy
                     + self.layout_clearance_m * math.cos(direction)
                 ),
                 y_m=(
                     staged_parent.y_m
-                    + exact_child.y_m
-                    - exact_parent.y_m
+                    + sine * dx + cosine * dy
                     + self.layout_clearance_m * math.sin(direction)
                 ),
-                yaw_rad=exact_child.yaw_rad,
+                yaw_rad=normalize_angle(exact_child.yaw_rad + yaw_offset),
             )
         result: dict[str, PlanarPose] = {}
         for target_id, target_pose in staged_by_target.items():

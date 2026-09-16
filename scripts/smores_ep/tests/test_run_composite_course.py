@@ -38,14 +38,16 @@ def test_select_episode_rejects_unknown_id() -> None:
         )
 
 
-def test_reconfiguration_executor_selection_is_explicit_and_legacy_by_default():
-    assert MODULE.argument_parser().parse_args([]).reconfiguration_executor == "legacy"
-    assert MODULE.argument_parser().parse_args([
-        "--reconfiguration-executor", "v2"
-    ]).reconfiguration_executor == "v2"
-    assert MODULE.transition_executable(False, "legacy") == "mssr_smores_self_reconfiguration_node"
-    assert MODULE.transition_executable(False, "v2") == "mssr_smores_deterministic_reconfiguration_node"
-    assert MODULE.transition_executable(True, "v2") == "mssr_smores_self_assembly_node"
+def test_only_available_transition_experts_are_selected():
+    assert MODULE.transition_executable(False) == "mssr_smores_self_reconfiguration_node"
+    assert MODULE.transition_executable(True) == "mssr_smores_self_assembly_node"
+
+
+def test_removed_v2_executor_option_is_rejected():
+    with pytest.raises(SystemExit):
+        MODULE.argument_parser().parse_args([
+            "--reconfiguration-executor", "v2"
+        ])
 
 
 def test_normalize_dataset_creates_one_episode_terminal(tmp_path: Path) -> None:
@@ -216,8 +218,6 @@ def test_composite_main_uses_manifest_instead_of_monolithic_dataset() -> None:
     assert "dataset.jsonl" not in main_source
     assert "normalize_dataset(" not in main_source
 
-    assert '"behavior_dataset_path:="' in main_source
-
     assert (
         "dataset_manifest.finalize_episode(success=True)"
         in main_source
@@ -259,3 +259,53 @@ def test_main_uses_manifest_instead_of_monolithic_dataset() -> None:
     # Keep normalize_dataset() as a legacy utility, but the new
     # composite main path must never invoke it.
     assert "normalize_dataset(" not in main
+
+
+def test_composite_launch_arguments_use_disabled_dataset_default(tmp_path, monkeypatch):
+    """The real launch parser must accept the command before any stage starts."""
+    from types import SimpleNamespace
+
+    launch = pytest.importorskip("launch")
+    launch_api = pytest.importorskip("ros2launch.api.api")
+    from launch.actions import DeclareLaunchArgument
+    from launch.substitutions import LaunchConfiguration
+
+    monkeypatch.setenv("ROS_LOG_DIR", str(tmp_path / "ros_logs"))
+    runtime_dir = tmp_path / "runtime"
+    monkeypatch.setattr(MODULE.sys, "argv", [
+        str(SCRIPT), "--episode", "composite-c05", "--preview-only",
+        "--runtime-dir", str(runtime_dir),
+    ])
+    commands = []
+    process = SimpleNamespace(wait=lambda: 0)
+
+    def capture_launch(command, **kwargs):
+        commands.append(command)
+        return process
+
+    monkeypatch.setattr(MODULE.subprocess, "Popen", capture_launch)
+    monkeypatch.setattr(MODULE, "wait_for_file", lambda *args: None)
+    monkeypatch.setattr(MODULE, "stop_process", lambda *args: None)
+    assert MODULE.main() == 0
+    assert len(commands) == 1
+    command = commands[0]
+    assert command[:4] == [
+        "ros2", "launch", "mssr_expert", "smores_runtime.launch.py"
+    ]
+    arguments = dict(launch_api.parse_launch_arguments(command[4:]))
+    assert "behavior_dataset_path" not in arguments
+
+    # Resolve the actual launch default without starting ROS nodes or Isaac.
+    launch_path = MODULE.EXPERT_SRC / "launch" / "smores_runtime.launch.py"
+    spec = importlib.util.spec_from_file_location("runtime_dataset_default", launch_path)
+    runtime_launch = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(runtime_launch)
+    declaration = next(
+        entity for entity in runtime_launch.generate_launch_description().entities
+        if isinstance(entity, DeclareLaunchArgument)
+        and entity.name == "behavior_dataset_path"
+    )
+    context = launch.LaunchContext()
+    declaration.execute(context)
+    assert LaunchConfiguration("behavior_dataset_path").perform(context) == ""
+    assert not list(runtime_dir.rglob("*.jsonl"))

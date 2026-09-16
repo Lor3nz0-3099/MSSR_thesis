@@ -132,6 +132,14 @@ class SelfReconfigurationExecutor:
                 "finite and non-negative."
             )
 
+        self._clear_passive_after_gravity_settle = bool(
+            plan.source_graph.global_attributes.get(
+                "pre_reconfiguration_clear_passive_after_settle",
+                False,
+            )
+            if plan.source_graph is not None
+            else False
+        )
         self._completed_gravity_settle = 0
         self._prepare_tilt_groups = tuple(
             tuple(group) for group in plan.prepare_tilt_groups_by_module
@@ -161,6 +169,13 @@ class SelfReconfigurationExecutor:
         self._prepare_awaiting_goal_id: str | None = None
         self._stage_index = 0
         self._stage_detach_index = 0
+
+        # Progressive-stage undocks are admitted as one coordinated
+        # wave. Multiple undock goals may remain active together.
+        self._stage_detach_goal_by_index: dict[int, str] = {}
+        self._stage_detach_succeeded: set[int] = set()
+        self._stage_detach_awaiting_goal_id: str | None = None
+
         self._reserve_detach_index = 0
         self._active_goal: PrimitiveGoalRequest | None = None
         self._assembly_active_goal_ids: tuple[str, ...] = ()
@@ -198,6 +213,25 @@ class SelfReconfigurationExecutor:
             stage_plan = self.plan.assembly_plan
             is_last_stage = True
             stage_suffix = "attach"
+        clearance_reference_by_module: dict[str, str] = {}
+
+        if self.plan.stages:
+            stage = self.plan.stages[self._stage_index]
+
+            for mobile_module_id in stage.mobile_module_ids:
+                for detach in stage.detach_actions:
+                    if detach.module_a_id == mobile_module_id:
+                        clearance_reference_by_module[
+                            mobile_module_id
+                        ] = detach.module_b_id
+                        break
+
+                    if detach.module_b_id == mobile_module_id:
+                        clearance_reference_by_module[
+                            mobile_module_id
+                        ] = detach.module_a_id
+                        break
+
         return ParallelAssemblyExecutor(
             plan=stage_plan,
             execution_id=f"{self.execution_id}-{stage_suffix}",
@@ -209,6 +243,10 @@ class SelfReconfigurationExecutor:
             ),
             post_assembly_pan_by_module=(
                 self.plan.final_pan_by_module if is_last_stage else {}
+            ),
+            posture_pan_best_effort_timeout=(
+                is_last_stage
+                and self.plan.target_morphology == "snake8"
             ),
             posture_tilt_tolerance_rad=(
                 float(
@@ -246,6 +284,15 @@ class SelfReconfigurationExecutor:
                 self.plan.final_push_by_lifter_module
                 if is_last_stage
                 else {}
+            ),
+            retain_mobile_structure_after_dock=True,
+            initial_straight_clearance_m=(
+                0.060
+                if clearance_reference_by_module
+                else 0.0
+            ),
+            initial_straight_clearance_reference_by_module=(
+                clearance_reference_by_module
             ),
             additional_known_module_ids=self._known_module_ids,
         )
@@ -325,47 +372,8 @@ class SelfReconfigurationExecutor:
             )
 
         if self._phase == "STAGE_UNDOCK":
-            terminal = self._consume_active_status(status_payload)
-            if terminal is not None:
-                return terminal
-            if self._active_goal is not None:
-                self._state = f"WAITING_{self._phase}"
-                return self._decision(
-                    None,
-                    f"Waiting for {self._active_goal.goal_id}.",
-                )
-
-        if self._phase == "STAGE_UNDOCK":
-            stage = self.plan.stages[self._stage_index]
-            if self._stage_detach_index >= len(stage.detach_actions):
-                self._phase = "STAGE_ASSEMBLY"
-                self._state = "READY_STAGE_ASSEMBLY"
-                module_list = ", ".join(stage.mobile_module_ids)
-                return self._decision(
-                    None,
-                    f"Wave [{module_list}] is free; its target docking starts "
-                    "before another source connection is released.",
-                )
-            action = stage.detach_actions[self._stage_detach_index]
-            retry = self._operation_retry()
-            goal_id = (
-                f"{self.execution_id}-stage-{self._stage_index}"
-                f"-undock-{self._stage_detach_index}"
-            )
-            if retry:
-                goal_id += f"-r{retry}"
-            goal = make_undock_goal(
-                goal_id=goal_id,
-                first_module_id=action.module_a_id,
-                first_face=action.face_a,
-                second_module_id=action.module_b_id,
-                second_face=action.face_b,
-                timeout_s=self.undock_timeout_s,
-            )
-            return self._dispatch(
-                goal,
-                f"Releasing {action.module_a_id}:{action.face_a} from "
-                f"{action.module_b_id}:{action.face_b}.",
+            return self._step_stage_undock(
+                status_payload
             )
 
         if self._phase in {"STAGE_ASSEMBLY", "ASSEMBLY"}:
@@ -456,6 +464,9 @@ class SelfReconfigurationExecutor:
                     )
                     self._stage_index += 1
                     self._stage_detach_index = 0
+                    self._stage_detach_goal_by_index.clear()
+                    self._stage_detach_succeeded.clear()
+                    self._stage_detach_awaiting_goal_id = None
                     self._assembly_active_goal_ids = ()
                     self._assembly_executor = self._make_assembly_executor()
                     self._phase = "STAGE_UNDOCK"
@@ -496,6 +507,7 @@ class SelfReconfigurationExecutor:
                     f"{self.plan.target_morphology}; the complete target "
                     "topology was verified.",
                 )
+
             self._state = "VERIFYING_TARGET"
             return self._decision(
                 None,
@@ -579,6 +591,9 @@ class SelfReconfigurationExecutor:
                     self._known_module_ids
                 ),
                 "duration_s": self._gravity_settle_s,
+                "clear_passive_policy_on_finish": (
+                    self._clear_passive_after_gravity_settle
+                ),
             },
             timeout_s=max(
                 self.joint_timeout_s,
@@ -732,6 +747,230 @@ class SelfReconfigurationExecutor:
             f"{prepare_group_index + 1}.",
         )
 
+    def _step_stage_undock(
+        self,
+        status_payload: Mapping[str, Any] | None,
+    ) -> SelfReconfigurationDecision:
+        """Admit every detach in a progressive wave before waiting."""
+
+        stage = self.plan.stages[self._stage_index]
+        actions = stage.detach_actions
+        statuses = parse_primitive_statuses(
+            status_payload
+        )
+
+        # --------------------------------------------------------
+        # Consume statuses from ALL undocks already admitted.
+        # --------------------------------------------------------
+        for action_index, goal_id in tuple(
+            self._stage_detach_goal_by_index.items()
+        ):
+            status = statuses.get(goal_id)
+
+            if status is None:
+                continue
+
+            # We only need admission before publishing the next peer.
+            # Do NOT wait for terminal success here.
+            if (
+                self._stage_detach_awaiting_goal_id == goal_id
+                and status.state in {
+                    "accepted",
+                    "running",
+                    "succeeded",
+                    "failed",
+                    "canceled",
+                    "rejected",
+                }
+            ):
+                self._stage_detach_awaiting_goal_id = None
+
+            if (
+                status.succeeded
+                and action_index
+                not in self._stage_detach_succeeded
+            ):
+                self._stage_detach_succeeded.add(
+                    action_index
+                )
+                self._completed_detach += 1
+                continue
+
+            if status.failed:
+                retry_key = (
+                    "STAGE_UNDOCK",
+                    action_index,
+                )
+
+                retry = self._retry_by_operation.get(
+                    retry_key,
+                    0,
+                )
+
+                if retry < self.retry_count:
+                    self._retry_by_operation[
+                        retry_key
+                    ] = retry + 1
+
+                    self._stage_detach_goal_by_index.pop(
+                        action_index,
+                        None,
+                    )
+                    self._stage_detach_succeeded.discard(
+                        action_index
+                    )
+
+                    self._state = (
+                        "RETRYING_STAGE_UNDOCK"
+                    )
+                    continue
+
+                self._state = "FAILED"
+                self._failure_message = (
+                    f"Primitive {status.goal_id} failed: "
+                    f"{status.code} {status.message}"
+                ).strip()
+
+                return self._decision(
+                    None,
+                    self._failure_message,
+                )
+
+        # --------------------------------------------------------
+        # Barrier completed: every detach of the wave succeeded.
+        # Only now may parallel redocking begin.
+        # --------------------------------------------------------
+        expected = set(
+            range(len(actions))
+        )
+
+        if self._stage_detach_succeeded == expected:
+            self._stage_detach_index = len(actions)
+
+            self._stage_detach_goal_by_index.clear()
+            self._stage_detach_succeeded.clear()
+            self._stage_detach_awaiting_goal_id = None
+
+            self._phase = "STAGE_ASSEMBLY"
+            self._state = "READY_STAGE_ASSEMBLY"
+
+            module_list = ", ".join(
+                stage.mobile_module_ids
+            )
+
+            return self._decision(
+                None,
+                f"Wave [{module_list}] was released "
+                "synchronously; its parallel target "
+                "docking may start.",
+            )
+
+        # --------------------------------------------------------
+        # Wait only until the last published goal is ADMITTED.
+        # We explicitly do not wait for it to terminate.
+        # --------------------------------------------------------
+        if self._stage_detach_awaiting_goal_id is not None:
+            self._state = (
+                "WAITING_STAGE_UNDOCK_ADMISSION"
+            )
+
+            return self._decision(
+                None,
+                "Waiting for synchronized undock "
+                "goal admission.",
+            )
+
+        # --------------------------------------------------------
+        # Publish the next undock belonging to the SAME wave.
+        # All peers get the same coordination barrier identifier.
+        # --------------------------------------------------------
+        group_size = len(actions)
+
+        for action_index, action in enumerate(actions):
+            if (
+                action_index
+                in self._stage_detach_goal_by_index
+                or action_index
+                in self._stage_detach_succeeded
+            ):
+                continue
+
+            retry_key = (
+                "STAGE_UNDOCK",
+                action_index,
+            )
+
+            retry = self._retry_by_operation.get(
+                retry_key,
+                0,
+            )
+
+            goal_id = (
+                f"{self.execution_id}"
+                f"-stage-{self._stage_index}"
+                f"-undock-{action_index}"
+            )
+
+            if retry:
+                goal_id += f"-r{retry}"
+
+            goal = make_undock_goal(
+                goal_id=goal_id,
+                first_module_id=action.module_a_id,
+                first_face=action.face_a,
+                second_module_id=action.module_b_id,
+                second_face=action.face_b,
+                timeout_s=self.undock_timeout_s,
+                coordination_group=(
+                    f"{self.execution_id}"
+                    f"-stage-{self._stage_index}"
+                    "-undock-wave"
+                    if group_size > 1
+                    else None
+                ),
+                coordination_size=(
+                    group_size
+                    if group_size > 1
+                    else None
+                ),
+            )
+
+            self._stage_detach_goal_by_index[
+                action_index
+            ] = goal_id
+
+            self._stage_detach_awaiting_goal_id = (
+                goal_id
+            )
+
+            self._state = (
+                "DISPATCHING_STAGE_UNDOCK"
+            )
+
+            return self._decision(
+                goal,
+                f"Admitting synchronized release "
+                f"{action.module_a_id}:{action.face_a} "
+                f"from "
+                f"{action.module_b_id}:{action.face_b} "
+                f"({action_index + 1}/{group_size}).",
+            )
+
+        # --------------------------------------------------------
+        # All members are admitted simultaneously from the point
+        # of view of the state machine. Await their results.
+        # --------------------------------------------------------
+        self._state = (
+            "WAITING_STAGE_UNDOCK_RESULTS"
+        )
+
+        return self._decision(
+            None,
+            "Every undock in the current wave is admitted; "
+            "waiting for synchronized release results.",
+        )
+
+
     def _consume_active_status(
         self,
         status_payload: Mapping[str, Any] | None,
@@ -799,6 +1038,15 @@ class SelfReconfigurationExecutor:
                 for module_id, _ in self._prepare_items
                 if module_id not in self._prepare_succeeded
                 and module_id in self._prepare_goal_by_module
+            )
+        elif self._phase == "STAGE_UNDOCK":
+            active = tuple(
+                goal_id
+                for action_index, goal_id in sorted(
+                    self._stage_detach_goal_by_index.items()
+                )
+                if action_index
+                not in self._stage_detach_succeeded
             )
         elif self._active_goal is not None:
             active = (self._active_goal.goal_id,)

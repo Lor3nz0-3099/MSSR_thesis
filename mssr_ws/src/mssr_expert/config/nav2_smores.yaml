@@ -98,16 +98,16 @@ controller_server:
       debug_trajectory_details: false
       min_vel_x: 0.0
       min_vel_y: 0.0
-      max_vel_x: 0.10
+      max_vel_x: 0.14
       max_vel_y: 0.0
       max_vel_theta: 0.50
       min_speed_xy: 0.0
-      max_speed_xy: 0.10
+      max_speed_xy: 0.14
       min_speed_theta: 0.0
-      acc_lim_x: 0.20
+      acc_lim_x: 0.28
       acc_lim_y: 0.0
       acc_lim_theta: 1.0
-      decel_lim_x: -0.25
+      decel_lim_x: -0.30
       decel_lim_y: 0.0
       decel_lim_theta: -1.2
       vx_samples: 12
@@ -122,7 +122,7 @@ controller_server:
       short_circuit_trajectory_evaluation: true
       stateful: true
       critics: [RotateToGoal, Oscillation, BaseObstacle, GoalAlign, PathAlign, PathDist, GoalDist]
-      BaseObstacle.scale: 0.02
+      BaseObstacle.scale: 0.08
       PathAlign.scale: 24.0
       PathAlign.forward_point_distance: 0.08
       GoalAlign.scale: 18.0
@@ -166,9 +166,11 @@ global_costmap:
       publish_frequency: 1.0
       global_frame: map
       robot_base_frame: base_link
-      rolling_window: true
-      width: 8
-      height: 4
+      rolling_window: false
+      origin_x: -3.20
+      origin_y: -1.70
+      width: 12
+      height: 5
       resolution: 0.025
       footprint: "[[0.165, 0.126], [0.165, -0.126], [-0.165, -0.126], [-0.165, 0.126]]"
       track_unknown_space: false
@@ -244,10 +246,13 @@ velocity_smoother:
     smoothing_frequency: 20.0
     scale_velocities: true
     feedback: OPEN_LOOP
-    max_velocity: [0.06, 0.0, 0.50]
+    # 0.085 m/s stays under the physical wheel-speed ceiling (~0.088 m/s,
+    # SMORES_EP_MAX_LAND_SPEED_M_S in smores_ep/config/physics.py); this was
+    # the tighter bottleneck vs FollowPath's own max_vel_x/max_speed_xy.
+    max_velocity: [0.085, 0.0, 0.50]
     min_velocity: [-0.06, 0.0, -0.50]
-    max_accel: [0.15, 0.0, 1.0]
-    max_decel: [-0.20, 0.0, -1.2]
+    max_accel: [0.20, 0.0, 1.0]
+    max_decel: [-0.25, 0.0, -1.2]
     odom_topic: /odom
     odom_duration: 0.2
     deadband_velocity: [0.001, 0.0, 0.001]

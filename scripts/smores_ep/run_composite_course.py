@@ -95,20 +95,12 @@ def argument_parser() -> argparse.ArgumentParser:
     parser.set_defaults(execute=True)
 
     parser.add_argument("--ros-domain-id", default="0")
-    parser.add_argument(
-        "--reconfiguration-executor",
-        choices=("legacy", "v2"),
-        default="legacy",
-        help="Select the reconfiguration node explicitly; legacy remains default.",
-    )
     return parser
 
 
-def transition_executable(is_assembly: bool, reconfiguration_executor: str) -> str:
+def transition_executable(is_assembly: bool) -> str:
     if is_assembly:
         return "mssr_smores_self_assembly_node"
-    if reconfiguration_executor == "v2":
-        return "mssr_smores_deterministic_reconfiguration_node"
     return "mssr_smores_self_reconfiguration_node"
 
 
@@ -357,10 +349,9 @@ def start_transition(
     dataset_path: Path,
     episode_id: str,
     environment: Mapping[str, str],
-    reconfiguration_executor: str = "legacy",
 ) -> None:
     is_assembly = stage.kind == "assembly"
-    executable = transition_executable(is_assembly, reconfiguration_executor)
+    executable = transition_executable(is_assembly)
     command = ["ros2", "run", "mssr_expert", executable, "--ros-args"]
     if is_assembly:
         command.extend(
@@ -795,7 +786,6 @@ def execute_stages(
     environment: Mapping[str, str],
     headless: bool,
     stop_after_stage: int | None = None,
-    reconfiguration_executor: str = "legacy",
 ) -> bool:
     completed_button_tasks: set[str] = set()
     for stage in stages:
@@ -829,7 +819,6 @@ def execute_stages(
                     dataset_path=stream.path,
                     episode_id=episode_id,
                     environment=environment,
-                    reconfiguration_executor=reconfiguration_executor,
                 )
             except BaseException:
                 dataset_manifest.finalize_stage(
@@ -1191,7 +1180,8 @@ def main() -> int:
         "actuator_effort_scale:=4.0",
         "wheel_friction_scale:=1.50",
         "tilt_effort_scale:=8.0",
-        "behavior_dataset_path:=",
+        # Omit behavior_dataset_path: the launch defaults to disabled logging.
+        # ROS 2 rejects an empty CLI assignment; each stage sets its own path.
         f"behavior_dataset_episode_id:={args.episode}",
         f"ros_domain_id:={args.ros_domain_id}",
         "rmw_implementation:=rmw_cyclonedds_cpp",
@@ -1225,7 +1215,6 @@ def main() -> int:
             environment=environment,
             headless=args.headless,
             stop_after_stage=args.stop_after_stage,
-            reconfiguration_executor=args.reconfiguration_executor,
         )
 
         if not completed_all_stages:

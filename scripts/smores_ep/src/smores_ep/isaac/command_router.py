@@ -41,6 +41,22 @@ class IsaacMultiModuleCommandRouter:
         self._docking = docking
         self._configured: dict[str, RoutedModuleState] = {}
 
+    def reset_free_modules(self, module_ids: tuple[str, ...]) -> None:
+        """Apply the spawn initializer only to physically isolated modules."""
+        unknown = set(module_ids) - set(self._states)
+        if unknown:
+            raise ValueError(f"Reset references unknown modules: {sorted(unknown)}")
+        attached = [m for m in module_ids if self._connected_faces(m)]
+        if attached:
+            raise ValueError(f"Cannot reset attached modules: {attached}")
+        for module_id in module_ids:
+            state = self._states[module_id]
+            self._configured.pop(module_id, None)
+            state.configure_fully_passive_mode()
+            state.set_pan_contact_mode("pan_face")
+            self._drives[module_id].initialize_from_measured_posture()
+            self._configured[module_id] = RoutedModuleState("passive_all", frozenset())
+
     def apply(
         self,
         commands: Mapping[str, SmoresCommand],

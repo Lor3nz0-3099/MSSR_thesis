@@ -48,6 +48,7 @@ def assign_modules_to_targets(
     target_depth_by_vertex: Mapping[str, int] | None = None,
     staging_distance_m: float = 0.070,
     staging_corridor_clearance_m: float = 0.110,
+    fixed_target_to_module: Mapping[str, str] | None = None,
 ) -> AssignmentResult:
     """Assign modules with minimum congestion first, then minimum travel.
 
@@ -65,6 +66,17 @@ def assign_modules_to_targets(
         target=target,
         orientation_weight_m_per_rad=orientation_weight_m_per_rad,
     )
+
+    fixed = dict(fixed_target_to_module or {})
+    if fixed.get(target.root_id, physical_root_id) != physical_root_id:
+        raise AssignmentError("Fixed root conflicts with physical_root_id.")
+    fixed[target.root_id] = physical_root_id
+    if not set(fixed) <= set(target.poses_by_vertex):
+        raise AssignmentError("Fixed assignment contains unknown target vertices.")
+    if not set(fixed.values()) <= set(physical_poses):
+        raise AssignmentError("Fixed assignment contains unknown modules.")
+    if len(set(fixed.values())) != len(fixed):
+        raise AssignmentError("Fixed assignment must be injective.")
 
     target_root_pose = target.poses_by_vertex[target.root_id]
     physical_root_pose = physical_poses[physical_root_id]
@@ -88,13 +100,13 @@ def assign_modules_to_targets(
     target_ids = sorted(
         target_id
         for target_id in target.poses_by_vertex
-        if target_id != target.root_id
+        if target_id not in fixed
     )
 
     module_ids = sorted(
         module_id
         for module_id in physical_poses
-        if module_id != physical_root_id
+        if module_id not in fixed.values()
     )
 
     motion_cost_matrix: tuple[tuple[float, ...], ...] = tuple(
@@ -139,16 +151,9 @@ def assign_modules_to_targets(
     )
     selected_columns = solve_rectangular_assignment(selection_cost_matrix)
 
-    target_to_module: dict[str, str] = {
-        target.root_id: physical_root_id,
-    }
-
-    cost_by_target: dict[str, float] = {
-        target.root_id: 0.0,
-    }
-    blocker_count_by_target: dict[str, int] = {
-        target.root_id: 0,
-    }
+    target_to_module: dict[str, str] = dict(fixed)
+    cost_by_target: dict[str, float] = {target_id: 0.0 for target_id in fixed}
+    blocker_count_by_target: dict[str, int] = {target_id: 0 for target_id in fixed}
 
     for row_index, column_index in enumerate(selected_columns):
         target_id = target_ids[row_index]

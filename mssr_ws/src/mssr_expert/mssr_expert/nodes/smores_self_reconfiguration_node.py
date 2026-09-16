@@ -82,12 +82,13 @@ def load_morphology_catalog(
 class SmoresSelfReconfigurationNode(Node):
     """Transform one connected morphology into another connected morphology."""
 
-    def __init__(self) -> None:
-        super().__init__("smores_self_reconfiguration_node")
+    def __init__(self, node_name: str = "smores_self_reconfiguration_node",
+                 default_target_filename: str = "smores_snake7.json") -> None:
+        super().__init__(node_name)
         package_share = Path(get_package_share_directory("mssr_expert"))
         config_directory = package_share / "config"
         self._declare_parameters(
-            config_directory / "smores_snake7.json"
+            config_directory / default_target_filename
         )
         self._morphology_catalog = load_morphology_catalog(
             config_directory
@@ -328,6 +329,7 @@ class SmoresSelfReconfigurationNode(Node):
             self._latest_status_payload,
             current_graph=current_graph,
         )
+        decision = self._prepare_decision(decision)
         task_graph = self._current_task_graph(current_graph, decision)
         expert_output = self._expert_output(decision)
         self._publish(decision, task_graph)
@@ -351,6 +353,10 @@ class SmoresSelfReconfigurationNode(Node):
                 if decision.success
                 else f"Self-reconfiguration failed: {decision.message}"
             )
+
+    def _prepare_decision(self, decision):
+        """Allow specialized transports to complete terminal cleanup."""
+        return decision
 
     def _cancel_stale_primitive_goal(self) -> bool:
         """Release primitive resources left by the source expert.

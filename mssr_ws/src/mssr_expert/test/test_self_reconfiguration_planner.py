@@ -447,7 +447,7 @@ def test_holonomic9_to_manipulator8_releases_one_leaf_reserve() -> None:
 
     assert len(plan.reserve_module_ids) == 1
     assert len(plan.reserve_detach_actions) == 1
-    assert len(plan.final_pan_by_module) == 1
+    assert len(plan.final_pan_by_module) == 0
     assert len(plan.final_tilt_by_module) == 8
 
 
@@ -1183,8 +1183,13 @@ def test_every_known_morphology_transition_executes_to_verification(
     verified = executor.step(
         current_graph=_physical_target_graph(plan),
     )
+
+    # Graph verification completes reconfiguration directly.  Do not issue
+    # a second global gravity-settle/reset over the completed morphology.
+    assert verified.primitive_goal is None
     assert verified.done
     assert verified.success
+    assert verified.phase == "COMPLETE"
     assert (
         verified.completed_operation_count
         == verified.total_operation_count
@@ -1257,10 +1262,11 @@ def test_executor_stows_undocks_redocks_and_verifies_graph() -> None:
     assert decision.phase == "VERIFY"
     assert emitted.count("set_tilt") == 4
     assert emitted.count("undock") == 4
-    assert emitted.count("align_faces") == 12
+    assert emitted.count("align_faces") == 16
     assert emitted.count("dock") == 4
     assert face_execution_phases.count("reach") == 4
     assert face_execution_phases.count("align") == 4
+    assert face_execution_phases.count("clocking") == 4
     assert face_execution_phases.count("approach") == 4
     assert {
         goal.parameters["coordination_group"] for goal in prepare_goals
@@ -1274,6 +1280,7 @@ def test_executor_stows_undocks_redocks_and_verifies_graph() -> None:
     verified = executor.step(
         current_graph=_physical_target_graph(plan),
     )
+    assert verified.primitive_goal is None
     assert verified.done
     assert verified.success
     assert verified.completed_operation_count == 12
@@ -1334,6 +1341,7 @@ def test_reverse_transition_applies_rc_car_operational_posture() -> None:
     verified = executor.step(
         current_graph=_physical_target_graph(plan),
     )
+    assert verified.primitive_goal is None
     assert verified.done
     assert verified.success
     assert verified.completed_operation_count == 19
@@ -1377,3 +1385,104 @@ def test_reconfiguration_congestion_cost_only_reassigns_free_movers() -> None:
     assert assignment.target_to_module["v3"] == "m2"
     assert assignment.total_future_blockers == 0
     assert len(retained) == 1
+
+def test_progressive_wave_prefers_balanced_source_supports_and_faces() -> None:
+    """Equal-size waves should distribute load across source supports/faces."""
+    planner = SmoresSelfReconfigurationPlanner(max_parallel_actions=2)
+
+    support_front = "support_front"
+    support_rear = "support_rear"
+    front_left = "front_left"
+    rear_left = "rear_left"
+    front_right = "front_right"
+    rear_right = "rear_right"
+
+    module_ids = (
+        support_front,
+        support_rear,
+        front_left,
+        rear_left,
+        front_right,
+        rear_right,
+    )
+
+    current_edges = (
+        _connection(support_front, "TOP", support_rear, "BOTTOM"),
+        _connection(front_left, "BOTTOM", support_front, "LEFT"),
+        _connection(front_right, "BOTTOM", support_front, "RIGHT"),
+        _connection(rear_left, "BOTTOM", support_rear, "LEFT"),
+        _connection(rear_right, "BOTTOM", support_rear, "RIGHT"),
+    )
+
+    detach_actions = (
+        ReconfigurationDetachAction(
+            front_left, "BOTTOM", support_front, "LEFT"
+        ),
+        ReconfigurationDetachAction(
+            rear_left, "BOTTOM", support_rear, "LEFT"
+        ),
+        ReconfigurationDetachAction(
+            front_right, "BOTTOM", support_front, "RIGHT"
+        ),
+        ReconfigurationDetachAction(
+            rear_right, "BOTTOM", support_rear, "RIGHT"
+        ),
+    )
+
+    # Deliberately put the two LEFT-side movers first. The old greedy
+    # selector therefore chooses them together even though a balanced
+    # LEFT+RIGHT diagonal exists at the same parallel cardinality.
+    actions = (
+        AssemblyAction(
+            front_left, "BOTTOM", support_front, "LEFT",
+            "v_front_left", "v_front", 1, 0, False,
+        ),
+        AssemblyAction(
+            rear_left, "BOTTOM", support_rear, "LEFT",
+            "v_rear_left", "v_rear", 1, 0, False,
+        ),
+        AssemblyAction(
+            front_right, "BOTTOM", support_front, "RIGHT",
+            "v_front_right", "v_front", 1, 0, False,
+        ),
+        AssemblyAction(
+            rear_right, "BOTTOM", support_rear, "RIGHT",
+            "v_rear_right", "v_rear", 1, 0, False,
+        ),
+    )
+
+    physical_poses = {
+        support_front: PlanarPose(0.0, 0.0, 0.0),
+        support_rear: PlanarPose(10.0, 0.0, 0.0),
+        front_left: PlanarPose(0.0, 1.0, 0.0),
+        front_right: PlanarPose(0.0, -1.0, 0.0),
+        rear_left: PlanarPose(10.0, 1.0, 0.0),
+        rear_right: PlanarPose(10.0, -1.0, 0.0),
+    }
+
+    target_xy_by_module = {
+        support_front: (0.0, 0.0),
+        support_rear: (10.0, 0.0),
+        front_left: (0.0, 3.0),
+        front_right: (0.0, -3.0),
+        rear_left: (10.0, 3.0),
+        rear_right: (10.0, -3.0),
+    }
+
+    waves, _, _ = planner._progressive_action_waves(
+        module_ids,
+        current_edges,
+        {support_front, support_rear},
+        detach_actions,
+        actions,
+        physical_poses,
+        target_xy_by_module,
+    )
+
+    assert [
+        tuple(action.mobile_module_id for action in wave)
+        for wave in waves
+    ] == [
+        (front_left, rear_right),
+        (rear_left, front_right),
+    ]

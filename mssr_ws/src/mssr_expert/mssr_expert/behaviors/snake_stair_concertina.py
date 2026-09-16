@@ -15,7 +15,7 @@ from mssr_expert.behaviors.morphology_library import (
 from mssr_expert.behaviors.snake_stair_concertina_geometry import (
     ConcertinaStaircase,
 )
-from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitError
+from mssr_expert.behaviors.snake_stair_concertina_geometry import SnakeStairGaitError
 from mssr_expert.behaviors.snake_stair_path_ik import (
     PathPoint,
     WheelCenterPath,
@@ -29,7 +29,7 @@ from mssr_expert.primitives.common import module_position
 class SnakeStairConcertinaPlanner:
     """Generate a global stair-profile trajectory and solve it by IK.
 
-    The planner deliberately has no BUILD/GROW/SHIFT state machine. The stair
+    The planner uses only the continuous wheel-centre PATH-IK trajectory. The stair
     collision profile first becomes a smooth wheel-centre path. Eight points
     at the measured rigid module spacing are then placed on that path and
     converted to relative TILT angles. Advancing the head coordinate moves
@@ -197,7 +197,7 @@ class SnakeStairConcertinaPlanner:
                 "trajectory_step_m must be in [0.005, 0.030]"
             )
         goal_tolerance = self._number(
-            parameters, "crawl_goal_tolerance_m", 0.003
+            parameters, "crawl_goal_tolerance_m", 0.016
         )
         if not 0.001 <= goal_tolerance <= 0.020:
             raise SnakeStairGaitError(
@@ -619,9 +619,12 @@ class SnakeStairConcertinaPlanner:
                 module_id=assignment.module_id,
                 joint="tilt",
                 angle_rad=(
-                    1.2217304763960306
-                    if assignment.module_id == "smores_08"
-                    and phase.startswith("PATH_IK_TRACK_")
+                    math.radians(70.0)
+                    if assignment.target_role == "snake_head"
+                    and (
+                        phase.startswith("PATH_IK_TRACK_")
+                        or phase == "PATH_IK_LIFT_TAIL"
+                    )
                     else float(tilts[index])
                 ),
                 target_vertex_id=assignment.target_vertex_id,

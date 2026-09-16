@@ -224,6 +224,30 @@ def sparse_behavior_commands(
     return dict(commands)
 
 
+def invalidate_module_command_sources(
+    module_ids: tuple[str, ...], *, action_channel: ActionFileChannel,
+    held_primitive_commands: dict[str, SmoresCommand],
+) -> None:
+    """Quarantine stale behavior/primitive commands at an ownership handoff."""
+    action_channel.invalidate_modules(module_ids)
+    for module_id in module_ids:
+        held_primitive_commands.pop(module_id, None)
+
+
+def apply_free_module_reset(
+    module_ids: tuple[str, ...], *, action_channel: ActionFileChannel,
+    held_primitive_commands: dict[str, SmoresCommand],
+    command_router: IsaacMultiModuleCommandRouter,
+) -> None:
+    """Atomically drop stale command sources before resetting free drives."""
+    invalidate_module_command_sources(
+        module_ids,
+        action_channel=action_channel,
+        held_primitive_commands=held_primitive_commands,
+    )
+    command_router.reset_free_modules(module_ids)
+
+
 def _world_position(
     stage: Any,
     prim_path: str,
@@ -554,42 +578,73 @@ def run_parallel_self_assembly_scenario(
     )
 
     if not config.headless:
-        course_extent_m = (
-            6.0
-            if config.composite_mission_path is not None
-            else 2.4
-            if config.manual_obstacle_course
-            else 1.8
-            if config.stair_test_course
-            else 2.80
-            if config.rc_car_planar_test_course
-            else 1.25
-            if config.button_test_course or config.gap_test_course
-            else 0.0
-        )
-        camera_extent_m = max(
-            0.52,
-            config.spawn_radius_m * 1.8,
-            course_extent_m,
-        )
-        ViewportManager.set_camera_view(
-            "/OmniverseKit_Persp",
-            eye=[
+        if (
+            config.composite_mission_path is not None
+            and obstacle_course is not None
+        ):
+            # Start close to the assembly area instead of framing the whole
+            # long composite course from several metres away.
+            start_box = next(
+                (
+                    box
+                    for box in obstacle_course.boxes
+                    if box.semantic == "composite_start_platform"
+                ),
+                None,
+            )
+
+            if start_box is not None:
+                start_x, start_y, _ = start_box.center_xyz_m
+            else:
+                start_x, start_y = -1.50, 0.0
+
+            camera_target = [
+                float(start_x),
+                float(start_y),
+                0.12,
+            ]
+            camera_eye = [
+                float(start_x) + 1.90,
+                float(start_y) - 2.00,
+                1.55,
+            ]
+
+        else:
+            course_extent_m = (
+                2.4
+                if config.manual_obstacle_course
+                else 1.8
+                if config.stair_test_course
+                else 2.80
+                if config.rc_car_planar_test_course
+                else 1.25
+                if config.button_test_course or config.gap_test_course
+                else 0.0
+            )
+            camera_extent_m = max(
+                0.52,
+                config.spawn_radius_m * 1.8,
+                course_extent_m,
+            )
+            camera_eye = [
                 1.30 * camera_extent_m,
                 -1.2 * camera_extent_m,
                 max(0.46, 0.85 * camera_extent_m),
-            ],
-            target=(
-                [2.0, 0.0, 0.20]
-                if config.composite_mission_path is not None
-                else [1.25, 0.0, 0.08]
+            ]
+            camera_target = (
+                [1.25, 0.0, 0.08]
                 if config.manual_obstacle_course
                 else [1.0, 0.0, 0.10]
                 if config.stair_test_course
                 else [0.45, 0.0, 0.08]
                 if config.button_test_course or config.gap_test_course
                 else [0.0, 0.0, 0.03]
-            ),
+            )
+
+        ViewportManager.set_camera_view(
+            "/OmniverseKit_Persp",
+            eye=camera_eye,
+            target=camera_target,
         )
 
     expected_root = closest_module_to_centroid(layout)
@@ -627,6 +682,39 @@ def run_parallel_self_assembly_scenario(
     next_log_step = 0
     last_primitive_status = ""
     terminal_status_by_goal: dict[str, Any] = {}
+
+    # PhysX needs the validated 240 Hz integration rate, but the geometric
+    # primitive controller does not. ALIGN_FACES in particular evaluates
+    # multiple USD world transforms and collision-aware staging geometry.
+    # Run that control work at 60 Hz and hold the latest actuator command
+    # between controller ticks.
+    primitive_control_hz = min(60, config.physics_hz)
+    primitive_control_interval = max(
+        1,
+        config.physics_hz // primitive_control_hz,
+    )
+    held_primitive_commands: dict[str, SmoresCommand] = {}
+
+    def invalidate_command_sources(module_ids: tuple[str, ...]) -> None:
+        invalidate_module_command_sources(
+            module_ids,
+            action_channel=action_channel,
+            held_primitive_commands=held_primitive_commands,
+        )
+
+    def reset_free_modules(module_ids: tuple[str, ...]) -> None:
+        apply_free_module_reset(
+            module_ids,
+            action_channel=action_channel,
+            held_primitive_commands=held_primitive_commands,
+            command_router=command_router,
+        )
+
+    primitive_executor.invalidate_module_command_sources_callback = (
+        invalidate_command_sources
+    )
+    primitive_executor.reset_free_modules_callback = reset_free_modules
+
     previous_connection_count = 0
     previous_behavior_commands: dict[str, SmoresCommand] = {}
     behavior_started_step: int | None = None
@@ -700,10 +788,15 @@ def run_parallel_self_assembly_scenario(
         except (KeyError, TypeError, ValueError) as error:
             print(f"[primitive] REJECTED malformed payload: {error}")
 
-        primitive_step = primitive_executor.step(now_s)
+        primitive_statuses: tuple[Any, ...] = ()
+        if physics_step % primitive_control_interval == 0:
+            primitive_step = primitive_executor.step(now_s)
+            held_primitive_commands = dict(primitive_step.commands)
+            primitive_statuses = primitive_step.statuses
+
         last_primitive_status = _publish_primitive_statuses(
             primitive_channel,
-            tuple(admission_statuses) + primitive_step.statuses,
+            tuple(admission_statuses) + primitive_statuses,
             terminal_status_by_goal,
             now_s,
             physics_step,
@@ -767,7 +860,7 @@ def run_parallel_self_assembly_scenario(
 
         routed_commands = primitive_executor.compose_with_baseline(
             behavior_baseline,
-            primitive_step.commands,
+            held_primitive_commands,
         )
         routed_rates = command_router.apply(routed_commands)
         if behavior_baseline != previous_behavior_commands:
@@ -914,10 +1007,32 @@ def run_parallel_self_assembly_scenario(
                 f"{position[1]:+.3f},{position[2]:+.3f})"
                 for module_id, position in positions.items()
             )
+            pan02 = routed_commands.get(
+                "smores_02",
+                SmoresCommand(),
+            )
+            pan02_mode = getattr(
+                pan02.internal_motion,
+                "value",
+                str(pan02.internal_motion),
+            )
+            pan02_target = (
+                None
+                if pan02.pan_target_rad is None
+                else round(float(pan02.pan_target_rad), 4)
+            )
+            pan02_velocity = round(
+                float(pan02.pan_velocity_rad_s),
+                4,
+            )
+
             print(
                 f"t={elapsed:7.3f}s {position_text} "
                 f"wheel_cmd={moving} "
                 f"pan_cmd={pan_moving} "
+                f"PAN02=(mode={pan02_mode},"
+                f"target={pan02_target},"
+                f"vel={pan02_velocity}) "
                 f"connections={connection_count}"
             )
             next_log_step += config.log_interval

@@ -21,7 +21,6 @@ from std_msgs.msg import String
 
 from mssr_expert.behaviors.morphology_library import AssignedModule, MorphologyLibrary
 from mssr_expert.behaviors.snake_gap_gait import SnakeGapGaitPlanner
-from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitPlanner
 from mssr_expert.behaviors.snake_stair_registry import STAIR_GAIT_BEHAVIORS
 from mssr_expert.behaviors.snake_stair_concertina import (
     SnakeStairConcertinaPlanner,
@@ -127,7 +126,6 @@ class SmoresObstacleCourseNode(Node):
             package_share / "config" / "smores_morphology_behaviors.json"
         )
         self._gap_gait_planner = SnakeGapGaitPlanner()
-        self._stair_gait_planner = SnakeStairGaitPlanner()
         self._stair_concertina_planner = SnakeStairConcertinaPlanner()
         self._policy = ObstacleCoursePolicy.from_morphology_catalog(
             self._catalog
@@ -545,8 +543,6 @@ class SmoresObstacleCourseNode(Node):
         if course_step.behavior in STAIR_GAIT_BEHAVIORS | {"gap_crossing"}:
             if course_step.behavior == "gap_crossing":
                 planner = self._gap_gait_planner.plan
-            elif course_step.behavior == "crawl_stairs_arch_wave":
-                planner = self._stair_gait_planner.plan_arch_wave
             elif course_step.behavior == "crawl_stairs_spatial_concertina":
                 planner = self._stair_concertina_planner.plan
             if course_step.behavior == "crawl_stairs_spatial_concertina":
@@ -557,8 +553,8 @@ class SmoresObstacleCourseNode(Node):
                     neutral_tilts,
                 )
             else:
-                # Keep the historical arch-wave call exactly at its validated
-                # three-argument interface; only concertina consumes neutrals.
+                # gap_crossing uses its dedicated three-argument
+                # planner interface.
                 program_override = planner(
                     current_graph,
                     assignments,

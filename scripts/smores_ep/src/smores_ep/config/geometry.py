@@ -74,9 +74,9 @@ class SmoresGeometry:
         -0.010632,
     )
 
-    # Both driving wheels reference the same CAD prototype. Its raw mesh is
-    # exactly 62 mm in diameter; 31.06 mm includes the sub-0.1 mm tessellation
-    # and assembly-orientation envelope measured from the transformed points.
+    # Effective driving-wheel radius used by the current physics/runtime
+    # model.  The 31.50 mm value is the calibrated collision/rolling radius
+    # used by the validated PATH-IK and locomotion configuration.
     wheel_radius_m: float = 0.03150
     wheel_width_m: float = 0.0165
     pan_face_radius_m: float = 0.03140

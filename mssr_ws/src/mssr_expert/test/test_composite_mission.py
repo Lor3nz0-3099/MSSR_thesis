@@ -61,3 +61,63 @@ def test_button_uses_validated_rc_mm8_rc_route() -> None:
         "mobile_manipulator8",
         "rc_car8",
     ]
+
+
+
+def test_gap_alignment_precedes_snake_reconfiguration() -> None:
+    stages = _planner().build(
+        (
+            MissionTask(
+                "curve",
+                "flat_navigation",
+                {"seed": 5100},
+            ),
+            MissionTask(
+                "gap",
+                "gap",
+                {
+                    "seed": 4100,
+                    "reconfiguration_pose_xyyaw": [
+                        1.43,
+                        1.16,
+                        0.0,
+                    ],
+                    "reconfiguration_navigation": {
+                        "waypoints_xyyaw": [
+                            [0.98, 1.16, 1.57079632679],
+                            [1.43, 1.16, 0.0],
+                        ],
+                    },
+                },
+            ),
+            MissionTask(
+                "goal",
+                "goal",
+                {
+                    "center_xyz_m": [
+                        3.0,
+                        0.0,
+                        0.0,
+                    ],
+                },
+            ),
+        )
+    )
+
+    gap_stages = [
+        stage
+        for stage in stages
+        if stage.task_id == "gap"
+    ]
+
+    assert [stage.kind for stage in gap_stages] == [
+        "gap_rc_alignment",
+        "reconfiguration",
+        "behavior",
+    ]
+
+    assert gap_stages[0].target_morphology == "rc_car8"
+    assert gap_stages[0].parameters["target_yaw_rad"] == 0.0
+
+    assert gap_stages[1].source_morphology == "rc_car8"
+    assert gap_stages[1].target_morphology == "snake8"

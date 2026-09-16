@@ -220,6 +220,7 @@ class DockingPairEvaluation:
     clocking_residual_rad: float
     clocking_error_rad: float
     clocking_quarter_turns: int
+    clocking_constrained: bool
     eligible: bool
     score: float
 
@@ -265,21 +266,22 @@ def evaluate_face_pair(
     )
     clocking_error = abs(clocking_residual)
 
-    # LEFT and RIGHT are continuously rotating connector disks.  Their
-    # clocking is therefore not a configuration constraint when mating with
-    # the non-rotating BOTTOM face (SMORES-EP, Sec. III-A).  Keeping the
-    # generic square-array gate here made a correctly positioned wheel back
-    # away and retry solely because the target disk had rolled to an arbitrary
-    # angle during the earlier assembly wave.  BOTTOM-to-BOTTOM and all other
-    # pairs retain the explicit clocking gate.
+    # Clocking remains useful telemetry, but it is not a docking
+    # constraint for the mechanically permissive face pairs used by the
+    # assembly/reconfiguration pipeline. LEFT/RIGHT are rotating disks, and
+    # TOP<->BOTTOM is intentionally given the same non-rigid docking policy.
+    # Other pairs retain the explicit square-array clocking gate.
     face_names = frozenset((first.face.face_name, second.face.face_name))
     top_bottom_pair = face_names == frozenset(("TOP", "BOTTOM"))
     bottom_lateral_pair = face_names in (
         frozenset(("BOTTOM", "LEFT")),
         frozenset(("BOTTOM", "RIGHT")),
     )
+    clocking_constrained = not (
+        top_bottom_pair or bottom_lateral_pair
+    )
     clocking_eligible = (
-        bottom_lateral_pair
+        not clocking_constrained
         or clocking_error <= limits.clocking_tolerance_rad
     )
     normal_contact_tolerance_m = (
@@ -315,7 +317,7 @@ def evaluate_face_pair(
         )
         + (
             0.0
-            if bottom_lateral_pair
+            if not clocking_constrained
             else normalized(
                 clocking_error,
                 limits.clocking_tolerance_rad,
@@ -331,6 +333,7 @@ def evaluate_face_pair(
         clocking_residual_rad=clocking_residual,
         clocking_error_rad=clocking_error,
         clocking_quarter_turns=clocking_quarter_turns,
+        clocking_constrained=clocking_constrained,
         eligible=eligible,
         score=score,
     )

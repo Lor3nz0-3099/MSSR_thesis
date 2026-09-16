@@ -9,7 +9,7 @@ from typing import Sequence
 from mssr_expert.behaviors.snake_stair_concertina_geometry import (
     ConcertinaStaircase,
 )
-from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitError
+from mssr_expert.behaviors.snake_stair_concertina_geometry import SnakeStairGaitError
 
 
 @dataclass(frozen=True)

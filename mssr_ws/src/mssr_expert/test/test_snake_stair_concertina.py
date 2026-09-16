@@ -20,7 +20,7 @@ from mssr_expert.behaviors.snake_stair_concertina import (
 from mssr_expert.behaviors.snake_stair_concertina_geometry import (
     ConcertinaStaircase,
 )
-from mssr_expert.behaviors.snake_stair_gait import SnakeStairGaitError
+from mssr_expert.behaviors.snake_stair_concertina_geometry import SnakeStairGaitError
 from mssr_expert.behaviors.snake_stair_path_ik import (
     WheelCenterPath,
     reconstruct_centers,
@@ -395,9 +395,11 @@ def test_planner_generates_only_global_path_ik_tracking() -> None:
     assert phases[-1] == "PATH_IK_UPPER_DECK_SETTLE"
     assert phases.count("PATH_IK_LIFT_TAIL") == 1
     assert all(
-        token not in phase
+        phase == "PATH_IK_PRELOAD"
+        or phase == "PATH_IK_LIFT_TAIL"
+        or phase == "PATH_IK_UPPER_DECK_SETTLE"
+        or phase.startswith("PATH_IK_TRACK_")
         for phase in phases
-        for token in ("BUILD", "GROW", "SHIFT", "ADVANCE")
     )
 
     tracking = tuple(
@@ -503,6 +505,62 @@ def test_path_ik_keeps_all_eight_modules_in_traction() -> None:
         assert step.active_target_roles == ROLES
         assert step.posture_reached_active_target_roles == ROLES
 
+
+
+def test_path_ik_head_lift_follows_role_not_physical_module() -> None:
+    assignments = tuple(
+        AssignedModule(
+            (
+                "smores_08"
+                if role == "snake_tail"
+                else "smores_01"
+                if role == "snake_head"
+                else f"physical_{index}"
+            ),
+            f"v{index}",
+            role,
+        )
+        for index, role in enumerate(ROLES)
+    )
+
+    targets = SnakeStairConcertinaPlanner._posture_targets(
+        phase="PATH_IK_TRACK_ROLE_TEST",
+        previous_tilts=(0.0,) * 8,
+        tilts=(0.0,) * 8,
+        assignments=assignments,
+    )
+
+    by_role = {
+        target.target_role: target
+        for target in targets
+    }
+
+    assert by_role["snake_head"].module_id == "smores_01"
+    assert by_role["snake_head"].angle_rad == pytest.approx(
+        math.radians(70.0)
+    )
+
+    # smores_08 è intenzionalmente NON-head.
+    assert by_role["snake_tail"].module_id == "smores_08"
+    assert by_role["snake_tail"].angle_rad == pytest.approx(0.0)
+
+
+    lift_targets = SnakeStairConcertinaPlanner._posture_targets(
+        phase="PATH_IK_LIFT_TAIL",
+        previous_tilts=(0.0,) * 8,
+        tilts=(0.0,) * 8,
+        assignments=assignments,
+    )
+
+    lift_by_role = {
+        target.target_role: target
+        for target in lift_targets
+    }
+
+    assert lift_by_role["snake_head"].module_id == "smores_01"
+    assert lift_by_role["snake_head"].angle_rad == pytest.approx(
+        math.radians(70.0)
+    )
 
 
 def test_tracking_tilts_are_time_synchronized() -> None:

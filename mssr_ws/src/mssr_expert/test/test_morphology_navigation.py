@@ -84,12 +84,12 @@ def test_rc_car8_navigation_forward_matches_pan_rolling_direction() -> None:
             "chassis_right",
         ),
         "forward_from_roles": (
-            "wheel_right_front",
-            "wheel_right_rear",
-        ),
-        "forward_to_roles": (
             "wheel_left_front",
             "wheel_left_rear",
+        ),
+        "forward_to_roles": (
+            "wheel_right_front",
+            "wheel_right_rear",
         ),
     }
 
@@ -116,7 +116,7 @@ def test_rc_car8_navigation_forward_matches_pan_rolling_direction() -> None:
 
     state = estimate_planar_morphology_state(graph, assignments, spec)
 
-    assert abs(state.yaw_rad) == pytest.approx(math.pi)
+    assert state.yaw_rad == pytest.approx(0.0)
 
 
 def test_snake8_navigation_frame_points_from_tail_to_head() -> None:
@@ -203,3 +203,35 @@ def test_mobile_manipulator8_navigation_points_from_rear_drive_to_support() -> N
     assert state.y_m == pytest.approx(0.0)
     assert state.yaw_rad == pytest.approx(0.0)
     assert state.vx_m_s == pytest.approx(0.03)
+
+
+def test_rc_car_progress_checker_uses_validated_12s_allowance():
+    from pathlib import Path
+    import yaml
+
+    config_path = (
+        Path(__file__).resolve().parents[1]
+        / "config"
+        / "nav2_smores.yaml"
+    )
+
+    config = yaml.safe_load(
+        config_path.read_text(encoding="utf-8")
+    )
+
+    params = config["controller_server"]["ros__parameters"]
+
+    assert (
+        float(
+            params["progress_checker"][
+                "movement_time_allowance"
+            ]
+        )
+        == 12.0
+    )
+
+    # FollowPath remains forward-only. Reverse is reserved
+    # for the explicit Nav2 BackUp recovery behavior.
+    assert float(
+        params["FollowPath"]["min_vel_x"]
+    ) == 0.0

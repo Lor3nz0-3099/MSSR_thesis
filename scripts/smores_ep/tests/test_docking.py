@@ -279,3 +279,32 @@ def test_selection_ignores_occupied_faces_and_uses_best_contact() -> None:
     )
     assert selected is not None
     assert selected.first.face.face_name == "LEFT"
+
+def test_top_bottom_does_not_require_clocking() -> None:
+    """TOP/BOTTOM keeps clocking as telemetry, not as a docking gate."""
+
+    first = _pose(
+        "parent",
+        "TOP",
+        (0.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0),
+    )
+
+    angle = math.radians(45.0)
+    second = _pose(
+        "mobile",
+        "BOTTOM",
+        (0.0014, 0.0, 0.0),
+        (-1.0, 0.0, 0.0),
+        (0.0, math.cos(angle), math.sin(angle)),
+    )
+
+    result = evaluate_face_pair(first, second)
+
+    # Preserve the measured error for diagnostics.
+    assert result.clocking_error_rad == pytest.approx(angle)
+
+    # But TOP/BOTTOM must behave like BOTTOM/LEFT-RIGHT:
+    # clocking does not decide whether the pair may dock.
+    assert not result.clocking_constrained
+    assert result.eligible

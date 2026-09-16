@@ -194,12 +194,18 @@ class ParallelAssemblyExecutor:
         snap_docking_faces_to_nominal: bool = (
             DEFAULT_ASSEMBLY_EXECUTION_POLICY.snap_docking_faces_to_nominal
         ),
+        initial_straight_clearance_m: float = 0.0,
+        initial_straight_clearance_reference_by_module: (
+            Mapping[str, str] | None
+        ) = None,
+        retain_mobile_structure_after_dock: bool = False,
         enable_borrowed_helper: bool = False,
         helper_lift_tilt_rad: float = math.pi / 4.0,
         helper_joint_timeout_s: float = 30.0,
         layout_pose_by_module: Mapping[str, PlanarPose] | None = None,
         post_assembly_tilt_by_module: Mapping[str, float] | None = None,
         post_assembly_pan_by_module: Mapping[str, float] | None = None,
+        posture_pan_best_effort_timeout: bool = False,
         posture_tilt_tolerance_rad: float | None = None,
         posture_tilt_max_servo_error_rad: float | None = None,
         coordinate_posture_tilts: bool = False,
@@ -210,6 +216,7 @@ class ParallelAssemblyExecutor:
             Mapping[str, tuple[str, float]] | None
         ) = None,
         additional_known_module_ids: tuple[str, ...] = (),
+        initially_assembled_module_ids: tuple[str, ...] = (),
     ) -> None:
         if not execution_id.strip():
             raise ParallelAssemblyExecutionError(
@@ -298,12 +305,35 @@ class ParallelAssemblyExecutor:
         self.snap_docking_faces_to_nominal = bool(
             snap_docking_faces_to_nominal
         )
+        if (
+            not math.isfinite(initial_straight_clearance_m)
+            or initial_straight_clearance_m < 0.0
+        ):
+            raise ParallelAssemblyExecutionError(
+                "initial_straight_clearance_m must be finite and "
+                "non-negative."
+            )
+
+        self.initial_straight_clearance_m = float(
+            initial_straight_clearance_m
+        )
+        self._initial_straight_clearance_reference_by_module = dict(
+            initial_straight_clearance_reference_by_module or {}
+        )
+
+        self.retain_mobile_structure_after_dock = bool(
+            retain_mobile_structure_after_dock
+        )
+
         self.enable_borrowed_helper = enable_borrowed_helper
         self.helper_lift_tilt_rad = helper_lift_tilt_rad
         self.helper_joint_timeout_s = helper_joint_timeout_s
         self.coordinate_posture_tilts = bool(coordinate_posture_tilts)
         self._additional_known_module_ids = set(
             additional_known_module_ids
+        )
+        self._initially_assembled_module_ids = set(
+            initially_assembled_module_ids
         )
 
         self._layout_pose_by_module = dict(layout_pose_by_module or {})
@@ -312,6 +342,9 @@ class ParallelAssemblyExecutor:
         )
         self._post_assembly_pan_by_module = dict(
             post_assembly_pan_by_module or {}
+        )
+        self._posture_pan_best_effort_timeout = bool(
+            posture_pan_best_effort_timeout
         )
         if posture_tilt_tolerance_rad is not None and (
             not math.isfinite(posture_tilt_tolerance_rad)
@@ -343,7 +376,7 @@ class ParallelAssemblyExecutor:
         # manipulator and holonomic morphologies.
         all_assigned_module_ids = {self.plan.root_module_id} | {
             action.mobile_module_id for action in self.plan.all_actions
-        }
+        } | self._initially_assembled_module_ids
         self._posture_structural_hold_module_ids = (
             all_assigned_module_ids
             - set(self._post_assembly_tilt_by_module)
@@ -380,6 +413,7 @@ class ParallelAssemblyExecutor:
         self._align_timeout_retry_by_action: dict[tuple[str, int], int] = {}
         self._deferred_align_retry_actions: list[int] = []
         self._approach_recovery_pending_actions: set[int] = set()
+        self._clocking_recovery_pending_actions: set[int] = set()
         self._dock_recovery_by_action: dict[int, int] = {}
         self._dock_recovery_pending_actions: set[int] = set()
 
@@ -450,6 +484,7 @@ class ParallelAssemblyExecutor:
             *(action.mobile_module_id for action in self.plan.all_actions),
             *(action.parent_module_id for action in self.plan.all_actions),
             *self._additional_known_module_ids,
+            *self._initially_assembled_module_ids,
         }
         unknown_layout = set(self._layout_pose_by_module) - known_modules
         unknown_posture = (
@@ -686,6 +721,12 @@ class ParallelAssemblyExecutor:
                     else self._post_assembly_pan_by_module[module_id]
                 ),
             }
+            if (
+                posture_joint == "pan"
+                and self._posture_pan_best_effort_timeout
+            ):
+                parameters["best_effort_timeout_success"] = True
+
             if posture_joint == "tilt":
                 # Capture every non-target module (for example an RC-Car
                 # chassis link) into structural hold once the coordinated
@@ -1229,6 +1270,26 @@ class ParallelAssemblyExecutor:
                 )
                 if (
                     self._phase == "APPROACH"
+                    and status.code == "CLOCKING_LOST"
+                    and retries < self.align_retry_count
+                ):
+                    self._align_timeout_retry_by_action[retry_key] = (
+                        retries + 1
+                    )
+                    self._retry_by_action[action_index] = (
+                        self._retry_by_action.get(action_index, 0) + 1
+                    )
+                    self._submitted_goal_by_action.pop(action_index, None)
+                    self._clocking_recovery_pending_actions.add(
+                        action_index
+                    )
+                    self._state = (
+                        "WAITING_CLOCKING_RECOVERY_BARRIER"
+                    )
+                    continue
+
+                if (
+                    self._phase == "APPROACH"
                     and status.code
                     in {
                         "TIMEOUT",
@@ -1245,7 +1306,7 @@ class ParallelAssemblyExecutor:
                     self._state = "WAITING_APPROACH_RECOVERY_BARRIER"
                     continue
                 if (
-                    self._phase in {"REACH", "ALIGN"}
+                    self._phase in {"REACH", "ALIGN", "CLOCKING", "RETREAT"}
                     and status.code
                     in {
                         "TIMEOUT",
@@ -1383,6 +1444,7 @@ class ParallelAssemblyExecutor:
             terminal_approaches = (
                 self._succeeded_actions
                 | self._approach_recovery_pending_actions
+                | self._clocking_recovery_pending_actions
             )
             if terminal_approaches != expected_action_indices:
                 return
@@ -1399,16 +1461,72 @@ class ParallelAssemblyExecutor:
                 self._succeeded_actions.clear()
                 self._deferred_align_retry_actions.clear()
                 self._approach_recovery_pending_actions.clear()
+                self._clocking_recovery_pending_actions.clear()
                 self._awaiting_admission_goal_id = None
                 self._state = "REALIGNING_AFTER_APPROACH_FAILURE"
+                return
+
+            if self._clocking_recovery_pending_actions:
+                # CLOCKING_LOST may happen only after the mobile connector
+                # has already entered the contact/capture region. Re-clocking
+                # while still touching makes both bodies rotate together, so
+                # first back out only the affected actions. Peers that already
+                # reached good contact remain untouched.
+                recovery_actions = set(
+                    self._clocking_recovery_pending_actions
+                )
+                self._phase = "RETREAT"
+                self._submitted_goal_by_action.clear()
+                self._succeeded_actions = (
+                    expected_action_indices - recovery_actions
+                )
+                self._deferred_align_retry_actions.clear()
+                self._awaiting_admission_goal_id = None
+                self._state = "RETREATING_AFTER_CLOCKING_LOST"
                 return
 
         if self._succeeded_actions != expected_action_indices:
             return
 
+        if (
+            self._phase == "RETREAT"
+            and self._clocking_recovery_pending_actions
+        ):
+            recovery_actions = set(
+                self._clocking_recovery_pending_actions
+            )
+            self._phase = "CLOCKING"
+            self._submitted_goal_by_action.clear()
+            self._succeeded_actions = (
+                expected_action_indices - recovery_actions
+            )
+            self._deferred_align_retry_actions.clear()
+            self._awaiting_admission_goal_id = None
+            self._state = "RECLOCKING_AFTER_RETREAT"
+            return
+
+        if (
+            self._phase == "CLOCKING"
+            and self._clocking_recovery_pending_actions
+        ):
+            recovery_actions = set(
+                self._clocking_recovery_pending_actions
+            )
+            self._phase = "APPROACH"
+            self._submitted_goal_by_action.clear()
+            self._succeeded_actions = (
+                expected_action_indices - recovery_actions
+            )
+            self._deferred_align_retry_actions.clear()
+            self._clocking_recovery_pending_actions.clear()
+            self._awaiting_admission_goal_id = None
+            self._state = "REAPPROACHING_AFTER_RECLOCK"
+            return
+
         next_phase = {
             "REACH": "ALIGN",
-            "ALIGN": "APPROACH",
+            "ALIGN": "CLOCKING",
+            "CLOCKING": "APPROACH",
             "APPROACH": "DOCK",
         }.get(self._phase)
         if next_phase is None:
@@ -1438,6 +1556,7 @@ class ParallelAssemblyExecutor:
         self._align_timeout_retry_by_action.clear()
         self._deferred_align_retry_actions.clear()
         self._approach_recovery_pending_actions.clear()
+        self._clocking_recovery_pending_actions.clear()
         self._dock_recovery_by_action.clear()
         self._dock_recovery_pending_actions.clear()
         self._awaiting_admission_goal_id = None
@@ -1449,7 +1568,7 @@ class ParallelAssemblyExecutor:
         """Return the next action not yet sent to the backend."""
 
         if (
-            self._phase in {"REACH", "ALIGN", "APPROACH"}
+            self._phase in {"REACH", "ALIGN", "CLOCKING", "RETREAT", "APPROACH"}
             and self.max_concurrent_alignments_per_wave > 0
         ):
             active_motion_count = sum(
@@ -1470,6 +1589,11 @@ class ParallelAssemblyExecutor:
                 and action_index not in self._succeeded_actions
                 and action_index
                 not in self._approach_recovery_pending_actions
+                and not (
+                    self._phase == "APPROACH"
+                    and action_index
+                    in self._clocking_recovery_pending_actions
+                )
                 and action_index not in self._dock_recovery_pending_actions
             ):
                 candidates.append(action_index)
@@ -1510,7 +1634,7 @@ class ParallelAssemblyExecutor:
             phase=self._phase,
         )
 
-        if self._phase in {"REACH", "ALIGN", "APPROACH"}:
+        if self._phase in {"REACH", "ALIGN", "CLOCKING", "RETREAT", "APPROACH"}:
             return make_align_faces_goal(
                 goal_id=goal_id,
                 mobile_module_id=(
@@ -1543,6 +1667,26 @@ class ParallelAssemblyExecutor:
                         action_index
                     )
                 ),
+                initial_straight_clearance_m=(
+                    self.initial_straight_clearance_m
+                    if (
+                        self._phase == "REACH"
+                        and self._retry_by_action.get(
+                            action_index,
+                            0,
+                        ) == 0
+                        and action.mobile_module_id
+                        in self._initial_straight_clearance_reference_by_module
+                    )
+                    else None
+                ),
+                initial_straight_clearance_reference_module_id=(
+                    self._initial_straight_clearance_reference_by_module.get(
+                        action.mobile_module_id
+                    )
+                    if self._phase == "REACH"
+                    else None
+                ),
             )
 
         if self._phase == "DOCK":
@@ -1568,6 +1712,9 @@ class ParallelAssemblyExecutor:
                 ),
                 snap_to_nominal=(
                     self.snap_docking_faces_to_nominal
+                ),
+                retain_mobile_structure_after_dock=(
+                    self.retain_mobile_structure_after_dock
                 ),
             )
 

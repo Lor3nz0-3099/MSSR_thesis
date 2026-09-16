@@ -54,9 +54,6 @@
       "v6": 1.5454890526409788,
       "v7": 1.5526449025741555
     },
-    "post_assembly_pan_rad_by_vertex": {
-      "v7": 0.0
-    },
     "capabilities": [
       "flat_locomotion",
       "high_reach",

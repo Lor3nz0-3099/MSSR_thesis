@@ -12,6 +12,7 @@ class InternalMotionMode(str, Enum):
     HOLD = "hold"
     STRUCTURAL_HOLD = "structural_hold"
     PAN = "pan"
+    PAN_CONTINUOUS = "pan_continuous"
     PAN_VELOCITY = "pan_velocity"
     TILT = "tilt"
 
@@ -27,10 +28,20 @@ class SmoresCommand:
     # internal differential; locomotion alone must not alter the posture.
     internal_motion: InternalMotionMode = InternalMotionMode.PASSIVE
     pan_velocity_rad_s: float = 0.0
+    # Explicit reconfiguration reset; ordinary PASSIVE keeps its legacy
+    # assembly behavior. This flag is generated only by GRAVITY_SETTLE.
+    reset_internal_targets: bool = False
 
     def __post_init__(self) -> None:
         if not isinstance(self.internal_motion, InternalMotionMode):
             raise ValueError("internal_motion must be an InternalMotionMode")
+        if not isinstance(self.reset_internal_targets, bool):
+            raise ValueError("reset_internal_targets must be a bool")
+        if (
+            self.reset_internal_targets
+            and self.internal_motion is not InternalMotionMode.PASSIVE
+        ):
+            raise ValueError("Internal target reset requires PASSIVE mode")
         values = (
             self.linear_x_m_s,
             self.angular_z_rad_s,

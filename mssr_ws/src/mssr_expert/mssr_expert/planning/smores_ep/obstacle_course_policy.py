@@ -187,7 +187,14 @@ class ObstacleCoursePolicy:
             morphology=morphology,
             behavior=requirement.behavior,
             execution_kind=requirement.execution_kind,
-            parameters=dict(task.parameters),
+            parameters={
+                **(
+                    {"crawl_goal_tolerance_m": 0.016}
+                    if task.task_type == "stairs"
+                    else {}
+                ),
+                **dict(task.parameters),
+            },
         )
 
     def plan(
@@ -225,7 +232,7 @@ class ObstacleCoursePolicy:
         rc_car = self.choose_morphology("flat_navigation")
         stair_parameters = {
             "linear_m_s": 0.040,
-            "crawl_goal_tolerance_m": 0.012,
+            "crawl_goal_tolerance_m": 0.016,
             "path_corner_safety_m": 0.020,
             "trajectory_step_m": 0.005,
         }

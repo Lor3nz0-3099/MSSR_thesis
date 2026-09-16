@@ -111,6 +111,34 @@ class CompositeMissionPlanner:
                 ensure_morphology(decision.task, decision.task_type, rc_car)
                 continue
 
+            # The preceding RC-Car8 Nav2 stage already brings the
+            # vehicle onto the gap reconfiguration pad.  Nav2 is allowed
+            # to finish coarsely; a local reverse-arc expert establishes
+            # the precise heading before RC-Car8 -> Snake8.
+            if decision.task_type == "gap":
+                rc_car = self._policy.choose_morphology(
+                    "flat_navigation"
+                )
+
+                raw_goal = decision.parameters.get(
+                    "reconfiguration_pose_xyyaw"
+                )
+
+                if (
+                    current == rc_car
+                    and isinstance(raw_goal, (list, tuple))
+                    and len(raw_goal) == 3
+                ):
+                    append(
+                        decision.task,
+                        decision.task_type,
+                        "gap_rc_alignment",
+                        rc_car,
+                        parameters={
+                            "target_yaw_rad": float(raw_goal[2]),
+                        },
+                    )
+
             ensure_morphology(
                 decision.task,
                 decision.task_type,

@@ -18,6 +18,8 @@ VALID_FACE_EXECUTION_PHASES = frozenset(
         "full",
         "reach",
         "align",
+        "clocking",
+        "retreat",
         "approach",
     }
 )
@@ -30,6 +32,7 @@ class PrimitiveName(str, Enum):
     DOCK = "dock"
     UNDOCK = "undock"
     GRAVITY_SETTLE = "gravity_settle"
+    RESET_FREE_MODULES = "reset_free_modules"
     SET_PAN = "set_pan"
     ROTATE_PAN_BY = "rotate_pan_by"
     SET_TILT = "set_tilt"
@@ -114,6 +117,8 @@ class PrimitiveGoal:
         }
 
     def _validate_shape(self) -> None:
+        if self.primitive is PrimitiveName.RESET_FREE_MODULES:
+            return  # Any nonempty, distinct released set is valid.
         expected_modules = (
             3
             if self.primitive is PrimitiveName.ASSISTED_ALIGN_FACES
@@ -176,7 +181,7 @@ class PrimitiveGoal:
                 ).lower()
                 if execution_phase not in VALID_FACE_EXECUTION_PHASES:
                     raise ValueError(
-                        "execution_phase must be full, reach, align or "
+                        "execution_phase must be full, reach, align, clocking, retreat or "
                         "approach"
                     )
                 parameters["execution_phase"] = execution_phase

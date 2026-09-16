@@ -1320,30 +1320,90 @@ class SmoresSelfReconfigurationPlanner:
                     module_id,
                 )
             )
-            wave_modules: list[str] = []
             wave_depth = source_depth[ready[0]]
-            for module_id in tuple(ready):
-                if source_depth[module_id] != wave_depth:
-                    continue
-                if (
-                    self.max_parallel_actions > 0
-                    and len(wave_modules) >= self.max_parallel_actions
-                ):
-                    break
-                if all(
-                    self._parallel_actions_independent(
-                        action_by_module[module_id],
-                        action_by_module[peer],
-                        detach_by_module.get(module_id),
-                        detach_by_module.get(peer),
-                        physical_poses,
-                        target_xy_by_module,
+            same_depth = tuple(
+                module_id
+                for module_id in ready
+                if source_depth[module_id] == wave_depth
+            )
+            parallel_limit = (
+                min(len(same_depth), self.max_parallel_actions)
+                if self.max_parallel_actions > 0
+                else len(same_depth)
+            )
+
+            def source_support_signature(
+                module_id: str,
+            ) -> tuple[str, str] | None:
+                detach = detach_by_module.get(module_id)
+                if detach is None:
+                    return None
+                if detach.module_a_id == module_id:
+                    return detach.module_b_id, detach.face_b
+                if detach.module_b_id == module_id:
+                    return detach.module_a_id, detach.face_a
+                raise SelfReconfigurationPlanningError(
+                    f"Detach action does not contain mover {module_id!r}."
+                )
+
+            best_modules: tuple[str, ...] | None = None
+            best_key: tuple[
+                int,
+                int,
+                int,
+                tuple[int, ...],
+                tuple[str, ...],
+            ] | None = None
+
+            for size in range(1, parallel_limit + 1):
+                for candidate in combinations(same_depth, size):
+                    if not all(
+                        self._parallel_actions_independent(
+                            action_by_module[first],
+                            action_by_module[second],
+                            detach_by_module.get(first),
+                            detach_by_module.get(second),
+                            physical_poses,
+                            target_xy_by_module,
+                        )
+                        for first, second in combinations(candidate, 2)
+                    ):
+                        continue
+
+                    signatures = tuple(
+                        signature
+                        for module_id in candidate
+                        if (
+                            signature := source_support_signature(module_id)
+                        )
+                        is not None
                     )
-                    for peer in wave_modules
-                ):
-                    wave_modules.append(module_id)
-            if not wave_modules:
-                wave_modules.append(ready[0])
+                    distinct_supports = len(
+                        {support for support, _ in signatures}
+                    )
+                    distinct_faces = len(
+                        {face for _, face in signatures}
+                    )
+
+                    # Parallel cardinality remains the primary objective.
+                    # For equally parallel choices, distribute the detach
+                    # load across different source supports and opposite
+                    # faces. In a four-corner RC-Car this selects a diagonal
+                    # pair instead of peeling one complete side first.
+                    key = (
+                        -len(candidate),
+                        -distinct_supports,
+                        -distinct_faces,
+                        tuple(original_index[item] for item in candidate),
+                        candidate,
+                    )
+                    if best_key is None or key < best_key:
+                        best_key = key
+                        best_modules = candidate
+
+            wave_modules = list(
+                best_modules if best_modules is not None else (ready[0],)
+            )
             action_waves.append(
                 tuple(action_by_module[module_id] for module_id in wave_modules)
             )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import math
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from smores_ep.config.geometry import SmoresGeometry
 from smores_ep.control.differential_drive import PlanarPose
@@ -63,8 +63,13 @@ class _ActiveGoal:
     alignment_staging_position_reached: bool = False
     alignment_staging_drive_direction: float | None = None
     alignment_approach_started: bool = False
+    alignment_clocking_settle_count: int = 0
+    alignment_clocking_target_rad: float | None = None
+    alignment_clocking_locked: bool = False
     alignment_recovery_count: int = 0
     contact_quality_recovery_active: bool = False
+    contact_stall_best_gap_m: float | None = None
+    contact_stall_since_s: float | None = None
     axial_alignment_mode: str = "curve"
     axial_pivot_sample_started_s: float | None = None
     axial_pivot_sample_yaw_rad: float | None = None
@@ -73,6 +78,15 @@ class _ActiveGoal:
     collision_route_xy: tuple[tuple[float, float], ...] = ()
     collision_route_goal_xy: tuple[float, float] | None = None
     collision_route_replans: int = 0
+    initial_straight_clearance_start_xy: (
+        tuple[float, float] | None
+    ) = None
+    initial_straight_clearance_heading_xy: (
+        tuple[float, float] | None
+    ) = None
+    initial_straight_clearance_direction: float | None = None
+    initial_straight_clearance_done: bool = False
+    command_sources_invalidated: bool = False
 
 
 class IsaacPrimitiveExecutor:
@@ -216,7 +230,17 @@ class IsaacPrimitiveExecutor:
         self._staging_waypoint_margin_m = staging_waypoint_margin_m
         self._joint_tolerance_rad = joint_tolerance_rad
         self._tilt_joint_tolerance_rad = tilt_joint_tolerance_rad
+        self.reset_free_modules_callback: Callable[[tuple[str, ...]], None] | None = None
+        self.invalidate_module_command_sources_callback: (
+            Callable[[tuple[str, ...]], None] | None
+        ) = None
+        self._group_module_ids: dict[str, set[str]] = {}
         self._released_joint_groups: set[str] = set()
+        # Coordinated UNDOCK goals are held until the complete
+        # progressive detach wave is active. The whole group is then
+        # released inside one PrimitiveExecutor.step(), before the next
+        # physics integration frame.
+        self._released_undock_groups: set[str] = set()
         self._completed_joint_groups: set[str] = set()
         # Only joints which have explicitly reached a PAN/TILT target are
         # retained. Every other module remains backdrivable.
@@ -230,9 +254,21 @@ class IsaacPrimitiveExecutor:
             module_id: ContinuousAngleTracker()
             for module_id in module_roots
         }
+        # The EP-Face connector is 4-fold symmetric, so a docked module's
+        # PAN can legitimately settle at any of 4 quarter turns depending on
+        # its approach geometry. Rather than forcing docking itself onto one
+        # canonical quarter turn, whatever PAN a module reaches right after
+        # a successful dock becomes ITS OWN new zero reference: absolute
+        # SET_PAN targets from later posture behaviors are resolved relative
+        # to this offset instead of a single global zero.
+        self._pan_reference_offset_rad: dict[str, float] = {}
         self._active: dict[str, _ActiveGoal] = {}
         self._resource_owners: dict[str, dict[str, str]] = {}
         self._status: PrimitiveStatus | None = None
+
+        # Cache repeated USD pose reads only while evaluating one primitive.
+        self._primitive_planar_pose_cache: dict[str, PlanarPose] = {}
+        self._primitive_face_poses_cache: dict[str, Any] = {}
 
     @property
     def active_goal(self) -> PrimitiveGoal | None:
@@ -298,9 +334,34 @@ class IsaacPrimitiveExecutor:
             owns_internal = (
                 f"internal_motion:{module_id}" in self._resource_owners
             )
+            if (
+                primitive.reset_internal_targets
+                and not owns_locomotion
+                and not owns_internal
+            ):
+                # A completed settle releases its resources in step(), but
+                # its final reset must still reach the controller this frame.
+                self._retained_internal_commands.pop(module_id, None)
+                result[module_id] = primitive
+                continue
             internal_source = base
             if owns_internal:
                 internal_source = primitive
+                # Admission can precede the next 60 Hz controller step.
+                # Preserve a TOP hold in that interval as well; reservation
+                # of its resource by ALIGN_FACES is not a release request.
+                owners = self._resource_owners[f"internal_motion:{module_id}"]
+                if (
+                    primitive.internal_motion is InternalMotionMode.PASSIVE
+                    and retained is not None
+                    and module_id not in self._passive_internal_module_ids
+                    and all(
+                        self._active[goal_id].goal.primitive
+                        is PrimitiveName.ALIGN_FACES
+                        for goal_id in owners
+                    )
+                ):
+                    internal_source = retained
             elif (
                 base.internal_motion is InternalMotionMode.PAN_VELOCITY
                 and retained is not None
@@ -341,6 +402,7 @@ class IsaacPrimitiveExecutor:
                 pan_velocity_rad_s=(
                     internal_source.pan_velocity_rad_s
                 ),
+                reset_internal_targets=internal_source.reset_internal_targets,
             )
         return result
 
@@ -410,6 +472,13 @@ class IsaacPrimitiveExecutor:
                     "stabilize_during_group_module_ids", ()
                 )
             )
+        if goal.primitive is PrimitiveName.ALIGN_FACES:
+            clearance_reference = goal.parameters.get(
+                "initial_straight_clearance_reference_module_id"
+            )
+            if clearance_reference is not None:
+                referenced_modules.add(str(clearance_reference))
+
         unknown = sorted(referenced_modules - set(self._module_roots))
         if unknown:
             return self._make_status(
@@ -420,6 +489,37 @@ class IsaacPrimitiveExecutor:
                 code="UNKNOWN_MODULE",
                 message="unknown module(s): " + ", ".join(unknown),
             )
+        if goal.primitive is PrimitiveName.RESET_FREE_MODULES:
+            attached = sorted(set(goal.module_ids) & {
+                face.module_id
+                for connection in self._docking.connections
+                for face in (connection.first_face, connection.second_face)
+            })
+            if attached:
+                return self._make_status(
+                    goal, PrimitiveState.REJECTED, now_s, phase="admission",
+                    code="MODULE_ATTACHED", message=f"Cannot reset attached modules: {attached}",
+                )
+            if not set(goal.module_ids).issubset(self._motion_module_ids):
+                return self._make_status(
+                    goal, PrimitiveState.REJECTED, now_s, phase="admission",
+                    code="MODULE_NOT_CONTROLLED", message="Every reset module needs a controller",
+                )
+            for active in self._active.values():
+                referenced = set(active.goal.module_ids)
+                group = active.goal.parameters.get("coordination_group")
+                if group is not None:
+                    referenced.update(self._group_module_ids.get(str(group), ()))
+                for key, value in active.goal.parameters.items():
+                    if key.endswith("module_ids") and isinstance(value, (list, tuple)):
+                        referenced.update(str(item) for item in value)
+                    elif key.endswith("module_id") and value is not None:
+                        referenced.add(str(value))
+                if referenced.intersection(goal.module_ids):
+                    return self._make_status(
+                        goal, PrimitiveState.REJECTED, now_s, phase="admission",
+                        code="RESOURCE_BUSY", message=f"Reset requires ownership handoff from {active.goal.goal_id}",
+                    )
         controlled_module_id = (
             goal.module_ids[2]
             if goal.primitive is PrimitiveName.ASSISTED_ALIGN_FACES
@@ -502,6 +602,9 @@ class IsaacPrimitiveExecutor:
             resource_modes=dict(resource_modes),
             resolved_target_rad=resolved_target,
         )
+        group = goal.parameters.get("coordination_group")
+        if group is not None:
+            self._group_module_ids.setdefault(str(group), set()).update(referenced_modules)
         self._active[goal.goal_id] = runtime
         for resource, mode in resource_modes.items():
             self._resource_owners.setdefault(resource, {})[
@@ -530,19 +633,51 @@ class IsaacPrimitiveExecutor:
         )
 
     def step(self, now_s: float) -> PrimitiveExecutorStep:
+        # ContinuousAngleTracker.update() only unwraps correctly if it is
+        # sampled often enough that the true rotation between two calls
+        # stays below pi. A module with no active goal on it was previously
+        # never re-sampled here, only inside _joint_positions() when some
+        # later goal happened to target it. A module that rotated more than
+        # half a turn while idle (e.g. a residual fold disturbance) then had
+        # that motion silently aliased into a full spurious 2*pi offset the
+        # next time it was read, poisoning any later absolute SET_PAN target.
+        # Refreshing every module every tick removes that idle sampling gap.
+        for module_id in self._module_roots:
+            self._pan_trackers[module_id].update(
+                self._states[module_id].read().pan_joint_rad
+            )
         merged: dict[str, SmoresCommand] = {}
         statuses: list[PrimitiveStatus] = []
         for goal_id in tuple(self._active):
             runtime = self._active.get(goal_id)
             if runtime is None:
                 continue
+
+            # Another primitive may have moved or docked a module, so every
+            # primitive starts from fresh world poses.
+            self._primitive_planar_pose_cache.clear()
+            self._primitive_face_poses_cache.clear()
+
             goal = runtime.goal
             coordination_group = goal.parameters.get("coordination_group")
-            waiting_for_group = (
+
+            waiting_for_tilt_group = (
                 goal.primitive is PrimitiveName.SET_TILT
                 and coordination_group is not None
                 and str(coordination_group)
                 not in self._released_joint_groups
+            )
+
+            waiting_for_undock_group = (
+                goal.primitive is PrimitiveName.UNDOCK
+                and coordination_group is not None
+                and str(coordination_group)
+                not in self._released_undock_groups
+            )
+
+            waiting_for_group = (
+                waiting_for_tilt_group
+                or waiting_for_undock_group
             )
             timeout_started_at_s = (
                 runtime.execution_started_at_s
@@ -553,6 +688,29 @@ class IsaacPrimitiveExecutor:
                 not waiting_for_group
                 and now_s - timeout_started_at_s > goal.timeout_s
             ):
+                if (
+                    goal.primitive is PrimitiveName.SET_PAN
+                    and bool(
+                        goal.parameters.get(
+                            "best_effort_timeout_success",
+                            False,
+                        )
+                    )
+                ):
+                    statuses.append(
+                        self._finish(
+                            runtime,
+                            PrimitiveState.SUCCEEDED,
+                            now_s,
+                            code="BEST_EFFORT_TIMEOUT",
+                            message=(
+                                "pan target accepted as best-effort "
+                                f"after {goal.timeout_s:.3f}s"
+                            ),
+                        )
+                    )
+                    continue
+
                 contact_timeout = (
                     goal.primitive is PrimitiveName.ALIGN_FACES
                     and runtime.alignment_approach_started
@@ -599,6 +757,8 @@ class IsaacPrimitiveExecutor:
         now_s: float,
     ) -> tuple[dict[str, SmoresCommand], PrimitiveStatus]:
         goal = runtime.goal
+        if goal.primitive is PrimitiveName.RESET_FREE_MODULES:
+            return self._reset_free_modules(runtime, now_s)
         if goal.primitive is PrimitiveName.DRIVE_TO_POSE:
             return self._drive_to_pose(runtime, now_s)
         if goal.primitive is PrimitiveName.ALIGN_FACES:
@@ -610,6 +770,55 @@ class IsaacPrimitiveExecutor:
         if goal.primitive is PrimitiveName.GRAVITY_SETTLE:
             return self._gravity_settle(runtime, now_s)
         return self._move_joint(runtime, now_s)
+
+    def _reset_free_modules(
+        self, runtime: _ActiveGoal, now_s: float,
+    ) -> tuple[dict[str, SmoresCommand], PrimitiveStatus]:
+        module_ids = runtime.goal.module_ids
+        attached = {
+            face.module_id
+            for connection in self._docking.connections
+            for face in (connection.first_face, connection.second_face)
+        }.intersection(module_ids)
+        if attached:
+            raise ValueError(f"Cannot reset attached modules: {sorted(attached)}")
+        if self.reset_free_modules_callback is None:
+            raise RuntimeError("Reset application backend is not installed")
+        affected_groups = {
+            group for group, members in self._group_module_ids.items()
+            if members.intersection(module_ids)
+        }
+        if any(
+            active is not runtime
+            and active.goal.parameters.get("coordination_group") is not None
+            and str(active.goal.parameters.get("coordination_group")) in affected_groups
+            for active in self._active.values()
+        ):
+            raise ValueError("Reset requires ownership handoff from active coordination groups")
+        # Runtime must invalidate old inputs and apply drive configuration before
+        # returning. A publication/queue operation is not an acknowledgement.
+        self.reset_free_modules_callback(module_ids)
+        for module_id in module_ids:
+            self._retained_internal_commands.pop(module_id, None)
+            self._passive_internal_module_ids.discard(module_id)
+            self._pan_reference_offset_rad.pop(module_id, None)
+            tracker = ContinuousAngleTracker()
+            tracker.update(self._states[module_id].read().pan_joint_rad)
+            self._pan_trackers[module_id] = tracker
+            self._primitive_planar_pose_cache.pop(module_id, None)
+            self._primitive_face_poses_cache.pop(module_id, None)
+        # Retire completed mixed groups as well: their execution flags are
+        # indivisible, and retaining them would bypass a later group barrier.
+        # Anchor controller targets and unrelated groups remain untouched.
+        for group in affected_groups:
+            self._released_joint_groups.discard(group)
+            self._released_undock_groups.discard(group)
+            self._completed_joint_groups.discard(group)
+            del self._group_module_ids[group]
+        return {}, self._finish(
+            runtime, PrimitiveState.SUCCEEDED, now_s,
+            code="FREE_MODULES_RESET", message="Released module reset applied by backend",
+        )
 
     def _drive_to_pose(
         self,
@@ -692,15 +901,23 @@ class IsaacPrimitiveExecutor:
             else None
         )
         if (
-            execution_phase in {"full", "align"}
+            execution_phase == "full"
             and top_module_id is not None
             and evaluation.normal_misalignment_rad
             <= docking_thresholds.normal_alignment_tolerance_rad
+            and evaluation.clocking_constrained
             and evaluation.clocking_error_rad
             > docking_thresholds.clocking_tolerance_rad
         ):
             current_pan, current_tilt = self._joint_positions(top_module_id)
+            retained = self._retained_internal_commands.get(top_module_id)
+            if retained is not None:
+                current_tilt = retained.tilt_target_rad
             pan_target = current_pan + evaluation.clocking_residual_rad
+            self._update_retained_structural_target(
+                top_module_id,
+                pan_target_rad=pan_target,
+            )
             return {
                 top_module_id: SmoresCommand(
                     pan_target_rad=pan_target,
@@ -757,11 +974,160 @@ class IsaacPrimitiveExecutor:
                 current,
                 staging_target,
             )
+        if execution_phase == "retreat":
+            # CLOCKING_LOST can occur after the connector has already entered
+            # the magnetic/contact region.  PAN cannot be meaningfully
+            # re-clocked there because the contacting bodies move together.
+            #
+            # Back the mobile module out first, strictly along its current
+            # connector corridor.  No steering correction is allowed here:
+            # RETREAT only creates free space for the following CLOCKING
+            # barrier.
+            retreat_target = self._face_alignment_staging_target(
+                final_target,
+                target_id,
+                face_b,
+                distance_m=min(
+                    self._face_alignment_staging_distance_m,
+                    0.040,
+                ),
+            )
+            retreat_step = self._straight_face_approach_step(
+                current,
+                retreat_target,
+                feedback_enabled=False,
+            )
+
+            if retreat_step.done:
+                return {}, self._finish(
+                    runtime,
+                    PrimitiveState.SUCCEEDED,
+                    now_s,
+                    code="RETREAT_COMPLETE",
+                    message=(
+                        f"{mobile_id}:{face_a} backed out of the "
+                        "connector contact region"
+                    ),
+                )
+
+            retreat_commands = {
+                mobile_id: SmoresCommand(
+                    linear_x_m_s=retreat_step.linear_x_m_s,
+                    angular_z_rad_s=0.0,
+                )
+            }
+
+            # Keep the clocking coordinate fixed while backing out.  CLOCKING
+            # is the only phase allowed to choose a new PAN target.
+            if top_module_id is not None:
+                retained = self._retained_internal_commands.get(
+                    top_module_id
+                )
+                if (
+                    retained is None
+                    or retained.internal_motion
+                    is not InternalMotionMode.STRUCTURAL_HOLD
+                ):
+                    current_pan, current_tilt = self._joint_positions(
+                        top_module_id
+                    )
+                    retained = SmoresCommand(
+                        pan_target_rad=current_pan,
+                        tilt_target_rad=current_tilt,
+                        internal_motion=(
+                            InternalMotionMode.STRUCTURAL_HOLD
+                        ),
+                    )
+                    self._retained_internal_commands[
+                        top_module_id
+                    ] = retained
+
+                if top_module_id == mobile_id:
+                    retreat_commands[mobile_id] = SmoresCommand(
+                        linear_x_m_s=retreat_step.linear_x_m_s,
+                        angular_z_rad_s=0.0,
+                        pan_target_rad=retained.pan_target_rad,
+                        tilt_target_rad=retained.tilt_target_rad,
+                        internal_motion=(
+                            InternalMotionMode.STRUCTURAL_HOLD
+                        ),
+                    )
+                else:
+                    retreat_commands[top_module_id] = retained
+
+            return retreat_commands, self._make_status(
+                goal,
+                PrimitiveState.RUNNING,
+                now_s,
+                phase="clocking_recovery_retreat",
+                progress=0.0,
+                code="RETREATING",
+                message=(
+                    f"{mobile_id} is backing away before re-clocking"
+                ),
+                feedback={
+                    "command_linear_m_s": (
+                        retreat_step.linear_x_m_s
+                    ),
+                    "command_angular_rad_s": 0.0,
+                    "retreat_distance_m": 0.040,
+                    "normal_gap_m": (
+                        evaluation.normal_separation_m
+                    ),
+                },
+            )
+
+        if execution_phase == "clocking":
+            # Dedicated stationary barrier:
+            # ALIGN has already parked the connector geometry; only PAN may
+            # move here. No wheel command is emitted until clocking is stable.
+            clocking_gate = self._clocking_alignment_gate(
+                runtime,
+                now_s,
+                mobile_id,
+                face_a,
+                target_id,
+                face_b,
+            )
+            if clocking_gate is not None:
+                return clocking_gate
+
+            return {}, self._finish(
+                runtime,
+                PrimitiveState.SUCCEEDED,
+                now_s,
+                code="CLOCKING_ALIGNED",
+                message=(
+                    f"{mobile_id}:{face_a} and "
+                    f"{target_id}:{face_b} clocking is settled"
+                ),
+            )
+
         if execution_phase == "approach":
-            # REACH and ALIGN were completed collectively by the whole wave.
-            # This goal therefore starts directly with the signed straight
-            # approach: BOTTOM-face movers back up while TOP-face movers move
-            # forward, both preserving the docking centreline.
+            # APPROACH never owns PAN clocking correction. If clocking was
+            # disturbed after the dedicated CLOCKING barrier, stop before
+            # issuing any translation and let the executor recover through
+            # ALIGN -> CLOCKING -> APPROACH.
+            if (
+                top_module_id is not None
+                and evaluation.normal_misalignment_rad
+                <= docking_thresholds.normal_alignment_tolerance_rad
+                and evaluation.clocking_constrained
+                and evaluation.clocking_error_rad
+                > docking_thresholds.clocking_tolerance_rad
+            ):
+                return {}, self._finish(
+                    runtime,
+                    PrimitiveState.FAILED,
+                    now_s,
+                    code="CLOCKING_LOST",
+                    message=(
+                        "clocking left tolerance before connector approach; "
+                        "translation remains stopped"
+                    ),
+                )
+
+            # REACH, ALIGN and CLOCKING have completed collectively.
             runtime.alignment_approach_started = True
         planar_lateral_error_m = self._planar_face_lateral_offset(
             first,
@@ -944,6 +1310,80 @@ class IsaacPrimitiveExecutor:
             progress_offset = 0.5
             progress_scale = 0.5
             phase_prefix = "contact"
+        if phase_prefix == "contact" and not step.done:
+            face_names = frozenset((face_a, face_b))
+            bottom_lateral_pair = face_names in (
+                frozenset(("BOTTOM", "LEFT")),
+                frozenset(("BOTTOM", "RIGHT")),
+            )
+            clocking_ready = (
+                bottom_lateral_pair
+                or not evaluation.clocking_constrained
+                or evaluation.clocking_error_rad
+                <= docking_thresholds.clocking_tolerance_rad
+            )
+            non_gap_contact_ready = (
+                evaluation.lateral_offset_m
+                <= docking_thresholds.lateral_offset_tolerance_m
+                and evaluation.normal_misalignment_rad
+                <= docking_thresholds.normal_alignment_tolerance_rad
+                and clocking_ready
+            )
+            top_bottom_pair = face_names == frozenset(("TOP", "BOTTOM"))
+            contact_gap = (
+                docking_thresholds.top_bottom_contact_tolerance_m
+                if top_bottom_pair
+                else docking_thresholds.normal_contact_tolerance_m
+            )
+            proximal_aligned_push = (
+                runtime.alignment_approach_started
+                and not alignment_complete
+                and evaluation.normal_separation_m
+                <= max(0.012, 3.0 * contact_gap)
+                and abs(step.linear_x_m_s) >= 0.015
+            )
+
+            if proximal_aligned_push:
+                current_gap = evaluation.normal_separation_m
+                improvement_m = 0.00025
+
+                if (
+                    runtime.contact_stall_best_gap_m is None
+                    or current_gap
+                    < runtime.contact_stall_best_gap_m - improvement_m
+                ):
+                    runtime.contact_stall_best_gap_m = current_gap
+                    runtime.contact_stall_since_s = now_s
+                elif runtime.contact_stall_since_s is None:
+                    runtime.contact_stall_since_s = now_s
+                elif now_s - runtime.contact_stall_since_s >= 0.75:
+                    return {}, self._finish(
+                        runtime,
+                        PrimitiveState.FAILED,
+                        now_s,
+                        code="CONTACT_POSE_INVALID",
+                        message=(
+                            "aligned proximal contact stopped closing for "
+                            "0.75s while drive remained commanded; treating "
+                            "the physical stop as a recoverable contact "
+                            "failure instead of continuing to push: "
+                            f"normal_gap="
+                            f"{1e3*evaluation.normal_separation_m:.2f}mm "
+                            f"lateral="
+                            f"{1e3*evaluation.lateral_offset_m:.2f}mm "
+                            "normal_error="
+                            f"{math.degrees(evaluation.normal_misalignment_rad):.1f}deg "
+                            "clocking_error="
+                            f"{math.degrees(evaluation.clocking_error_rad):.1f}deg"
+                        ),
+                    )
+            else:
+                runtime.contact_stall_best_gap_m = None
+                runtime.contact_stall_since_s = None
+        else:
+            runtime.contact_stall_best_gap_m = None
+            runtime.contact_stall_since_s = None
+
         if phase_prefix == "contact" and step.done:
             # Never leave an ALIGN_FACES primitive running with a zero wheel
             # command.  At this point the monotonic straight approach has
@@ -1070,6 +1510,121 @@ class IsaacPrimitiveExecutor:
         """Execute only the paper's collision-free navigation phase."""
 
         goal = runtime.goal
+        straight_clearance_m = float(
+            goal.parameters.get(
+                "initial_straight_clearance_m",
+                0.0,
+            )
+        )
+
+        clearance_reference_id = goal.parameters.get(
+            "initial_straight_clearance_reference_module_id"
+        )
+
+        if (
+            straight_clearance_m > 0.0
+            and clearance_reference_id is not None
+            and not runtime.initial_straight_clearance_done
+        ):
+            reference_pose = self._planar_pose(
+                str(clearance_reference_id)
+            )
+
+            if runtime.initial_straight_clearance_start_xy is None:
+                runtime.initial_straight_clearance_start_xy = (
+                    current.x_m,
+                    current.y_m,
+                )
+
+                heading = (
+                    math.cos(current.yaw_rad),
+                    math.sin(current.yaw_rad),
+                )
+                runtime.initial_straight_clearance_heading_xy = heading
+
+                outward = (
+                    current.x_m - reference_pose.x_m,
+                    current.y_m - reference_pose.y_m,
+                )
+
+                projection = (
+                    outward[0] * heading[0]
+                    + outward[1] * heading[1]
+                )
+
+                runtime.initial_straight_clearance_direction = (
+                    1.0 if projection >= 0.0 else -1.0
+                )
+
+            start_x, start_y = (
+                runtime.initial_straight_clearance_start_xy
+            )
+            heading_x, heading_y = (
+                runtime.initial_straight_clearance_heading_xy
+                or (
+                    math.cos(current.yaw_rad),
+                    math.sin(current.yaw_rad),
+                )
+            )
+
+            dx = current.x_m - start_x
+            dy = current.y_m - start_y
+
+            travelled_m = abs(
+                dx * heading_x
+                + dy * heading_y
+            )
+
+            if travelled_m < straight_clearance_m:
+                direction = (
+                    runtime.initial_straight_clearance_direction
+                    if runtime.initial_straight_clearance_direction
+                    is not None
+                    else 1.0
+                )
+
+                speed_m_s = min(
+                    0.035,
+                    self._pose_controller.max_linear_speed_m_s,
+                )
+
+                return {
+                    mobile_id: SmoresCommand(
+                        linear_x_m_s=direction * speed_m_s,
+                        angular_z_rad_s=0.0,
+                    )
+                }, self._make_status(
+                    goal,
+                    PrimitiveState.RUNNING,
+                    now_s,
+                    phase="straight_clearance",
+                    progress=min(
+                        0.20,
+                        0.20
+                        * travelled_m
+                        / straight_clearance_m,
+                    ),
+                    code="STRAIGHT_CLEARANCE",
+                    message=(
+                        f"{mobile_id} is clearing the source "
+                        "morphology without turning"
+                    ),
+                    feedback={
+                        "clearance_travelled_m": travelled_m,
+                        "clearance_target_m": straight_clearance_m,
+                        "clearance_reference_module_id": str(
+                            clearance_reference_id
+                        ),
+                        "command_linear_m_s": (
+                            direction * speed_m_s
+                        ),
+                        "command_angular_rad_s": 0.0,
+                    },
+                )
+
+            runtime.initial_straight_clearance_done = True
+            runtime.initial_metric = None
+
         fallback_level = self._staging_path_fallback_level(goal)
         clearance_m = self._staging_clearance_for_goal(goal)
         waypoint, avoidance_active = self._collision_aware_staging_waypoint(
@@ -1172,9 +1727,10 @@ class IsaacPrimitiveExecutor:
                 code="FACES_ALIGNED",
                 message=(
                     f"{mobile_id}:{mobile_face} is aligned with "
-                    f"{target_id}:{target_face} and ready to approach"
+                    f"{target_id}:{target_face} and ready for clocking"
                 ),
             )
+
         return {
             mobile_id: SmoresCommand(
                 linear_x_m_s=step.linear_x_m_s,
@@ -1193,6 +1749,154 @@ class IsaacPrimitiveExecutor:
                 "yaw_error_rad": step.yaw_error_rad,
             },
         )
+
+    def _clocking_alignment_gate(
+        self,
+        runtime: _ActiveGoal,
+        now_s: float,
+        mobile_id: str,
+        mobile_face: str,
+        target_id: str,
+        target_face: str,
+    ) -> tuple[dict[str, SmoresCommand], PrimitiveStatus] | None:
+        """Align TOP-face clocking only while connector translation is stopped.
+
+        Three consecutive in-tolerance samples are required before the PAN
+        coordinate is frozen as STRUCTURAL_HOLD.  If clocking later degrades
+        during APPROACH, the caller emits no locomotion command while this
+        barrier reacquires the clocking orientation.
+        """
+
+        top_module_id = (
+            mobile_id
+            if mobile_face == "TOP"
+            else target_id
+            if target_face == "TOP"
+            else None
+        )
+        if top_module_id is None:
+            return None
+
+        first = self._face_pose(mobile_id, mobile_face)
+        second = self._face_pose(target_id, target_face)
+        thresholds = self._docking_thresholds_for_goal(runtime.goal)
+        evaluation = evaluate_face_pair(first, second, thresholds)
+
+        # Clocking is meaningful only once the two connector normals are
+        # already geometrically aligned. Before that, planar/yaw alignment
+        # remains responsible for the face orientation.
+        if (
+            evaluation.normal_misalignment_rad
+            > thresholds.normal_alignment_tolerance_rad
+        ):
+            runtime.alignment_clocking_settle_count = 0
+            runtime.alignment_clocking_locked = False
+            runtime.alignment_clocking_target_rad = None
+            return None
+
+        current_pan, current_tilt = self._joint_positions(top_module_id)
+
+        if (
+            evaluation.clocking_constrained
+            and evaluation.clocking_error_rad
+            > thresholds.clocking_tolerance_rad
+        ):
+            runtime.alignment_clocking_settle_count = 0
+            runtime.alignment_clocking_locked = False
+
+            pan_target = current_pan + evaluation.clocking_residual_rad
+            runtime.alignment_clocking_target_rad = pan_target
+
+            return {
+                top_module_id: SmoresCommand(
+                    pan_target_rad=pan_target,
+                    tilt_target_rad=current_tilt,
+                    internal_motion=InternalMotionMode.PAN,
+                )
+            }, self._make_status(
+                runtime.goal,
+                PrimitiveState.RUNNING,
+                now_s,
+                phase="face_clocking",
+                progress=0.0,
+                code="ALIGNING_CLOCKING",
+                message=(
+                    f"translation stopped while {top_module_id}:TOP "
+                    "corrects EP-Face clocking"
+                ),
+                feedback={
+                    "clocking_error_rad": evaluation.clocking_error_rad,
+                    "clocking_residual_rad": evaluation.clocking_residual_rad,
+                    "pan_target_rad": pan_target,
+                    "clocking_settle_count": 0,
+                },
+            )
+
+        if runtime.alignment_clocking_locked:
+            return None
+
+        if runtime.alignment_clocking_target_rad is None:
+            runtime.alignment_clocking_target_rad = current_pan
+
+        runtime.alignment_clocking_settle_count += 1
+        required_samples = 3
+
+        if runtime.alignment_clocking_settle_count < required_samples:
+            # Once clocking is inside tolerance, do not unnecessarily replace
+            # an existing structural support controller with a PAN controller.
+            # In particular, a TOP face belonging to the preserved structure
+            # must remain structurally held while we validate that clocking is
+            # stable before connector translation begins.
+            retained = self._retained_internal_commands.get(top_module_id)
+            if (
+                retained is not None
+                and retained.internal_motion
+                is InternalMotionMode.STRUCTURAL_HOLD
+            ):
+                settle_command = retained
+            else:
+                settle_command = SmoresCommand(
+                    pan_target_rad=runtime.alignment_clocking_target_rad,
+                    tilt_target_rad=current_tilt,
+                    internal_motion=InternalMotionMode.PAN,
+                )
+
+            return {
+                top_module_id: settle_command
+            }, self._make_status(
+                runtime.goal,
+                PrimitiveState.RUNNING,
+                now_s,
+                phase="face_clocking_settle",
+                progress=0.0,
+                code="SETTLING_CLOCKING",
+                message=(
+                    f"{top_module_id}:TOP clocking is in tolerance; "
+                    "holding PAN before connector translation"
+                ),
+                feedback={
+                    "clocking_error_rad": evaluation.clocking_error_rad,
+                    "clocking_residual_rad": evaluation.clocking_residual_rad,
+                    "pan_target_rad": runtime.alignment_clocking_target_rad,
+                    "clocking_settle_count": (
+                        runtime.alignment_clocking_settle_count
+                    ),
+                    "clocking_settle_required": required_samples,
+                },
+            )
+
+        # Freeze the actually reached coordinate, not the originally requested
+        # branch. This becomes the fixed PAN posture used during APPROACH and
+        # prevents the clocking controller from continuing after docking.
+        self._retained_internal_commands[top_module_id] = SmoresCommand(
+            pan_target_rad=current_pan,
+            tilt_target_rad=current_tilt,
+            internal_motion=InternalMotionMode.STRUCTURAL_HOLD,
+        )
+        runtime.alignment_clocking_target_rad = current_pan
+        runtime.alignment_clocking_locked = True
+
+        return None
 
     def _assisted_align_faces(
         self,
@@ -2053,6 +2757,40 @@ class IsaacPrimitiveExecutor:
             if goal.primitive is PrimitiveName.DOCK
             else "detach"
         )
+
+        coordination_group = goal.parameters.get(
+            "coordination_group"
+        )
+
+        if (
+            action == "detach"
+            and coordination_group is not None
+            and not self._coordinated_undock_ready(
+                runtime,
+                now_s,
+            )
+        ):
+            return {}, self._make_status(
+                goal,
+                PrimitiveState.RUNNING,
+                now_s,
+                phase="undock_coordination",
+                progress=0.0,
+                code="WAITING_UNDOCK_GROUP",
+                message=(
+                    "waiting for every synchronized "
+                    "undock goal in the wave"
+                ),
+                feedback={
+                    "coordination_group": str(
+                        coordination_group
+                    ),
+                    "coordination_size": int(
+                        goal.parameters["coordination_size"]
+                    ),
+                },
+            )
+
         if action == "attach":
             face_a = str(goal.parameters["face_a"])
             face_b = str(goal.parameters["face_b"])
@@ -2143,6 +2881,42 @@ class IsaacPrimitiveExecutor:
             if result.accepted
             else "DOCKING_REJECTED"
         )
+        if result.accepted and action == "attach":
+            top_module_id = (
+                first
+                if str(goal.parameters["face_a"]) == "TOP"
+                else second
+                if str(goal.parameters["face_b"]) == "TOP"
+                else None
+            )
+            if top_module_id is not None:
+                self._pan_reference_offset_rad[top_module_id] = (
+                    self._joint_positions(top_module_id)[0]
+                )
+
+        if (
+            result.accepted
+            and action == "attach"
+            and bool(
+                goal.parameters.get(
+                    "retain_mobile_structure_after_dock",
+                    False,
+                )
+            )
+        ):
+            # The first module is the mobile module.
+            #
+            # Alignment/reconfiguration may have released its former
+            # internal posture.  Capture the CURRENT measured PAN/TILT
+            # after successful docking as the new structural reference.
+            #
+            # This does NOT prevent future SET_PAN/SET_TILT primitives:
+            # an active primitive owns internal_motion and overrides this
+            # background hold.
+            self._passive_internal_module_ids.discard(first)
+            self._retained_internal_commands.pop(first, None)
+            self._retain_structure_targets((first,))
+
         return {}, self._finish(
             runtime,
             state,
@@ -2165,9 +2939,25 @@ class IsaacPrimitiveExecutor:
             for item in goal.parameters["passive_module_ids"]
         )
 
+        # This primitive is the explicit locomotion -> reconfiguration
+        # ownership handoff. Quarantine the previous behavior producer once,
+        # before PASSIVE commands are composed with the runtime baseline.
+        if not runtime.command_sources_invalidated:
+            if self.invalidate_module_command_sources_callback is not None:
+                self.invalidate_module_command_sources_callback(passive_ids)
+            runtime.command_sources_invalidated = True
+
         # Forget all retained PAN/TILT/structural targets for these
         # modules.  PASSIVE is the backdrivable internal mode.
         self._apply_passive_structure_policy(goal.parameters)
+
+        # Discard the executor's old revolution count at the same measured
+        # coordinate used by the controller reset. No tracker behavior changes
+        # outside this explicit reconfiguration phase.
+        for module_id in passive_ids:
+            tracker = ContinuousAngleTracker()
+            tracker.update(self._states[module_id].read().pan_joint_rad)
+            self._pan_trackers[module_id] = tracker
 
         # Explicitly command PASSIVE every executor tick.  Resources
         # also own locomotion, so stale wheel commands cannot move the
@@ -2175,6 +2965,7 @@ class IsaacPrimitiveExecutor:
         commands = {
             module_id: SmoresCommand(
                 internal_motion=InternalMotionMode.PASSIVE,
+                reset_internal_targets=True,
             )
             for module_id in passive_ids
         }
@@ -2185,14 +2976,37 @@ class IsaacPrimitiveExecutor:
         )
 
         if elapsed_s >= duration_s:
+            clear_policy = bool(
+                goal.parameters.get(
+                    "clear_passive_policy_on_finish",
+                    False,
+                )
+            )
+
+            if clear_policy:
+                # Old PAN/TILT/STRUCTURAL_HOLD targets were already removed
+                # by _apply_passive_structure_policy().  Clear only the
+                # latched PASSIVE membership so the following morphology
+                # primitives can establish a fresh actuation state.
+                self._passive_internal_module_ids.clear()
+
             return commands, self._finish(
                 runtime,
                 PrimitiveState.SUCCEEDED,
                 now_s,
-                code="GRAVITY_SETTLED",
+                code=(
+                    "PASSIVE_POLICY_RESET_AFTER_SETTLE"
+                    if clear_policy
+                    else "GRAVITY_SETTLED"
+                ),
                 message=(
                     f"{len(passive_ids)} module internal drives were "
                     f"passive for {duration_s:.3f}s"
+                    + (
+                        "; passive policy reset for fresh reconfiguration"
+                        if clear_policy
+                        else ""
+                    )
                 ),
             )
 
@@ -2230,16 +3044,84 @@ class IsaacPrimitiveExecutor:
             PrimitiveName.ROTATE_PAN_BY,
         }
         current = current_pan if is_pan else current_tilt
+
+        # PAN is physically periodic.  Most ROTATE_PAN_BY goals intentionally
+        # preserve their revolution count (for example +4*pi really means two
+        # complete turns).  IK is different: it only cares about the physical
+        # orientation and explicitly opts into periodic equivalence.
+        #
+        # This also makes the goal robust when two state layers represent the
+        # same physical angle on different 2*pi branches, e.g.
+        # -329 deg and +31 deg.
+        periodic_equivalent = (
+            is_pan
+            and goal.primitive is PrimitiveName.ROTATE_PAN_BY
+            and bool(
+                goal.parameters.get(
+                    "periodic_equivalent",
+                    False,
+                )
+            )
+        )
+
+        if periodic_equivalent:
+            target = current + math.atan2(
+                math.sin(target - current),
+                math.cos(target - current),
+            )
+
         self._apply_passive_structure_policy(goal.parameters)
         self._retain_structure_targets(
             goal.parameters.get("structural_hold_module_ids", ())
         )
         retained = self._retained_internal_commands.get(module_id)
+        held_pan = (
+            retained.pan_target_rad
+            if retained is not None
+            else current_pan
+        )
         held_tilt = (
             retained.tilt_target_rad
             if retained is not None
             else current_tilt
         )
+
+        # TEMPORARY DIAGNOSTIC:
+        # Trace the PAN coordinate inherited by Snake8 posture TILT goals.
+        # No control semantics are changed here.
+        if (
+            not is_pan
+            and "stage-04" in goal.goal_id
+            and module_id
+            in {"smores_03", "smores_04", "smores_06", "smores_08"}
+        ):
+            seen = globals().setdefault("_PANSTATE_DIAG_SEEN", set())
+            key = ("start", goal.goal_id)
+            if key not in seen:
+                retained_pan = (
+                    retained.pan_target_rad
+                    if retained is not None
+                    else float("nan")
+                )
+                retained_mode = (
+                    str(retained.internal_motion)
+                    if retained is not None
+                    else "none"
+                )
+                print(
+                    "[PANSTATE] event=TILT_START "
+                    f"goal={goal.goal_id} "
+                    f"module={module_id} "
+                    f"current_pan={current_pan:+.6f} "
+                    f"held_pan={held_pan:+.6f} "
+                    f"retained_pan={retained_pan:+.6f} "
+                    f"retained_mode={retained_mode} "
+                    f"current_tilt={current_tilt:+.6f} "
+                    f"target_tilt={target:+.6f}",
+                    flush=True,
+                )
+                seen.add(key)
+
         error = target - current
         tolerance = (
             self._joint_tolerance_rad
@@ -2251,8 +3133,8 @@ class IsaacPrimitiveExecutor:
         if not is_pan and coordination_group is not None:
             if not self._coordinated_tilt_ready(runtime, now_s):
                 command = SmoresCommand(
-                    pan_target_rad=current_pan,
-                    tilt_target_rad=current_tilt,
+                    pan_target_rad=held_pan,
+                    tilt_target_rad=held_tilt,
                     internal_motion=InternalMotionMode.TILT,
                 )
                 commands = {module_id: command}
@@ -2291,9 +3173,13 @@ class IsaacPrimitiveExecutor:
                 and coordination_group is not None
                 and not self._coordinated_tilt_complete(runtime)
             ):
+                self._update_retained_structural_target(
+                    module_id,
+                    tilt_target_rad=target,
+                )
                 commands = {
                     module_id: SmoresCommand(
-                        pan_target_rad=current_pan,
+                        pan_target_rad=held_pan,
                         tilt_target_rad=target,
                         internal_motion=InternalMotionMode.TILT,
                     )
@@ -2325,6 +3211,43 @@ class IsaacPrimitiveExecutor:
                 current_pan,
                 current_tilt,
             )
+
+            # TEMPORARY DIAGNOSTIC:
+            # Show what PAN is retained after the TILT actually completes.
+            if (
+                not is_pan
+                and "stage-04" in goal.goal_id
+                and module_id
+                in {"smores_03", "smores_04", "smores_06", "smores_08"}
+            ):
+                seen = globals().setdefault("_PANSTATE_DIAG_SEEN", set())
+                key = ("done", goal.goal_id)
+                if key not in seen:
+                    retained_after = self._retained_internal_commands.get(
+                        module_id
+                    )
+                    after_pan = (
+                        retained_after.pan_target_rad
+                        if retained_after is not None
+                        else float("nan")
+                    )
+                    after_mode = (
+                        str(retained_after.internal_motion)
+                        if retained_after is not None
+                        else "none"
+                    )
+                    print(
+                        "[PANSTATE] event=TILT_DONE "
+                        f"goal={goal.goal_id} "
+                        f"module={module_id} "
+                        f"current_pan={current_pan:+.6f} "
+                        f"held_pan_before={held_pan:+.6f} "
+                        f"retained_pan_after={after_pan:+.6f} "
+                        f"retained_mode_after={after_mode}",
+                        flush=True,
+                    )
+                    seen.add(key)
+
             return {}, self._finish(
                 runtime,
                 PrimitiveState.SUCCEEDED,
@@ -2343,6 +3266,17 @@ class IsaacPrimitiveExecutor:
             if previous_target is None or previous_time is None:
                 previous_target = current
                 previous_time = now_s
+
+            # If the measured PAN crossed to an equivalent 2*pi branch,
+            # move the previous servo target onto that same branch before
+            # computing the rate-limited command.  Otherwise a perfectly
+            # local IK step could become an artificial full revolution.
+            if periodic_equivalent:
+                previous_target = current + math.atan2(
+                    math.sin(previous_target - current),
+                    math.cos(previous_target - current),
+                )
+
             max_delta = max_servo_speed * max(0.0, now_s - previous_time)
             remaining = target - previous_target
             commanded_target = previous_target + max(
@@ -2375,13 +3309,25 @@ class IsaacPrimitiveExecutor:
                     commanded_target,
                 )
             )
+        self._update_retained_structural_target(
+            module_id,
+            pan_target_rad=commanded_target if is_pan else None,
+            tilt_target_rad=commanded_target if not is_pan else None,
+        )
         command = SmoresCommand(
-            pan_target_rad=commanded_target if is_pan else current_pan,
+            pan_target_rad=commanded_target if is_pan else held_pan,
             tilt_target_rad=held_tilt if is_pan else commanded_target,
             internal_motion=(
-                InternalMotionMode.PAN
-                if is_pan
-                else InternalMotionMode.TILT
+                InternalMotionMode.PAN_CONTINUOUS
+                if (
+                    is_pan
+                    and goal.primitive == PrimitiveName.ROTATE_PAN_BY
+                )
+                else (
+                    InternalMotionMode.PAN
+                    if is_pan
+                    else InternalMotionMode.TILT
+                )
             ),
         )
         commands = {module_id: command}
@@ -2421,20 +3367,27 @@ class IsaacPrimitiveExecutor:
             },
         )
 
-    @staticmethod
     def _add_group_stabilizers(
+        self,
         commands: dict[str, SmoresCommand],
         goal: PrimitiveGoal,
     ) -> None:
-        """Keep declared frame modules square during a coupled fold."""
+        """Hold declared frame modules at their retained structural posture."""
 
         for raw_module_id in goal.parameters.get(
             "stabilize_during_group_module_ids", ()
         ):
             module_id = str(raw_module_id)
+            retained = self._retained_internal_commands.get(module_id)
+            if retained is not None:
+                pan_target = retained.pan_target_rad
+                tilt_target = retained.tilt_target_rad
+            else:
+                pan_target, tilt_target = self._joint_positions(module_id)
+
             commands[module_id] = SmoresCommand(
-                pan_target_rad=0.0,
-                tilt_target_rad=0.0,
+                pan_target_rad=pan_target,
+                tilt_target_rad=tilt_target,
                 internal_motion=InternalMotionMode.STRUCTURAL_HOLD,
             )
 
@@ -2466,6 +3419,36 @@ class IsaacPrimitiveExecutor:
             linear_x_m_s=speed,
             pan_target_rad=pan_target,
             tilt_target_rad=tilt_target,
+            internal_motion=InternalMotionMode.STRUCTURAL_HOLD,
+        )
+
+    def _update_retained_structural_target(
+        self,
+        module_id: str,
+        *,
+        pan_target_rad: float | None = None,
+        tilt_target_rad: float | None = None,
+    ) -> None:
+        """Move an existing structural hold with an explicit joint target."""
+
+        retained = self._retained_internal_commands.get(module_id)
+        if (
+            retained is None
+            or retained.internal_motion
+            is not InternalMotionMode.STRUCTURAL_HOLD
+        ):
+            return
+        self._retained_internal_commands[module_id] = SmoresCommand(
+            pan_target_rad=(
+                retained.pan_target_rad
+                if pan_target_rad is None
+                else pan_target_rad
+            ),
+            tilt_target_rad=(
+                retained.tilt_target_rad
+                if tilt_target_rad is None
+                else tilt_target_rad
+            ),
             internal_motion=InternalMotionMode.STRUCTURAL_HOLD,
         )
 
@@ -2546,6 +3529,60 @@ class IsaacPrimitiveExecutor:
                 tilt_target_rad=current_tilt,
                 internal_motion=InternalMotionMode.STRUCTURAL_HOLD,
             )
+
+    def _coordinated_undock_ready(
+        self,
+        runtime: _ActiveGoal,
+        now_s: float,
+    ) -> bool:
+        """Release a complete undock group in one executor step.
+
+        Individual goals may arrive on different bridge ticks. No
+        physical connector is released until every member of the
+        coordination group is active. Once the barrier opens, all
+        members encountered by the current PrimitiveExecutor.step()
+        may execute their detach before the next physics frame.
+        """
+
+        group_name = str(
+            runtime.goal.parameters["coordination_group"]
+        )
+        expected_size = int(
+            runtime.goal.parameters["coordination_size"]
+        )
+
+        # A peer processed earlier in this same step may already have
+        # opened the barrier and completed/removed itself from _active.
+        if group_name in self._released_undock_groups:
+            return True
+
+        group = [
+            candidate
+            for candidate in self._active.values()
+            if (
+                candidate.goal.primitive
+                is PrimitiveName.UNDOCK
+                and candidate.goal.parameters.get(
+                    "coordination_group"
+                )
+                == group_name
+            )
+        ]
+
+        if len(group) < expected_size:
+            return False
+
+        self._released_undock_groups.add(
+            group_name
+        )
+
+        # Admission time is not execution time. Give every member the
+        # same physical execution start when the barrier opens.
+        for candidate in group:
+            candidate.execution_started_at_s = now_s
+
+        return True
+
 
     def _coordinated_tilt_ready(
         self,
@@ -2698,7 +3735,23 @@ class IsaacPrimitiveExecutor:
             return None
         pan, tilt = self._joint_positions(goal.module_ids[0])
         if goal.primitive is PrimitiveName.SET_PAN:
-            return float(goal.parameters["angle_rad"])
+            # PAN is periodic. Resolve an absolute morphology target
+            # to the nearest 2*pi-equivalent angle so a module that
+            # accumulated turns while acting as an RC-Car locomotor
+            # never unwinds several full revolutions during posture
+            # normalization. The literal angle_rad is offset by this
+            # module's own docking-time reference (see
+            # _pan_reference_offset_rad) instead of a global zero, since
+            # the 4-fold-symmetric connector can dock at any quarter turn.
+            desired = float(
+                goal.parameters["angle_rad"]
+            ) + self._pan_reference_offset_rad.get(
+                goal.module_ids[0], 0.0
+            )
+            turns = round(
+                (pan - desired) / (2.0 * math.pi)
+            )
+            return desired + turns * 2.0 * math.pi
         if goal.primitive is PrimitiveName.ROTATE_PAN_BY:
             return pan + float(goal.parameters["delta_rad"])
         if goal.primitive is PrimitiveName.SET_TILT:
@@ -2719,6 +3772,10 @@ class IsaacPrimitiveExecutor:
         return pan, -state.tilt_joint_rad
 
     def _planar_pose(self, module_id: str) -> PlanarPose:
+        cached = self._primitive_planar_pose_cache.get(module_id)
+        if cached is not None:
+            return cached
+
         from pxr import Gf, Usd, UsdGeom
 
         body_path = f"{self._module_roots[module_id]}/body_link"
@@ -2727,16 +3784,24 @@ class IsaacPrimitiveExecutor:
         ).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
         position = matrix.ExtractTranslation()
         forward = matrix.TransformDir(Gf.Vec3d(1.0, 0.0, 0.0))
-        return PlanarPose(
+
+        pose = PlanarPose(
             float(position[0]),
             float(position[1]),
             math.atan2(float(forward[1]), float(forward[0])),
         )
+        self._primitive_planar_pose_cache[module_id] = pose
+        return pose
 
     def _face_pose(self, module_id: str, face_name: str) -> Any:
+        poses = self._primitive_face_poses_cache.get(module_id)
+        if poses is None:
+            poses = self._docking.face_poses_for(module_id)
+            self._primitive_face_poses_cache[module_id] = poses
+
         return next(
             pose
-            for pose in self._docking.face_poses_for(module_id)
+            for pose in poses
             if pose.face.face_name == face_name
         )
 
@@ -2918,6 +3983,15 @@ class IsaacPrimitiveExecutor:
         """Resolve exclusive and shared physical-resource claims."""
 
         first = goal.module_ids[0]
+        if goal.primitive is PrimitiveName.RESET_FREE_MODULES:
+            return {
+                resource: "exclusive"
+                for module_id in goal.module_ids
+                for resource in (
+                    f"internal_motion:{module_id}", f"locomotion:{module_id}",
+                    *(f"connector:{module_id}:{face}" for face in ("TOP", "BOTTOM", "LEFT", "RIGHT")),
+                )
+            }
         if goal.primitive is PrimitiveName.GRAVITY_SETTLE:
             passive_ids = tuple(
                 str(item)
@@ -3041,6 +4115,11 @@ class IsaacPrimitiveExecutor:
                     incoming.pan_velocity_rad_s
                     if owns_internal
                     else current.pan_velocity_rad_s
+                ),
+                reset_internal_targets=(
+                    incoming.reset_internal_targets
+                    if owns_internal
+                    else current.reset_internal_targets
                 ),
             )
 

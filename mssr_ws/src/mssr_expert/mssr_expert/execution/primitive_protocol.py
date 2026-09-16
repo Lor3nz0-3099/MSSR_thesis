@@ -32,6 +32,7 @@ VALID_PRIMITIVES = frozenset(
         "rotate_pan_by",
         "set_tilt",
         "rotate_tilt_by",
+        "reset_free_modules",
     }
 )
 
@@ -49,6 +50,8 @@ VALID_FACE_EXECUTION_PHASES = frozenset(
         "full",
         "reach",
         "align",
+        "clocking",
+        "retreat",
         "approach",
     }
 )
@@ -127,6 +130,9 @@ class PrimitiveGoalRequest:
         }
 
         expected_module_count = (
+            len(self.module_ids)
+            if self.primitive == "reset_free_modules"
+            else
             3
             if self.primitive == "assisted_align_faces"
             else
@@ -201,7 +207,7 @@ class PrimitiveGoalRequest:
                 ).lower()
                 if execution_phase not in VALID_FACE_EXECUTION_PHASES:
                     raise PrimitiveProtocolError(
-                        "execution_phase must be full, reach, align or "
+                        "execution_phase must be full, reach, align, clocking, retreat or "
                         "approach."
                     )
                 parameters["execution_phase"] = execution_phase
@@ -493,6 +499,8 @@ def make_align_faces_goal(
     contact_approach_feedback: bool = False,
     execution_phase: str | None = None,
     staging_path_fallback_level: int | None = None,
+    initial_straight_clearance_m: float | None = None,
+    initial_straight_clearance_reference_module_id: str | None = None,
 ) -> PrimitiveGoalRequest:
     """Create an explicit face-alignment goal."""
 
@@ -522,6 +530,25 @@ def make_align_faces_goal(
         parameters["staging_path_fallback_level"] = (
             staging_path_fallback_level
         )
+
+    if initial_straight_clearance_m is not None:
+        if initial_straight_clearance_reference_module_id is None:
+            raise PrimitiveProtocolError(
+                "Straight clearance requires a reference module."
+            )
+        if (
+            not math.isfinite(initial_straight_clearance_m)
+            or initial_straight_clearance_m <= 0.0
+        ):
+            raise PrimitiveProtocolError(
+                "initial_straight_clearance_m must be positive and finite."
+            )
+        parameters["initial_straight_clearance_m"] = float(
+            initial_straight_clearance_m
+        )
+        parameters[
+            "initial_straight_clearance_reference_module_id"
+        ] = str(initial_straight_clearance_reference_module_id)
 
     return PrimitiveGoalRequest(
         goal_id=goal_id,
@@ -585,6 +612,7 @@ def make_dock_goal(
     top_bottom_contact_tolerance_m: float | None = None,
     contact_approach_feedback: bool = False,
     snap_to_nominal: bool = False,
+    retain_mobile_structure_after_dock: bool = False,
 ) -> PrimitiveGoalRequest:
     """Create an explicit rigid docking goal."""
 
@@ -601,6 +629,11 @@ def make_dock_goal(
         parameters["contact_approach_feedback"] = True
     if snap_to_nominal:
         parameters["snap_to_nominal"] = True
+
+    if retain_mobile_structure_after_dock:
+        parameters[
+            "retain_mobile_structure_after_dock"
+        ] = True
 
     return PrimitiveGoalRequest(
         goal_id=goal_id,
@@ -621,17 +654,53 @@ def make_undock_goal(
     second_module_id: str,
     second_face: str,
     timeout_s: float = 10.0,
+    coordination_group: str | None = None,
+    coordination_size: int | None = None,
 ) -> PrimitiveGoalRequest:
     """Create an explicit rigid undocking goal."""
+
+    parameters: dict[str, Any] = {
+        "face_a": first_face,
+        "face_b": second_face,
+    }
+
+    if (
+        coordination_group is None
+        and coordination_size is not None
+    ) or (
+        coordination_group is not None
+        and coordination_size is None
+    ):
+        raise PrimitiveProtocolError(
+            "coordination_group and coordination_size "
+            "must be supplied together."
+        )
+
+    if coordination_group is not None:
+        group = str(coordination_group).strip()
+
+        if not group:
+            raise PrimitiveProtocolError(
+                "coordination_group cannot be empty."
+            )
+
+        if (
+            isinstance(coordination_size, bool)
+            or not isinstance(coordination_size, int)
+            or coordination_size < 2
+        ):
+            raise PrimitiveProtocolError(
+                "coordination_size must be an integer >= 2."
+            )
+
+        parameters["coordination_group"] = group
+        parameters["coordination_size"] = coordination_size
 
     return PrimitiveGoalRequest(
         goal_id=goal_id,
         primitive="undock",
         module_ids=(first_module_id, second_module_id),
-        parameters={
-            "face_a": first_face,
-            "face_b": second_face,
-        },
+        parameters=parameters,
         timeout_s=timeout_s,
     )
 

@@ -4,6 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from mssr_expert.planning.smores_ep.partial_assembly import connection_key, topology_edge_key
+from mssr_expert.planning.smores_ep.topology import SmoresTopologyEdge
+
 from mssr_expert.planning.smores_ep.assignment import (
     AssignmentResult,
 )
@@ -84,16 +87,30 @@ class ParallelAssemblyPlan:
 def generate_parallel_assembly_plan(
     tree: RootedSmoresTree,
     assignment: AssignmentResult,
+    *,
+    completed_target_edges: tuple[SmoresTopologyEdge, ...] = (),
 ) -> ParallelAssemblyPlan:
     """Generate Algorithm 1 assembly waves from root to leaves."""
 
     _validate_assignment(tree, assignment)
+
+    completed = {topology_edge_key(edge) for edge in completed_target_edges}
+    target_keys = {
+        connection_key(edge.parent_vertex, edge.parent_face, edge.child_vertex,
+                       edge.child_face, edge.clocking_quarter_turns)
+        for edge in tree.edges
+    }
+    if len(completed) != len(completed_target_edges) or not completed <= target_keys:
+        raise AssemblySequenceError("Completed edges must be distinct target edges.")
 
     root_module_id = assignment.target_to_module[tree.root_id]
 
     actions_by_depth: dict[int, list[AssemblyAction]] = {}
 
     for edge in tree.edges:
+        if connection_key(edge.parent_vertex, edge.parent_face, edge.child_vertex,
+                          edge.child_face, edge.clocking_quarter_turns) in completed:
+            continue
         depth = tree.depth_by_vertex.get(edge.child_vertex)
 
         if depth is None:
@@ -199,7 +216,7 @@ def generate_parallel_assembly_plan(
         waves=tuple(waves),
     )
 
-    expected_action_count = max(0, len(tree.vertex_ids) - 1)
+    expected_action_count = len(tree.edges) - len(completed)
 
     if plan.action_count != expected_action_count:
         raise AssemblySequenceError(

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Mapping
 
@@ -19,6 +19,7 @@ from smores_ep.primitives.model import (
 class ActionDiagnostics:
     """Expert context retained beside the real-time locomotion command."""
 
+    command_id: str = ""
     phase: str = ""
     fsm_state: str = ""
     pan_traction_module_ids: tuple[str, ...] = ()
@@ -163,6 +164,8 @@ class ActionFileChannel:
         self._last_received_s: float | None = None
         self._commands: dict[str, SmoresCommand] = {}
         self._diagnostics = ActionDiagnostics()
+        self._seen_command_ids: set[str] = set()
+        self._blocked_modules: dict[str, frozenset[str]] = {}
 
     def commands(self, now_s: float) -> dict[str, SmoresCommand]:
         """Poll once and return only commands that still satisfy the timeout."""
@@ -175,18 +178,46 @@ class ActionFileChannel:
             if signature != self._last_signature:
                 self._last_signature = signature
                 self._commands, self._diagnostics = self._parse(payload)
+                command_id = self._diagnostics.command_id
+                if command_id:
+                    self._seen_command_ids.add(command_id)
                 self._last_received_s = now_s
         if self._last_received_s is None:
             return {}
         if now_s - self._last_received_s > self._timeout_s:
             return {}
-        return dict(self._commands)
+        return {m: c for m, c in self._commands.items() if not self._command_blocked(m)}
+
+    def _command_blocked(self, module_id: str) -> bool:
+        previous = self._blocked_modules.get(module_id)
+        return previous is not None and (
+            not self._diagnostics.command_id
+            or self._diagnostics.command_id in previous
+        )
+
+    def invalidate_modules(self, module_ids: tuple[str, ...]) -> None:
+        """Quarantine old behavior requests until a new command ID takes over."""
+        # Capture even a source packet that arrived since the last poll.
+        snapshot = PrimitiveFileChannel._snapshot(self._action_file)
+        if snapshot is not None:
+            _, diagnostics = self._parse(snapshot[1])
+            if diagnostics.command_id:
+                self._seen_command_ids.add(diagnostics.command_id)
+        for module_id in module_ids:
+            self._commands.pop(module_id, None)
+            self._blocked_modules[module_id] = frozenset(self._seen_command_ids)
 
     @property
     def diagnostics(self) -> ActionDiagnostics:
         """Return metadata from the most recently accepted action payload."""
 
-        return self._diagnostics
+        return replace(
+            self._diagnostics,
+            pan_traction_module_ids=tuple(
+                m for m in self._diagnostics.pan_traction_module_ids
+                if not self._command_blocked(m)
+            ),
+        )
 
     @staticmethod
     def _parse(
@@ -277,6 +308,7 @@ class ActionFileChannel:
             )
         )
         diagnostics = ActionDiagnostics(
+            command_id=str(debug.get("command_id", "")),
             phase=str(metrics.get("phase", "")),
             fsm_state=str(expert.get("fsm_state", "")),
             pan_traction_module_ids=pan_traction_module_ids,

@@ -156,19 +156,47 @@ def test_single_action_executes_paper_docking_barriers() -> None:
 
     assert decision.primitive_goal is not None
     assert decision.phase == "ALIGN"
-    assert decision.primitive_goal.primitive == "align_faces"
     assert decision.primitive_goal.parameters["execution_phase"] == "align"
 
     decision = executor.step(
-        _status(decision.primitive_goal.goal_id, "align_faces", "succeeded")
+        _status(
+            decision.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
     )
-    assert decision.phase == "APPROACH"
+
     assert decision.primitive_goal is not None
-    assert decision.primitive_goal.parameters["execution_phase"] == "approach"
+    assert decision.phase == "CLOCKING"
+    assert decision.primitive_goal.goal_id == "test-w0-a0-clocking"
+    assert (
+        decision.primitive_goal.parameters["execution_phase"]
+        == "clocking"
+    )
 
     decision = executor.step(
-        _status(decision.primitive_goal.goal_id, "align_faces", "succeeded")
+        _status(
+            decision.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
     )
+
+    assert decision.primitive_goal is not None
+    assert decision.phase == "APPROACH"
+    assert (
+        decision.primitive_goal.parameters["execution_phase"]
+        == "approach"
+    )
+
+    decision = executor.step(
+        _status(
+            decision.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
+    )
+
     assert decision.phase == "DOCK"
     assert decision.primitive_goal is not None
     assert decision.primitive_goal.goal_id == "test-w0-a0-dock"
@@ -690,9 +718,25 @@ def test_rejected_dock_returns_through_alignment_and_approach() -> None:
         "execution_phase"
     ] == "align"
 
-    approach_retry = executor.step(
+    clocking_retry = executor.step(
         _status(
             "recover-w0-a0-align-r1",
+            "align_faces",
+            "succeeded",
+        )
+    )
+    assert clocking_retry.primitive_goal is not None
+    assert clocking_retry.primitive_goal.goal_id == (
+        "recover-w0-a0-clocking-r1"
+    )
+    assert (
+        clocking_retry.primitive_goal.parameters["execution_phase"]
+        == "clocking"
+    )
+
+    approach_retry = executor.step(
+        _status(
+            "recover-w0-a0-clocking-r1",
             "align_faces",
             "succeeded",
         )
@@ -733,9 +777,14 @@ def test_dock_recovery_preserves_parallel_connection_already_latched() -> None:
         executor.step(),
         2,
     )
-    _, first_approach = _succeed_parallel_phase(
+    _, first_clocking = _succeed_parallel_phase(
         executor,
         first_align,
+        2,
+    )
+    _, first_approach = _succeed_parallel_phase(
+        executor,
+        first_clocking,
         2,
     )
     _, first_dock = _succeed_parallel_phase(
@@ -768,15 +817,33 @@ def test_dock_recovery_preserves_parallel_connection_already_latched() -> None:
     assert realign_second.primitive_goal.goal_id.endswith("a1-align-r1")
     assert realign_second.primitive_goal.primitive == "align_faces"
 
-    approach_second = executor.step(
+    clocking_second = executor.step(
         _status(
             "parallel-recover-w0-a1-align-r1",
             "align_faces",
             "succeeded",
         )
     )
+    assert clocking_second.primitive_goal is not None
+    assert clocking_second.primitive_goal.goal_id.endswith(
+        "a1-clocking-r1"
+    )
+    assert (
+        clocking_second.primitive_goal.parameters["execution_phase"]
+        == "clocking"
+    )
+
+    approach_second = executor.step(
+        _status(
+            "parallel-recover-w0-a1-clocking-r1",
+            "align_faces",
+            "succeeded",
+        )
+    )
     assert approach_second.primitive_goal is not None
-    assert approach_second.primitive_goal.goal_id.endswith("a1-approach-r1")
+    assert approach_second.primitive_goal.goal_id.endswith(
+        "a1-approach-r1"
+    )
 
     redock_second = executor.step(
         _status(
@@ -999,8 +1066,22 @@ def test_planar_layout_precedes_docking_and_final_posture() -> None:
         _status(reach.primitive_goal.goal_id, "align_faces", "succeeded")
     )
     assert align.phase == "ALIGN"
-    approach = executor.step(
+    clocking = executor.step(
         _status(align.primitive_goal.goal_id, "align_faces", "succeeded")
+    )
+    assert clocking.phase == "CLOCKING"
+    assert clocking.primitive_goal is not None
+    assert (
+        clocking.primitive_goal.parameters["execution_phase"]
+        == "clocking"
+    )
+
+    approach = executor.step(
+        _status(
+            clocking.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
     )
     assert approach.phase == "APPROACH"
     dock = executor.step(
@@ -1062,9 +1143,14 @@ def test_future_wave_reaches_only_after_chassis_wave_is_complete() -> None:
         executor.step(),
         2,
     )
-    _, first_approach = _succeed_parallel_phase(
+    _, first_clocking = _succeed_parallel_phase(
         executor,
         first_align,
+        2,
+    )
+    _, first_approach = _succeed_parallel_phase(
+        executor,
+        first_clocking,
         2,
     )
     _, first_dock = _succeed_parallel_phase(
@@ -1129,6 +1215,22 @@ def test_empty_topology_delta_can_still_apply_target_posture() -> None:
     )
     assert finished.done
     assert finished.success
+
+
+def test_partial_posture_structurally_holds_preserved_non_target_anchor() -> None:
+    plan = ParallelAssemblyPlan(
+        root_target_vertex="root", root_module_id="m0", waves=(),
+    )
+    executor = ParallelAssemblyExecutor(
+        plan,
+        initially_assembled_module_ids=("m0", "preserved"),
+        post_assembly_tilt_by_module={"m0": 0.5},
+    )
+    posture = executor.step()
+    assert posture.primitive_goal is not None
+    assert posture.primitive_goal.parameters["hold_after_group_module_ids"] == [
+        "m0", "preserved"
+    ]
 
 
 def test_empty_topology_delta_can_lock_final_pan_posture() -> None:
@@ -1317,3 +1419,223 @@ def test_target_vertex_posture_groups_follow_physical_assignment() -> None:
     )
 
     assert groups == (("rear", "front"), ("left", "right"))
+
+def test_single_action_has_explicit_clocking_barrier_before_approach() -> None:
+    executor = ParallelAssemblyExecutor(
+        _plan((_action(),)),
+        execution_id="clocking-barrier",
+    )
+
+    reach = executor.step()
+    assert reach.phase == "REACH"
+    assert reach.primitive_goal is not None
+
+    align = executor.step(
+        _status(
+            reach.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
+    )
+    assert align.phase == "ALIGN"
+    assert align.primitive_goal is not None
+
+    clocking = executor.step(
+        _status(
+            align.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
+    )
+
+    assert clocking.phase == "CLOCKING"
+    assert clocking.primitive_goal is not None
+    assert clocking.primitive_goal.goal_id == (
+        "clocking-barrier-w0-a0-clocking"
+    )
+    assert (
+        clocking.primitive_goal.parameters["execution_phase"]
+        == "clocking"
+    )
+
+    approach = executor.step(
+        _status(
+            clocking.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
+    )
+
+    assert approach.phase == "APPROACH"
+    assert approach.primitive_goal is not None
+    assert (
+        approach.primitive_goal.parameters["execution_phase"]
+        == "approach"
+    )
+
+
+def test_clocking_lost_returns_to_clocking_before_retrying_approach() -> None:
+    executor = ParallelAssemblyExecutor(
+        _plan((_action(),)),
+        execution_id="clocking-recovery",
+        align_retry_count=1,
+    )
+
+    approach = _single_goal_for_phase(executor, "APPROACH")
+
+    retreat = executor.step(
+        _status(
+            approach.goal_id,
+            "align_faces",
+            "failed",
+            code="CLOCKING_LOST",
+        )
+    )
+
+    assert not retreat.done
+    assert retreat.phase == "RETREAT"
+    assert retreat.primitive_goal is not None
+    assert retreat.primitive_goal.goal_id == (
+        "clocking-recovery-w0-a0-retreat-r1"
+    )
+    assert retreat.primitive_goal.parameters["execution_phase"] == "retreat"
+
+    clocking = executor.step(
+        _status(
+            retreat.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
+    )
+
+    assert clocking.phase == "CLOCKING"
+    assert clocking.primitive_goal is not None
+    assert clocking.primitive_goal.goal_id == (
+        "clocking-recovery-w0-a0-clocking-r1"
+    )
+
+    reapproach = executor.step(
+        _status(
+            clocking.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
+    )
+
+    assert reapproach.phase == "APPROACH"
+    assert reapproach.primitive_goal is not None
+    assert reapproach.primitive_goal.goal_id == (
+        "clocking-recovery-w0-a0-approach-r1"
+    )
+
+
+def test_clocking_recovery_does_not_reclock_peer_already_at_contact() -> None:
+    executor = ParallelAssemblyExecutor(
+        _plan((_action("m1", "m0"), _action("m2", "m0"))),
+        execution_id="parallel-clocking-recovery",
+        align_retry_count=1,
+        max_concurrent_alignments_per_wave=0,
+    )
+
+    _, first_align = _succeed_parallel_phase(
+        executor,
+        executor.step(),
+        2,
+    )
+    _, first_clocking = _succeed_parallel_phase(
+        executor,
+        first_align,
+        2,
+    )
+    _, first_approach = _succeed_parallel_phase(
+        executor,
+        first_clocking,
+        2,
+    )
+
+    a0 = first_approach.primitive_goal
+    assert a0 is not None
+
+    second = executor.step(
+        _status(
+            a0.goal_id,
+            "align_faces",
+            "accepted",
+        )
+    )
+
+    a1 = second.primitive_goal
+    assert a1 is not None
+
+    executor.step(
+        _status(
+            a1.goal_id,
+            "align_faces",
+            "accepted",
+        )
+    )
+
+    retreat = executor.step(
+        {
+            "statuses": [
+                _status(
+                    a0.goal_id,
+                    "align_faces",
+                    "succeeded",
+                ),
+                _status(
+                    a1.goal_id,
+                    "align_faces",
+                    "failed",
+                    code="CLOCKING_LOST",
+                ),
+            ]
+        }
+    )
+
+    # a0 is already at good contact. Only a1 may back away.
+    assert retreat.phase == "RETREAT"
+    assert retreat.primitive_goal is not None
+    assert retreat.primitive_goal.goal_id == (
+        "parallel-clocking-recovery-w0-a1-retreat-r1"
+    )
+
+    clocking = executor.step(
+        _status(
+            retreat.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
+    )
+
+    assert clocking.phase == "CLOCKING"
+    assert clocking.primitive_goal is not None
+    assert clocking.primitive_goal.goal_id == (
+        "parallel-clocking-recovery-w0-a1-clocking-r1"
+    )
+
+    reapproach = executor.step(
+        _status(
+            clocking.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
+    )
+
+    assert reapproach.phase == "APPROACH"
+    assert reapproach.primitive_goal is not None
+    assert reapproach.primitive_goal.goal_id == (
+        "parallel-clocking-recovery-w0-a1-approach-r1"
+    )
+
+    dock = executor.step(
+        _status(
+            reapproach.primitive_goal.goal_id,
+            "align_faces",
+            "succeeded",
+        )
+    )
+
+    assert dock.phase == "DOCK"
+    assert dock.primitive_goal is not None
+    assert dock.primitive_goal.goal_id.endswith("a0-dock")

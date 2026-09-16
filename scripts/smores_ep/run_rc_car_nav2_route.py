@@ -51,6 +51,18 @@ def parser():
         ),
     )
     p.add_argument("--action-timeout-s", type=float, default=900.0)
+    p.add_argument(
+        "--accept-position-m",
+        type=float,
+        default=None,
+        help="Optional early physical position tolerance for explicit goals.",
+    )
+    p.add_argument(
+        "--accept-yaw-rad",
+        type=float,
+        default=None,
+        help="Optional early physical yaw tolerance for explicit goals.",
+    )
     p.add_argument("--result-json", type=Path)
     p.add_argument("--dataset-path", type=Path)
     p.add_argument("--episode-id", default="")
@@ -131,11 +143,6 @@ def main():
         for value in explicit_goal_values
     )
 
-    if args.route_json is not None and explicit_goal_mode:
-        raise ValueError(
-            "--route-json cannot be combined with explicit --goal-* options"
-        )
-
     if explicit_goal_mode and not all(
         value is not None
         for value in explicit_goal_values
@@ -154,9 +161,13 @@ def main():
         if args.route_json is not None
         else {}
     )
-    explicit_route_mode = bool(composite_route)
+    # A composite route can describe the OccupancyGrid without forcing
+    # Nav2 through every sampled waypoint.  When an explicit goal is also
+    # supplied, keep the composite map but use NavigateToPose.
+    composite_map_mode = bool(composite_route)
+    explicit_route_mode = composite_map_mode and not explicit_goal_mode
 
-    if explicit_route_mode:
+    if composite_map_mode:
         margin_m = 0.75
         xs = [pose[0] for pose in composite_route]
         ys = [pose[1] for pose in composite_route]
@@ -172,13 +183,61 @@ def main():
             if isinstance(raw_bounds, list) and len(raw_bounds) == 4
             else default_bounds
         )
+        raw_start_pad = composite_payload.get(
+            "start_pad_bounds_xy_m"
+        )
+        start_pad_bounds = (
+            tuple(float(value) for value in raw_start_pad)
+            if isinstance(raw_start_pad, list)
+            and len(raw_start_pad) == 4
+            else (
+                composite_route[0][0] - 0.55,
+                composite_route[0][0] + 0.30,
+                composite_route[0][1] - 0.60,
+                composite_route[0][1] + 0.60,
+            )
+        )
+
+        baseline_layout = rc_car_planar_obstacle_layout(args.seed)
+        raw_free_rectangles = composite_payload.get(
+            "free_rectangles_xy_m",
+            [],
+        )
+        free_rectangles = tuple(
+            (
+                float(rectangle[0]),
+                float(rectangle[1]),
+                float(rectangle[2]),
+                float(rectangle[3]),
+            )
+            for rectangle in raw_free_rectangles
+            if isinstance(rectangle, (list, tuple))
+            and len(rectangle) == 4
+        )
+
+        raw_footprint = composite_payload.get("vehicle_footprint")
+        vehicle_footprint = (
+            {
+                str(key): float(value)
+                for key, value in raw_footprint.items()
+            }
+            if isinstance(raw_footprint, dict)
+            else dict(baseline_layout["vehicle_footprint"])
+        )
+
         raw_cones = composite_payload.get("cone_centers_xy_m", [])
         cone_centers = (
             tuple((float(point[0]), float(point[1])) for point in raw_cones)
             if isinstance(raw_cones, list)
             else ()
         )
-        gx, gy, gyaw = composite_route[-1]
+        if explicit_goal_mode:
+            gx = float(args.goal_x)
+            gy = float(args.goal_y)
+            gyaw = float(args.goal_yaw)
+        else:
+            gx, gy, gyaw = composite_route[-1]
+
         layout = {
             "track_profile": "composite_waypoints",
             "has_curve": any(
@@ -187,12 +246,8 @@ def main():
                 for index in range(1, len(composite_route))
             ),
             "platform_bounds_xy_m": platform_bounds,
-            "start_pad_bounds_xy_m": (
-                composite_route[0][0] - 0.55,
-                composite_route[0][0] + 0.30,
-                composite_route[0][1] - 0.60,
-                composite_route[0][1] + 0.60,
-            ),
+            "start_pad_bounds_xy_m": start_pad_bounds,
+            "free_rectangles_xy_m": free_rectangles,
             "centerline_xy_m": tuple((x, y) for x, y, _ in composite_route),
             "corridor_width_m": float(
                 composite_payload.get("corridor_width_m", 1.10)
@@ -201,6 +256,7 @@ def main():
             "cone_radius_m": float(
                 composite_payload.get("cone_radius_m", 0.05)
             ),
+            "vehicle_footprint": vehicle_footprint,
             "goal_xyyaw": (gx, gy, gyaw),
             "finish_x_m": gx,
             "finish_y_m": gy,
@@ -693,6 +749,21 @@ def main():
                 for v in layout["start_pad_bounds_xy_m"]
             ]
 
+            free_rectangles = tuple(
+                (
+                    float(rectangle[0]),
+                    float(rectangle[1]),
+                    float(rectangle[2]),
+                    float(rectangle[3]),
+                )
+                for rectangle in layout.get(
+                    "free_rectangles_xy_m",
+                    (),
+                )
+                if isinstance(rectangle, (list, tuple))
+                and len(rectangle) == 4
+            )
+
             if cones is None:
                 cones = tuple(
                     (float(x), float(y))
@@ -782,9 +853,17 @@ def main():
                         <= road_half
                     )
 
+                    on_extra_free = any(
+                        rx0 <= x <= rx1
+                        and ry0 <= y <= ry1
+                        for rx0, rx1, ry0, ry1
+                        in free_rectangles
+                    )
+
                     if not (
                         on_start_pad
                         or on_road
+                        or on_extra_free
                     ):
                         continue
 
@@ -906,6 +985,22 @@ def main():
             goal = NavigateToPose.Goal()
             goal.pose = stamped_pose(gx, gy, gyaw)
 
+            rc_car_bt = (
+                SCRIPT_DIR.parent.parent
+                / "mssr_ws"
+                / "src"
+                / "mssr_expert"
+                / "config"
+                / "smores_rc_car_nav_to_pose.xml"
+            )
+
+            if not rc_car_bt.is_file():
+                raise RuntimeError(
+                    f"RC-Car Nav2 behavior tree not found: {rc_car_bt}"
+                )
+
+            goal.behavior_tree = str(rc_car_bt)
+
         node.status(
             False,
             False,
@@ -982,6 +1077,40 @@ def main():
         )
 
         physical_finish_success = False
+        coarse_goal_success = False
+        coarse_goal_metrics = None
+
+        def coarse_explicit_goal_metrics():
+            if (
+                not explicit_goal_mode
+                or args.accept_position_m is None
+                or args.accept_yaw_rad is None
+                or node._odom_pose is None
+            ):
+                return None
+
+            x_m, y_m, yaw_rad = node._odom_pose
+
+            position_error_m = math.hypot(
+                x_m - gx,
+                y_m - gy,
+            )
+
+            yaw_error_rad = math.atan2(
+                math.sin(gyaw - yaw_rad),
+                math.cos(gyaw - yaw_rad),
+            )
+
+            return {
+                "position_error_m": position_error_m,
+                "yaw_error_rad": yaw_error_rad,
+                "accepted": (
+                    position_error_m
+                    <= float(args.accept_position_m)
+                    and abs(yaw_error_rad)
+                    <= float(args.accept_yaw_rad)
+                ),
+            }
 
         while (
             rclpy.ok()
@@ -992,6 +1121,40 @@ def main():
                 node,
                 timeout_sec=0.10,
             )
+
+            coarse_goal_metrics = (
+                coarse_explicit_goal_metrics()
+            )
+
+            if (
+                coarse_goal_metrics is not None
+                and coarse_goal_metrics["accepted"]
+            ):
+                coarse_goal_success = True
+
+                node.get_logger().warn(
+                    "COARSE NAV2 GOAL ACCEPTED: "
+                    f"position_error="
+                    f"{coarse_goal_metrics['position_error_m']:.3f}m, "
+                    f"yaw_error="
+                    f"{math.degrees(coarse_goal_metrics['yaw_error_rad']):+.1f}deg"
+                )
+
+                cancel_future = handle.cancel_goal_async()
+
+                rclpy.spin_until_future_complete(
+                    node,
+                    cancel_future,
+                    timeout_sec=2.0,
+                )
+
+                rclpy.spin_until_future_complete(
+                    node,
+                    future,
+                    timeout_sec=2.0,
+                )
+
+                break
 
             if (
                 not (explicit_goal_mode or explicit_route_mode)
@@ -1027,7 +1190,31 @@ def main():
 
                 break
 
-        if physical_finish_success:
+        # The action could finish between loop iterations, so perform
+        # one last physical tolerance check before interpreting status.
+        if not coarse_goal_success:
+            coarse_goal_metrics = (
+                coarse_explicit_goal_metrics()
+            )
+            coarse_goal_success = bool(
+                coarse_goal_metrics is not None
+                and coarse_goal_metrics["accepted"]
+            )
+
+        if coarse_goal_success:
+            if future.done() and future.result() is not None:
+                status = int(
+                    future.result().status
+                )
+            else:
+                status = int(
+                    GoalStatus.STATUS_CANCELING
+                )
+
+            success = True
+            completion_source = "coarse_explicit_goal"
+
+        elif physical_finish_success:
             if future.done() and future.result() is not None:
                 status = int(
                     future.result().status
@@ -1109,6 +1296,12 @@ def main():
             )
         )
 
+        if completion_source == "coarse_explicit_goal":
+            message = (
+                "RC-Car8 entered coarse "
+                "pre-reconfiguration goal region."
+            )
+
         for _ in range(5):
             node.status(
                 True,
@@ -1134,6 +1327,7 @@ def main():
         result["message"] = message
         result["completion_source"] = completion_source
         result["finish_validation"] = node.finish_metrics()
+        result["coarse_goal_validation"] = coarse_goal_metrics
 
         rc = 0 if success else 1
 

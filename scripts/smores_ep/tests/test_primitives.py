@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from smores_ep.control.teleop import InternalMotionMode, SmoresCommand
+from smores_ep.control.pan_tilt import ContinuousAngleTracker
 from smores_ep.control.differential_drive import (
     PlanarPose,
     twist_to_wheel_rates,
@@ -446,12 +447,16 @@ class _FakeState:
 
 
 class _FakeStateReader:
+    def __init__(self) -> None:
+        self.pan_angle_tracker = ContinuousAngleTracker()
+
     def read(self) -> _FakeState:
         return _FakeState()
 
 
 class _MutableStateReader:
     def __init__(self, tilt_rad: float = 0.0, pan_rad: float = 0.0) -> None:
+        self.pan_angle_tracker = ContinuousAngleTracker()
         self.state = SimpleNamespace(
             pan_joint_rad=pan_rad,
             # Isaac's articulation state and the public tilt convention use
@@ -465,6 +470,7 @@ class _MutableStateReader:
 
 class _FakeDynamicArticulation:
     def __init__(self) -> None:
+        self.pan_angle_tracker = ContinuousAngleTracker()
         self.state = SimpleNamespace(pan_joint_rad=0.0, tilt_joint_rad=0.0)
         self.targets: dict[str, float] = {}
 
@@ -559,6 +565,34 @@ def _goal(
     parameters: dict[str, object],
 ) -> PrimitiveGoal:
     return PrimitiveGoal(goal_id, primitive, module_ids, parameters)
+
+
+@pytest.mark.parametrize("phase", ["reach", "align", "approach"])
+def test_top_parent_hold_survives_alignment_admission_and_motion(phase) -> None:
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={"mobile": "/M", "target": "/T"},
+        states={"mobile": _MutableStateReader(),
+                "target": _MutableStateReader(pan_rad=0.4, tilt_rad=0.13)},
+        docking=_FakeContactDocking(),
+    )
+    executor._planar_pose = lambda _: PlanarPose(0.0, 0.0, 0.0)
+    executor._face_alignment_target = lambda *_: PlanarPose(0.2, 0.0, 0.0)
+    executor._retain_structure_targets(("target",))
+    hold = executor.compose_with_baseline({}, {})["target"]
+    goal = _goal("align-" + phase, PrimitiveName.ALIGN_FACES,
+                 ("mobile", "target"),
+                 {"face_a": "BOTTOM", "face_b": "TOP", "execution_phase": phase})
+    executor.submit(goal, 0.0)
+    # The file bridge can admit a goal between controller ticks.
+    assert executor.compose_with_baseline({}, {})["target"] == hold
+    step = executor.step(0.1)
+    assert step.statuses[0].state is PrimitiveState.RUNNING
+    assert executor.compose_with_baseline({}, step.commands)["target"] == hold
+    executor.cancel(goal.goal_id, 0.2)
+    assert executor.compose_with_baseline({}, {})["target"] == hold
 
 
 def test_dock_closes_contact_forward_before_creating_joint() -> None:
@@ -724,12 +758,30 @@ def test_collective_face_phases_do_not_cross_their_barriers() -> None:
     align = phase_goal("align")
     executor.submit(align, 0.2)
     aligned = executor.step(0.3)
+
     assert aligned.commands == {}
     assert aligned.statuses[0].code == "FACES_ALIGNED"
 
+    clocking = phase_goal("clocking")
+    executor.submit(clocking, 0.4)
+
+    settle_1 = executor.step(0.5)
+    settle_2 = executor.step(0.6)
+
+    assert settle_1.statuses[0].code == "SETTLING_CLOCKING"
+    assert settle_2.statuses[0].code == "SETTLING_CLOCKING"
+    assert "module_a" not in settle_1.commands
+    assert "module_a" not in settle_2.commands
+
+    clocked = executor.step(0.7)
+
+    assert clocked.commands == {}
+    assert clocked.statuses[0].code == "CLOCKING_ALIGNED"
+
     approach = phase_goal("approach")
-    executor.submit(approach, 0.4)
-    approaching = executor.step(0.5)
+    executor.submit(approach, 0.8)
+    approaching = executor.step(0.9)
+
     assert approaching.statuses[0].code == "CLOSING_CONTACT"
     assert approaching.commands["module_a"].linear_x_m_s < 0.0
 
@@ -787,8 +839,9 @@ def test_completed_contact_approach_never_runs_with_zero_command() -> None:
     assert result.statuses[0].code == "CONTACT_POSE_INVALID"
 
 
-def test_top_bottom_alignment_corrects_pan_clocking_before_contact() -> None:
-    """A driven TOP disk must be reclocked before it can dock as a chain."""
+
+def test_aligned_proximal_contact_stall_stops_push_for_recovery() -> None:
+    """An aligned blocked connector must not push a movable parent forever."""
 
     from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
 
@@ -796,12 +849,12 @@ def test_top_bottom_alignment_corrects_pan_clocking_before_contact() -> None:
         stage=object(),
         module_roots={"module_a": "/A", "module_b": "/B"},
         states={
-            "module_a": _MutableStateReader(),
-            "module_b": _MutableStateReader(),
+            "module_a": _FakeStateReader(),
+            "module_b": _FakeStateReader(),
         },
         docking=_FakeDocking(),  # type: ignore[arg-type]
     )
-    angle = math.radians(30.0)
+
     mobile_face = DockingFacePose(
         DockingFace("module_a", "TOP", "/A/TOP", "/A/body"),
         (0.0, 0.0, 0.0),
@@ -810,32 +863,89 @@ def test_top_bottom_alignment_corrects_pan_clocking_before_contact() -> None:
     )
     target_face = DockingFacePose(
         DockingFace("module_b", "BOTTOM", "/B/BOTTOM", "/B/body"),
-        (0.001, 0.0, 0.0),
+        (0.0055, 0.0, 0.0),
         (-1.0, 0.0, 0.0),
-        (0.0, math.cos(angle), math.sin(angle)),
+        (0.0, 1.0, 0.0),
     )
+
     executor._face_pose = (  # type: ignore[method-assign]
         lambda module_id, _face: (
             mobile_face if module_id == "module_a" else target_face
         )
     )
+    executor._planar_pose = (  # type: ignore[method-assign]
+        lambda _module_id: PlanarPose(0.0, 0.0, 0.0)
+    )
+    executor._face_alignment_target = (  # type: ignore[method-assign]
+        lambda *_args: PlanarPose(0.10, 0.0, 0.0)
+    )
+
     goal = _goal(
-        "clock-top-before-dock",
+        "blocked-aligned-contact",
         PrimitiveName.ALIGN_FACES,
         ("module_a", "module_b"),
-        {"face_a": "TOP", "face_b": "BOTTOM"},
+        {
+            "face_a": "TOP",
+            "face_b": "BOTTOM",
+            "execution_phase": "approach",
+            "top_bottom_contact_tolerance_m": 0.004,
+            "contact_quality_planar_tolerance_m": 0.0015,
+            "contact_quality_retry_count": 2,
+        },
+    )
+
+    executor.submit(goal, 0.0)
+
+    first = executor.step(0.10)
+    assert first.statuses[0].state is PrimitiveState.RUNNING
+    assert first.statuses[0].code == "CLOSING_CONTACT"
+    assert first.commands["module_a"].linear_x_m_s != 0.0
+
+    stalled = executor.step(0.90)
+    assert stalled.commands == {}
+    assert stalled.statuses[0].state is PrimitiveState.FAILED
+    assert stalled.statuses[0].code == "CONTACT_POSE_INVALID"
+    assert "stopped closing" in stalled.statuses[0].message
+
+
+
+@pytest.mark.parametrize("preheld", [False, True])
+def test_top_bottom_clocking_is_nonbinding_before_contact(
+    preheld: bool,
+) -> None:
+    executor, _target_state, set_clocking_deg = _clocking_sequence_executor()
+
+    # Deliberately far outside the generic 10 degree clocking tolerance.
+    set_clocking_deg(30.0)
+
+    if preheld:
+        executor._retain_structure_targets(("module_a",))
+
+    goal = _goal(
+        "top-bottom-nonbinding-clocking",
+        PrimitiveName.ALIGN_FACES,
+        ("module_a", "module_b"),
+        {
+            "face_a": "BOTTOM",
+            "face_b": "TOP",
+            "execution_phase": "clocking",
+            "contact_approach_feedback": True,
+        },
     )
 
     assert executor.submit(goal, 0.0).state is PrimitiveState.ACCEPTED
-    result = executor.step(0.1)
 
-    assert result.statuses[0].state is PrimitiveState.RUNNING
-    assert result.statuses[0].code == "ALIGNING_CLOCKING"
-    command = result.commands["module_a"]
-    assert command.internal_motion is InternalMotionMode.PAN
-    assert command.pan_target_rad == pytest.approx(angle)
-    assert "internal_motion:module_a" in executor._resource_owners
+    # TOP/BOTTOM clocking is telemetry only. The clocking barrier may settle,
+    # but it must not command a corrective PAN rotation.
+    first = executor.step(0.1)
 
+    assert first.statuses[0].state is PrimitiveState.RUNNING
+    assert first.statuses[0].code == "SETTLING_CLOCKING"
+
+    for command in first.commands.values():
+        assert command.linear_x_m_s == pytest.approx(0.0)
+        assert command.angular_z_rad_s == pytest.approx(0.0)
+        assert command.pan_velocity_rad_s == pytest.approx(0.0)
 
 def test_valid_but_decentered_contact_gets_one_bounded_parking_retry() -> None:
     """A quality retry backs away once, then falls back to the hard gate."""
@@ -1694,6 +1804,10 @@ def test_operational_pan_rate_limits_steering_and_holds_entire_structure() -> No
     first = executor.step(0.1)
     assert first.commands["module_a"].pan_target_rad == pytest.approx(0.05)
     assert first.commands["module_a"].tilt_target_rad == pytest.approx(-1.25)
+    retained_a = executor._retained_internal_commands["module_a"]
+    assert retained_a.internal_motion is InternalMotionMode.STRUCTURAL_HOLD
+    assert retained_a.pan_target_rad == pytest.approx(0.05)
+    assert retained_a.tilt_target_rad == pytest.approx(-1.25)
     composed = executor.compose_with_baseline({}, first.commands)
     assert (
         composed["module_b"].internal_motion
@@ -1705,6 +1819,10 @@ def test_operational_pan_rate_limits_steering_and_holds_entire_structure() -> No
     state_a.state.pan_joint_rad = 0.05
     second = executor.step(0.2)
     assert second.commands["module_a"].pan_target_rad == pytest.approx(0.10)
+    assert (
+        executor._retained_internal_commands["module_a"].pan_target_rad
+        == pytest.approx(0.10)
+    )
 
 
 def test_tilt_servo_error_limit_softens_a_large_fold_target() -> None:
@@ -1720,6 +1838,7 @@ def test_tilt_servo_error_limit_softens_a_large_fold_target() -> None:
         },
         docking=_FakeDocking(),  # type: ignore[arg-type]
     )
+    executor._retain_structure_targets(("module_a",))
     goal = _goal(
         "soft-fold",
         PrimitiveName.SET_TILT,
@@ -1738,6 +1857,10 @@ def test_tilt_servo_error_limit_softens_a_large_fold_target() -> None:
     assert first.statuses[0].feedback["commanded_target_rad"] == pytest.approx(
         -0.35
     )
+    retained = executor._retained_internal_commands["module_a"]
+    assert retained.internal_motion is InternalMotionMode.STRUCTURAL_HOLD
+    assert retained.pan_target_rad == pytest.approx(0.2)
+    assert retained.tilt_target_rad == pytest.approx(-0.35)
 
 
 def test_coordinated_tilt_holds_fast_member_for_slower_support() -> None:
@@ -2171,3 +2294,248 @@ def test_coordinated_tilt_at_target_waits_for_the_complete_group() -> None:
         "JOINT_TARGET_REACHED"
     }
     assert not executor.active_goals
+
+@pytest.mark.parametrize(
+    ("current_pan", "retained_target", "expected_target"),
+    (
+        (0.05, 2.0 * math.pi - 0.08, -0.08),
+        (2.0 * math.pi - 0.05, 0.08, 2.0 * math.pi + 0.08),
+    ),
+)
+def test_structural_hold_pan_uses_nearest_periodic_target(
+    current_pan,
+    retained_target,
+    expected_target,
+):
+    """A structural PAN hold must never correct through the long revolution."""
+    from smores_ep.config.geometry import SmoresGeometry
+    from smores_ep.isaac.dynamic_stage import DynamicDriveController
+
+    articulation = _FakeDynamicArticulation()
+    articulation.state.pan_joint_rad = current_pan
+
+    controller = DynamicDriveController(
+        articulation,
+        SmoresGeometry(),
+        max_wheel_speed_rad_s=2.4,
+    )
+
+    controller.apply(
+        SmoresCommand(
+            pan_target_rad=retained_target,
+            tilt_target_rad=0.0,
+            internal_motion=InternalMotionMode.STRUCTURAL_HOLD,
+        )
+    )
+
+    logical_target = articulation.targets["pan_logical_target_rad"]
+
+    assert logical_target == pytest.approx(expected_target)
+    assert abs(logical_target - current_pan) <= math.pi
+
+def _clocking_sequence_executor():
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    target_state = _MutableStateReader(pan_rad=0.0)
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={"module_a": "/A", "module_b": "/B"},
+        states={
+            "module_a": _MutableStateReader(),
+            "module_b": target_state,
+        },
+        docking=_FakeDocking(),  # type: ignore[arg-type]
+    )
+
+    faces = {
+        "mobile": DockingFacePose(
+            DockingFace("module_a", "BOTTOM", "/A/BOTTOM", "/A/body"),
+            (0.040, 0.0, 0.0),
+            (-1.0, 0.0, 0.0),
+            (0.0, 1.0, 0.0),
+        ),
+        "target": DockingFacePose(
+            DockingFace("module_b", "TOP", "/B/TOP", "/B/body"),
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (
+                0.0,
+                math.cos(math.radians(20.0)),
+                math.sin(math.radians(20.0)),
+            ),
+        ),
+    }
+
+    executor._face_pose = (  # type: ignore[method-assign]
+        lambda module_id, _face: (
+            faces["mobile"]
+            if module_id == "module_a"
+            else faces["target"]
+        )
+    )
+    executor._planar_pose = (  # type: ignore[method-assign]
+        lambda _module_id: PlanarPose(0.040, 0.0, 0.0)
+    )
+    executor._face_alignment_target = (  # type: ignore[method-assign]
+        lambda *_args: PlanarPose(0.0, 0.0, 0.0)
+    )
+    executor._face_alignment_staging_target = (  # type: ignore[method-assign]
+        lambda *_args, **_kwargs: PlanarPose(0.040, 0.0, 0.0)
+    )
+
+    def set_clocking_deg(angle_deg: float) -> None:
+        angle = math.radians(angle_deg)
+        faces["target"] = DockingFacePose(
+            DockingFace("module_b", "TOP", "/B/TOP", "/B/body"),
+            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
+            (0.0, math.cos(angle), math.sin(angle)),
+        )
+
+    return executor, target_state, set_clocking_deg
+
+
+
+def test_explicit_clocking_phase_does_not_force_pan_for_top_bottom() -> None:
+    executor, _target_state, set_clocking_deg = _clocking_sequence_executor()
+
+    set_clocking_deg(30.0)
+
+    goal = _goal(
+        "explicit-clocking",
+        PrimitiveName.ALIGN_FACES,
+        ("module_a", "module_b"),
+        {
+            "face_a": "BOTTOM",
+            "face_b": "TOP",
+            "execution_phase": "clocking",
+            "contact_approach_feedback": True,
+        },
+    )
+
+    assert executor.submit(goal, 0.0).state is PrimitiveState.ACCEPTED
+
+    result = executor.step(0.1)
+
+    assert result.statuses[0].state is PrimitiveState.RUNNING
+    assert result.statuses[0].code == "SETTLING_CLOCKING"
+
+    # No locomotion and, crucially, no active PAN correction for TOP/BOTTOM.
+    for command in result.commands.values():
+        assert command.linear_x_m_s == pytest.approx(0.0)
+        assert command.angular_z_rad_s == pytest.approx(0.0)
+        assert command.pan_velocity_rad_s == pytest.approx(0.0)
+
+
+def test_top_bottom_approach_continues_when_clocking_exceeds_tolerance() -> None:
+    executor, _target_state, set_clocking_deg = _clocking_sequence_executor()
+
+    # TOP/BOTTOM now has the same non-binding clocking semantics as the
+    # rotating lateral connector pairs.
+    set_clocking_deg(20.0)
+
+    goal = _goal(
+        "approach-with-nonbinding-clocking",
+        PrimitiveName.ALIGN_FACES,
+        ("module_a", "module_b"),
+        {
+            "face_a": "BOTTOM",
+            "face_b": "TOP",
+            "execution_phase": "approach",
+            "contact_approach_feedback": True,
+        },
+    )
+
+    assert executor.submit(goal, 0.0).state is PrimitiveState.ACCEPTED
+
+    result = executor.step(0.1)
+
+    # It must keep approaching instead of emitting CLOCKING_LOST.
+    assert result.statuses[0].state is PrimitiveState.RUNNING
+    assert result.statuses[0].code != "CLOCKING_LOST"
+    assert "module_a" in result.commands
+
+    command = result.commands["module_a"]
+
+    # Steering remains allowed during approach.
+    assert command.linear_x_m_s != pytest.approx(0.0)
+
+    # But the approach itself does not issue a PAN velocity correction.
+    assert command.pan_velocity_rad_s == pytest.approx(0.0)
+
+def test_explicit_retreat_backs_away_straight_before_reclocking() -> None:
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={"mobile": "/M", "target": "/T"},
+        states={
+            "mobile": _MutableStateReader(),
+            "target": _MutableStateReader(),
+        },
+        docking=_FakeContactDocking(),  # type: ignore[arg-type]
+    )
+
+    current = {"pose": PlanarPose(0.0, 0.0, 0.0)}
+
+    executor._planar_pose = (  # type: ignore[method-assign]
+        lambda module_id: (
+            current["pose"]
+            if module_id == "mobile"
+            else PlanarPose(0.0, 0.0, 0.0)
+        )
+    )
+    executor._face_alignment_target = (  # type: ignore[method-assign]
+        lambda *_args: PlanarPose(0.0, 0.0, 0.0)
+    )
+    executor._face_alignment_staging_target = (  # type: ignore[method-assign]
+        lambda *_args, **_kwargs: PlanarPose(0.040, 0.0, 0.0)
+    )
+
+    mobile_face = DockingFacePose(
+        DockingFace("mobile", "BOTTOM", "/M/BOTTOM", "/M/body"),
+        (0.0, 0.0, 0.0),
+        (-1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+    )
+    target_face = DockingFacePose(
+        DockingFace("target", "TOP", "/T/TOP", "/T/body"),
+        (0.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+    )
+
+    executor._face_pose = (  # type: ignore[method-assign]
+        lambda module_id, _face: (
+            mobile_face if module_id == "mobile" else target_face
+        )
+    )
+
+    goal = _goal(
+        "clocking-recovery-retreat",
+        PrimitiveName.ALIGN_FACES,
+        ("mobile", "target"),
+        {
+            "face_a": "BOTTOM",
+            "face_b": "TOP",
+            "execution_phase": "retreat",
+            "contact_approach_feedback": True,
+        },
+    )
+
+    assert executor.submit(goal, 0.0).state is PrimitiveState.ACCEPTED
+
+    backing = executor.step(0.1)
+
+    assert backing.statuses[0].state is PrimitiveState.RUNNING
+    assert backing.statuses[0].code == "RETREATING"
+    assert backing.commands["mobile"].linear_x_m_s > 0.0
+    assert backing.commands["mobile"].angular_z_rad_s == pytest.approx(0.0)
+
+    current["pose"] = PlanarPose(0.040, 0.0, 0.0)
+
+    finished = executor.step(0.2)
+
+    assert finished.commands == {}
+    assert finished.statuses[0].state is PrimitiveState.SUCCEEDED
+    assert finished.statuses[0].code == "RETREAT_COMPLETE"

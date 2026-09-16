@@ -732,8 +732,13 @@ def test_mobile_ready_posture_deploys_arched_pan_support_base() -> None:
         ("end_effector", "tilt"): pytest.approx(
             1.5526449025741555
         ),
-        ("end_effector", "pan"): pytest.approx(0.0),
     }
+
+    # PAN is intentionally omitted from mobile_ready.
+    # After self-reconfiguration the physical docking PAN is recaptured as
+    # the new reference; forcing end_effector.pan=0 here would overwrite
+    # that recovered alignment.
+    assert ("end_effector", "pan") not in by_role
 
 def test_mobile_manipulator_translates_on_longitudinal_left_right_wheels() -> None:
     library = _library()

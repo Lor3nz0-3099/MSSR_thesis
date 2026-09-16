@@ -45,16 +45,29 @@ class DynamicDriveController:
         self._articulation = articulation
         self._geometry = geometry
         self._max_wheel_speed_rad_s = max_wheel_speed_rad_s
-        self._pan_angle = ContinuousAngleTracker()
         self._pan_servo_gain_s = 4.0
-        initial = self._articulation.read()
-        self._pan_position_rad = self._pan_angle.update(
-            initial.pan_joint_rad
-        )
+        self.initialize_from_measured_posture()
+
+    def initialize_from_measured_posture(self) -> None:
+        """Initialize software and drive targets without writing joint poses."""
+        measured = self._articulation.read()
+        self._pan_angle = ContinuousAngleTracker()
+        self._pan_position_rad = self._pan_angle.update(measured.pan_joint_rad)
         self._pan_target_rad = self._pan_position_rad
-        self._tilt_target_rad = -initial.tilt_joint_rad
+        self._tilt_target_rad = -measured.tilt_joint_rad
+        self._articulation.set_targets(
+            left_wheel_velocity_rad_s=0.0,
+            right_wheel_velocity_rad_s=0.0,
+            tilt_joint_position_rad=measured.tilt_joint_rad,
+            pan_joint_velocity_rad_s=0.0,
+            pan_logical_target_rad=self._pan_target_rad,
+        )
 
     def apply(self, command: SmoresCommand) -> tuple[float, float]:
+        if command.reset_internal_targets:
+            self.initialize_from_measured_posture()
+            return 0.0, 0.0
+
         rates = twist_to_wheel_rates(
             command.linear_x_m_s,
             command.angular_z_rad_s,
@@ -73,9 +86,69 @@ class DynamicDriveController:
             self._articulation.read().pan_joint_rad
         )
         if command.internal_motion is InternalMotionMode.PAN:
-            self._pan_target_rad = command.pan_target_rad
+            # PAN is a continuous periodic coordinate. A position command
+            # describes an orientation, not a requested number of full turns.
+            # Select the equivalent 2*pi branch closest to the measured
+            # continuous position. Intentional continuous rotation belongs to
+            # PAN_VELOCITY instead.
+            requested_pan_target = command.pan_target_rad
+            pan_error = requested_pan_target - self._pan_position_rad
+            self._pan_target_rad = (
+                self._pan_position_rad
+                + math.atan2(math.sin(pan_error), math.cos(pan_error))
+            )
+
+            # Temporary branch diagnostic. Print only when the selected
+            # equivalent target differs by one or more complete turns, and
+            # only when that branch changes.
+            branch_turns = int(
+                round(
+                    (
+                        self._pan_target_rad
+                        - requested_pan_target
+                    )
+                    / (2.0 * math.pi)
+                )
+            )
+            previous_branch = getattr(
+                self,
+                "_last_pan_position_branch_turns",
+                None,
+            )
+            if branch_turns != previous_branch:
+                self._last_pan_position_branch_turns = branch_turns
+                if branch_turns != 0:
+                    module_root = getattr(
+                        self._articulation,
+                        "module_root",
+                        "<unknown-module>",
+                    )
+                    print(
+                        "[pan-periodic] "
+                        f"{module_root} "
+                        f"measured_cont={self._pan_position_rad:+.4f} "
+                        f"requested={requested_pan_target:+.4f} "
+                        f"applied={self._pan_target_rad:+.4f} "
+                        f"branch_turns={branch_turns:+d}"
+                    )
+
             # A steering operation belongs to the operational phase: PAN is
             # allowed to move, while TILT remains at the structural target.
+            self._tilt_target_rad = max(
+                self._geometry.tilt_min_rad,
+                min(
+                    self._geometry.tilt_max_rad,
+                    command.tilt_target_rad,
+                ),
+            )
+        elif (
+            command.internal_motion
+            is InternalMotionMode.PAN_CONTINUOUS
+        ):
+            # Explicit continuous/unwrapped position target.
+            # Unlike ordinary PAN, this mode intentionally preserves
+            # requested complete turns (for example rotate_pan_by(+4*pi)).
+            self._pan_target_rad = command.pan_target_rad
             self._tilt_target_rad = max(
                 self._geometry.tilt_min_rad,
                 min(
@@ -95,8 +168,14 @@ class DynamicDriveController:
             # Structural HOLD is deliberately different from PASSIVE.  It
             # captures both coordinates reached by a backdriven folding
             # mechanism and keeps that configuration after the pushing wheels
-            # stop.
-            self._pan_target_rad = command.pan_target_rad
+            # stop. PAN is periodic: always hold the equivalent 2*pi branch
+            # closest to the measured continuous position, otherwise a small
+            # disturbance across the wrap boundary can request a full turn.
+            pan_error = command.pan_target_rad - self._pan_position_rad
+            self._pan_target_rad = (
+                self._pan_position_rad
+                + math.atan2(math.sin(pan_error), math.cos(pan_error))
+            )
             self._tilt_target_rad = max(
                 self._geometry.tilt_min_rad,
                 min(
@@ -276,11 +355,24 @@ class ArticulationStateReader:
         # Keep normal tire contact instead of turning their docked wheels into
         # low-friction skids.
         self._set_wheel_contact_mode("wheel")
-        # All four coordinates retain a deliberate structure.  PAN is
-        # continuous, so DynamicDriveController supplies its unwrapped target
-        # on every frame; the implicit position drive provides the stiffness
-        # that the former velocity-only servo could not provide under load.
-        position_names = ("left_wheel", "right_wheel", "tilt", "pan")
+        # LEFT/RIGHT/TILT are frozen at the physical pose measured right now;
+        # nothing else re-writes their PhysX position target every frame, so
+        # a one-shot stiffness target is correct for them.  PAN is different:
+        # it is continuous/wrapped and DynamicDriveController already writes
+        # its own live logical target to the PhysX drive every single tick
+        # (via set_targets(), regardless of control mode), so PAN must never
+        # get its OWN one-shot frozen position target here -- that earlier
+        # attempt created a second, disagreeing authority over the same DOF
+        # (stale hardware target vs. the moving software target) and showed
+        # up as a persistent net torque / slow rotation. Restoring stiffness
+        # here did NOT stop the live rotation observed during folding (the
+        # real cause is upstream: whatever feeds PAN's logical target keeps
+        # re-reading the CURRENT measured angle instead of a latched one, so
+        # stiffness has nothing to hold against). PAN therefore stays
+        # damping-only here until that upstream retained-target gap is
+        # fixed; re-adding stiffness only reintroduces the frozen-target
+        # conflict without curing the rotation.
+        position_names = ("left_wheel", "right_wheel", "tilt")
         position_indices = [
             self._indices[name] for name in position_names
         ]
@@ -290,8 +382,8 @@ class ArticulationStateReader:
         ]
         drive = self._drive
         self._articulation.set_dof_gains(
-            stiffnesses=[drive.hold_stiffness_nm_per_rad] * 4,
-            dampings=[drive.hold_damping_nm_s_per_rad] * 4,
+            stiffnesses=[drive.hold_stiffness_nm_per_rad] * 3,
+            dampings=[drive.hold_damping_nm_s_per_rad] * 3,
             dof_indices=position_indices,
         )
         self._articulation.set_dof_max_efforts(
@@ -299,7 +391,6 @@ class ArticulationStateReader:
                 drive.wheel_max_effort_nm,
                 drive.wheel_max_effort_nm,
                 drive.tilt_max_effort_nm,
-                drive.pan_max_effort_nm,
             ],
             dof_indices=position_indices,
         )
@@ -308,8 +399,19 @@ class ArticulationStateReader:
             dof_indices=position_indices,
         )
         self._articulation.set_dof_velocity_targets(
-            [0.0] * 4,
+            [0.0] * 3,
             dof_indices=position_indices,
+        )
+
+        pan_index = [self._indices["pan"]]
+        self._articulation.set_dof_gains(
+            stiffnesses=[0.0],
+            dampings=[drive.hold_damping_nm_s_per_rad],
+            dof_indices=pan_index,
+        )
+        self._articulation.set_dof_max_efforts(
+            [drive.pan_max_effort_nm],
+            dof_indices=pan_index,
         )
 
         free_wheel_names = [
@@ -458,10 +560,19 @@ class ArticulationStateReader:
             [drive.internal_max_speed_rad_s] * 2,
             dof_indices=internal_indices,
         )
-        positions = self._articulation.get_dof_positions().numpy()[0]
+        # Only TILT gets a one-shot frozen position target here: nothing
+        # else re-writes it, so capturing the measured pose once is correct.
+        # PAN must never be frozen this way -- DynamicDriveController
+        # already rewrites its own live logical target to this same DOF
+        # every tick regardless of control mode, and a one-shot capture of
+        # whatever PAN happened to physically drift to (e.g. while damping-
+        # only in a prior structural_hold) would silently lock that drift
+        # in as the new "correct" position instead of the real target.
+        tilt_index = [self._indices["tilt"]]
+        position = self._articulation.get_dof_positions().numpy()[0]
         self._articulation.set_dof_position_targets(
-            [float(positions[index]) for index in internal_indices],
-            dof_indices=internal_indices,
+            [float(position[tilt_index[0]])],
+            dof_indices=tilt_index,
         )
 
     def configure_internal_drive_with_braked_wheels(
@@ -659,7 +770,7 @@ class ArticulationStateReader:
         self._articulation.set_dof_position_targets(
             [
                 tilt_joint_position_rad,
-                normalize_revolute_target(pan_logical_target_rad),
+                pan_logical_target_rad,
             ],
             dof_indices=[self._indices["tilt"], self._indices["pan"]],
         )

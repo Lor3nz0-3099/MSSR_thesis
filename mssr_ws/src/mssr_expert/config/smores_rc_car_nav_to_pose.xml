@@ -1,0 +1,76 @@
+<!--
+  RC-Car8 NavigateToPose tree.
+
+  Difference from the Nav2 Humble default:
+  - short reverse recovery FIRST;
+  - automatic replan immediately afterwards;
+  - costmap clearing only on the next failure;
+  - spin only after backing away and replanning failed;
+  - short wait is last resort.
+-->
+<root main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+
+    <RecoveryNode number_of_retries="6" name="NavigateRecovery">
+
+      <PipelineSequence name="NavigateWithReplanning">
+
+        <RateController hz="1.0">
+          <RecoveryNode number_of_retries="1" name="ComputePathToPose">
+            <ComputePathToPose
+              goal="{goal}"
+              path="{path}"
+              planner_id="GridBased"/>
+
+            <ClearEntireCostmap
+              name="ClearGlobalCostmap-Context"
+              service_name="global_costmap/clear_entirely_global_costmap"/>
+          </RecoveryNode>
+        </RateController>
+
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath
+            path="{path}"
+            controller_id="FollowPath"/>
+
+          <ClearEntireCostmap
+            name="ClearLocalCostmap-Context"
+            service_name="local_costmap/clear_entirely_local_costmap"/>
+        </RecoveryNode>
+
+      </PipelineSequence>
+
+      <ReactiveFallback name="RecoveryFallback">
+
+        <GoalUpdated/>
+
+        <RoundRobin name="RecoveryActions">
+
+          <!-- First recovery: create physical room, then NavigateRecovery
+               retries the navigation pipeline and replans. -->
+          <BackUp
+            backup_dist="0.08"
+            backup_speed="0.025"/>
+
+          <Sequence name="ClearingActions">
+            <ClearEntireCostmap
+              name="ClearLocalCostmap-Subtree"
+              service_name="local_costmap/clear_entirely_local_costmap"/>
+            <ClearEntireCostmap
+              name="ClearGlobalCostmap-Subtree"
+              service_name="global_costmap/clear_entirely_global_costmap"/>
+          </Sequence>
+
+          <!-- Rotation is deliberately after BackUp. -->
+          <Spin spin_dist="0.78"/>
+
+          <Wait wait_duration="2"/>
+
+        </RoundRobin>
+
+      </ReactiveFallback>
+
+    </RecoveryNode>
+
+  </BehaviorTree>
+</root>
