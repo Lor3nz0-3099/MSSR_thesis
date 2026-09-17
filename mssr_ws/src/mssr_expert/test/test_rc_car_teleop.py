@@ -434,6 +434,32 @@ def test_smoke_topics_are_exclusive_and_driver_is_the_verified_selected_device(t
     assert "status_topic:=/mssr/teleop_probe/run_abc123/status" in commands["teleop"]
 
 
+def test_smoke_keeps_topology_fresh_at_one_tenth_simulation_speed(tmp_path, monkeypatch):
+    from smores_ep.self_assembly_cli import build_argument_parser
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[4] / "scripts/teleop"))
+    command = smoke().runtime_commands(tmp_path, CONFIG / "smores_dualsense.yaml", "slow", 0)["isaac"]
+    args = build_argument_parser().parse_args(command[2:])
+    publish_hz = args.state_publish_hz or (5 if args.performance else 10)
+    steps_between_publications = args.physics_hz // publish_hz
+    core = runtime()
+    payload = graph().to_dict()
+    # Native publishes by physics steps; ROS polls every 0.1 wall seconds.
+    # The observed GUI run advances simulation much slower than wall time.
+    last_step = -1
+    for poll in range(31):
+        elapsed = poll * 0.1
+        physics_step = int(round(elapsed * 0.1 * args.physics_hz))
+        published_step = physics_step // steps_between_publications * steps_between_publications
+        if published_step != last_step:
+            payload["stamp"] = published_step / args.physics_hz
+            last_step = published_step
+        core.observe_graph(payload, now=10 + elapsed)
+        assert core.topology(10 + elapsed) == "rc_car8"
+    # Cached bridge messages must still lose authority when native stops.
+    core.observe_graph(payload, now=13.6)
+    assert core.topology(13.6) is None
+
+
 def test_smoke_held_height_captures_after_actual_stick_release():
     probe = smoke().HeldHeightProbe()
     status = {"controller_input": {"right_y": -1, "l2": 0, "r2": 0},

@@ -82,7 +82,8 @@ def runtime_commands(output, input_path, run_id, device_id):
     topic = f"/mssr/teleop_probe/run_{run_id}"
     return {
         "isaac": ["bash", "scripts/smores_ep/run_self_assembly.sh", "--module-count", "8",
-                  "--performance", "--physics-hz", "240", "--actuator-effort-scale", "4.0",
+                  "--performance", "--physics-hz", "240", "--state-publish-hz", "30",
+                  "--actuator-effort-scale", "4.0",
                   "--tilt-effort-scale", "8.0", "--action-file", str(action),
                   "--primitive-goal-file", str(goal), "--primitive-cancel-file", str(cancel),
                   "--primitive-status-file", str(status)],
@@ -163,6 +164,12 @@ def main():
             if predicate():
                 summary["checks"][label] = True
                 return
+        summary["failure_context"] = {
+            "phase": label,
+            "teleop_status": latest["status"],
+            "native_runtime_status": read("smores_teleop_runtime_status.json"),
+            "robot_graph_stamp": read("robot_graph.json").get("stamp"),
+        }
         raise TimeoutError(f"{label} did not produce observed acceptance evidence")
 
     def state():
@@ -185,7 +192,18 @@ def main():
             current = metrics()
             displacement = sum((current["center"][index] - before["center"][index]) * before["forward"][index]
                                for index in range(2))
-            return (state()["controller_input"][trigger] > 0.15 and not zero() and direction * displacement > 0.01)
+            status = state()
+            summary["drive_evidence"] = {
+                "direction": direction, "trigger": trigger,
+                "trigger_value": status["controller_input"][trigger],
+                "displacement_m": displacement,
+                "before_center": before["center"], "current_center": current["center"],
+                "forward": before["forward"],
+                "graph_stamp": current["stamp"],
+                "motion_enabled": status["safety"]["motion_enabled"],
+                "pan_commands": status["rc_car_effective_actions"],
+            }
+            return (status["controller_input"][trigger] > 0.15 and not zero() and direction * displacement > 0.01)
         return observed
 
     try:
