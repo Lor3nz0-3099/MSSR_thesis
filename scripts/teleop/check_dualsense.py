@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import MutableMapping
 from dataclasses import asdict
 from datetime import datetime, timezone
 import json
@@ -151,6 +152,22 @@ def build_driver_command(device_id: int, topic: str) -> list[str]:
             "-p", "sticky_buttons:=false"]
 
 
+def configure_probe_environment(environment: MutableMapping[str, str], output: Path) -> None:
+    """Validate DDS port range before cleanup or middleware initialization."""
+    value = environment.get("ROS_DOMAIN_ID", "42")
+    # Humble rcl uses strtoul(base=0): leading zeros are octal, unlike Python int.
+    if not isinstance(value, str) or re.fullmatch(r"0|[1-9][0-9]*", value) is None:
+        raise ValueError("ROS_DOMAIN_ID must be canonical ASCII decimal in [0,232]")
+    try:
+        domain = int(value)
+    except (TypeError, ValueError) as error:
+        raise ValueError("ROS_DOMAIN_ID must be an integer in [0,232]") from error
+    if not 0 <= domain <= 232:
+        raise ValueError(f"ROS_DOMAIN_ID={value} exceeds DDS port limits; use an integer in [0,232]")
+    environment.setdefault("ROS_DOMAIN_ID", "42")
+    environment["ROS_LOG_DIR"] = str(output / "ros_logs")
+
+
 def run(args, output: Path, metadata: dict) -> tuple[dict, int]:
     from runtime_cleanup import scoped_cleanup
     metadata["cleanup"] = scoped_cleanup(ROOT)
@@ -237,9 +254,11 @@ def main() -> int:
     args = parser.parse_args()
     now = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S.%fZ")
     output = ROOT / "logs/teleop/hardware_checks" / now
+    try:
+        configure_probe_environment(os.environ, output)
+    except ValueError as error:
+        parser.error(str(error))
     output.mkdir(parents=True, exist_ok=False)
-    os.environ.setdefault("ROS_DOMAIN_ID", "239")
-    os.environ["ROS_LOG_DIR"] = str(output / "ros_logs")
     metadata = {"schema": "mssr.teleop_input_verification.v1", "git_commit": subprocess.check_output(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(), "started_at": now,
         "ros_domain_id": os.environ["ROS_DOMAIN_ID"],

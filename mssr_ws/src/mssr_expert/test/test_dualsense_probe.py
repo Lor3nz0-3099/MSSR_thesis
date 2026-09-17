@@ -243,3 +243,32 @@ def test_device_preflight_does_not_claim_an_input_hardware_pass(tmp_path, monkey
     assert metadata["terminal_reason"] == "hardware_acceptance_pending"
     assert not result["input_checks_passed"]
     assert result["valid_packets"] == 0
+
+
+def test_default_probe_domain_fits_dds_ports_and_avoids_linux_ephemeral_ports(tmp_path):
+    probe = load_script("check_dualsense")
+    environment = {}
+    probe.configure_probe_environment(environment, tmp_path)
+    assert 0 <= int(environment["ROS_DOMAIN_ID"]) <= 101
+    assert environment["ROS_LOG_DIR"] == str(tmp_path / "ros_logs")
+
+
+@pytest.mark.parametrize("domain", ["0", "42", "101", "215", "232"])
+def test_valid_user_domain_is_preserved(tmp_path, domain):
+    environment = {"ROS_DOMAIN_ID": domain}
+    load_script("check_dualsense").configure_probe_environment(environment, tmp_path)
+    assert environment["ROS_DOMAIN_ID"] == domain
+
+
+@pytest.mark.parametrize("domain", ["239", "233", "-1", "", "abc", "4.2",
+                                  "08", "0x2a", "４２", "4_2", " 42", "+42"])
+def test_invalid_domain_fails_before_runtime_without_mutating_environment(tmp_path, domain):
+    environment = {"ROS_DOMAIN_ID": domain}
+    with pytest.raises(ValueError, match="ROS_DOMAIN_ID"):
+        load_script("check_dualsense").configure_probe_environment(environment, tmp_path)
+    assert environment == {"ROS_DOMAIN_ID": domain}
+
+
+def test_previous_failed_probe_is_a_cleanup_candidate():
+    assert load_script("runtime_cleanup").is_runtime_command(
+        ["python3", str(ROOT / "scripts/teleop/check_dualsense.py")], ROOT)

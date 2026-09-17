@@ -63,3 +63,19 @@ bash /home/lorenzo/MSSR_thesis/scripts/teleop/check_dualsense.sh
 Follow the six timed phases on screen: neutral, full/partial travel, two OPTIONS presses, disconnect, reconnect, final neutral. Return the complete `T0_HARDWARE_RESULT=...` line and contents of the `report.json` printed as `REPORT=...`; on failure include `game_controller.log` from the same directory if present. If DualSense enumeration lists an id other than 0, the probe will report failure and the next invocation should use `--device-id ID`.
 
 Next agent action after receiving passing evidence: inspect report and raw/log evidence, mark T0 complete only if checks are actually satisfied, commit acceptance documentation, then begin T1 failing state-machine tests.
+
+## Follow-up: Fast DDS domain fix
+
+The user's real enumeration recognized `PS5 Controller`, GUID `030000004c050000e60c000011810000`. ROS initialization then failed with the UDP port-limit error because the original default ROS_DOMAIN_ID=239 exceeded 232. Hardware recognition is now observed, but normalized Joy input and the timed acceptance phases remain unverified.
+
+The default is now 42; invalid domain values fail before output-directory creation, cleanup or ROS initialization. Canonical ASCII decimal is required so leading zeros or alternate encodings cannot disagree with Humble's base-0 parser. Valid user-provided domains are retained. Old probe instances from this checkout are cleanup candidates, with current PID and ancestors still excluded.
+
+Verification observed after the fix: **96 targeted tests passed**, **684 full-suite tests passed in 18.83s**. A real Fast DDS smoke test initialized `rmw_fastrtps_cpp` on default domain 42, exchanged a synthetic Joy through DDS, and observed connected input with R2=0.4791666666666667 for raw R2=-0.5. Cleanup before that runtime reported selected=0, survivors=0, daemon stopped. CLI checks for 239 and 08 returned clear configuration errors before cleanup/runtime. Independent review found no remaining issues. Synthetic messages are not physical-controller acceptance evidence. No milestone is complete.
+
+Retry command, explicitly overriding any inherited invalid domain:
+
+```bash
+ROS_DOMAIN_ID=42 bash /home/lorenzo/MSSR_thesis/scripts/teleop/check_dualsense.sh
+```
+
+Return `T0_HARDWARE_RESULT=...` and the contents of `REPORT=...` as described above. The only unrelated untracked file remains `docs/2026-09-17-teleoperation-v1-design.md`.
