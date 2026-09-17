@@ -8,3 +8,9 @@ joy:
   deadzone: 0.0
   autorepeat_rate: 50.0
   sticky_buttons: false
+rc_car:
+  # Calibrated support clearance; the inverse geometry uses the branch
+  # containing the library's nominal ready TILT and intersects live DOF limits.
+  height_rate_m_s: 0.005
+  max_dt_s: 0.1
+  observation_timeout_s: 0.5

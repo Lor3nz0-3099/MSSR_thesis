@@ -37,6 +37,11 @@ def main() -> int:
     rclpy.init(args=[])
     observer = rclpy.create_node(f"mssr_teleop_observer_{run_id}")
     messages = []
+    robot_topics = {"/mssr/actions", "/mssr/primitives/goal", "/mssr/primitives/cancel"}
+    robot_messages = []
+    for topic in robot_topics:
+        observer.create_subscription(String, topic,
+            lambda message, topic=topic: robot_messages.append((topic, message.data)), 10)
     observer.create_subscription(String, status_topic,
         lambda message: messages.append(json.loads(message.data)), 100)
     publisher = observer.create_publisher(Joy, joy_topic, 10)
@@ -88,8 +93,9 @@ def main() -> int:
             wait_for(lambda status: not status["controller_connected"])
             assert messages[-1]["phase"] == "READY" and messages[-1]["authority"] == "NONE"
             publishers = observer.get_publisher_names_and_types_by_node(shell_name, "/")
-            robot_topics = {"/mssr/actions", "/mssr/primitives/goal", "/mssr/primitives/cancel"}
-            assert not robot_topics.intersection(topic for topic, _ in publishers)
+            # T3 declares its transports, but unknown topology must never
+            # publish actuator messages, even while diagnostics keep ticking.
+            assert not robot_messages, robot_messages
             elapsed = messages[-1]["stamp_monotonic"] - messages[0]["stamp_monotonic"]
             observed_hz = (len(messages) - 1) / elapsed
             assert 35 <= observed_hz <= 65, observed_hz
@@ -97,7 +103,9 @@ def main() -> int:
             assert all(status["stamp_ros"] == 0.0 for status in messages)
             summary.update(passed=True, statuses=len(messages), measured_control_hz=observed_hz,
                            joy_timeout_observed=True, recording_edge_state_verified=True,
-                           frozen_sim_time=True, robot_publishers=[], publishers=publishers)
+                           frozen_sim_time=True, robot_messages_observed=0,
+                           robot_publishers=sorted(robot_topics.intersection(topic for topic, _ in publishers)),
+                           publishers=publishers)
             summary["stage"] = "verified"
     except Exception as error:
         summary["error"] = repr(error)

@@ -245,6 +245,8 @@ class IsaacPrimitiveExecutor:
         # Only joints which have explicitly reached a PAN/TILT target are
         # retained. Every other module remains backdrivable.
         self._retained_internal_commands: dict[str, SmoresCommand] = {}
+        self._reached_interrupt_holds: set[str] = set()
+        self._rc_posture_terminal_statuses: dict[str, PrimitiveStatus] = {}
         # Explicit compliance policy latched by operational posture goals.
         # It survives after a coordinated TILT group reaches its target so a
         # following geometric drive can keep the tail backdrivable.  A later
@@ -375,10 +377,14 @@ class IsaacPrimitiveExecutor:
                     pan_velocity_rad_s=base.pan_velocity_rad_s,
                 )
             elif (
-                base.internal_motion is InternalMotionMode.PASSIVE
+                base.internal_motion in {InternalMotionMode.PASSIVE, InternalMotionMode.HOLD}
                 and retained is not None
+                and (base.internal_motion is InternalMotionMode.PASSIVE
+                     or module_id in self._reached_interrupt_holds)
             ):
                 internal_source = retained
+            if not owns_internal:
+                self._reached_interrupt_holds.discard(module_id)
             result[module_id] = SmoresCommand(
                 linear_x_m_s=(
                     primitive.linear_x_m_s
@@ -431,6 +437,13 @@ class IsaacPrimitiveExecutor:
         return tuple(sorted(connected))
 
     def submit(self, goal: PrimitiveGoal, now_s: float) -> PrimitiveStatus:
+        if (
+            goal.primitive is PrimitiveName.SET_TILT
+            and goal.parameters.get("retain_reached_on_interrupt") is True
+            and goal.goal_id in self._rc_posture_terminal_statuses
+        ):
+            # A late atomic-file retry must never revive a retired RC goal.
+            return self._rc_posture_terminal_statuses[goal.goal_id]
         if goal.goal_id in self._active:
             return self._make_status(
                 goal,
@@ -606,6 +619,9 @@ class IsaacPrimitiveExecutor:
         if group is not None:
             self._group_module_ids.setdefault(str(group), set()).update(referenced_modules)
         self._active[goal.goal_id] = runtime
+        if goal.primitive in {PrimitiveName.SET_PAN, PrimitiveName.SET_TILT,
+                              PrimitiveName.ROTATE_PAN_BY, PrimitiveName.ROTATE_TILT_BY}:
+            self._reached_interrupt_holds.difference_update(goal.module_ids)
         for resource, mode in resource_modes.items():
             self._resource_owners.setdefault(resource, {})[
                 goal.goal_id
@@ -3506,6 +3522,7 @@ class IsaacPrimitiveExecutor:
 
         for raw_module_id in module_ids:
             self._retained_internal_commands.pop(str(raw_module_id), None)
+            self._reached_interrupt_holds.discard(str(raw_module_id))
 
     def _retain_structure_targets(self, module_ids: Any) -> None:
         """Latch missing operational holds without overwriting fold targets."""
@@ -3959,6 +3976,21 @@ class IsaacPrimitiveExecutor:
         message: str,
     ) -> PrimitiveStatus:
         goal = runtime.goal
+        if (
+            goal.primitive is PrimitiveName.SET_TILT
+            and goal.parameters.get("retain_reached_on_interrupt") is True
+            and state in {PrimitiveState.CANCELED, PrimitiveState.FAILED, PrimitiveState.REJECTED}
+        ):
+            # RC teleop yields shared PAN/TILT motors at the measured posture,
+            # never at an interrupted destination. Other primitive behavior is
+            # unchanged. Deliver this capture once before a baseline HOLD.
+            module_id = goal.module_ids[0]
+            pan, tilt = self._joint_positions(module_id)
+            self._retained_internal_commands[module_id] = SmoresCommand(
+                pan_target_rad=pan, tilt_target_rad=tilt,
+                internal_motion=InternalMotionMode.STRUCTURAL_HOLD,
+            )
+            self._reached_interrupt_holds.add(module_id)
         status = self._make_status(
             goal,
             state,
@@ -3969,6 +4001,8 @@ class IsaacPrimitiveExecutor:
             message=message,
         )
         self._status = status
+        if goal.primitive is PrimitiveName.SET_TILT and goal.parameters.get("retain_reached_on_interrupt") is True:
+            self._rc_posture_terminal_statuses[goal.goal_id] = status
         self._active.pop(goal.goal_id, None)
         for resource in runtime.resources:
             owners = self._resource_owners.get(resource)

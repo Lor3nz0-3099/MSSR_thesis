@@ -1825,6 +1825,65 @@ def test_operational_pan_rate_limits_steering_and_holds_entire_structure() -> No
     )
 
 
+@pytest.mark.parametrize("pan_velocity", [0.0, 1.0])
+def test_rc_teleop_cancel_retains_reached_tilt_before_pan_or_disconnect_hold(pan_velocity) -> None:
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+    from smores_ep.isaac.dynamic_stage import DynamicDriveController
+    from smores_ep.config.geometry import SmoresGeometry
+
+    state = _MutableStateReader(tilt_rad=-0.785, pan_rad=0.2)
+    executor = IsaacPrimitiveExecutor(
+        stage=object(), module_roots={"module_a": "/A", "module_b": "/B"},
+        states={"module_a": state, "module_b": _MutableStateReader()},
+        docking=_FakeDocking(),
+    )
+    executor._retain_structure_targets(("module_a",))
+    goal = _goal("rc-held-height", PrimitiveName.SET_TILT, ("module_a",),
+                 {"angle_rad": -0.85, "retain_reached_on_interrupt": True})
+    assert executor.submit(goal, 0).state is PrimitiveState.ACCEPTED
+    articulation = _FakeDynamicArticulation()
+    articulation.state.tilt_joint_rad = 0.785
+    articulation.state.pan_joint_rad = 0.2
+    drive = DynamicDriveController(articulation, SmoresGeometry(), 10.0)
+    drive.apply(executor.step(0.1).commands["module_a"])
+    state.state.tilt_joint_rad = 0.80
+    articulation.state.tilt_joint_rad = 0.80
+    assert executor.cancel(goal.goal_id, 0.2).state is PrimitiveState.CANCELED
+    command = SmoresCommand(internal_motion=InternalMotionMode.PAN_VELOCITY if pan_velocity else InternalMotionMode.HOLD,
+                            pan_velocity_rad_s=pan_velocity)
+    composed = executor.compose_with_baseline({"module_a": command}, {})
+    assert executor._retained_internal_commands["module_a"].tilt_target_rad == pytest.approx(-0.80)
+    assert composed["module_a"].tilt_target_rad == pytest.approx(-0.80)
+    assert composed["module_a"].pan_velocity_rad_s == pan_velocity
+    assert executor._retained_internal_commands["module_a"].pan_target_rad == pytest.approx(0.2)
+    assert not executor.active_goals
+    drive.apply(composed["module_a"])
+    assert articulation.targets["tilt_joint_position_rad"] == pytest.approx(0.80)
+    drive.apply(SmoresCommand(internal_motion=InternalMotionMode.HOLD))
+    assert articulation.targets["tilt_joint_position_rad"] == pytest.approx(0.80)
+
+
+@pytest.mark.parametrize("opt_in", [True, False])
+def test_retired_rc_height_goal_retry_is_idempotent_without_changing_legacy_replay(opt_in):
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    executor = IsaacPrimitiveExecutor(
+        stage=object(), module_roots={"module_a": "/A", "module_b": "/B"},
+        states={"module_a": _MutableStateReader(tilt_rad=-0.785), "module_b": _MutableStateReader()},
+        docking=_FakeDocking(),
+    )
+    goal = _goal("rc-height-retry", PrimitiveName.SET_TILT, ("module_a",),
+                 {"angle_rad": -0.85, "retain_reached_on_interrupt": opt_in})
+    assert executor.submit(goal, 0).state is PrimitiveState.ACCEPTED
+    terminal = executor.cancel(goal.goal_id, 0.1)
+    replay = executor.submit(goal, 0.2)
+    if opt_in:
+        assert replay == terminal
+        assert not executor.active_goals
+    else:
+        assert replay.state is PrimitiveState.ACCEPTED
+
+
 def test_tilt_servo_error_limit_softens_a_large_fold_target() -> None:
     from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
 
