@@ -68,7 +68,7 @@ PYTHONPATH=mssr_ws/src/mssr_expert python3 -m pytest mssr_ws/src/mssr_expert/tes
 - [x] Red evidence recorded: missing input module; missing probe; subsequent behavioral red/green for kinematic-process selection, exclusive Joy topic, settled/fresh neutral, stale-gap reset, and device-only preflight.
 - [x] Normalization/configuration and probe implemented. Ordered events retain multiplicity and modifier context.
 - [x] Automatic checks observed: 77 targeted tests, 665 regression tests; shell syntax and Python compilation; independent review findings corrected and re-reviewed.
-- [ ] Targeted and regression tests green; dedicated commit `feat: add configurable DualSense teleop input`.
+- [x] Targeted and regression tests green; dedicated commit `fce63c8d1168236286c3d261248e8690fc1189d3`, `feat: add configurable DualSense teleop input`. This is the verified software portion, not hardware acceptance.
 - [ ] Hardware gate: recognized DualSense, observed /joy raw messages, neutral/full triggers and all sticks, START edges, timed disconnect/reconnect. Preserve machine-readable report. This gate does not need any deferred physical button choice.
 
 ## T1 — Teleop shell and global state
@@ -239,4 +239,5 @@ def test_reintegration_never_jumps_to_automatic_target():
 - Preflight evidence: `logs/teleop/hardware_checks/20260917T115107.346827Z/report.json` (ignored runtime log). No actual Joy hardware samples were observed.
 - T0 remains **in progress**, awaiting timed DualSense acceptance evidence. T1–T8 have not started. No milestone T0–T8 is complete.
 - Deferred physical choices remain null. None is needed for the T0 command.
+- Detailed session handoff: `docs/superpowers/plans/2026-09-17-teleoperation-v1-handoff.md`.
 - At session end record HEAD SHA, finished/pending tasks, exact test results, open physical decisions, complete git status, and one next command with exact requested output.
