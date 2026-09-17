@@ -73,7 +73,7 @@ PYTHONPATH=mssr_ws/src/mssr_expert python3 -m pytest mssr_ws/src/mssr_expert/tes
 
 ## T1 — Teleop shell and global state
 
-**Files:** Create `teleop/state.py`, `nodes/smores_teleop_node.py`, `launch/smores_teleop.launch.py`, `test/test_teleop_state.py`; modify `setup.py` for `mssr_smores_teleop_node` entry point.
+**Files:** Create `teleop/{state,config,session}.py`, `nodes/smores_teleop_node.py`, `launch/smores_teleop.launch.py`, `test/test_teleop_state.py`, `test/test_teleop_session.py`, and `scripts/teleop/check_teleop_shell.py`; modify `setup.py` for `mssr_smores_teleop_node` entry point and extend scoped cleanup to this acceptance runner.
 
 **Interfaces:** `TeleopState` holds phase, requested/detected morphology, active controller, connection, recording, stop pending and estop fields. `request_morphology(name)`, `observe_topology(name_or_none)`, `begin_macro()`, `finish_macro(success)`, `pause()`, `resume()` expose transitions. Input snapshots are consumed at configurable wall-clock control rate, initially 50 Hz.
 
@@ -86,10 +86,11 @@ def test_requested_morphology_cannot_activate_without_observation():
 
 **Tests:** STARTUP/READY transitions; supported-morphology restriction; failed macro follows observed topology; unsupported topology has no controller; estop and macro authority; connectivity/recording remain orthogonal. Shell publishes diagnostics only, no actuator publisher yet.
 
-- [ ] Red: `python3 -m pytest mssr_ws/src/mssr_expert/test/test_teleop_state.py -q` with the input task's PYTHONPATH.
-- [ ] Minimal state and ROS shell implemented; no motion commands.
-- [ ] Targeted/regression tests and ROS launch smoke check observed.
-- [ ] Commit `feat: add teleop shell and topology-gated state machine`.
+- [x] Red observed: 21 state tests and 21 session/config tests failed for missing implementations; installed ROS probe failed for missing shell. Cleanup runner classification red/green observed separately.
+- [x] Minimal state, input coordination, validated config and installed ROS shell/launch implemented; no motion commands. Real topology verification, pause bridge and recording writer remain later milestones.
+- [x] Automatic verification observed: 42 state/session tests and 51 probe tests pass; 727 full regressions pass. Independent review found no important blockers.
+- [x] Installed build and ROS gate observed: fresh `build/teleop_t1` avoids an unrelated stale generated config link in the old build tree. `logs/teleop/shell_checks/ba5a717143d141df9b586505fb759df3/report.json` passes: 44 diagnostics, 50.0002 Hz, actual ROS stamps frozen at zero, valid START edges, Joy timeout, no robot publishers, final scoped cleanup zero survivors. First 5-second startup gate timed out with no diagnostics; bounded 20-second startup gate succeeds.
+- [ ] Commit `feat: add teleop shell and topology-gated state machine` (after final staged review).
 
 ## T2 — Runtime controls
 

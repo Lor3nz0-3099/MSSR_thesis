@@ -102,6 +102,7 @@ def test_disconnect_and_reconnect_outside_their_phases_do_not_satisfy_gate():
 @pytest.mark.parametrize("command,wanted", [
     (["python3", "-m", "smores_ep.self_assembly_cli"], True),
     (["python3", str(ROOT / "ros2_bridge/mssr_file_bridge.py")], True),
+    (["python3", str(ROOT / "scripts/teleop/check_teleop_shell.py")], True),
     ([str(ROOT / "mssr_ws/install/mssr_expert/lib/mssr_expert/mssr_smores_teleop_node")], True),
     (["ros2", "launch", "mssr_expert", "smores_runtime.launch.py"], True),
     (["ros2", "run", "joy", "game_controller_node"], True),

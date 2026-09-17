@@ -12,7 +12,7 @@ Repository: `/home/lorenzo/MSSR_thesis`; branch: `snake8-global-path-ik-recovery
 
 ## Milestone status
 
-**T0 is complete**, including verified real DualSense acceptance. T1 is next; T2–T8 have not started. Historical pending entries below describe earlier checkpoints and are superseded by the acceptance section at the end.
+**T0 and T1 are complete**, including real DualSense acceptance and installed ROS launch verification. T2 is next; T2–T8 have not started. Historical pending entries below describe earlier checkpoints and are superseded by the acceptance sections at the end.
 
 Implemented: pure configurable DualSense normalization, immutable snapshots, monotonic receipt timeout, atomic invalid-packet rejection, ordered button/semantic events with modifier context, startup/reconnect held-button suppression, configuration and ROS package dependencies, scoped cleanup, and one guided hardware probe with raw/normalized logs. START is assigned; deferred morphology/HOME/E-STOP/resume/override/module-selection/manual PAN/TILT assignments remain null.
 
@@ -89,3 +89,15 @@ Independently replayed all 5555 raw packets using the report's input configurati
 No Joy messages arrived for 13.411554243 seconds during unplug/replug. The driver log independently confirms removal and a second open. Final neutral was verified from fresh held-neutral samples. Report SHA256 `78ba5b925ecb05a8eb9cedd03dd0c402f5a27a2623da1ae4c376a1b80fcf2ad0`; raw JSONL SHA256 `2fbb414a4c211011e2d6b540c50e44e4aa948c8d9f838b9b0a866032fac1ea0a`.
 
 T0 is complete. Next authorized task: T1 failing tests, minimal state machine and ROS shell, regression suite, actual ROS launch verification, dedicated commit. No physical button decision is required yet.
+
+## T1 acceptance observed
+
+Pure state, input session and validated runtime configuration are implemented. The ROS executable and launch are installed. The state keeps morphology requests separate from verified observations, assigns ESTOP > macro > teleop authority, preserves macro/recording through disconnect, and defers recording stop to the actual macro terminal. T1 exposes recording flags only; file writing remains T4. All shipped deferred mappings remain null.
+
+Observed red/green: 21 state tests, 21 session/config tests, missing ROS shell, and scoped cleanup recognition of the new acceptance runner. Latest full regression: **727 passed**, zero failures. Independent read-only review found no important blockers.
+
+The existing generated build contains a dangling config link; ordinary colcon build failed on that unrelated artifact. No files were deleted. Fresh build succeeded using `colcon build --build-base build/teleop_t1 --packages-select mssr_expert --symlink-install` in `mssr_ws`.
+
+Real installed-launch gate: `logs/teleop/shell_checks/ba5a717143d141df9b586505fb759df3/report.json`, 44 diagnostics at **50.0002 Hz**, actual ROS stamps held at zero while monotonic timers and Joy expiry advance, START press/hold/release/repress verified, no robot-action publishers. Initial 5-second startup window timed out; the bounded 20-second window passed. Cleanup before launch selected none; final cleanup SIGTERM'd the surviving shell child, verified no remaining matches, and stopped the domain daemon.
+
+Next single step: begin T2 safety/camera/runtime adapter failing tests after inspecting existing file bridge and Isaac loop. T1 itself does not pause Isaac, control cameras, send actuator commands, match live topology or write episodes. Physical decisions remain deferred and are required only when their hardware validation is reached.

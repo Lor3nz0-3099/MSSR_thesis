@@ -29,6 +29,7 @@ setup(
     extras_require={"test": ["pytest"]},
     entry_points={
         "console_scripts": [
+            "mssr_smores_teleop_node = mssr_expert.nodes.smores_teleop_node:main",
             "mssr_expert_node = mssr_expert.nodes.expert_node:main",
             "mssr_curriculum_node = mssr_expert.nodes.curriculum_node:main",
             "mssr_smores_self_assembly_node = "
