@@ -90,7 +90,7 @@ def test_requested_morphology_cannot_activate_without_observation():
 - [x] Minimal state, input coordination, validated config and installed ROS shell/launch implemented; no motion commands. Real topology verification, pause bridge and recording writer remain later milestones.
 - [x] Automatic verification observed: 42 state/session tests and 51 probe tests pass; 727 full regressions pass. Independent review found no important blockers.
 - [x] Installed build and ROS gate observed: fresh `build/teleop_t1` avoids an unrelated stale generated config link in the old build tree. `logs/teleop/shell_checks/ba5a717143d141df9b586505fb759df3/report.json` passes: 44 diagnostics, 50.0002 Hz, actual ROS stamps frozen at zero, valid START edges, Joy timeout, no robot publishers, final scoped cleanup zero survivors. First 5-second startup gate timed out with no diagnostics; bounded 20-second startup gate succeeds.
-- [ ] Commit `feat: add teleop shell and topology-gated state machine` (after final staged review).
+- [x] Commit `5ad1f7d`, `feat: add teleop shell and topology-gated state machine`.
 
 ## T2 — Runtime controls
 
@@ -101,16 +101,26 @@ def test_requested_morphology_cannot_activate_without_observation():
 ```python
 def test_resume_with_held_trigger_keeps_motion_disarmed():
     gate.pause()
-    gate.resume()
+    gate.resume(resumed_at=10.0)
     assert not gate.update(connected=True, l2=0.0, r2=1.0).motion_enabled
 ```
 
 **Tests:** One pause request per edge; explicit resume; fresh-neutral latch; disconnect zero wheels and no new joints; target preservation; ongoing macro survives disconnect; camera bounds and independence. Resume processing must not depend on simulation steps or simulated time.
 
-- [ ] Red/green targeted safety, camera and adapter tests.
+- [x] Red/green pure targeted safety, camera, adapter and runtime-channel tests; corrective cases included in user-run 779-pass regression.
 - [ ] Regression tests; headless Isaac test observes timeline.is_playing false, frozen physics/time, then resumed physics.
 - [ ] GUI camera orbit check pending until actually observed; ask for E-STOP/resume physical assignments only for physical validation.
 - [ ] Commit `feat: add camera safe hold and Isaac timeline pause bridge`.
+
+**T2 checkpoint:** 26 safety/camera tests, 11 injected-timeline adapter tests and 11 runtime-channel tests observed red/green (48 total). Safety neutral latch, bounded orbit intent, idempotent timeline adapter and ordered request/ack channel implemented. Cleanup recognition of the new native acceptance script observed red; the user-run full regression now confirms green: **776 passed** (user-supplied terminal summary; duration not supplied). Native acceptance script prepared at `scripts/teleop/check_isaac_runtime.py`; execution outside sandbox was rejected, so no native Isaac evidence exists. ROS shell/file-bridge/scenario wiring is not implemented yet. Independent review of T2 is in progress; T2 is not complete.
+
+**User steering:** from this checkpoint the user executes terminal tests and supplies outputs. Do not launch tests or simulation autonomously. Inspect the supplied evidence before marking checks or making implementation commits. User supplied green regression evidence (776 passed). Commit the verified T2 foundation separately after review, then complete shell/file-bridge/scenario wiring with user-run test gates.
+
+**Review gate:** independent review identified two important defects: pause must supersede pending resume delivery; neutral arming must be fenced against actual monotonic resume time, not only previously consumed Joy. Three new behavioral tests were added; their red evidence is pending user execution before production fixes. The earlier 776-pass summary predates these tests. Foundation commit is deferred until corrective red/green and full regression are observed. Next user command: `PYTHONPATH=mssr_ws/src/mssr_expert python3 -m pytest mssr_ws/src/mssr_expert/test/test_teleop_runtime_channel.py mssr_ws/src/mssr_expert/test/test_teleop_safety_camera.py -q --tb=short`.
+
+**Corrective checkpoint:** user supplied the full baseline **776 passed in 18.13s** and the expected corrective red **3 failed, 37 passed in 0.15s**. Production fixes applied: pause preempts unacknowledged resume intent while retaining any already pending pause id; `SafetyGate.resume(resumed_at=...)` now requires explicit monotonic actual-resume time, and disarm preserves that fence through disconnect/invalid input. Tests use explicit synthetic resume times. Follow-up read-only review and user-run green full regression are pending; no tests were run by the agent. Next command is the complete regression above (779 tests expected). Commit and T2 acceptance remain deferred.
+
+**Verified foundation checkpoint:** user supplied final **779 passed**; follow-up review found both corrections addressed with no remaining important issues in those fixes. Foundation committed as `1ff2a57465b5da5fed4862d7e8097ff0d56a82f3`, `feat: add teleop safety camera and runtime channel foundations`. This supersedes preceding pending foundation-commit entries. T2 itself remains incomplete: ROS shell/file-bridge/production-loop wiring, native timeline/physics and GUI camera gates are pending. Next single step is integration tests, with user-run red evidence before production wiring. Current detailed handoff is `2026-09-17-teleoperation-v1-handoff.md` beside this plan. Do not execute terminal tests/runtimes autonomously.
 
 ## T3 — RC-Car8
 

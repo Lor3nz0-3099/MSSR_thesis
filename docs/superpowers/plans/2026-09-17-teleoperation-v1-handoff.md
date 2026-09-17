@@ -2,102 +2,73 @@
 
 Repository: `/home/lorenzo/MSSR_thesis`; branch: `snake8-global-path-ik-recovery`.
 
-## Git checkpoints
+## Current checkpoint
 
-- Approved design: `3014511` (byte-identical copy of the Downloads source; original untracked document preserved).
-- Implementation plan: `36b6ad6`.
-- Verified T0 software: **`fce63c8d1168236286c3d261248e8690fc1189d3`**.
-- This handoff is committed separately after that implementation checkpoint. The latest documentation HEAD is reported in the assistant's final response; use `git rev-parse HEAD` for subsequent sessions.
-- Commits are local; no push executed.
+Latest implementation commit: **`1ff2a57465b5da5fed4862d7e8097ff0d56a82f3`**, `feat: add teleop safety camera and runtime channel foundations`.
 
-## Milestone status
+This handoff and plan updates are committed in a subsequent documentation checkpoint. Obtain the latest HEAD with `git rev-parse HEAD`; the assistant reports that documentation SHA after committing. No push executed.
 
-**T0 and T1 are complete**, including real DualSense acceptance and installed ROS launch verification. T2 is next; T2–T8 have not started. Historical pending entries below describe earlier checkpoints and are superseded by the acceptance sections at the end.
+- **T0 complete:** configurable DualSense input and real hardware acceptance.
+- **T1 complete:** pure global state, input session, validated config, installed ROS shell/launch and real ROS acceptance.
+- **T2 in progress, incomplete:** reviewed safety/camera/runtime-channel foundation committed; production integration and native validation pending.
+- **T3–T8 not started.**
 
-Implemented: pure configurable DualSense normalization, immutable snapshots, monotonic receipt timeout, atomic invalid-packet rejection, ordered button/semantic events with modifier context, startup/reconnect held-button suppression, configuration and ROS package dependencies, scoped cleanup, and one guided hardware probe with raw/normalized logs. START is assigned; deferred morphology/HOME/E-STOP/resume/override/module-selection/manual PAN/TILT assignments remain null.
+Approved spec: `docs/superpowers/specs/2026-09-17-teleoperation-v1-design.md`, byte-identical to the approved Downloads source. Implementation plan: `docs/superpowers/plans/2026-09-17-teleoperation-v1.md`. The unrelated pre-existing untracked `docs/2026-09-17-teleoperation-v1-design.md` remains untouched and must not be staged.
 
-Recording toggle behavior here means input event generation only. The recording manager is T4. Real pause/resume, safe-hold action transport, cameras, morphology controllers and macros are not implemented in T0.
+## User instructions for resuming
 
-## Executed verification
+The user now executes **all terminal tests and runtime checks** and supplies outputs. Do not run tests or simulations autonomously. Prepare the exact command, inspect returned evidence, and only then claim a check passed or make an implementation commit. User requests a checkpoint before context exhaustion so they can push and continue in another session.
 
-- Initial baseline without ROS sourced: five import/collection errors, resolved by sourcing Humble without code changes.
-- Corrected baseline before implementation: **588 passed**.
-- Observed red/green input/probe and corrective regression cycles are recorded in the plan.
-- Latest targeted input/probe run: **77 passed in 0.32s**.
-- Latest complete MSSR/SMORES regression: **665 passed in 18.29s**, zero failures/skips.
-- Bash syntax, Python compilation and staged diff whitespace checks passed.
-- Independent input review and follow-up probe review completed; the three identified defects were covered with failing tests and corrected. Final review found no remaining software blockers.
-- Real tiny process fixtures exercised SIGTERM, escalation to SIGKILL for an ignoring selected process, unchanged unrelated process, and reused-PID protection. ROS daemon operation was isolated in those fixture tests.
+Work in the requested checkout/branch, preserve unrelated changes, follow the approved architecture, use Superpowers and TDD, and proceed one milestone at a time. A GUI/native gate without observed evidence remains pending. Use scoped process-command cleanup before/after runtimes, never broad name-based kills. Do not push unless expressly asked; the user intends to do that themselves.
 
-Exact regression command:
+## Observed evidence
+
+- Final full regression after foundation and review corrections: **779 passed**, supplied by the user. No duration supplied for this final run.
+- Previous full baseline: **776 passed in 18.13s**, complete terminal output supplied by the user.
+- Corrective red: **3 failed, 37 passed in 0.15s**, complete user output; matched both independent review findings.
+- Initial T2 pure red/green: 26 safety/camera, 11 injected-timeline adapter and 11 request/ack-channel cases. Three subsequent regressions bring T2 pure cases to 51.
+- Read-only independent review found two important issues, both fixed and re-reviewed: pause delivery preempts unacknowledged resume intent; fresh-neutral arming is fenced against actual monotonic resume acknowledgment time. No remaining important issues in those fixes.
+- Named-file staging and staged whitespace checks passed before the foundation commit. No agent tests/runtimes were executed after the user reserved terminal verification.
+- Native Isaac checker was prepared, but its requested execution outside sandbox was rejected. **It has not run.** Native timeline/physics and GUI camera remain unverified.
+
+Complete regression command, for user execution when changes require it:
 
 ```bash
+cd /home/lorenzo/MSSR_thesis
 source /opt/ros/humble/setup.bash
 PYTHONPATH=mssr_ws/src/mssr_expert:scripts/smores_ep/src:$PYTHONPATH python3 -m pytest mssr_ws/src/mssr_expert/test scripts/smores_ep/tests -q
 ```
 
-## Hardware evidence and outstanding gate
+## T2 implemented interfaces and integration constraints
 
-Sandbox preflight failed because local daemon sockets were forbidden. Authorized preflight outside the sandbox then observed `cleanup verified: selected=0, survivors=0, daemon stopped`; the daemon was not running. SDL enumeration exited 0 and listed **no devices**. No real `/joy` hardware packets were observed, and the report correctly returned `passed=false`, `selected_dualsense_not_detected`.
+- `teleop/safety.py`: immutable permission decisions; startup/disconnect fresh-neutral latch; ESTOP and macro authority; zero-wheel teleop safe hold with preserved targets. Macro authority survives disconnect and must not be overwritten by teleop safe hold. `resume(resumed_at=...)` requires the actual monotonic acknowledgment time; disconnect or invalid input must not lower that fence.
+- `teleop/camera.py`: bounded left-stick-only orbit intent, held angles on release/disconnect, configurable rates/radius/elevation and bounded wall delta; camera view follows a supplied live center. Robot action streams are untouched.
+- `teleop/runtime_channel.py`: pending timeline delivery retries keep their id; newer pause supersedes pending resume, retaining an already pending pause id; resume acknowledgment requires matching id/operation and actual timeline state. Re-publication of stale status files cannot keep runtime ready.
+- `smores_ep/isaac/teleop_runtime.py`: dependency-injected timeline/camera adapter; idempotent pause/resume IDs, observed timeline acknowledgments, atomic status file; invalid camera cannot suppress pause. This adapter does not advance physics.
+- `scripts/teleop/check_isaac_runtime.py`: system-Python cleanup/orchestrator and native Isaac probe; intended to observe moving rigid body, frozen simulated time/physics over app updates, and explicit resume. Not executed yet. Cleanup whitelist includes only this exact checkout script, with UID/cwd/PID identity protections preserved.
 
-Evidence: `logs/teleop/hardware_checks/20260917T115107.346827Z/report.json`. Logs are ignored by Git. This report predates the implementation commit and includes the then-current HEAD plus the full input configuration; it proves the preflight result, not completed T0 hardware acceptance.
+**Not wired yet:** `nodes/smores_teleop_node.py`, `ros2_bridge/mssr_file_bridge.py`, and `scenarios/parallel_self_assembly.py`. The running shell is still T1 diagnostic-only. Safe-hold decisions and camera intent do not yet affect the live robot/viewport; the native adapter does not yet service the production loop. Do not claim real E-STOP works from offline tests.
 
-All deferred physical button decisions still require explicit user approval when their milestone needs hardware validation. T0 needs none of them.
+The existing Isaac scenario explicitly advances physics with either `simulation_app.update()` or `SimulationManager.step(steps=1)`. Integration must poll runtime requests on application updates while paused, skip primitive/macro/robot execution and explicit physics stepping during pause, and allow resume without simulated-time progress. The existing GUI camera uses `ViewportManager.set_camera_view("/OmniverseKit_Persp", eye=..., target=...)`. Reuse that API and a live robot center.
 
-## Git status and next single step
+## Earlier accepted runtime gates
 
-After the implementation checkpoint, the only pre-existing untracked file was:
+T0 hardware report: `logs/teleop/hardware_checks/20260917T124255.339508Z/report.json`, code `fa481b7`. Real Sony PS5 controller device 0, ROS domain 42, 5555 valid raw/normalized samples independently replayed, zero invalid packets, all gates true, stick/trigger travel and analog response, three distinct OPTIONS edges, 13.4116-second unplug/replug gap and driver removal/reopen. Report SHA256 `78ba5b925ecb05a8eb9cedd03dd0c402f5a27a2623da1ae4c376a1b80fcf2ad0`; raw SHA256 `2fbb414a4c211011e2d6b540c50e44e4aa948c8d9f838b9b0a866032fac1ea0a`.
+
+T1 real ROS report: `logs/teleop/shell_checks/ba5a717143d141df9b586505fb759df3/report.json`, 44 diagnostics at 50.0002 Hz, actual ROS clock frozen at zero while monotonic timers/expiry progress, START press/hold/release/repress, no actuator publishers and final cleanup zero survivors. T1 implementation commit `5ad1f7d`.
+
+The old generated build tree has a dangling config symlink; no artifacts were deleted. Installed build succeeded with `colcon build --build-base build/teleop_t1 --packages-select mssr_expert --symlink-install` in `mssr_ws`. Input domain defaults to 42 and requires canonical ASCII decimal in [0,232].
+
+## Decisions, Git status and next single step
+
+All deferred morphology/HOME, E-STOP/resume, override, module-selection and manual PAN/TILT physical mappings remain null. START is recording toggle. No physical decision is required for the next offline integration tests; request explicit assignments only when their actual hardware gate needs them.
+
+After the documentation checkpoint, expected Git status contains only:
 
 ```text
 ?? docs/2026-09-17-teleoperation-v1-design.md
 ```
 
-This file was neither staged nor modified. Plan progress and this handoff are the only subsequent documentation changes and are committed together; verify final status after that commit.
+All T2 foundation work is committed and can be preserved by the user’s push. No current failed test remains after the user’s final 779-pass regression; native and integration gates remain pending.
 
-Connect the DualSense, leave controls neutral, and execute:
-
-```bash
-bash /home/lorenzo/MSSR_thesis/scripts/teleop/check_dualsense.sh
-```
-
-Follow the six timed phases on screen: neutral, full/partial travel, two OPTIONS presses, disconnect, reconnect, final neutral. Return the complete `T0_HARDWARE_RESULT=...` line and contents of the `report.json` printed as `REPORT=...`; on failure include `game_controller.log` from the same directory if present. If DualSense enumeration lists an id other than 0, the probe will report failure and the next invocation should use `--device-id ID`.
-
-Next agent action after receiving passing evidence: inspect report and raw/log evidence, mark T0 complete only if checks are actually satisfied, commit acceptance documentation, then begin T1 failing state-machine tests.
-
-## Follow-up: Fast DDS domain fix
-
-The user's real enumeration recognized `PS5 Controller`, GUID `030000004c050000e60c000011810000`. ROS initialization then failed with the UDP port-limit error because the original default ROS_DOMAIN_ID=239 exceeded 232. Hardware recognition is now observed, but normalized Joy input and the timed acceptance phases remain unverified.
-
-The default is now 42; invalid domain values fail before output-directory creation, cleanup or ROS initialization. Canonical ASCII decimal is required so leading zeros or alternate encodings cannot disagree with Humble's base-0 parser. Valid user-provided domains are retained. Old probe instances from this checkout are cleanup candidates, with current PID and ancestors still excluded.
-
-Verification observed after the fix: **96 targeted tests passed**, **684 full-suite tests passed in 18.83s**. A real Fast DDS smoke test initialized `rmw_fastrtps_cpp` on default domain 42, exchanged a synthetic Joy through DDS, and observed connected input with R2=0.4791666666666667 for raw R2=-0.5. Cleanup before that runtime reported selected=0, survivors=0, daemon stopped. CLI checks for 239 and 08 returned clear configuration errors before cleanup/runtime. Independent review found no remaining issues. Synthetic messages are not physical-controller acceptance evidence. No milestone is complete.
-
-Retry command, explicitly overriding any inherited invalid domain:
-
-```bash
-ROS_DOMAIN_ID=42 bash /home/lorenzo/MSSR_thesis/scripts/teleop/check_dualsense.sh
-```
-
-Return `T0_HARDWARE_RESULT=...` and the contents of `REPORT=...` as described above. The only unrelated untracked file remains `docs/2026-09-17-teleoperation-v1-design.md`.
-
-## T0 hardware acceptance observed
-
-Report: `logs/teleop/hardware_checks/20260917T124255.339508Z/report.json`; hardware code commit `fa481b776eeb36b1f901b3f99a6ba5adcef0ada3`. Real Sony PS5 controller on device 0 was recognized; domain 42, exclusive Joy topic and driver parameters match the shipped input configuration. Report passed every gate and the driver stopped cleanly.
-
-Independently replayed all 5555 raw packets using the report's input configuration and timed connectivity polls during the message gap. Compared raw normalization, semantic events, packet counts and phase results with recorded fields. All matched, with zero invalid packets. All four sticks cover [-1,1]; both triggers cover [0,1], including partial travel. Three separate OPTIONS press edges occurred at monotonic times 11094.818150759, 11095.510431290 and 11096.994917034; each generated exactly one record-toggle event. The test asks for at least two valid press/release edges, which these satisfy. No recording episode is created until T4.
-
-No Joy messages arrived for 13.411554243 seconds during unplug/replug. The driver log independently confirms removal and a second open. Final neutral was verified from fresh held-neutral samples. Report SHA256 `78ba5b925ecb05a8eb9cedd03dd0c402f5a27a2623da1ae4c376a1b80fcf2ad0`; raw JSONL SHA256 `2fbb414a4c211011e2d6b540c50e44e4aa948c8d9f838b9b0a866032fac1ea0a`.
-
-T0 is complete. Next authorized task: T1 failing tests, minimal state machine and ROS shell, regression suite, actual ROS launch verification, dedicated commit. No physical button decision is required yet.
-
-## T1 acceptance observed
-
-Pure state, input session and validated runtime configuration are implemented. The ROS executable and launch are installed. The state keeps morphology requests separate from verified observations, assigns ESTOP > macro > teleop authority, preserves macro/recording through disconnect, and defers recording stop to the actual macro terminal. T1 exposes recording flags only; file writing remains T4. All shipped deferred mappings remain null.
-
-Observed red/green: 21 state tests, 21 session/config tests, missing ROS shell, and scoped cleanup recognition of the new acceptance runner. Latest full regression: **727 passed**, zero failures. Independent read-only review found no important blockers.
-
-The existing generated build contains a dangling config link; ordinary colcon build failed on that unrelated artifact. No files were deleted. Fresh build succeeded using `colcon build --build-base build/teleop_t1 --packages-select mssr_expert --symlink-install` in `mssr_ws`.
-
-Real installed-launch gate: `logs/teleop/shell_checks/ba5a717143d141df9b586505fb759df3/report.json`, 44 diagnostics at **50.0002 Hz**, actual ROS stamps held at zero while monotonic timers and Joy expiry advance, START press/hold/release/repress verified, no robot-action publishers. Initial 5-second startup window timed out; the bounded 20-second window passed. Cleanup before launch selected none; final cleanup SIGTERM'd the surviving shell child, verified no remaining matches, and stopped the domain daemon.
-
-Next single step: begin T2 safety/camera/runtime adapter failing tests after inspecting existing file bridge and Isaac loop. T1 itself does not pause Isaac, control cameras, send actuator commands, match live topology or write episodes. Physical decisions remain deferred and are required only when their hardware validation is reached.
+**Next single step:** write T2 integration tests for shell coordination, the separate ROS/file runtime channel and paused production-loop servicing; give the user their exact targeted command and obtain red evidence before production wiring. Then implement integration, obtain targeted/full green outputs, request native Isaac and GUI evidence with one precise command at each gate, and only mark T2 complete after observing those required checks.
