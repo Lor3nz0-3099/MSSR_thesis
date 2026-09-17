@@ -35,7 +35,8 @@ For each task below, execute these steps in order and record evidence in the tas
 4. Rerun targeted tests, then the regression command:
 
 ```bash
-PYTHONPATH=mssr_ws/src/mssr_expert:scripts/smores_ep/src python3 -m pytest mssr_ws/src/mssr_expert/test scripts/smores_ep/tests -q
+source /opt/ros/humble/setup.bash
+PYTHONPATH=mssr_ws/src/mssr_expert:scripts/smores_ep/src:$PYTHONPATH python3 -m pytest mssr_ws/src/mssr_expert/test scripts/smores_ep/tests -q
 ```
 
 5. Inspect status, `git diff`, and `git diff --check`; stage only named task files and commit with the task's message after tests are green.
@@ -43,7 +44,7 @@ PYTHONPATH=mssr_ws/src/mssr_expert:scripts/smores_ep/src python3 -m pytest mssr_
 
 ## T0 — Controller input
 
-**Files:** Create `mssr_ws/src/mssr_expert/mssr_expert/teleop/{__init__,input}.py`, `config/smores_dualsense.yaml`, `config/smores_teleop.yaml`, `test/test_dualsense_input.py`; modify `package.xml` for sensor_msgs, joy and PyYAML. Create `scripts/teleop/check_dualsense.py` and its `test/test_dualsense_probe.py` tests; document the hardware procedure in `docs/teleoperation_v1_runbook.md`.
+**Files:** Create `mssr_ws/src/mssr_expert/mssr_expert/teleop/{__init__,input}.py`, `config/smores_dualsense.yaml`, `config/smores_teleop.yaml`, `test/test_dualsense_input.py`; modify `package.xml` for sensor_msgs, joy and PyYAML. Create `scripts/teleop/check_dualsense.py`, its shell entry point and `runtime_cleanup.py`, and `test/test_dualsense_probe.py` tests; document the hardware procedure in `docs/teleoperation_v1_runbook.md`.
 
 **Interfaces:** `DualSenseInput(config)` accepts raw axes/buttons with `update(axes, buttons, received_at)`; `snapshot(now)` supplies immutable normalized axes, triggers, pressed buttons, queued rising edges, semantic command edges, last valid receipt time and connectivity. Invalid packets never refresh connectivity. `load_input_config(path)` validates physical and semantic mappings.
 
@@ -64,8 +65,9 @@ PYTHONPATH=mssr_ws/src/mssr_expert python3 -m pytest mssr_ws/src/mssr_expert/tes
 
 **Additional tests:** Full/partial trigger travel and alternate joy_node endpoint conventions; stick bounds/deadzone/sign; held START versus release/repress; edge retention across multiple messages; stale input and malformed/nonfinite/short packets; invalid configuration; reconnect suppresses held command buttons; deferred mapping stays disabled. Probe tests exercise real raw/normalized report aggregation and timed phase validation.
 
-- [ ] Red evidence recorded.
-- [ ] Normalization/configuration and probe implemented.
+- [x] Red evidence recorded: missing input module; missing probe; subsequent behavioral red/green for kinematic-process selection, exclusive Joy topic, settled/fresh neutral, stale-gap reset, and device-only preflight.
+- [x] Normalization/configuration and probe implemented. Ordered events retain multiplicity and modifier context.
+- [x] Automatic checks observed: 77 targeted tests, 665 regression tests; shell syntax and Python compilation; independent review findings corrected and re-reviewed.
 - [ ] Targeted and regression tests green; dedicated commit `feat: add configurable DualSense teleop input`.
 - [ ] Hardware gate: recognized DualSense, observed /joy raw messages, neutral/full triggers and all sticks, START edges, timed disconnect/reconnect. Preserve machine-readable report. This gate does not need any deferred physical button choice.
 
@@ -230,6 +232,11 @@ def test_reintegration_never_jumps_to_automatic_target():
 ## Progress and handoff
 
 - Design saved unchanged and committed as `3014511`; trailing Markdown hard-break spaces retained from approved source.
-- Baseline regression run started before implementation; result must be recorded when observed.
-- T0–T8 are pending until their respective checks are executed and read.
+- Initial baseline without the ROS environment: five collection errors for missing ROS Python packages. Sourcing `/opt/ros/humble/setup.bash` resolved these without code changes; baseline: 588 passed.
+- Latest automatic verification: 77 targeted tests passed in 0.32s; complete suite 665 passed in 18.29s. Actual tiny subprocess checks demonstrated SIGTERM, SIGKILL only for an ignoring selected process, and survival of an unrelated process. ROS daemon response is isolated in those process tests.
+- Final read-only independent review: no remaining T0 software blockers. Review did not execute hardware/runtime.
+- Sandbox preflight could not open the ROS daemon socket. Authorized retry outside the sandbox completed cleanup: selected=0, survivors=0, daemon not running. SDL enumeration exited 0 with no devices; hardware result false, `selected_dualsense_not_detected`.
+- Preflight evidence: `logs/teleop/hardware_checks/20260917T115107.346827Z/report.json` (ignored runtime log). No actual Joy hardware samples were observed.
+- T0 remains **in progress**, awaiting timed DualSense acceptance evidence. T1–T8 have not started. No milestone T0–T8 is complete.
+- Deferred physical choices remain null. None is needed for the T0 command.
 - At session end record HEAD SHA, finished/pending tasks, exact test results, open physical decisions, complete git status, and one next command with exact requested output.

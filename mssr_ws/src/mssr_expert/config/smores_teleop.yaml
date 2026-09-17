@@ -1,0 +1,10 @@
+# Initial rates are configurable targets; measured runtime values remain pending.
+control_rate_hz: 50.0
+dataset_rate_hz: 25.0
+joy:
+  topic: /joy
+  device_id: 0
+  device_name: ""
+  deadzone: 0.0
+  autorepeat_rate: 50.0
+  sticky_buttons: false

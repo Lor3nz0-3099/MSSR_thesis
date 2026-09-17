@@ -1,0 +1,47 @@
+# ROS joy/game_controller_node SDL ordering, not a custom device driver.
+# Driver deadzone must be 0.0: normalization applies the deadzone exactly once.
+# Source: https://github.com/ros-drivers/joystick_drivers/tree/ros2/joy
+deadzone: 0.08
+trigger_deadzone: 0.04
+disconnect_timeout_s: 0.5
+axes:
+  left_x: {index: 0, sign: -1}   # Positive right (orbit), ROS driver positive left.
+  left_y: {index: 1, sign: 1}    # Positive up.
+  right_x: {index: 2, sign: -1}  # Positive right; controllers apply body-frame signs.
+  right_y: {index: 3, sign: 1}   # Positive up.
+triggers:
+  # SDL triggers are 0 released, -1 fully pressed after ROS axis inversion.
+  # Generic joy_node conventions can instead use released: 1, pressed: -1.
+  l2: {index: 4, released: 0.0, pressed: -1.0}
+  r2: {index: 5, released: 0.0, pressed: -1.0}
+buttons:
+  cross: 0
+  circle: 1
+  square: 2
+  triangle: 3
+  share: 4
+  ps: 5
+  start: 6
+  left_stick: 7
+  right_stick: 8
+  l1: 9
+  r1: 10
+  dpad_up: 11
+  dpad_down: 12
+  dpad_left: 13
+  dpad_right: 14
+commands:
+  record_toggle: start
+  select_rc: null
+  select_snake: null
+  select_mm8: null
+  home: null
+  estop: null
+  resume: null
+  override: null
+  previous_module: null
+  next_module: null
+  manual_pan_positive: null
+  manual_pan_negative: null
+  manual_tilt_positive: null
+  manual_tilt_negative: null
