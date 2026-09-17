@@ -11,6 +11,7 @@ import time
 from types import SimpleNamespace
 
 import pytest
+import yaml
 
 from mssr_expert.behaviors.morphology_library import MorphologyLibrary
 from mssr_expert.graph.serialization import attributed_graph_from_dict, load_attributed_graph
@@ -378,10 +379,15 @@ def test_runtime_rotates_action_identity_after_stop_to_escape_native_quarantine(
     assert before["expert"]["debug"]["command_id"] != after["expert"]["debug"]["command_id"]
 
 
-def test_hardware_smoke_refuses_deferred_bindings_before_any_runtime_launch():
+def test_hardware_smoke_refuses_deferred_bindings_before_any_runtime_launch(tmp_path):
     root = Path(__file__).resolve().parents[4]
+    mapping = yaml.safe_load((CONFIG / "smores_dualsense.yaml").read_text())
+    mapping["commands"].update(home=None, estop=None, resume=None)
+    mapping["commands"].pop("estop_toggle", None)
+    deferred = tmp_path / "deferred.yaml"
+    deferred.write_text(yaml.safe_dump(mapping))
     result = subprocess.run([sys.executable, str(root / "scripts/teleop/check_rc_car.py"),
-                             "--input-config", str(CONFIG / "smores_dualsense.yaml")],
+                             "--input-config", str(deferred)],
                             cwd=root, capture_output=True, text=True, timeout=5)
     assert result.returncode == 2
     assert "deferred" in result.stderr and "home" in result.stderr

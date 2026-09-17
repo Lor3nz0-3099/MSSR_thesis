@@ -14,6 +14,8 @@ class RuntimeCoordinator:
         self.runtime = RuntimeChannel()
         self.safety = SafetyGate()
         self._estop_latched = False
+        # Desired state tracks successive presses even while native ACKs wait.
+        self._stop_requested = False
         self._previous_tick = None
 
     def observe_runtime(self, payload, now):
@@ -25,8 +27,11 @@ class RuntimeCoordinator:
             self.safety.resume(resumed_at=now)
             self.session.state.resume()
             self._estop_latched = False
+            self._stop_requested = False
 
         elif operation == "stop":
+            if not self._estop_latched:
+                self._stop_requested = True
             self.safety.pause()
             self.session.state.pause()
             self._estop_latched = True
@@ -37,6 +42,8 @@ class RuntimeCoordinator:
         ):
             # A stop observed directly from the runtime is authoritative too.
             # Fresh neutral input alone must never clear it.
+            if not self._estop_latched:
+                self._stop_requested = True
             self.safety.pause()
             self.session.state.pause()
             self._estop_latched = True
@@ -51,14 +58,17 @@ class RuntimeCoordinator:
         if "estop" in commands:
             # E-STOP takes effect in the teleop safety layer immediately.
             # Runtime delivery then makes the stop authoritative at Isaac.
-            self.safety.pause()
-            self._estop_latched = True
-            self.runtime.request_stop(True)
+            self._request_stop(True)
 
         elif "resume" in commands and was_stopped:
             # Explicit resume requests a clear, but the latch remains set
             # until the matching runtime acknowledgment arrives.
-            self.runtime.request_stop(False)
+            self._request_stop(False)
+
+        else:
+            for command in commands:
+                if command == "estop_toggle":
+                    self._request_stop(not self._stop_requested)
 
         if self._estop_latched:
             self.session.state.pause()
@@ -101,3 +111,10 @@ class RuntimeCoordinator:
         )
 
         return status, self.runtime.payload(asdict(orbit))
+
+    def _request_stop(self, active):
+        self._stop_requested = active
+        if active:
+            self.safety.pause()
+            self._estop_latched = True
+        self.runtime.request_stop(active)

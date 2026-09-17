@@ -253,7 +253,7 @@ def test_shipped_configuration_keeps_all_deferred_commands_disabled():
     packet(reader)
     packet(reader, pressed=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
            at=10.1)
-    assert reader.snapshot(10.2).command_edges == frozenset({"record_toggle"})
+    assert reader.snapshot(10.2).command_edges == frozenset({"record_toggle", "home", "estop_toggle"})
 
 
 def test_configuration_loader_reports_malformed_yaml(tmp_path):

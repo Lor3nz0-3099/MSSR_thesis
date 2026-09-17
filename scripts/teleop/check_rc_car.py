@@ -1,8 +1,7 @@
 """Interactive T3 gate: existing Isaac assembly scene and real DualSense.
 
-No physical binding is chosen here. The shipped deferred bindings fail
-preflight before cleanup or launch. Pass an explicitly approved input config
-with --input-config to run the physical phases. Evidence is written separately
+The shipped mapping uses user-approved Circle HOME and Triangle stop/resume.
+Preflight rejects incomplete bindings before cleanup or launch. Evidence is written separately
 from any training dataset; software tests cannot mark this acceptance passed.
 """
 from __future__ import annotations
@@ -25,7 +24,9 @@ sys.path[:0] = [str(ROOT / "mssr_ws/src/mssr_expert"), str(ROOT / "scripts/smore
 def preflight(path):
     from mssr_expert.teleop.input import load_input_config
     config = load_input_config(path)
-    missing = [name for name in ("home", "estop", "resume") if config.commands.get(name) is None]
+    missing = ["home"] if config.commands.get("home") is None else []
+    if config.commands.get("estop_toggle") is None:
+        missing.extend(name for name in ("estop", "resume") if config.commands.get(name) is None)
     if missing:
         raise ValueError("deferred physical bindings: " + ", ".join(missing) +
                          "; use --input-config with user-approved assignments")
@@ -106,7 +107,7 @@ def main():
     parser.add_argument("--device-id", type=int, default=0)
     args = parser.parse_args()
     try:
-        preflight(args.input_config)
+        input_config = preflight(args.input_config)
         if not math.isfinite(args.assembly_timeout) or args.assembly_timeout <= 0:
             raise ValueError("assembly timeout must be positive and finite")
         if args.device_id < 0:
@@ -248,9 +249,12 @@ def main():
             nonlocal seen_home
             seen_home |= "home" in state()["controller_input"]["command_events"]
             return seen_home and all(abs(angle + 0.785398) < 0.01 for angle in metrics()["tilt"].values())
-        wait("home", "Premi HOME con il binding approvato; attendi il ritorno graduale.", homed)
+        home_button = input_config.commands["home"]
+        stop_button = input_config.commands.get("estop_toggle") or input_config.commands["estop"]
+        resume_button = input_config.commands.get("estop_toggle") or input_config.commands["resume"]
+        wait("home", f"Premi {home_button} (HOME); attendi il ritorno graduale.", homed)
         wait("pre_stop_drive", "Premi R2 circa 1/3.", drive(1))
-        wait("estop", "Mantieni R2 e premi E-stop con il binding approvato.",
+        wait("estop", f"Mantieni R2 e premi {stop_button} (E-stop).",
              lambda: state()["safety"]["authority"] == "ESTOP" and state()["runtime_structure_stopped"] and zero())
         stopped = metrics()
         since = time.monotonic()
@@ -260,7 +264,7 @@ def main():
                      read("smores_teleop_runtime_status.json").get("structure_stopped") is True and
                      read("smores_teleop_runtime_status.json").get("camera_applied") is True and zero() and
                      all(abs(metrics()["tilt"][module] - angle) < 0.02 for module, angle in stopped["tilt"].items()))
-        wait("resume_held_fence", "Mantieni R2 premuto, premi RESUME con il binding approvato.",
+        wait("resume_held_fence", f"Mantieni R2 premuto, rilascia e premi {resume_button} (RESUME).",
              lambda: state()["runtime_structure_stopped"] is False and state()["controller_input"]["r2"] > 0.1 and
                      not state()["safety"]["motion_enabled"] and zero())
         wait("fresh_neutral", "Rilascia trigger e stick: input nuovo e neutro per rearm.",

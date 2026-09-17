@@ -20,10 +20,10 @@ def component(name):
 
 def session():
     mapping = yaml.safe_load((CONFIG_DIR / "smores_dualsense.yaml").read_text())
-    # Synthetic test bindings only; shipped deferred assignments stay null.
+    # Isolate synthetic bindings from the approved physical toggle mapping.
     mapping["commands"].update(select_rc="cross", select_snake="triangle",
                                select_mm8="circle", home="square",
-                               estop="ps", resume="share")
+                               estop="ps", resume="share", estop_toggle=None)
     return component("session").TeleopSession(InputConfig.from_mapping(mapping))
 
 

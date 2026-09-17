@@ -19,7 +19,7 @@ STICKS = ("left_x", "left_y", "right_x", "right_y")
 TRIGGERS = ("l2", "r2")
 COMMANDS = frozenset({
     "record_toggle", "select_rc", "select_snake", "select_mm8", "home",
-    "estop", "resume", "override", "previous_module", "next_module",
+    "estop", "resume", "estop_toggle", "override", "previous_module", "next_module",
     "manual_pan_positive", "manual_pan_negative", "manual_tilt_positive",
     "manual_tilt_negative",
 })

@@ -32,10 +32,13 @@ buttons:
   dpad_right: 14
 commands:
   record_toggle: start
+  # Assembly/reconfiguration will use the D-pad, never either analog stick.
+  # Direction assignments and structural macros remain deferred.
   select_rc: null
   select_snake: null
   select_mm8: null
-  home: null
+  home: circle
+  estop_toggle: triangle  # Each new press alternates structure E-stop/resume.
   estop: null
   resume: null
   override: null
