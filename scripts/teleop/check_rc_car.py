@@ -82,7 +82,7 @@ def runtime_commands(output, input_path, run_id, device_id):
     topic = f"/mssr/teleop_probe/run_{run_id}"
     return {
         "isaac": ["bash", "scripts/smores_ep/run_self_assembly.sh", "--module-count", "8",
-                  "--performance", "--physics-hz", "240", "--state-publish-hz", "30",
+                  "--performance", "--simple-visuals", "--physics-hz", "240", "--state-publish-hz", "30",
                   "--actuator-effort-scale", "4.0",
                   "--tilt-effort-scale", "8.0", "--action-file", str(action),
                   "--primitive-goal-file", str(goal), "--primitive-cancel-file", str(cancel),

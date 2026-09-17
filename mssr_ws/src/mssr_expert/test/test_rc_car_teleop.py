@@ -424,8 +424,12 @@ def smoke():
 
 
 def test_smoke_topics_are_exclusive_and_driver_is_the_verified_selected_device(tmp_path, monkeypatch):
+    from smores_ep.self_assembly_cli import build_argument_parser
     monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[4] / "scripts/teleop"))
     commands = smoke().runtime_commands(tmp_path, CONFIG / "smores_dualsense.yaml", "abc123", 2)
+    native = build_argument_parser().parse_args(commands["isaac"][2:])
+    assert native.simple_visuals
+    assert not native.headless
     assert commands["assembly"][3] == "mssr_smores_self_assembly_node"
     assert "joy:=/mssr/teleop_probe/run_abc123/joy" in commands["joy"]
     assert "device_id:=2" in commands["joy"]
