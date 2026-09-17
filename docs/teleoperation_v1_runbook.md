@@ -46,7 +46,7 @@ PYTHONPATH=mssr_ws/src/mssr_expert:scripts/smores_ep/src:$PYTHONPATH python3 -m 
 
 ## T1 installed shell acceptance
 
-The shell publishes `/mssr/teleop/status` JSON at the configured wall-clock rate (default 50 Hz). It exposes input, state, connectivity and recording flags only; it does not write recording episodes, control Isaac or publish robot actions. Observed-topology activation is tested at the internal verified-result boundary; runtime matching belongs to T5. Physical assignments stay deferred.
+At T1 acceptance the shell published `/mssr/teleop/status` JSON at the configured wall-clock rate (default 50 Hz), with input/state/recording flags and no robot commands. The current T2 shell also publishes a separate camera/timeline runtime channel; its native behavior remains unverified. It does not write recording episodes or publish robot actions. Observed-topology activation is tested at the internal verified-result boundary; runtime matching belongs to T5. Physical assignments stay deferred.
 
 Build using a fresh generated build directory to avoid the existing stale config symlink:
 
@@ -67,4 +67,18 @@ ROS_DOMAIN_ID=42 python3 scripts/teleop/check_teleop_shell.py
 
 This runs scoped cleanup before and after a real launch, sends synthetic Joy on an exclusive topic, exercises START press/hold/release/repress and stale input, and verifies actual ROS clock stamps remain zero while diagnostics progress. `T1_SHELL_RESULT` must report `passed=true`; reports and captured statuses are ignored under `logs/teleop/shell_checks/`. It does not require physical button decisions.
 
-Accepted evidence: `logs/teleop/shell_checks/ba5a717143d141df9b586505fb759df3/report.json`, 44 diagnostics at 50.0002 Hz, all gates passing, final cleanup zero survivors. T2 remains unimplemented.
+Accepted T1 evidence: `logs/teleop/shell_checks/ba5a717143d141df9b586505fb759df3/report.json`, 44 diagnostics at 50.0002 Hz, all gates passing, final cleanup zero survivors. This predates T2 integration.
+
+## T2 pending native gate
+
+Foundation and production integration are committed, with user-run **794 passed in 17.17s** and read-only review. Native Isaac pause/frozen physics/resume, updated ROS runtime and GUI camera acceptance remain pending; T2 is not complete. The user executes terminal tests and runtime checks.
+
+Next native adapter check, not yet executed:
+
+```bash
+cd /home/lorenzo/MSSR_thesis
+source /opt/ros/humble/setup.bash
+ROS_DOMAIN_ID=42 python3 scripts/teleop/check_isaac_runtime.py
+```
+
+Return the complete `T2_RUNTIME_RESULT=...` line and the contents of JSON printed as `REPORT=...`; on failure include relevant errors from that directory's `isaac.log`. This check uses a native rigid-body scene and the runtime adapter with scoped cleanup. It does not establish acceptance of the full production scenario or ROS transport. No physical E-STOP/resume assignment is needed for its explicit synthetic requests.
