@@ -106,26 +106,38 @@ def test_pause_has_priority_and_only_explicit_resume_releases_it():
     assert state.phase == "READY"
 
 
-def test_pause_and_resume_preserve_running_macro():
+def test_estop_interrupts_running_macro_and_resume_does_not_restart_it():
     state = new_state()
     ready(state, "rc_car8")
     state.request_morphology("snake8")
     state.begin_macro()
-    state.pause()
-    assert state.macro_active
+
+    # The physical topology reached before E-STOP is authoritative.
+    state.observe_topology("snake8")
+
+    assert state.pause()
+    assert not state.macro_active
     assert state.authority == "ESTOP"
-    state.resume()
-    assert state.phase == "STRUCTURAL_MACRO"
-    assert state.authority == "STRUCTURAL_MACRO"
+    assert state.active_controller == "snake8"
+
+    assert state.resume()
+    assert state.phase == "READY"
+    assert state.authority == "TELEOP"
+    assert state.active_controller == "snake8"
 
 
-def test_macro_terminal_while_paused_never_resumes_teleop():
+def test_macro_terminal_after_estop_interruption_is_ignored():
     state = new_state()
     ready(state, "snake8")
     state.request_morphology("mobile_manipulator8")
     state.begin_macro()
-    state.pause()
-    state.finish_macro(success=False)
+
+    assert state.pause()
+    assert not state.macro_active
+
+    # A late terminal event from the interrupted execution cannot revive or
+    # re-finalize that macro.
+    assert not state.finish_macro(success=True)
     assert state.phase == "ESTOP_PAUSED"
     assert state.authority == "ESTOP"
 
@@ -223,3 +235,28 @@ def test_finish_without_running_macro_cannot_mutate_recording_or_state():
     assert not state.finish_macro(success=False)
     assert state.last_macro_success is None
     assert state.recording
+
+
+
+def test_estop_interrupt_clears_deferred_recording_stop_but_keeps_recording_open():
+    state = new_state()
+    ready(state, "rc_car8")
+
+    state.toggle_recording()
+    assert state.recording
+
+    state.request_morphology("snake8")
+    assert state.begin_macro()
+
+    # User asks to stop recording, but normal macro completion would defer it.
+    state.toggle_recording()
+    assert state.recording
+    assert state.recording_stop_pending
+
+    # E-STOP interrupts the macro. Recording itself must remain open, while
+    # the deferred stop tied to that now-dead macro must not leak forward.
+    assert state.pause()
+
+    assert not state.macro_active
+    assert state.recording
+    assert not state.recording_stop_pending

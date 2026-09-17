@@ -1,4 +1,4 @@
-"""Timeline requests and camera channel, using a controlled timeline fixture."""
+"""Structure-stop and camera runtime channel without Isaac timeline control."""
 import importlib
 import importlib.util
 import json
@@ -6,98 +6,152 @@ import json
 import pytest
 
 
-def runtime(tmp_path, playing=True):
+def runtime(tmp_path):
     module = "smores_ep.isaac.teleop_runtime"
-    assert importlib.util.find_spec(module) is not None, "missing T2 Isaac runtime adapter"
-    timeline = Timeline(playing)
+    assert importlib.util.find_spec(module) is not None
+
+    stop_calls = []
     cameras = []
+
+    request_file = tmp_path / "request.json"
+    status_file = tmp_path / "status.json"
+
     bridge = importlib.import_module(module).TeleopRuntimeBridge(
-        timeline, tmp_path / "request.json", tmp_path / "status.json",
+        request_file,
+        status_file,
+        structure_stop_callback=lambda active: stop_calls.append(active),
         camera_callback=lambda eye, target: cameras.append((eye, target)),
-        center_callback=lambda: (3.0, 4.0, 0.2))
-    return bridge, timeline, cameras
+        center_callback=lambda: (3.0, 4.0, 0.2),
+    )
+    return bridge, request_file, status_file, stop_calls, cameras
 
 
-class Timeline:
-    def __init__(self, playing):
-        self.playing = playing
-        self.calls = []
-
-    def is_playing(self):
-        return self.playing
-
-    def pause(self):
-        self.calls.append("pause")
-        self.playing = False
-
-    def play(self):
-        self.calls.append("resume")
-        self.playing = True
-
-
-def write(bridge, operation=None, request_id="r1", camera=None):
-    payload = {"schema_version": "mssr.teleop_runtime.v1", "camera": camera}
-    if operation is not None:
-        payload["timeline_request"] = {"id": request_id, "operation": operation}
-    bridge.request_file.write_text(json.dumps(payload))
+def write(
+    request_file,
+    *,
+    active=None,
+    request_id="r1",
+    camera=None,
+):
+    payload = {
+        "schema_version": "mssr.teleop_runtime.v1",
+        "camera": camera,
+    }
+    if active is not None:
+        payload["structure_stop_request"] = {
+            "id": request_id,
+            "active": active,
+        }
+    request_file.write_text(json.dumps(payload))
 
 
-def test_pause_is_acknowledged_and_duplicate_request_is_idempotent(tmp_path):
-    bridge, timeline, _ = runtime(tmp_path)
-    write(bridge, "pause")
+def test_structure_stop_is_acknowledged_and_duplicate_is_idempotent(tmp_path):
+    bridge, request_file, status_file, stop_calls, _ = runtime(tmp_path)
+
+    write(request_file, active=True)
     status = bridge.poll()
-    assert not status["timeline_playing"]
-    assert status["timeline_ack"] == {"id": "r1", "operation": "pause", "applied": True}
+
+    assert status["structure_stopped"] is True
+    assert status["structure_stop_ack"] == {
+        "id": "r1",
+        "active": True,
+        "applied": True,
+    }
+    assert stop_calls == [True]
+
     bridge.poll()
-    assert timeline.calls == ["pause"]
-    assert json.loads(bridge.status_file.read_text())["timeline_ack"] == status["timeline_ack"]
+    assert stop_calls == [True]
+
+    persisted = json.loads(status_file.read_text())
+    assert persisted["structure_stop_ack"] == status["structure_stop_ack"]
 
 
-def test_resume_can_be_processed_while_physics_is_paused(tmp_path):
-    bridge, timeline, _ = runtime(tmp_path, playing=False)
-    write(bridge, "resume")
-    assert bridge.poll()["timeline_playing"]
-    assert timeline.calls == ["resume"]
+def test_structure_stop_can_be_explicitly_cleared(tmp_path):
+    bridge, request_file, _, stop_calls, _ = runtime(tmp_path)
 
-
-def test_old_pause_replay_cannot_pause_after_a_new_resume(tmp_path):
-    bridge, timeline, _ = runtime(tmp_path)
-    write(bridge, "pause", "r1")
+    write(request_file, active=True, request_id="stop-1")
     bridge.poll()
-    write(bridge, "resume", "r2")
-    bridge.poll()
-    write(bridge, "pause", "r1")
-    bridge.poll()
-    assert timeline.playing and timeline.calls == ["pause", "resume"]
+
+    write(request_file, active=False, request_id="clear-1")
+    status = bridge.poll()
+
+    assert status["structure_stopped"] is False
+    assert status["structure_stop_ack"] == {
+        "id": "clear-1",
+        "active": False,
+        "applied": True,
+    }
+    assert stop_calls == [True, False]
 
 
-def test_camera_changes_follow_live_center_even_while_paused(tmp_path):
-    bridge, timeline, cameras = runtime(tmp_path, playing=False)
-    write(bridge, camera={"azimuth_rad": 0.0, "elevation_rad": 0.5, "radius_m": 2.0})
-    assert bridge.poll()["camera_applied"]
+def test_camera_remains_available_while_structure_is_stopped(tmp_path):
+    bridge, request_file, _, _, cameras = runtime(tmp_path)
+
+    write(request_file, active=True, request_id="stop-1")
+    bridge.poll()
+
+    write(
+        request_file,
+        camera={
+            "azimuth_rad": 0.0,
+            "elevation_rad": 0.5,
+            "radius_m": 2.0,
+        },
+    )
+    status = bridge.poll()
+
+    assert status["structure_stopped"] is True
+    assert status["camera_applied"] is True
     assert cameras[-1][1] == (3.0, 4.0, 0.2)
-    assert not timeline.playing and not timeline.calls
 
 
-def test_invalid_camera_does_not_prevent_estop(tmp_path):
-    bridge, timeline, cameras = runtime(tmp_path)
-    write(bridge, "pause", camera={"radius_m": -1})
+def test_invalid_camera_does_not_prevent_structure_stop(tmp_path):
+    bridge, request_file, _, stop_calls, cameras = runtime(tmp_path)
+
+    write(
+        request_file,
+        active=True,
+        request_id="stop-1",
+        camera={"radius_m": -1},
+    )
     status = bridge.poll()
-    assert not timeline.playing and not cameras
-    assert status["timeline_ack"]["applied"] and status["error"]
+
+    assert status["structure_stopped"] is True
+    assert status["structure_stop_ack"]["applied"] is True
+    assert stop_calls == [True]
+    assert cameras == []
+    assert status["error"]
 
 
-@pytest.mark.parametrize("payload", ["{", "[]", "null", '{"schema_version":"wrong"}',
-    '{"schema_version":"mssr.teleop_runtime.v1","timeline_request":{"id":"r1","operation":"stop"}}'])
-def test_malformed_or_unsupported_request_cannot_control_timeline(tmp_path, payload):
-    bridge, timeline, _ = runtime(tmp_path)
-    bridge.request_file.write_text(payload)
-    assert bridge.poll()["error"]
-    assert timeline.playing and not timeline.calls
+@pytest.mark.parametrize(
+    "payload",
+    [
+        "{",
+        "[]",
+        "null",
+        '{"schema_version":"wrong"}',
+        (
+            '{"schema_version":"mssr.teleop_runtime.v1",'
+            '"structure_stop_request":{"id":"r1","active":"yes"}}'
+        ),
+    ],
+)
+def test_malformed_request_cannot_change_structure_state(tmp_path, payload):
+    bridge, request_file, _, stop_calls, _ = runtime(tmp_path)
+
+    request_file.write_text(payload)
+    status = bridge.poll()
+
+    assert status["error"]
+    assert status["structure_stopped"] is False
+    assert stop_calls == []
 
 
-def test_no_request_still_reports_real_timeline_state(tmp_path):
-    bridge, timeline, _ = runtime(tmp_path)
-    assert bridge.poll()["timeline_playing"]
-    timeline.playing = False
-    assert not bridge.poll()["timeline_playing"]
+def test_no_request_reports_current_structure_state(tmp_path):
+    bridge, _, _, stop_calls, _ = runtime(tmp_path)
+
+    status = bridge.poll()
+
+    assert status["structure_stopped"] is False
+    assert status["structure_stop_ack"] is None
+    assert stop_calls == []

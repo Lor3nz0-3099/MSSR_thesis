@@ -1,4 +1,4 @@
-"""External teleoperation shell with a separate timeline/camera channel."""
+"""External teleoperation shell with separate structure-stop and camera channels."""
 from __future__ import annotations
 
 import json
@@ -37,7 +37,7 @@ class SmoresTeleopNode(Node):
         self._runtime_request = self.create_publisher(String, runtime_request_topic, 10)
         self._runtime_status = self.create_subscription(String, runtime_status_topic, self._on_runtime_status, 10)
         self._joy = self.create_subscription(Joy, joy_topic, self._on_joy, qos_profile_sensor_data)
-        # Input age and diagnostics must progress while Isaac's simulation clock is paused.
+        # Input age and diagnostics use a steady wall clock independent of Isaac simulation time.
         self._wall_clock = Clock(clock_type=ClockType.STEADY_TIME)
         self._timer = self.create_timer(1.0 / rate, self._tick, clock=self._wall_clock)
         self.get_logger().info(f"Teleop diagnostics at {rate:g} Hz; actuator transport disabled")

@@ -31,6 +31,10 @@ class _State:
 class _Drive:
     def __init__(self) -> None:
         self.commands: list[SmoresCommand] = []
+        self.posture_captures = 0
+
+    def initialize_from_measured_posture(self) -> None:
+        self.posture_captures += 1
 
     def apply(self, command: SmoresCommand) -> tuple[float, float]:
         self.commands.append(command)
@@ -205,3 +209,84 @@ def test_fold_pusher_drives_wheels_and_holds_internal_structure() -> None:
     assert states["locomotor"].modes == ["wheels_and_internal"]
     assert drives["locomotor"].commands[-1].pan_target_rad == 0.0
     assert drives["locomotor"].commands[-1].tilt_target_rad == 0.4
+
+
+
+def test_emergency_stop_captures_once_and_overrides_all_motion_commands() -> None:
+    router, states, drives = _router()
+
+    router.set_emergency_stop(True)
+
+    # Entry captures the physically reached posture exactly once.
+    assert drives["locomotor"].posture_captures == 1
+    assert drives["payload"].posture_captures == 1
+
+    # Every module is put into braked-wheel/internal-hold mode.
+    assert states["locomotor"].modes[-1] == "internal_with_wheel_brake"
+    assert states["payload"].modes[-1] == "internal_with_wheel_brake"
+
+    # Capturing the stop must not synthesize a normal morphology command.
+    assert drives["locomotor"].commands == []
+    assert drives["payload"].commands == []
+
+    # Even a later locomotion/internal-motion command cannot bypass E-STOP.
+    rates = router.apply(
+        {
+            "locomotor": SmoresCommand(
+                linear_x_m_s=0.08,
+                angular_z_rad_s=0.4,
+                internal_motion=InternalMotionMode.PAN_VELOCITY,
+                pan_velocity_rad_s=1.0,
+            )
+        }
+    )
+
+    assert rates == {
+        "locomotor": (0.0, 0.0),
+        "payload": (0.0, 0.0),
+    }
+    assert drives["locomotor"].commands == []
+    assert drives["payload"].commands == []
+
+    # Repeated STOP delivery must not recapture a slightly changed posture.
+    router.set_emergency_stop(True)
+    assert drives["locomotor"].posture_captures == 1
+    assert drives["payload"].posture_captures == 1
+
+
+def test_emergency_stop_clear_does_not_move_robot_and_fresh_command_can_resume() -> None:
+    router, _, drives = _router()
+
+    router.set_emergency_stop(True)
+
+    capture_counts = {
+        module_id: drive.posture_captures
+        for module_id, drive in drives.items()
+    }
+    command_counts = {
+        module_id: len(drive.commands)
+        for module_id, drive in drives.items()
+    }
+
+    router.set_emergency_stop(False)
+
+    # Clearing the latch must not itself touch actuator targets.
+    assert {
+        module_id: drive.posture_captures
+        for module_id, drive in drives.items()
+    } == capture_counts
+    assert {
+        module_id: len(drive.commands)
+        for module_id, drive in drives.items()
+    } == command_counts
+
+    # A later fresh command may pass normally.
+    router.apply(
+        {
+            "locomotor": SmoresCommand(
+                linear_x_m_s=0.03,
+            )
+        }
+    )
+
+    assert drives["locomotor"].commands[-1].linear_x_m_s == 0.03

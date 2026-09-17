@@ -112,6 +112,19 @@ class TeleopState:
     def pause(self) -> bool:
         if self.estop_active:
             return False
+
+        interrupted_macro = self.macro_active
+
+        # E-STOP terminates structural-macro authority immediately.
+        # The actually observed topology remains authoritative and the
+        # interrupted macro must not resume automatically.
+        self._macro_active = False
+
+        # A deferred recording stop belongs to the interrupted macro's
+        # normal terminal event. E-STOP keeps recording open instead.
+        if interrupted_macro:
+            self._recording_stop_pending = False
+
         self._estop_active = True
         return True
 

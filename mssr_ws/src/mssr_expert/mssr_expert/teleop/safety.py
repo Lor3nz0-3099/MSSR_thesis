@@ -2,7 +2,7 @@
 
 A safe-hold decision preserves posture targets and commands zero wheels.
 Structural macro authority is kept on disconnect; its own commands must not
-be replaced by teleop safe hold. The Isaac timeline adapter enforces ESTOP.
+be replaced by teleop safe hold. The structure-stop runtime boundary enforces E-STOP without pausing Isaac physics.
 """
 from dataclasses import dataclass
 import math

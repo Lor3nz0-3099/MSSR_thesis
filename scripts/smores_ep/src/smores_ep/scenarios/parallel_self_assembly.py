@@ -29,6 +29,7 @@ from smores_ep.primitives.file_channel import (
     ActionFileChannel,
     PrimitiveFileChannel,
 )
+from smores_ep.primitives.model import PrimitiveState, PrimitiveStatus
 from smores_ep.primitives.pose_control import PoseControllerConfig
 
 
@@ -333,13 +334,75 @@ class _RealtimeRenderPacer:
         self._deadline_s = now_s
 
 
-def _service_teleop_runtime(runtime, simulation_app) -> bool:
-    """Keep app/request servicing alive while skipping all paused robot work."""
-    if not runtime.poll()["timeline_playing"]:
-        simulation_app.update()
-        time.sleep(0.005)
-        return False
-    return True
+def _service_teleop_runtime(runtime) -> dict:
+    """Poll teleop runtime without stopping simulation or physics progress."""
+    return runtime.poll()
+
+
+def _apply_structure_stop(
+    active: bool,
+    command_router,
+    primitive_executor,
+    action_channel,
+    module_ids: tuple[str, ...],
+    now_s: float,
+    *,
+    held_primitive_commands: dict[str, SmoresCommand] | None = None,
+) -> tuple:
+    """Apply structure E-STOP and terminate in-flight primitive authority.
+
+    Entering E-STOP first closes the final actuator boundary, then quarantines
+    any already-published behavior command and cancels every active primitive.
+    Clearing E-STOP only releases the router latch; nothing resumes
+    automatically.
+    """
+    command_router.set_emergency_stop(active)
+
+    if not active:
+        return ()
+
+    if held_primitive_commands is None:
+        # Compatibility for isolated/unit callers that do not own the
+        # production held-command cache.
+        action_channel.invalidate_modules(module_ids)
+    else:
+        invalidate_module_command_sources(
+            module_ids,
+            action_channel=action_channel,
+            held_primitive_commands=held_primitive_commands,
+        )
+
+    statuses = []
+    for goal in tuple(primitive_executor.active_goals):
+        status = primitive_executor.cancel(goal.goal_id, now_s)
+        if status is not None:
+            statuses.append(status)
+
+    return tuple(statuses)
+
+
+def _admit_primitive_goal(
+    primitive_executor,
+    goal,
+    now_s: float,
+    *,
+    structure_stopped: bool,
+):
+    """Reject new primitive authority while structure E-STOP is latched."""
+    if not structure_stopped:
+        return primitive_executor.submit(goal, now_s)
+
+    return PrimitiveStatus(
+        goal_id=goal.goal_id,
+        primitive=goal.primitive,
+        state=PrimitiveState.REJECTED,
+        stamp_s=now_s,
+        module_ids=goal.module_ids,
+        phase="estop",
+        progress=0.0,
+        code="ESTOP_ACTIVE",
+        message="primitive goal rejected while structure E-STOP is active",
+    )
 
 
 def run_parallel_self_assembly_scenario(
@@ -350,7 +413,6 @@ def run_parallel_self_assembly_scenario(
 
     import isaacsim.core.experimental.utils.app as app_utils
     import isaacsim.core.experimental.utils.stage as stage_utils
-    import omni.timeline
     from isaacsim.core.rendering_manager import ViewportManager
     from isaacsim.core.simulation_manager import SimulationManager
 
@@ -758,16 +820,44 @@ def run_parallel_self_assembly_scenario(
                      for root in module_roots.values()]
         return tuple(sum(float(position[index]) for position in positions) / len(positions) for index in range(3))
 
+    def handle_structure_stop(active: bool) -> None:
+        nonlocal last_primitive_status
+
+        now_s = SimulationManager.get_simulation_time()
+        statuses = _apply_structure_stop(
+            active,
+            command_router,
+            primitive_executor,
+            action_channel,
+            tuple(module_roots),
+            now_s,
+            held_primitive_commands=held_primitive_commands,
+        )
+
+        if statuses:
+            current_step = (
+                SimulationManager.get_num_physics_steps()
+                - initial_step
+            )
+            last_primitive_status = _publish_primitive_statuses(
+                primitive_channel,
+                statuses,
+                terminal_status_by_goal,
+                now_s,
+                current_step,
+                state_publish_interval,
+                last_primitive_status,
+            )
+
     runtime = TeleopRuntimeBridge(
-        omni.timeline.get_timeline_interface(),
         Path(config.action_file).with_name("smores_teleop_runtime_request.json"),
         config.primitive_status_file.with_name("smores_teleop_runtime_status.json"),
+        structure_stop_callback=handle_structure_stop,
         camera_callback=(None if config.headless else
             lambda eye, target: ViewportManager.set_camera_view("/OmniverseKit_Persp", eye=list(eye), target=list(target))),
         center_callback=camera_center)
     while simulation_app.is_running():
-        if not _service_teleop_runtime(runtime, simulation_app):
-            continue
+        runtime_status = _service_teleop_runtime(runtime)
         physics_step = (
             SimulationManager.get_num_physics_steps()
             - initial_step
@@ -789,9 +879,13 @@ def run_parallel_self_assembly_scenario(
         try:
             primitive_goal = primitive_channel.poll_goal()
             if primitive_goal is not None:
-                accepted = primitive_executor.submit(
+                accepted = _admit_primitive_goal(
+                    primitive_executor,
                     primitive_goal,
                     now_s,
+                    structure_stopped=bool(
+                        runtime_status["structure_stopped"]
+                    ),
                 )
                 admission_statuses.append(accepted)
                 primitive_channel.publish(accepted)

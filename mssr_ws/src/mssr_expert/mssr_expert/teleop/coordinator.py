@@ -13,43 +13,91 @@ class RuntimeCoordinator:
         self.camera = camera if camera is not None else CameraController()
         self.runtime = RuntimeChannel()
         self.safety = SafetyGate()
-        self._paused = False
+        self._estop_latched = False
         self._previous_tick = None
 
     def observe_runtime(self, payload, now):
         operation = self.runtime.observe(payload, now)
-        if operation == "resume":
+
+        if operation == "clear":
+            # Clear is accepted only after the runtime confirms that the
+            # structure-stop state has actually been removed.
             self.safety.resume(resumed_at=now)
             self.session.state.resume()
-            self._paused = False
-        elif self.runtime.ready(now) and self.runtime.timeline_playing is False:
+            self._estop_latched = False
+
+        elif operation == "stop":
             self.safety.pause()
             self.session.state.pause()
-            self._paused = True
+            self._estop_latched = True
+
+        elif (
+            self.runtime.ready(now)
+            and self.runtime.structure_stopped is True
+        ):
+            # A stop observed directly from the runtime is authoritative too.
+            # Fresh neutral input alone must never clear it.
+            self.safety.pause()
+            self.session.state.pause()
+            self._estop_latched = True
 
     def tick(self, now):
-        was_paused = self._paused
+        was_stopped = self._estop_latched
+
         status = self.session.tick(now)
         sample = status["controller_input"]
         commands = sample["command_events"]
+
         if "estop" in commands:
+            # E-STOP takes effect in the teleop safety layer immediately.
+            # Runtime delivery then makes the stop authoritative at Isaac.
             self.safety.pause()
-            self._paused = True
-            self.runtime.request("pause")
-        elif "resume" in commands and was_paused:
-            self.runtime.request("resume")
-        # Session handles intent; only the matching runtime acknowledgment clears ESTOP.
-        if self._paused:
+            self._estop_latched = True
+            self.runtime.request_stop(True)
+
+        elif "resume" in commands and was_stopped:
+            # Explicit resume requests a clear, but the latch remains set
+            # until the matching runtime acknowledgment arrives.
+            self.runtime.request_stop(False)
+
+        if self._estop_latched:
             self.session.state.pause()
+
         ready = self.runtime.ready(now)
+
         decision = self.safety.update(
-            connected=sample["connected"] and ready and self.runtime.timeline_playing is True,
-            l2=sample["l2"], r2=sample["r2"], received_at=sample["last_message_at"],
+            connected=(
+                sample["connected"]
+                and ready
+                and self.runtime.structure_stopped is False
+            ),
+            l2=sample["l2"],
+            r2=sample["r2"],
+            received_at=sample["last_message_at"],
             macro_active=self.session.state.macro_active,
-            topology_supported=self.session.state.active_controller is not None)
-        dt = 0.0 if self._previous_tick is None else now - self._previous_tick
-        orbit = self.camera.step(SimpleNamespace(**sample), dt)
+            topology_supported=(
+                self.session.state.active_controller is not None
+            ),
+        )
+
+        dt = (
+            0.0
+            if self._previous_tick is None
+            else now - self._previous_tick
+        )
+
+        orbit = self.camera.step(
+            SimpleNamespace(**sample),
+            dt,
+        )
+
         self._previous_tick = now
+
         status.update(self.session.state.status())
-        status.update(runtime_bridge_ready=ready, safety=asdict(decision))
+        status.update(
+            runtime_bridge_ready=ready,
+            runtime_structure_stopped=self.runtime.structure_stopped,
+            safety=asdict(decision),
+        )
+
         return status, self.runtime.payload(asdict(orbit))

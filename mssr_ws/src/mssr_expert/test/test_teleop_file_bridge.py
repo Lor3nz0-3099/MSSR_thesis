@@ -48,7 +48,7 @@ def bridge(tmp_path, monkeypatch):
 
 def test_runtime_request_never_writes_robot_or_primitive_files(tmp_path, monkeypatch):
     node, _, subscriptions, _ = bridge(tmp_path, monkeypatch)
-    payload = '{"schema_version":"mssr.teleop_runtime.v1","timeline_request":{"id":"p1","operation":"pause"}}'
+    payload = '{"schema_version":"mssr.teleop_runtime.v1","structure_stop_request":{"id":"p1","active":true}}'
     subscriptions["/mssr/teleop/runtime_request"](SimpleNamespace(data=payload))
     assert (tmp_path / "runtime_request.json").read_text() == payload
     assert not any((tmp_path / name).exists() for name in ("actions.json", "goal.json", "cancel.json"))
@@ -56,7 +56,7 @@ def test_runtime_request_never_writes_robot_or_primitive_files(tmp_path, monkeyp
 
 def test_runtime_status_has_its_own_topic(tmp_path, monkeypatch):
     node, publishers, _, _ = bridge(tmp_path, monkeypatch)
-    payload = '{"schema_version":"mssr.teleop_runtime_status.v1","timeline_playing":false}'
+    payload = '{"schema_version":"mssr.teleop_runtime_status.v1","structure_stopped":true,"structure_stop_ack":{"id":"p1","active":true,"applied":true}}'
     (tmp_path / "runtime_status.json").write_text(payload)
     node._publish_files()
     assert publishers["/mssr/teleop/runtime_status"] == [payload]

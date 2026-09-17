@@ -274,3 +274,40 @@ def test_invalid_domain_fails_before_runtime_without_mutating_environment(tmp_pa
 def test_previous_failed_probe_is_a_cleanup_candidate():
     assert load_script("runtime_cleanup").is_runtime_command(
         ["python3", str(ROOT / "scripts/teleop/check_dualsense.py")], ROOT)
+
+
+def test_isaac_runtime_checker_exposes_configurable_timeout_cli():
+    result = subprocess.run(
+        [sys.executable, str(ROOT / "scripts/teleop/check_isaac_runtime.py"), "--help"],
+        cwd=ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert result.returncode == 0
+    assert "--timeout-s" in result.stdout
+
+
+
+def test_isaac_runtime_checker_uses_structure_stop_not_timeline():
+    source = (
+        ROOT / "scripts/teleop/check_isaac_runtime.py"
+    ).read_text()
+
+    assert "structure_stop_request" in source
+    assert "structure_stopped" in source
+    assert "structure_stop_ack" in source
+
+    assert "omni.timeline" not in source
+    assert "timeline_request" not in source
+    assert "timeline_playing" not in source
+    assert "timeline_ack" not in source
+
+
+def test_isaac_runtime_checker_keeps_configurable_timeout_after_migration():
+    source = (
+        ROOT / "scripts/teleop/check_isaac_runtime.py"
+    ).read_text()
+
+    assert "--timeout-s" in source
+    assert "args.timeout_s" in source

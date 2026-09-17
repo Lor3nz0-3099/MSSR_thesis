@@ -40,6 +40,41 @@ class IsaacMultiModuleCommandRouter:
         self._drives = dict(drives)
         self._docking = docking
         self._configured: dict[str, RoutedModuleState] = {}
+        self._emergency_stop_active = False
+
+    def set_emergency_stop(self, active: bool) -> None:
+        """Latch or clear structure-only emergency actuator hold.
+
+        Entering the stop captures the physically reached posture once.
+        While latched, normal morphology/primitive commands cannot reach
+        the module drives. Clearing the latch does not itself command motion.
+        """
+        if not isinstance(active, bool):
+            raise ValueError("emergency stop state must be a bool")
+
+        if active == self._emergency_stop_active:
+            return
+
+        if not active:
+            self._emergency_stop_active = False
+            return
+
+        self._emergency_stop_active = True
+
+        for module_id, state in self._states.items():
+            docked_faces = self._connected_faces(module_id)
+
+            # Capture the real posture reached at the stop edge. This writes
+            # zero wheel velocity and retains measured PAN/TILT targets.
+            self._drives[module_id].initialize_from_measured_posture()
+
+            # Brake wheel motion and energize the internal hold profile.
+            state.configure_internal_drive_with_braked_wheels(docked_faces)
+
+            self._configured[module_id] = RoutedModuleState(
+                "emergency_hold",
+                docked_faces,
+            )
 
     def reset_free_modules(self, module_ids: tuple[str, ...]) -> None:
         """Apply the spawn initializer only to physically isolated modules."""
@@ -67,6 +102,16 @@ class IsaacMultiModuleCommandRouter:
                 "Commands reference unknown module(s): "
                 + ", ".join(sorted(unknown))
             )
+
+        # Absolute actuator boundary: while E-STOP is latched, no teleop,
+        # morphology or primitive command is allowed to reach a drive.
+        # The targets captured on the stop edge remain installed in PhysX.
+        if self._emergency_stop_active:
+            return {
+                module_id: (0.0, 0.0)
+                for module_id in self._states
+            }
+
         wheel_rates: dict[str, tuple[float, float]] = {}
         for module_id, state in self._states.items():
             docked_faces = self._connected_faces(module_id)
