@@ -46,6 +46,8 @@ def main() -> int:
     command = ["ros2", "launch", "mssr_expert", "smores_teleop.launch.py",
                "start_joy:=false", "use_sim_time:=true", f"joy_topic:={joy_topic}",
                f"status_topic:={status_topic}", f"node_name:={shell_name}"]
+    command.extend([f"runtime_request_topic:=/mssr/teleop_shell_check/run_{run_id}/runtime_request",
+                    f"runtime_status_topic:=/mssr/teleop_shell_check/run_{run_id}/runtime_status"])
 
     def wait_for(predicate, pressed=None, timeout=5.0):
         deadline = time.monotonic() + timeout

@@ -1,4 +1,4 @@
-"""External teleoperation coordinator; T1 exposes diagnostics only."""
+"""External teleoperation shell with a separate timeline/camera channel."""
 from __future__ import annotations
 
 import json
@@ -14,6 +14,7 @@ from sensor_msgs.msg import Joy
 from std_msgs.msg import String
 
 from mssr_expert.teleop.config import control_rate, load_teleop_config
+from mssr_expert.teleop.coordinator import RuntimeCoordinator
 from mssr_expert.teleop.input import load_input_config
 from mssr_expert.teleop.session import TeleopSession
 
@@ -26,10 +27,15 @@ class SmoresTeleopNode(Node):
         teleop_path = self.declare_parameter("teleop_config_path", str(config_dir / "smores_teleop.yaml")).value
         config = load_teleop_config(teleop_path)
         self.session = TeleopSession(load_input_config(input_path))
+        self.coordinator = RuntimeCoordinator(self.session)
         joy_topic = self.declare_parameter("joy_topic", config.joy_topic).value
         status_topic = self.declare_parameter("status_topic", "/mssr/teleop/status").value
         rate = control_rate(self.declare_parameter("control_rate_hz", config.control_rate_hz).value)
         self._status = self.create_publisher(String, status_topic, 10)
+        runtime_request_topic = self.declare_parameter("runtime_request_topic", "/mssr/teleop/runtime_request").value
+        runtime_status_topic = self.declare_parameter("runtime_status_topic", "/mssr/teleop/runtime_status").value
+        self._runtime_request = self.create_publisher(String, runtime_request_topic, 10)
+        self._runtime_status = self.create_subscription(String, runtime_status_topic, self._on_runtime_status, 10)
         self._joy = self.create_subscription(Joy, joy_topic, self._on_joy, qos_profile_sensor_data)
         # Input age and diagnostics must progress while Isaac's simulation clock is paused.
         self._wall_clock = Clock(clock_type=ClockType.STEADY_TIME)
@@ -39,14 +45,24 @@ class SmoresTeleopNode(Node):
     def _on_joy(self, message: Joy) -> None:
         self.session.update_joy(message.axes, message.buttons, time.monotonic())
 
+    def _on_runtime_status(self, message: String) -> None:
+        try:
+            payload = json.loads(message.data)
+        except (ValueError, TypeError):
+            return
+        self.coordinator.observe_runtime(payload, time.monotonic())
+
     def _tick(self) -> None:
-        status = self.session.tick(time.monotonic())
+        status, runtime_request = self.coordinator.tick(time.monotonic())
         status["stamp_ros"] = self.get_clock().now().nanoseconds * 1e-9
-        status.update(actuator_commands_enabled=False, runtime_bridge_ready=False,
+        status.update(actuator_commands_enabled=False,
                       topology_verification_ready=False, recording_backend_ready=False)
         message = String()
         message.data = json.dumps(status, allow_nan=False)
         self._status.publish(message)
+        request = String()
+        request.data = json.dumps(runtime_request, allow_nan=False)
+        self._runtime_request.publish(request)
 
 
 def main(args=None) -> None:

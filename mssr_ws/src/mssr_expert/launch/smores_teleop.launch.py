@@ -30,6 +30,8 @@ def _nodes(context):
                       parameters=[{"input_config_path": argument("input_config_path"),
                                    "teleop_config_path": argument("teleop_config_path"),
                                    "joy_topic": joy_topic, "status_topic": argument("status_topic"),
+                                   "runtime_request_topic": argument("runtime_request_topic"),
+                                   "runtime_status_topic": argument("runtime_status_topic"),
                                    "use_sim_time": use_sim_time == "true"}]))
     return nodes
 
@@ -41,6 +43,8 @@ def generate_launch_description():
         DeclareLaunchArgument("teleop_config_path", default_value=str(config_dir / "smores_teleop.yaml")),
         DeclareLaunchArgument("joy_topic", default_value=""),
         DeclareLaunchArgument("status_topic", default_value="/mssr/teleop/status"),
+        DeclareLaunchArgument("runtime_request_topic", default_value="/mssr/teleop/runtime_request"),
+        DeclareLaunchArgument("runtime_status_topic", default_value="/mssr/teleop/runtime_status"),
         DeclareLaunchArgument("node_name", default_value="mssr_smores_teleop_node"),
         DeclareLaunchArgument("start_joy", default_value="true"),
         DeclareLaunchArgument("use_sim_time", default_value="false"),

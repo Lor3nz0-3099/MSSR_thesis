@@ -11,6 +11,7 @@ import argparse
 from pathlib import Path
 
 import rclpy
+from rclpy.clock import Clock, ClockType
 from rclpy.node import Node
 from rclpy.executors import ExternalShutdownException
 from std_msgs.msg import String
@@ -27,6 +28,8 @@ class MssrFileBridge(Node):
         primitive_cancel_file: Path,
         primitive_status_file: Path,
         publish_period: float,
+        runtime_request_file: Path | None = None,
+        runtime_status_file: Path | None = None,
     ) -> None:
         """Create publishers, subscriber, and periodic file polling."""
         super().__init__("mssr_file_bridge")
@@ -35,6 +38,8 @@ class MssrFileBridge(Node):
         self._primitive_goal_file = primitive_goal_file
         self._primitive_cancel_file = primitive_cancel_file
         self._primitive_status_file = primitive_status_file
+        self._runtime_request_file = runtime_request_file or action_file.with_name("smores_teleop_runtime_request.json")
+        self._runtime_status_file = runtime_status_file or primitive_status_file.with_name("smores_teleop_runtime_status.json")
 
         self._state_pub = self.create_publisher(String, "/mssr/module_states", 10)
         self._graph_pub = self.create_publisher(String, "/mssr/robot_graph", 10)
@@ -63,7 +68,11 @@ class MssrFileBridge(Node):
             self._on_primitive_cancel,
             10,
         )
-        self._timer = self.create_timer(publish_period, self._publish_files)
+        self._runtime_status_pub = self.create_publisher(String, "/mssr/teleop/runtime_status", 10)
+        self._runtime_request_sub = self.create_subscription(
+            String, "/mssr/teleop/runtime_request", self._on_runtime_request, 10)
+        self._wall_clock = Clock(clock_type=ClockType.STEADY_TIME)
+        self._timer = self.create_timer(publish_period, self._publish_files, clock=self._wall_clock)
         self.get_logger().info(f"Reading Isaac JSON payloads from {state_graph_dir}")
         self.get_logger().info(f"Writing incoming actions to {action_file}")
         self.get_logger().info(
@@ -82,6 +91,7 @@ class MssrFileBridge(Node):
             self._primitive_status_file,
             self._primitive_status_pub,
         )
+        self._publish_path(self._runtime_status_file, self._runtime_status_pub)
 
     def _publish_file(self, filename: str, publisher: object) -> None:
         """Publish one JSON file if it exists."""
@@ -109,6 +119,10 @@ class MssrFileBridge(Node):
     def _on_primitive_cancel(self, message: String) -> None:
         """Forward a primitive cancellation request to Isaac."""
         self._write_atomic(self._primitive_cancel_file, message.data)
+
+    def _on_runtime_request(self, message: String) -> None:
+        """Forward timeline/camera intent without touching robot-action files."""
+        self._write_atomic(self._runtime_request_file, message.data)
 
     @staticmethod
     def _write_atomic(path: Path, payload: str) -> None:
@@ -152,6 +166,10 @@ def parse_args() -> argparse.Namespace:
         default="logs/bridge/smores_primitive_status.json",
         help="Status file produced by Isaac and published to ROS 2.",
     )
+    parser.add_argument("--runtime-request-file", default=None,
+                        help="Separate teleop timeline/camera request file; defaults beside action file.")
+    parser.add_argument("--runtime-status-file", default=None,
+                        help="Isaac timeline acknowledgment file; defaults beside primitive status file.")
     return parser.parse_args()
 
 
@@ -166,6 +184,8 @@ def main() -> None:
         primitive_cancel_file=Path(args.primitive_cancel_file),
         primitive_status_file=Path(args.primitive_status_file),
         publish_period=args.publish_period,
+        runtime_request_file=Path(args.runtime_request_file) if args.runtime_request_file else None,
+        runtime_status_file=Path(args.runtime_status_file) if args.runtime_status_file else None,
     )
     try:
         rclpy.spin(node)

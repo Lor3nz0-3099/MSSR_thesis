@@ -24,6 +24,7 @@ from smores_ep.isaac.multi_module_stage import (
 from smores_ep.isaac.physics_asset import PHYSICS_ROOT
 from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
 from smores_ep.isaac.state_graph_publisher import SmoresStateGraphPublisher
+from smores_ep.isaac.teleop_runtime import TeleopRuntimeBridge
 from smores_ep.primitives.file_channel import (
     ActionFileChannel,
     PrimitiveFileChannel,
@@ -332,6 +333,15 @@ class _RealtimeRenderPacer:
         self._deadline_s = now_s
 
 
+def _service_teleop_runtime(runtime, simulation_app) -> bool:
+    """Keep app/request servicing alive while skipping all paused robot work."""
+    if not runtime.poll()["timeline_playing"]:
+        simulation_app.update()
+        time.sleep(0.005)
+        return False
+    return True
+
+
 def run_parallel_self_assembly_scenario(
     config: SelfAssemblySimulationConfig,
     simulation_app: object,
@@ -340,6 +350,7 @@ def run_parallel_self_assembly_scenario(
 
     import isaacsim.core.experimental.utils.app as app_utils
     import isaacsim.core.experimental.utils.stage as stage_utils
+    import omni.timeline
     from isaacsim.core.rendering_manager import ViewportManager
     from isaacsim.core.simulation_manager import SimulationManager
 
@@ -740,7 +751,23 @@ def run_parallel_self_assembly_scenario(
         if config.realtime_pacing
         else None
     )
+    def camera_center():
+        from pxr import UsdGeom
+        cache = UsdGeom.XformCache()
+        positions = [cache.GetLocalToWorldTransform(stage.GetPrimAtPath(f"{root}/body_link")).ExtractTranslation()
+                     for root in module_roots.values()]
+        return tuple(sum(float(position[index]) for position in positions) / len(positions) for index in range(3))
+
+    runtime = TeleopRuntimeBridge(
+        omni.timeline.get_timeline_interface(),
+        Path(config.action_file).with_name("smores_teleop_runtime_request.json"),
+        config.primitive_status_file.with_name("smores_teleop_runtime_status.json"),
+        camera_callback=(None if config.headless else
+            lambda eye, target: ViewportManager.set_camera_view("/OmniverseKit_Persp", eye=list(eye), target=list(target))),
+        center_callback=camera_center)
     while simulation_app.is_running():
+        if not _service_teleop_runtime(runtime, simulation_app):
+            continue
         physics_step = (
             SimulationManager.get_num_physics_steps()
             - initial_step
