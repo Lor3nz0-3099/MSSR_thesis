@@ -90,6 +90,9 @@ def main() -> int:
     args = parser.parse_args()
     if args.native_output is not None:
         return native(args.native_output)
+    # The documented system-Python command sources Humble, not the workspace.
+    # Load the checkout package required by the shared probe environment helper.
+    sys.path.insert(0, str(ROOT / "mssr_ws/src/mssr_expert"))
     from check_dualsense import configure_probe_environment
     from runtime_cleanup import scoped_cleanup
     output = ROOT / "logs/teleop/runtime_checks" / uuid4().hex

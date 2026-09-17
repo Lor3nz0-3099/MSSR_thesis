@@ -8,7 +8,7 @@ Latest implementation commit: **`39c2839c616bc47da707aea87b4ede2465147f43`**, `f
 
 Foundation: `1ff2a57465b5da5fed4862d7e8097ff0d56a82f3`. T1: `5ad1f7d`. This handoff/plan/runbook are committed in a subsequent documentation checkpoint; get latest HEAD with `git rev-parse HEAD` or the assistant final response.
 
-User confirmed pushing the previous documentation checkpoint `9f7e3db`; local integration and new documentation commits have not been pushed by the agent. The remote branch was observed at `9f7e3db` before these new commits.
+User confirmed pushing the previous documentation checkpoint `9f7e3db`. At the latest native-timeout checkpoint the user explicitly authorized an agent commit and preventive push of subsequent work. Final push result and HEAD are reported in the assistant response; verify them when resuming.
 
 ## Milestones and user constraints
 
@@ -84,4 +84,14 @@ After documentation commit, only the unrelated pre-existing untracked file shoul
 ?? docs/2026-09-17-teleoperation-v1-design.md
 ```
 
-It is untouched and must not be staged. All session implementation/documentation work is committed and can be preserved by the user’s next push. No tests currently reported failed after final user 794-pass regression; native, updated runtime and GUI gates remain pending. No agent push executed.
+It is untouched and must not be staged. The user requested a preventive commit/push at 91% context. Full regression last passed 794 tests before the checker-only bootstrap fix; no full regression after that tiny correction was run by the agent. Native checker subsequently timed out, as recorded below; updated runtime and GUI gates remain pending.
+
+## Latest native-check bootstrap and startup-timeout checkpoint
+
+User ran the exact native command and observed `ModuleNotFoundError: No module named 'mssr_expert'` while importing the shared environment helper, before cleanup or Isaac startup. Checker now adds the checkout `mssr_ws/src/mssr_expert` to `sys.path` in the system-Python branch before importing that helper. User rerun passed that bootstrap, performed scoped cleanup and launched native Isaac. Import correction is verified by this actual rerun; it does not prove native physics/timeline behavior. No agent tests/runtimes executed.
+
+Native result: **passed=false**, `TimeoutExpired(..., 180)`, native process terminated with -15. Report `logs/teleop/runtime_checks/9d37a441a5fd4c14b0fb1fcaac55f35b/report.json`; git code checkpoint recorded as `911acba` (bootstrap fix was then a working change). Cleanup before/after selected no survivors and stopped the daemon. Both report and log were read by the agent, without launching tests. `isaac.log` still shows extension startup through approximately 172 seconds, with no observed native gate completion. Inference: initialization consumed the current 180-second deadline; do not label this a successful pause/resume or assume a timeline defect from the timeout.
+
+User requested commit and preventive push before further work. Save only the bootstrap correction and documentation, preserving the unrelated untracked file. No timeout or simulator-setting change is implemented in this checkpoint.
+
+**Next single step for the resumed session:** inspect startup timing and prepare a bounded, configurable startup/test timeout (longer than current 180 seconds), then give the user one exact native-check command. Obtain red/green evidence as appropriate; user still owns all tests/runtimes. Do not repeatedly rerun the unchanged 180-second checker or begin T3. T2 remains incomplete, with native adapter, full production ROS/Isaac and GUI camera acceptance pending. All deferred physical mappings remain null; no button choice is needed for this native probe.
