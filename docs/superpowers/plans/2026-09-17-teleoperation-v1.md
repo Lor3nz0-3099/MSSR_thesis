@@ -69,7 +69,7 @@ PYTHONPATH=mssr_ws/src/mssr_expert python3 -m pytest mssr_ws/src/mssr_expert/tes
 - [x] Normalization/configuration and probe implemented. Ordered events retain multiplicity and modifier context.
 - [x] Automatic checks observed: 77 targeted tests, 665 regression tests; shell syntax and Python compilation; independent review findings corrected and re-reviewed.
 - [x] Targeted and regression tests green; dedicated commit `fce63c8d1168236286c3d261248e8690fc1189d3`, `feat: add configurable DualSense teleop input`. This is the verified software portion, not hardware acceptance.
-- [ ] Hardware gate: recognized DualSense, observed /joy raw messages, neutral/full triggers and all sticks, START edges, timed disconnect/reconnect. Preserve machine-readable report. This gate does not need any deferred physical button choice.
+- [x] Hardware gate observed and independently replayed: `logs/teleop/hardware_checks/20260917T124255.339508Z/report.json`, 5555 valid samples, no invalid packets, all checks true, driver removal/reopen confirmed, 13.41s disconnect gap. T0 complete; three distinct OPTIONS edges verified (each emitted once).
 
 ## T1 — Teleop shell and global state
 
@@ -241,4 +241,5 @@ def test_reintegration_never_jumps_to_automatic_target():
 - Deferred physical choices remain null. None is needed for the T0 command.
 - Detailed session handoff: `docs/superpowers/plans/2026-09-17-teleoperation-v1-handoff.md`.
 - Hardware follow-up: user enumeration recognized Sony `PS5 Controller`, GUID `030000004c050000e60c000011810000`, but Fast DDS initialization rejected the original default domain 239. The probe now defaults to 42, rejects invalid/noncanonical domains before runtime, and cleans up prior probe instances in this checkout. Observed red/green: 19 new regression cases; targeted total **96 passed**, full suite **684 passed in 18.83s**. Real `rmw_fastrtps_cpp` initialization and synthetic Joy pub/sub on domain 42 passed after scoped cleanup; this is middleware evidence, not hardware acceptance. CLI checks for 239 and 08 returned clear configuration errors before cleanup/runtime. Independent review found no remaining issues. T0 still awaits the six-phase hardware report.
+- Acceptance supersedes the preceding historical pending entries: hardware report on commit `fa481b776eeb36b1f901b3f99a6ba5adcef0ada3` passed. Raw and normalized samples replayed with monotonic timeout polls, checked against reported fields, phases and counts; driver log confirms real unplug/replug. T0 complete, T1 next. Report SHA256: `78ba5b925ecb05a8eb9cedd03dd0c402f5a27a2623da1ae4c376a1b80fcf2ad0`; raw SHA256: `2fbb414a4c211011e2d6b540c50e44e4aa948c8d9f838b9b0a866032fac1ea0a`.
 - At session end record HEAD SHA, finished/pending tasks, exact test results, open physical decisions, complete git status, and one next command with exact requested output.

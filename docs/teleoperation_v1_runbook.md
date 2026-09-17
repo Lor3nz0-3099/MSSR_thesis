@@ -2,9 +2,11 @@
 
 Implementation follows [the approved design](superpowers/specs/2026-09-17-teleoperation-v1-design.md) and [milestone plan](superpowers/plans/2026-09-17-teleoperation-v1.md).
 
-## Current milestone: T0, hardware verification pending
+## Accepted milestone: T0; T1 is next
 
 Input normalization and its automatic checks are separate from the hardware acceptance gate. No later milestone is declared complete by these tests. No robot runtime is required for T0.
+
+T0 acceptance was observed in `logs/teleop/hardware_checks/20260917T124255.339508Z/`: report checks all true; 5555 valid raw/normalized samples independently replayed, zero invalid packets, trigger/stick full travel, distinct START edges and a 13.41-second disconnect gap with driver removal/reopen confirmed. This validates controller input, not later morphology or Isaac behavior.
 
 The shipped input configuration uses ROS `joy/game_controller_node` SDL order. Sticks apply a configurable deadzone once; the driver is launched with `deadzone:=0.0`. ROS SDL trigger values are 0 at rest and -1 fully pressed. Generic `joy_node` mappings may use different indices/endpoints and require an explicit configuration. See [the ROS joy README](https://github.com/ros-drivers/joystick_drivers/blob/3.3.0/joy/README.md) and [driver conversion](https://github.com/ros-drivers/joystick_drivers/blob/3.3.0/joy/src/game_controller.cpp).
 

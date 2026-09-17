@@ -12,7 +12,7 @@ Repository: `/home/lorenzo/MSSR_thesis`; branch: `snake8-global-path-ik-recovery
 
 ## Milestone status
 
-**No T0–T8 milestone is complete.** T0 software is implemented, tested and committed; T0 hardware acceptance is pending. T1–T8 have not started, following the one-milestone-at-a-time instruction.
+**T0 is complete**, including verified real DualSense acceptance. T1 is next; T2–T8 have not started. Historical pending entries below describe earlier checkpoints and are superseded by the acceptance section at the end.
 
 Implemented: pure configurable DualSense normalization, immutable snapshots, monotonic receipt timeout, atomic invalid-packet rejection, ordered button/semantic events with modifier context, startup/reconnect held-button suppression, configuration and ROS package dependencies, scoped cleanup, and one guided hardware probe with raw/normalized logs. START is assigned; deferred morphology/HOME/E-STOP/resume/override/module-selection/manual PAN/TILT assignments remain null.
 
@@ -79,3 +79,13 @@ ROS_DOMAIN_ID=42 bash /home/lorenzo/MSSR_thesis/scripts/teleop/check_dualsense.s
 ```
 
 Return `T0_HARDWARE_RESULT=...` and the contents of `REPORT=...` as described above. The only unrelated untracked file remains `docs/2026-09-17-teleoperation-v1-design.md`.
+
+## T0 hardware acceptance observed
+
+Report: `logs/teleop/hardware_checks/20260917T124255.339508Z/report.json`; hardware code commit `fa481b776eeb36b1f901b3f99a6ba5adcef0ada3`. Real Sony PS5 controller on device 0 was recognized; domain 42, exclusive Joy topic and driver parameters match the shipped input configuration. Report passed every gate and the driver stopped cleanly.
+
+Independently replayed all 5555 raw packets using the report's input configuration and timed connectivity polls during the message gap. Compared raw normalization, semantic events, packet counts and phase results with recorded fields. All matched, with zero invalid packets. All four sticks cover [-1,1]; both triggers cover [0,1], including partial travel. Three separate OPTIONS press edges occurred at monotonic times 11094.818150759, 11095.510431290 and 11096.994917034; each generated exactly one record-toggle event. The test asks for at least two valid press/release edges, which these satisfy. No recording episode is created until T4.
+
+No Joy messages arrived for 13.411554243 seconds during unplug/replug. The driver log independently confirms removal and a second open. Final neutral was verified from fresh held-neutral samples. Report SHA256 `78ba5b925ecb05a8eb9cedd03dd0c402f5a27a2623da1ae4c376a1b80fcf2ad0`; raw JSONL SHA256 `2fbb414a4c211011e2d6b540c50e44e4aa948c8d9f838b9b0a866032fac1ea0a`.
+
+T0 is complete. Next authorized task: T1 failing tests, minimal state machine and ROS shell, regression suite, actual ROS launch verification, dedicated commit. No physical button decision is required yet.
