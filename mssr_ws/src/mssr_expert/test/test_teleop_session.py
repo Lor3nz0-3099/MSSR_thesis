@@ -1,6 +1,7 @@
 """Input/state coordination and strict shell configuration without ROS."""
 import importlib
 import importlib.util
+import math
 from pathlib import Path
 
 import pytest
@@ -136,6 +137,49 @@ def test_shell_config_produces_driver_parameters_without_double_deadzone():
     assert config.control_rate_hz == 50.0
     assert config.dataset_rate_hz == 25.0
     assert config.joy_topic == "/joy"
+
+
+def test_shipped_camera_radius_matches_initial_rc_assembly_view():
+    config = component("config").load_teleop_config(CONFIG_DIR / "smores_teleop.yaml")
+    # Existing scene at the CLI's default 0.34 m spawn radius.
+    startup_distance = math.dist((0.7956, -0.7344, 0.5202), (0.0, 0.0, 0.03))
+    assert getattr(config, "camera_radius_m", None) == pytest.approx(startup_distance)
+
+
+@pytest.mark.parametrize("radius", [0.6, 1.4])
+def test_configured_camera_radius_reaches_runtime_intent_and_orbit_geometry(tmp_path, radius):
+    mapping = yaml.safe_load((CONFIG_DIR / "smores_teleop.yaml").read_text())
+    mapping["camera"] = {"radius_m": radius}
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(mapping))
+    config = component("config").load_teleop_config(path)
+    assert getattr(config, "camera_radius_m", None) == radius
+    controller = component("camera").CameraController(radius_m=config.camera_radius_m)
+    core = component("coordinator").RuntimeCoordinator(session(), camera=controller)
+    send(core.session)
+    _, request = core.tick(10.0)
+    assert request["camera"]["radius_m"] == radius
+    eye, target = controller.step(core.session.input.snapshot(10.0), 0.0).view((1, 2, 0.1))
+    assert math.dist(eye, target) == pytest.approx(radius)
+
+
+@pytest.mark.parametrize("radius", [0, -1, float("nan"), float("inf"), True, 101])
+def test_invalid_camera_radius_fails_before_shell_startup(tmp_path, radius):
+    mapping = yaml.safe_load((CONFIG_DIR / "smores_teleop.yaml").read_text())
+    mapping["camera"] = {"radius_m": radius}
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(mapping))
+    with pytest.raises(ValueError, match="camera"):
+        component("config").load_teleop_config(path)
+
+
+def test_legacy_configuration_without_camera_preserves_old_radius(tmp_path):
+    mapping = yaml.safe_load((CONFIG_DIR / "smores_teleop.yaml").read_text())
+    mapping.pop("camera", None)
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(mapping))
+    config = component("config").load_teleop_config(path)
+    assert getattr(config, "camera_radius_m", None) == 2.0
 
 
 @pytest.mark.parametrize("field,value", [

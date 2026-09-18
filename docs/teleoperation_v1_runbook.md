@@ -2,7 +2,7 @@
 
 Implementation follows [the approved design](superpowers/specs/2026-09-17-teleoperation-v1-design.md) and [milestone plan](superpowers/plans/2026-09-17-teleoperation-v1.md).
 
-## Accepted milestones: T0 and T1
+## Accepted milestones: T0, T1 and T3
 
 Input normalization and its automatic checks are separate from the hardware acceptance gate. No later milestone is declared complete by these tests. No robot runtime is required for T0.
 
@@ -10,7 +10,7 @@ T0 acceptance was observed in `logs/teleop/hardware_checks/20260917T124255.33950
 
 The shipped input configuration uses ROS `joy/game_controller_node` SDL order. Sticks apply a configurable deadzone once; the driver is launched with `deadzone:=0.0`. ROS SDL trigger values are 0 at rest and -1 fully pressed. Generic `joy_node` mappings may use different indices/endpoints and require an explicit configuration. See [the ROS joy README](https://github.com/ros-drivers/joystick_drivers/blob/3.3.0/joy/README.md) and [driver conversion](https://github.com/ros-drivers/joystick_drivers/blob/3.3.0/joy/src/game_controller.cpp).
 
-Positive normalized X means stick right, positive Y means stick up. Morphology controllers must explicitly convert this to their coordinate frame. Left stick is reserved for camera. Morphology/HOME, E-STOP/resume and manual-control assignments are null until explicitly approved. OPTIONS/START is the recording toggle.
+Positive normalized X means stick right, positive Y means stick up. Morphology controllers must explicitly convert this to their coordinate frame. Left stick is reserved for camera. The user-approved mapping is Circle for HOME and Triangle alternating E-stop/resume; morphology/manual assignments remain deferred. OPTIONS/START is the recording toggle. Reconfiguration/assembly directions on the D-pad belong to future milestones.
 
 Input code uses monotonic receipt time, independent of ROS/simulated time. Invalid packets do not refresh connectivity. Snapshot consumers must gate motion on `connected`. Ordered `command_events` preserve repeated toggles, and `button_events` preserve held modifier context; the set views are diagnostics. Startup/reconnect held buttons need release and repress to generate an edge.
 
@@ -82,3 +82,19 @@ ROS_DOMAIN_ID=42 python3 scripts/teleop/check_isaac_runtime.py
 ```
 
 Return the complete `T2_RUNTIME_RESULT=...` line and the contents of JSON printed as `REPORT=...`; on failure include relevant errors from that directory's `isaac.log`. This check uses a native rigid-body scene and the runtime adapter with scoped cleanup. It does not establish acceptance of the full production scenario or ROS transport. No physical E-STOP/resume assignment is needed for its explicit synthetic requests.
+
+## T3 observed RC-Car8 acceptance
+
+The preceding T2 timeline-gate notes describe an earlier checkpoint; current teleop uses a structure-only E-stop and keeps physics and camera running.
+
+Real DualSense/native Isaac acceptance passed on commit `63276ea857dd9c97777f02a51df1e8db4718741f`: `logs/teleop/rc_car_checks/5b9efd91f2ce411c8a1bdf79e9654310/report.json`, `passed=true`, all 22 checks true, final cleanup zero survivors and daemon stopped. Software regression at that checkpoint passed 905 tests. The probe deliberately closes Isaac after observing the final zero command and archives native JSON evidence into the persistent report directory.
+
+Run the same scoped probe to check the current camera distance:
+
+```bash
+ROS_DOMAIN_ID=42 bash /home/lorenzo/MSSR_thesis/scripts/teleop/check_rc_car.sh
+```
+
+R2/L2 control forward/reverse; right-X steers, right-Y raises/lowers the held chassis-height target. Circle returns gradually to nominal height. Left stick orbits the camera. The shipped `camera.radius_m` in `mssr_ws/src/mssr_expert/config/smores_teleop.yaml` is 1.188536394 m, matching this assembly scene's default startup distance (spawn radius 0.34 m). Custom scenes or spawn radii can use a different configured orbit distance; it is not measured dynamically from the viewport.
+
+For `resume_held_fence`, keep R2 pressed continuously while releasing and pressing Triangle again. Release R2 only when `fresh_neutral` appears. The probe requires the held-trigger fence before accepting fresh-neutral rearm; releasing R2 before resume skips that evidence even if resume works. The camera-distance follow-up still requires the user's visual confirmation on a new real run.

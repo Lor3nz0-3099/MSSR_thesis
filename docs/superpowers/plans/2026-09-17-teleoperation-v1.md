@@ -148,9 +148,13 @@ def test_height_is_held_when_stick_is_released():
 
 **Tests:** Analog forward/reverse; immediate zero on release; right-X steering; rate/bounds on height; nominal return; same-module steering PAN priority retains height and resumes TILT when free. No left-stick robot command.
 
-- [ ] Red/green RC and transport tests; regression suite.
-- [ ] Isaac RC smoke scenario verifies actual motion, steering/height and safe hold.
-- [ ] Commit `feat: implement RC-Car8 held-height teleoperation`.
+- [x] Red/green RC and transport tests; regression suite.
+- [x] Isaac RC smoke scenario verifies actual motion, steering/height and safe hold.
+- [x] Commit `feat: implement RC-Car8 held-height teleoperation`.
+
+**Observed T3 acceptance (2026-09-18):** the user ran the real DualSense/native Isaac probe on `63276ea857dd9c97777f02a51df1e8db4718741f`. Report `logs/teleop/rc_car_checks/5b9efd91f2ce411c8a1bdf79e9654310/report.json` has `passed=true` and all 22 checks true, including measured forward/reverse/steering, raise/lower, held height, HOME, structure-only E-stop with continuing physics/camera, resume with R2 held and motion fenced, fresh-neutral rearm, post-resume propulsion and final zero. Final cleanup has zero survivors and the daemon stopped. Report SHA256: `ddb20417c65d81117c7fd3603ccae632d129909d692e82117dd5af9390c68c26`. The RC-height correction had observed red (5 failures), post-terminal handoff red (6 failures), targeted green (133 passes), full regression (905 passes in 19.30s), and independent review without remaining blockers. Initial T3 implementation was committed as `7dfadda`; the acceptance includes its subsequent fixes. This closes the T3 physical gate at the named commit, without starting T4+.
+
+**Camera follow-up:** the user requested the startup scene distance rather than the former 2 m teleop orbit. `smores_teleop.yaml` now configures a 1.188536394 m radius, derived from the existing scene's default startup eye/target. Automatic verification: 10 expected red failures, targeted green 77 passes, full regression 915 passes in 19.12s, independent review without blockers. Visual comfort on the next real run remains to be confirmed and is not inferred from the preceding accepted run.
 
 ## T4 — Recording and manifest
 

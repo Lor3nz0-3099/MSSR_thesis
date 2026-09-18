@@ -311,7 +311,7 @@ def main():
                      read("smores_teleop_runtime_status.json").get("structure_stopped") is True and
                      read("smores_teleop_runtime_status.json").get("camera_applied") is True and zero() and
                      all(abs(metrics()["tilt"][module] - angle) < 0.02 for module, angle in stopped["tilt"].items()))
-        wait("resume_held_fence", f"Mantieni R2 premuto, rilascia e premi {resume_button} (RESUME).",
+        wait("resume_held_fence", f"Tieni R2 premuto continuamente. Rilascia {resume_button}, poi premilo (RESUME). R2 resta premuto fino a fresh_neutral.",
              lambda: state()["runtime_structure_stopped"] is False and state()["controller_input"]["r2"] > 0.1 and
                      not state()["safety"]["motion_enabled"] and zero())
         wait("fresh_neutral", "Rilascia trigger e stick: input nuovo e neutro per rearm.",

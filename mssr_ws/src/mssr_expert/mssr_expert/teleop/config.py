@@ -27,6 +27,7 @@ class TeleopConfig:
     device_id: int
     device_name: str
     autorepeat_rate: float
+    camera_radius_m: float = 2.0
 
     def joy_parameters(self) -> dict:
         return {"device_id": self.device_id, "device_name": self.device_name,
@@ -43,6 +44,13 @@ def load_teleop_config(path: str | Path) -> TeleopConfig:
     if not isinstance(payload, Mapping):
         raise ValueError("teleop configuration must be a mapping")
     try:
+        camera = payload.get("camera", {})
+        if not isinstance(camera, Mapping):
+            raise ValueError("camera configuration must be a mapping")
+        radius = camera.get("radius_m", 2.0)
+        if (isinstance(radius, bool) or not isinstance(radius, (int, float))
+                or not math.isfinite(radius) or not 0 < radius <= 100):
+            raise ValueError("camera radius must be a finite number in (0,100]")
         joy = payload["joy"]
         if not isinstance(joy, Mapping):
             raise ValueError("joy configuration must be a mapping")
@@ -58,6 +66,6 @@ def load_teleop_config(path: str | Path) -> TeleopConfig:
             raise ValueError("device_name must be a string")
         return TeleopConfig(control_rate(payload["control_rate_hz"]),
                             control_rate(payload["dataset_rate_hz"]), topic,
-                            device_id, name, control_rate(joy["autorepeat_rate"]))
+                            device_id, name, control_rate(joy["autorepeat_rate"]), float(radius))
     except KeyError as error:
         raise ValueError(f"missing teleop configuration field: {error.args[0]}") from error

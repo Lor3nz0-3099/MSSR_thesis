@@ -1,6 +1,10 @@
 # Initial rates are configurable targets; measured runtime values remain pending.
 control_rate_hz: 50.0
 dataset_rate_hz: 25.0
+camera:
+  # Match the initial parallel assembly view at its default 0.34 m spawn
+  # radius: eye=(0.7956,-0.7344,0.5202), target=(0,0,0.03), about 1.19 m.
+  radius_m: 1.1885363940578346
 joy:
   topic: /joy
   device_id: 0

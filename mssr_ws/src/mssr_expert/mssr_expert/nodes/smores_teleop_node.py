@@ -18,6 +18,7 @@ from std_msgs.msg import String
 
 from mssr_expert.teleop.config import control_rate, load_teleop_config
 from mssr_expert.teleop.coordinator import RuntimeCoordinator
+from mssr_expert.teleop.camera import CameraController
 from mssr_expert.teleop.input import load_input_config
 from mssr_expert.teleop.session import TeleopSession
 from mssr_expert.teleop.safety import SafetyDecision
@@ -35,7 +36,7 @@ class SmoresTeleopNode(Node):
         teleop_path = self.declare_parameter("teleop_config_path", str(config_dir / "smores_teleop.yaml")).value
         config = load_teleop_config(teleop_path)
         self.session = TeleopSession(load_input_config(input_path))
-        self.coordinator = RuntimeCoordinator(self.session)
+        self.coordinator = RuntimeCoordinator(self.session, camera=CameraController(radius_m=config.camera_radius_m))
         rc_config = yaml.safe_load(Path(teleop_path).read_text()).get("rc_car", {})
         self._rc = RcCarRuntime(MorphologyLibrary.load(config_dir / "smores_morphology_behaviors.json"),
                                 load_attributed_graph(config_dir / "smores_rc_car8.json"),
