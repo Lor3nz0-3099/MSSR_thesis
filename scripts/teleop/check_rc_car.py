@@ -11,8 +11,10 @@ import json
 import math
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from uuid import uuid4
 
@@ -75,10 +77,11 @@ class HeldHeightProbe:
         return now - self.since >= 1 and abs(height - self.height) < 1e-9
 
 
-def runtime_commands(output, input_path, run_id, device_id):
+def runtime_commands(output, input_path, run_id, device_id, *, runtime_dir=None):
     from check_dualsense import build_driver_command
-    action = output / "actions.json"
-    goal, cancel, status = [output / name for name in ("goal.json", "cancel.json", "primitive_status.json")]
+    runtime_dir = output if runtime_dir is None else runtime_dir
+    action = runtime_dir / "actions.json"
+    goal, cancel, status = [runtime_dir / name for name in ("goal.json", "cancel.json", "primitive_status.json")]
     topic = f"/mssr/teleop_probe/run_{run_id}"
     return {
         "isaac": ["bash", "scripts/smores_ep/run_self_assembly.sh", "--module-count", "8",
@@ -87,7 +90,7 @@ def runtime_commands(output, input_path, run_id, device_id):
                   "--tilt-effort-scale", "8.0", "--action-file", str(action),
                   "--primitive-goal-file", str(goal), "--primitive-cancel-file", str(cancel),
                   "--primitive-status-file", str(status)],
-        "bridge": [sys.executable, "ros2_bridge/mssr_file_bridge.py", "--state-graph-dir", str(output),
+        "bridge": [sys.executable, "ros2_bridge/mssr_file_bridge.py", "--state-graph-dir", str(runtime_dir),
                    "--action-file", str(action), "--primitive-goal-file", str(goal),
                    "--primitive-cancel-file", str(cancel), "--primitive-status-file", str(status)],
         "assembly": ["ros2", "run", "mssr_expert", "mssr_smores_self_assembly_node", "--ros-args",
@@ -99,6 +102,27 @@ def runtime_commands(output, input_path, run_id, device_id):
                    f"node_name:=mssr_rc_teleop_{run_id}",
                    f"input_config_path:={input_path.resolve()}", f"teleop_config_path:={CONFIG / 'smores_teleop.yaml'}"],
     }
+
+
+def archive_runtime(runtime_dir, output):
+    """Keep complete native JSON snapshots after writers have been stopped."""
+    archived = []
+    for source in runtime_dir.glob("*.json"):
+        destination = output / source.name
+        if source.is_file():
+            if destination.exists():
+                raise FileExistsError(f"Refusing to overwrite acceptance evidence: {destination}")
+            shutil.copy2(source, destination)
+            archived.append(source.name)
+    return archived
+
+
+def finalize_runtime(runtime_dir, output, *, writers_stopped):
+    if not writers_stopped:
+        return {"runtime_preserved": str(runtime_dir)}
+    archived = archive_runtime(runtime_dir, output)
+    shutil.rmtree(runtime_dir)
+    return {"archived_runtime_files": archived}
 
 
 def main():
@@ -127,8 +151,13 @@ def main():
     output = ROOT / "logs/teleop/rc_car_checks" / uuid4().hex
     configure_probe_environment(os.environ, output)
     output.mkdir(parents=True)
-    commands = runtime_commands(output, args.input_config, output.name, args.device_id)
+    # High-frequency atomic JSON exchange must not stall physics on disk.
+    # Persistent logs and acceptance evidence stay in the checkout.
+    runtime_dir = Path(tempfile.mkdtemp(prefix=f"mssr-teleop-{output.name}-", dir="/dev/shm"))
+    commands = runtime_commands(output, args.input_config, output.name, args.device_id,
+                                runtime_dir=runtime_dir)
     summary = {"passed": False, "source": "real_dualsense_and_native_isaac", "checks": {},
+               "runtime_dir": str(runtime_dir),
                "git_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()}
     processes = []
     observer = None
@@ -149,7 +178,7 @@ def main():
 
     def read(name):
         try:
-            return json.loads((output / name).read_text())
+            return json.loads((runtime_dir / name).read_text())
         except (OSError, ValueError):
             return {}
 
@@ -299,13 +328,21 @@ def main():
             observer.destroy_node()
         if rclpy.ok():
             rclpy.shutdown()
+        writers_stopped = False
         try:
             # UID, checkout cwd, argv and PID start-time scope; TERM/wait,
             # KILL only pertinent survivors, daemon stop, final verification.
             summary["final_cleanup"] = scoped_cleanup(ROOT)
+            writers_stopped = True
         except Exception as error:
             summary["passed"] = False
             summary["cleanup_error"] = repr(error)
+        try:
+            summary.update(finalize_runtime(runtime_dir, output, writers_stopped=writers_stopped))
+        except Exception as error:
+            summary["passed"] = False
+            summary["runtime_finalize_error"] = repr(error)
+            summary["runtime_preserved"] = str(runtime_dir)
         (output / "report.json").write_text(json.dumps(summary, indent=2, allow_nan=False) + "\n")
     print("T3_RC_RESULT=" + json.dumps(summary), flush=True)
     print(f"REPORT={output / 'report.json'}", flush=True)

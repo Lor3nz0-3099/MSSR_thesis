@@ -464,6 +464,63 @@ def test_smoke_keeps_topology_fresh_at_one_tenth_simulation_speed(tmp_path, monk
     assert core.topology(13.6) is None
 
 
+def test_smoke_native_and_bridge_share_ram_transport_but_keep_evidence_on_disk(tmp_path, monkeypatch):
+    monkeypatch.syspath_prepend(str(Path(__file__).resolve().parents[4] / "scripts/teleop"))
+    evidence = tmp_path / "evidence"
+    memory = tmp_path / "ram"
+    commands = smoke().runtime_commands(evidence, CONFIG / "smores_dualsense.yaml", "ram", 0,
+                                        runtime_dir=memory)
+    for process in ("isaac", "bridge"):
+        command = commands[process]
+        for option, name in (("--action-file", "actions.json"),
+                             ("--primitive-goal-file", "goal.json"),
+                             ("--primitive-cancel-file", "cancel.json"),
+                             ("--primitive-status-file", "primitive_status.json")):
+            assert command[command.index(option) + 1] == str(memory / name)
+    bridge = commands["bridge"]
+    assert bridge[bridge.index("--state-graph-dir") + 1] == str(memory)
+    assert f"dataset_path:={evidence / 'assembly.jsonl'}" in commands["assembly"]
+
+
+def test_smoke_archives_ram_state_without_overwriting_evidence(tmp_path):
+    memory, evidence = tmp_path / "ram", tmp_path / "evidence"
+    memory.mkdir()
+    evidence.mkdir()
+    (memory / "robot_graph.json").write_text('{"stamp": 42}')
+    (memory / "robot_graph.json.tmp").write_text('{"stamp":')
+    (evidence / "observations.jsonl").write_text("observed evidence\n")
+    smoke().archive_runtime(memory, evidence)
+    assert json.loads((evidence / "robot_graph.json").read_text()) == {"stamp": 42}
+    assert (evidence / "observations.jsonl").read_text() == "observed evidence\n"
+    assert not (evidence / "robot_graph.json.tmp").exists()
+
+
+@pytest.mark.parametrize("writers_stopped", [False, True])
+def test_smoke_removes_ram_only_after_verified_stop_and_archival(tmp_path, writers_stopped):
+    memory, evidence = tmp_path / "ram", tmp_path / "evidence"
+    memory.mkdir()
+    evidence.mkdir()
+    (memory / "robot_graph.json").write_text('{"stamp": 42}')
+    result = smoke().finalize_runtime(memory, evidence, writers_stopped=writers_stopped)
+    if writers_stopped:
+        assert json.loads((evidence / "robot_graph.json").read_text()) == {"stamp": 42}
+        assert not memory.exists()
+        assert "robot_graph.json" in result["archived_runtime_files"]
+    else:
+        assert (memory / "robot_graph.json").exists()
+        assert not (evidence / "robot_graph.json").exists()
+        assert result["runtime_preserved"] == str(memory)
+
+
+def test_failed_archival_preserves_only_ram_snapshot(tmp_path):
+    memory = tmp_path / "ram"
+    memory.mkdir()
+    (memory / "robot_graph.json").write_text('{"stamp": 42}')
+    with pytest.raises(OSError):
+        smoke().finalize_runtime(memory, tmp_path / "missing_output", writers_stopped=True)
+    assert json.loads((memory / "robot_graph.json").read_text()) == {"stamp": 42}
+
+
 def test_smoke_held_height_captures_after_actual_stick_release():
     probe = smoke().HeldHeightProbe()
     status = {"controller_input": {"right_y": -1, "l2": 0, "r2": 0},
