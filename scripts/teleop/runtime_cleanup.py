@@ -60,7 +60,8 @@ def is_runtime_command(command: list[str] | tuple[str, ...], root: Path) -> bool
                 root / "scripts/teleop/check_dualsense.py",
                 root / "scripts/teleop/check_teleop_shell.py",
                 root / "scripts/teleop/check_isaac_runtime.py",
-                root / "scripts/teleop/check_rc_car.py"}:
+                root / "scripts/teleop/check_rc_car.py",
+                root / "scripts/teleop/profile_assembly.py"}:
         return True
     if path.is_relative_to(root / "mssr_ws/install") and executable.startswith("mssr_smores_"):
         return True

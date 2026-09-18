@@ -105,6 +105,7 @@ def test_disconnect_and_reconnect_outside_their_phases_do_not_satisfy_gate():
     (["python3", str(ROOT / "scripts/teleop/check_teleop_shell.py")], True),
     (["python3", str(ROOT / "scripts/teleop/check_isaac_runtime.py")], True),
     (["python3", str(ROOT / "scripts/teleop/check_rc_car.py")], True),
+    (["python3", str(ROOT / "scripts/teleop/profile_assembly.py")], True),
     (["python3", "/other/project/scripts/teleop/check_rc_car.py"], False),
     ([str(ROOT / "mssr_ws/install/mssr_expert/lib/mssr_expert/mssr_smores_teleop_node")], True),
     (["ros2", "launch", "mssr_expert", "smores_runtime.launch.py"], True),

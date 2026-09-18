@@ -9,4 +9,8 @@ export PYTHONPATH="${SCRIPT_DIR}/src${PYTHONPATH:+:${PYTHONPATH}}"
 # rclpy stay in the external bridge process, so Isaac does not load its ROS
 # extensions and the GUI is independent from the selected DDS implementation.
 cd "${PROJECT_ROOT}"
+if [[ -n "${MSSR_ASSEMBLY_PROFILE_OUTPUT:-}" ]]; then
+    exec /home/lorenzo/isaac/python.sh "${PROJECT_ROOT}/scripts/teleop/profile_assembly.py" \
+        --output "${MSSR_ASSEMBLY_PROFILE_OUTPUT}" -- "$@"
+fi
 exec /home/lorenzo/isaac/python.sh -m smores_ep.self_assembly_cli "$@"
