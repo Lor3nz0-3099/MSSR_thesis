@@ -1,7 +1,6 @@
 """Opt-in assembly profiling with periodic snapshots and shutdown saves."""
 import argparse
 import cProfile
-import marshal
 import math
 from pathlib import Path
 import pstats
@@ -9,7 +8,6 @@ import runpy
 import signal
 import sys
 import tempfile
-import threading
 
 
 def main():
@@ -25,54 +23,79 @@ def main():
         native_args = native_args[1:]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     profiler = cProfile.Profile()
-    save_lock = threading.RLock()
-    finished = threading.Event()
+    recording = False
 
     def save():
-        with save_lock:
-            # dump_stats/create_stats disable profiling. Snapshot directly so
-            # later native work remains recorded after each periodic save.
-            profiler.snapshot_stats()
-            with tempfile.TemporaryDirectory(dir=args.output.parent, prefix=".assembly-profile-") as folder:
-                binary = Path(folder) / "stats.pstats"
-                report = Path(folder) / "stats.txt"
-                with binary.open("wb") as stream:
-                    marshal.dump(profiler.stats, stream)
-                with report.open("w") as stream:
-                    stats = pstats.Stats(str(binary), stream=stream).strip_dirs()
-                    stats.sort_stats("cumulative").print_stats(40)
-                    stats.sort_stats("tottime").print_stats(40)
-                # Publish complete files even if Kit exits without unwinding
-                # Python handlers/finally; retain the last valid snapshot.
-                report.replace(Path(str(args.output) + ".txt"))
-                binary.replace(args.output)
+        # All profiler operations run on the measured main thread, with
+        # recording disabled. Report generation cannot pollute native timings.
+        with tempfile.TemporaryDirectory(dir=args.output.parent, prefix=".assembly-profile-") as folder:
+            binary = Path(folder) / "stats.pstats"
+            report = Path(folder) / "stats.txt"
+            profiler.dump_stats(str(binary))
+            with report.open("w") as stream:
+                stats = pstats.Stats(str(binary), stream=stream).strip_dirs()
+                stats.sort_stats("cumulative").print_stats(40)
+                stats.sort_stats("tottime").print_stats(40)
+            report.replace(Path(str(args.output) + ".txt"))
+            binary.replace(args.output)
 
-    def periodic_save():
-        while not finished.wait(args.snapshot_interval):
+    def checkpoint(signum, frame):
+        signal.setitimer(signal.ITIMER_REAL, 0)
+        profiler.disable()
+        try:
             save()
+        finally:
+            if recording:
+                profiler.enable()
+                signal.setitimer(signal.ITIMER_REAL, args.snapshot_interval)
 
     def interrupted(signum, frame):
+        nonlocal recording
         # Save immediately: Kit shutdown can exceed cleanup's grace period.
+        recording = False
+        signal.setitimer(signal.ITIMER_REAL, 0)
         profiler.disable()
-        finished.set()
         save()
         raise SystemExit(128 + signum)
 
-    previous_signals = {sig: signal.signal(sig, interrupted)
-                        for sig in (signal.SIGINT, signal.SIGTERM)}
+    from smores_ep.scenarios import parallel_self_assembly
+    original = parallel_self_assembly.run_parallel_self_assembly_scenario
+
+    def measured(*positional, **keywords):
+        nonlocal recording
+        # The CLI calls this after SimulationApp initialization. Exclude Kit
+        # startup and install handlers after Kit has installed its own.
+        previous_signals = {
+            sig: signal.signal(sig, handler) for sig, handler in (
+                (signal.SIGALRM, checkpoint),
+                (signal.SIGINT, interrupted), (signal.SIGTERM, interrupted),
+            )
+        }
+        previous_timer = signal.getitimer(signal.ITIMER_REAL)
+        try:
+            recording = True
+            profiler.enable()
+            signal.setitimer(signal.ITIMER_REAL, args.snapshot_interval)
+            return original(*positional, **keywords)
+        finally:
+            recording = False
+            signal.setitimer(signal.ITIMER_REAL, 0)
+            profiler.disable()
+            try:
+                save()
+            finally:
+                for sig, handler in previous_signals.items():
+                    signal.signal(sig, handler)
+                signal.setitimer(signal.ITIMER_REAL, *previous_timer)
+
     previous_argv = sys.argv
     sys.argv = ["smores_ep.self_assembly_cli", *native_args]
+    parallel_self_assembly.run_parallel_self_assembly_scenario = measured
     try:
-        profiler.enable()
-        threading.Thread(target=periodic_save, name="assembly-profile-writer", daemon=True).start()
         runpy.run_module("smores_ep.self_assembly_cli", run_name="__main__")
     finally:
-        profiler.disable()
-        finished.set()
-        save()
+        parallel_self_assembly.run_parallel_self_assembly_scenario = original
         sys.argv = previous_argv
-        for sig, handler in previous_signals.items():
-            signal.signal(sig, handler)
 
 
 if __name__ == "__main__":
