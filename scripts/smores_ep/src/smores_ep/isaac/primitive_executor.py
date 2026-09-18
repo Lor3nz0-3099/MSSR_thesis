@@ -247,6 +247,7 @@ class IsaacPrimitiveExecutor:
         self._retained_internal_commands: dict[str, SmoresCommand] = {}
         self._reached_interrupt_holds: set[str] = set()
         self._rc_posture_terminal_statuses: dict[str, PrimitiveStatus] = {}
+        self._rc_retained_posture_goal_ids: dict[str, str] = {}
         # Explicit compliance policy latched by operational posture goals.
         # It survives after a coordinated TILT group reaches its target so a
         # following geometric drive can keep the tail backdrivable.  A later
@@ -344,6 +345,7 @@ class IsaacPrimitiveExecutor:
                 # A completed settle releases its resources in step(), but
                 # its final reset must still reach the controller this frame.
                 self._retained_internal_commands.pop(module_id, None)
+                self._rc_retained_posture_goal_ids.pop(module_id, None)
                 result[module_id] = primitive
                 continue
             internal_source = base
@@ -619,6 +621,9 @@ class IsaacPrimitiveExecutor:
         if group is not None:
             self._group_module_ids.setdefault(str(group), set()).update(referenced_modules)
         self._active[goal.goal_id] = runtime
+        for resource, mode in resource_modes.items():
+            if mode == "exclusive" and resource.startswith("internal_motion:"):
+                self._rc_retained_posture_goal_ids.pop(resource.split(":", 1)[1], None)
         if goal.primitive in {PrimitiveName.SET_PAN, PrimitiveName.SET_TILT,
                               PrimitiveName.ROTATE_PAN_BY, PrimitiveName.ROTATE_TILT_BY}:
             self._reached_interrupt_holds.difference_update(goal.module_ids)
@@ -639,7 +644,26 @@ class IsaacPrimitiveExecutor:
     def cancel(self, goal_id: str, now_s: float) -> PrimitiveStatus | None:
         runtime = self._active.get(goal_id)
         if runtime is None:
-            return None
+            status = self._rc_posture_terminal_statuses.get(goal_id)
+            if status is None or status.state is not PrimitiveState.SUCCEEDED:
+                return status
+            module_id = status.module_ids[0]
+            if self._rc_retained_posture_goal_ids.get(module_id) == goal_id:
+                # Coarse completion ACKs retain the destination. An explicit
+                # RC handoff cancels that destination at the measured posture.
+                pan, tilt = self._joint_positions(module_id)
+                self._retained_internal_commands[module_id] = SmoresCommand(
+                    pan_target_rad=pan, tilt_target_rad=tilt,
+                    internal_motion=InternalMotionMode.STRUCTURAL_HOLD,
+                )
+                self._reached_interrupt_holds.add(module_id)
+                self._rc_retained_posture_goal_ids.pop(module_id, None)
+            status = replace(status, state=PrimitiveState.CANCELED, stamp_s=now_s,
+                             progress=0.0, code="CANCELED_BY_CLIENT",
+                             message="retained RC posture goal canceled")
+            self._rc_posture_terminal_statuses[goal_id] = status
+            self._status = status
+            return status
         return self._finish(
             runtime,
             PrimitiveState.CANCELED,
@@ -816,6 +840,7 @@ class IsaacPrimitiveExecutor:
         self.reset_free_modules_callback(module_ids)
         for module_id in module_ids:
             self._retained_internal_commands.pop(module_id, None)
+            self._rc_retained_posture_goal_ids.pop(module_id, None)
             self._passive_internal_module_ids.discard(module_id)
             self._pan_reference_offset_rad.pop(module_id, None)
             tracker = ContinuousAngleTracker()
@@ -3522,6 +3547,7 @@ class IsaacPrimitiveExecutor:
 
         for raw_module_id in module_ids:
             self._retained_internal_commands.pop(str(raw_module_id), None)
+            self._rc_retained_posture_goal_ids.pop(str(raw_module_id), None)
             self._reached_interrupt_holds.discard(str(raw_module_id))
 
     def _retain_structure_targets(self, module_ids: Any) -> None:
@@ -4003,6 +4029,8 @@ class IsaacPrimitiveExecutor:
         self._status = status
         if goal.primitive is PrimitiveName.SET_TILT and goal.parameters.get("retain_reached_on_interrupt") is True:
             self._rc_posture_terminal_statuses[goal.goal_id] = status
+            if state is PrimitiveState.SUCCEEDED:
+                self._rc_retained_posture_goal_ids[goal.module_ids[0]] = goal.goal_id
         self._active.pop(goal.goal_id, None)
         for resource in runtime.resources:
             owners = self._resource_owners.get(resource)

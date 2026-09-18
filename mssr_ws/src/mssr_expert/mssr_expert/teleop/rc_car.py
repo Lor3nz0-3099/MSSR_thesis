@@ -208,7 +208,9 @@ class RcCarTeleopController:
                 # Preserve the exact observed coordinate at neutral; never
                 # invert a contact plateau or force the ready posture on entry.
                 if abs(self._targets[module] - positions[module]) > 1e-6:
-                    targets.append(replace(template, angle_rad=self._targets[module], tolerance_rad=0.001))
+                    # Keep the profile's loaded-joint tolerance: an overly
+                    # narrow override can trap the first coordinated snapshot.
+                    targets.append(replace(template, angle_rad=self._targets[module]))
         return RcCarActions(actions, tuple(targets),
                             {"chassis_height_m": self.desired_chassis_height, "steering_yaw_rate_rad_s": yaw},
                             {item.module_id: item.target_role for item in self._assignments},

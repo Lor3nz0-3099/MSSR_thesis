@@ -1863,6 +1863,62 @@ def test_rc_teleop_cancel_retains_reached_tilt_before_pan_or_disconnect_hold(pan
     assert articulation.targets["tilt_joint_position_rad"] == pytest.approx(0.80)
 
 
+@pytest.mark.parametrize("pan_velocity", [0.0, 1.0])
+def test_retired_rc_tilt_cancel_captures_measured_posture_and_is_idempotent(pan_velocity):
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+    from smores_ep.isaac.dynamic_stage import DynamicDriveController
+    from smores_ep.config.geometry import SmoresGeometry
+
+    state = _MutableStateReader(tilt_rad=-0.785, pan_rad=0.2)
+    executor = IsaacPrimitiveExecutor(
+        stage=object(), module_roots={"module_a": "/A", "module_b": "/B"},
+        states={"module_a": state, "module_b": _MutableStateReader()}, docking=_FakeDocking())
+    goal = _goal("rc-coarse-success", PrimitiveName.SET_TILT, ("module_a",),
+                 {"angle_rad": -0.795, "tolerance_rad": 0.12, "retain_reached_on_interrupt": True})
+    assert executor.submit(goal, 0).state is PrimitiveState.ACCEPTED
+    assert executor.step(0.1).status.state is PrimitiveState.SUCCEEDED
+    articulation = _FakeDynamicArticulation()
+    articulation.state.tilt_joint_rad = 0.785
+    articulation.state.pan_joint_rad = 0.2
+    drive = DynamicDriveController(articulation, SmoresGeometry(), 10.0)
+    drive.apply(executor.compose_with_baseline({}, {})["module_a"])
+    assert articulation.targets["tilt_joint_position_rad"] == pytest.approx(0.795)
+    state.state.tilt_joint_rad = 0.788
+    articulation.state.tilt_joint_rad = 0.788
+    terminal = executor.cancel(goal.goal_id, 0.2)
+    assert terminal is not None and terminal.state is PrimitiveState.CANCELED
+    baseline = SmoresCommand(internal_motion=InternalMotionMode.PAN_VELOCITY if pan_velocity else InternalMotionMode.HOLD,
+                             pan_velocity_rad_s=pan_velocity)
+    composed = executor.compose_with_baseline({"module_a": baseline}, {})["module_a"]
+    assert composed.tilt_target_rad == pytest.approx(-0.788)
+    drive.apply(composed)
+    assert articulation.targets["tilt_joint_position_rad"] == pytest.approx(0.788)
+    state.state.tilt_joint_rad = 0.789
+    assert executor.cancel(goal.goal_id, 0.3) == terminal
+    assert executor.submit(goal, 0.4) == terminal
+    drive.apply(SmoresCommand(internal_motion=InternalMotionMode.HOLD))
+    assert articulation.targets["tilt_joint_position_rad"] == pytest.approx(0.788)
+
+
+@pytest.mark.parametrize("opt_in", [True, False])
+def test_late_retired_rc_cancel_does_not_overwrite_a_newer_retained_target(opt_in):
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    state = _MutableStateReader(tilt_rad=-0.785)
+    executor = IsaacPrimitiveExecutor(
+        stage=object(), module_roots={"module_a": "/A", "module_b": "/B"},
+        states={"module_a": state, "module_b": _MutableStateReader()}, docking=_FakeDocking())
+    first = _goal("rc-old-success", PrimitiveName.SET_TILT, ("module_a",),
+                  {"angle_rad": -0.795, "tolerance_rad": 0.12, "retain_reached_on_interrupt": True})
+    second = _goal("new-success", PrimitiveName.SET_TILT, ("module_a",),
+                   {"angle_rad": -0.805, "tolerance_rad": 0.12, "retain_reached_on_interrupt": opt_in})
+    for index, goal in enumerate((first, second)):
+        assert executor.submit(goal, index * 0.2).state is PrimitiveState.ACCEPTED
+        assert executor.step(index * 0.2 + 0.1).status.state is PrimitiveState.SUCCEEDED
+    assert executor.cancel(first.goal_id, 0.4) is not None
+    assert executor.compose_with_baseline({}, {})["module_a"].tilt_target_rad == pytest.approx(-0.805)
+
+
 @pytest.mark.parametrize("opt_in", [True, False])
 def test_retired_rc_height_goal_retry_is_idempotent_without_changing_legacy_replay(opt_in):
     from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor

@@ -50,6 +50,7 @@ class RcCarPostureTransport:
             raise ValueError("Posture timeout and retry must be positive finite values")
         self.retry_s, self.timeout_s = retry_s, timeout_s
         self._active = {}
+        self._retained = {}
         self._queue = []
         self._pending = None
         self._last_send = None
@@ -65,8 +66,14 @@ class RcCarPostureTransport:
             # original goal still owns the motors. This acknowledges delivery,
             # but cannot prove retirement or authorize PAN on that module.
             duplicate = status.state == "rejected" and status.code == "DUPLICATE_GOAL_ID"
+            if not status.failed or duplicate:
+                self._retained.pop(goal.module_ids[0], None)
             if status.terminal and not duplicate:
                 self._active.pop(goal_id)
+                if status.state == "succeeded":
+                    # A completion ACK can leave a loaded servo moving toward
+                    # its retained target. Keep its identity for a safe yield.
+                    self._retained[goal.module_ids[0]] = goal
                 if self._cancel_pending == goal_id:
                     self._cancel_pending = None
                 if status.failed:
@@ -82,10 +89,13 @@ class RcCarPostureTransport:
                        if abs(command.get("pan_rate_rad_s", 0)) > 1e-12}
         owned = {goal.module_ids[0] for goal in self._active.values()}
         queued_modules = {goal.module_ids[0] for goal in self._queue}
-        if not result.allow_joint_updates or (owned | queued_modules).intersection(pan_modules):
+        if not result.allow_joint_updates or (owned | queued_modules | set(self._retained)).intersection(pan_modules):
             self._canceling = True
             self._queue.clear()
         if self._canceling:
+            self._active.update((goal.goal_id, goal) for goal in self._retained.values())
+            self._retained.clear()
+            owned = {goal.module_ids[0] for goal in self._active.values()}
             if self._active:
                 goal_id = self._cancel_pending or next(iter(self._active))
                 self._cancel_pending = goal_id
@@ -103,7 +113,8 @@ class RcCarPostureTransport:
             chassis = sorted(module for module, role in result.module_roles.items() if not role.startswith("wheel_"))
             self._queue = [PrimitiveGoalRequest(
                 goal_id=f"{group}-{index}", primitive="set_tilt", module_ids=(target.module_id,),
-                parameters={"angle_rad": target.angle_rad, "tolerance_rad": 0.001,
+                parameters={"angle_rad": target.angle_rad,
+                            **({"tolerance_rad": target.tolerance_rad} if target.tolerance_rad is not None else {}),
                             "coordination_group": group, "coordination_size": len(result.joint_targets),
                             "retain_reached_on_interrupt": True,
                             "structural_hold_module_ids": chassis}, timeout_s=self.timeout_s)

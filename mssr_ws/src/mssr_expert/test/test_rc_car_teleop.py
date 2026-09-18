@@ -315,6 +315,99 @@ def test_unacknowledged_pose_goal_is_retried_with_same_id_not_overwritten():
     assert delivery.step(height, now=11).goal == first
 
 
+@pytest.mark.parametrize("tolerance", [0.12, 0.025, None])
+def test_height_delivery_preserves_existing_profile_tolerance(tolerance):
+    controller, observation = setup_controller()
+    profile = controller.library._profile("rc_car8")
+    for target in profile["postures"][profile["ready_posture"]]:
+        target["tolerance_rad"] = tolerance
+    height = step(controller, observation, dt=0.02, right_y=1)
+    assert all(target.tolerance_rad == tolerance for target in height.joint_targets)
+    goal = component("action_transport").RcCarPostureTransport().step(height, now=10).goal
+    if tolerance is None:
+        assert "tolerance_rad" not in goal.parameters
+    else:
+        assert goal.parameters["tolerance_rad"] == tolerance
+
+
+@pytest.mark.parametrize("direction", [1, -1])
+def test_loaded_four_tilt_group_retires_and_delivers_next_height_snapshot(direction):
+    """Replay the measured 6.5 mrad load error through the actual executor."""
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+    from smores_ep.primitives.model import PrimitiveState
+
+    controller, observation = setup_controller(tilt=-0.765)
+    step(controller, observation)
+    first_height = step(controller, observation, dt=0.02, right_y=direction)
+    states = {}
+    for assignment in observation.assignments:
+        state = SimpleNamespace(pan_joint_rad=0.0, tilt_joint_rad=0.765)
+        states[assignment.module_id] = SimpleNamespace(read=lambda state=state: state)
+    executor = IsaacPrimitiveExecutor(
+        stage=object(), module_roots={module: f"/{module}" for module in states},
+        states=states, docking=SimpleNamespace(module_ids=tuple(states), connections=()))
+    delivery = component("action_transport").RcCarPostureTransport()
+    targets = {target.module_id: target.angle_rad for target in first_height.joint_targets}
+    assert len(targets) == 4
+    latest_height = first_height
+    for index in range(4):
+        goal = delivery.step(latest_height, now=10 + index * 0.02).goal
+        assert goal is not None
+        native_goal = PrimitiveGoal.from_dict(goal.to_dict())
+        assert executor.submit(native_goal, index * 0.01).state is PrimitiveState.ACCEPTED
+        # A loaded servo remains slightly above its commanded public angle.
+        states[goal.module_ids[0]].read().tilt_joint_rad = -(goal.parameters["angle_rad"] + 0.0065)
+        native = executor.step(index * 0.01 + 0.005)
+        if index < 3:
+            assert all(status.code == "WAITING_JOINT_GROUP" for status in native.statuses)
+        delivery.observe({"schema_version": "mssr.primitive_status_batch.v1",
+                          "statuses": [status.to_dict() for status in native.statuses]})
+        latest_height = step(controller, observation, dt=0.02, right_y=direction)
+    assert all(status.state is PrimitiveState.SUCCEEDED for status in native.statuses)
+    assert not executor.active_goals
+    retained = executor.compose_with_baseline({}, native.commands)
+    for module, target in targets.items():
+        assert retained[module].tilt_target_rad == pytest.approx(target)
+    following = delivery.step(latest_height, now=10.1).goal
+    assert following is not None and following.goal_id != goal.goal_id
+    assert -direction * (following.parameters["angle_rad"] - targets[following.module_ids[0]]) > 0
+
+
+@pytest.mark.parametrize("handoff", ["pan", "disconnect"])
+def test_post_terminal_height_targets_are_canceled_before_pan_or_safety_hold(handoff):
+    controller, observation = setup_controller()
+    height = step(controller, observation, dt=0.02, right_y=1)
+    delivery = component("action_transport").RcCarPostureTransport()
+    goals = []
+    for index in range(4):
+        goal = delivery.step(height, now=10 + index * 0.02).goal
+        goals.append(goal)
+        delivery.observe({"schema_version": "mssr.primitive_status.v1", "goal_id": goal.goal_id,
+                          "primitive": "set_tilt", "module_ids": list(goal.module_ids), "state": "running"})
+    for goal in goals:
+        delivery.observe({"schema_version": "mssr.primitive_status.v1", "goal_id": goal.goal_id,
+                          "primitive": "set_tilt", "module_ids": list(goal.module_ids), "state": "succeeded"})
+    result = (step(controller, observation, r2=0.2) if handoff == "pan" else
+              step(controller, observation, safety=SafetyDecision("NONE", False, True, False)))
+    remaining = {goal.goal_id: goal for goal in goals}
+    for index in range(4):
+        yielded = delivery.step(result, now=10.2 + index * 0.02)
+        assert yielded.goal is None and yielded.cancel_goal_id in remaining
+        assert set(yielded.blocked_module_ids) == {goal.module_ids[0] for goal in remaining.values()}
+        # A bridge replay of old success ACKs cannot prove that the retained
+        # destination has been canceled or release propulsion prematurely.
+        for retained_goal in remaining.values():
+            delivery.observe({"schema_version": "mssr.primitive_status.v1", "goal_id": retained_goal.goal_id,
+                              "primitive": "set_tilt", "module_ids": list(retained_goal.module_ids), "state": "succeeded"})
+        waiting = delivery.step(result, now=10.201 + index * 0.02)
+        assert waiting.goal is None and waiting.cancel_goal_id in remaining
+        assert set(waiting.blocked_module_ids) == set(yielded.blocked_module_ids)
+        goal = remaining.pop(yielded.cancel_goal_id)
+        delivery.observe({"schema_version": "mssr.primitive_status.v1", "goal_id": goal.goal_id,
+                          "primitive": "set_tilt", "module_ids": list(goal.module_ids), "state": "canceled"})
+    assert not delivery.step(result, now=10.3).blocked_module_ids
+
+
 def test_queued_unadmitted_tilt_cannot_take_a_module_requested_by_pan():
     from dataclasses import replace
     controller, observation = setup_controller()
