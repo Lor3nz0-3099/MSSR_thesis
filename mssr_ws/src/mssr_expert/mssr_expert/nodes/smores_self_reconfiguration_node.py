@@ -332,7 +332,6 @@ class SmoresSelfReconfigurationNode(Node):
         decision = self._prepare_decision(decision)
         task_graph = self._current_task_graph(current_graph, decision)
         expert_output = self._expert_output(decision)
-        self._publish(decision, task_graph)
         self._pending_transition = _PendingTransition(
             timestep=self._timestep,
             observation=dict(self._latest_observation),
@@ -340,6 +339,16 @@ class SmoresSelfReconfigurationNode(Node):
             task_graph=task_graph,
             expert_output=expert_output,
         )
+
+        # A non-terminal transition is normally completed by the next graph
+        # observation at the beginning of the following tick.  A terminal
+        # decision has no following executor tick, and T5 may terminate this
+        # process as soon as its done=True state is observed.  Persist that
+        # final row before exposing the terminal ROS state.
+        if decision.done:
+            self._flush_pending_transition(current_graph)
+
+        self._publish(decision, task_graph)
         self._timestep += 1
         if decision.done:
             self._terminal_reached = True

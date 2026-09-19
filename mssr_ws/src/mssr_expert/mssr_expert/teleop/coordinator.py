@@ -8,9 +8,16 @@ from mssr_expert.teleop.safety import SafetyGate
 
 
 class RuntimeCoordinator:
-    def __init__(self, session, *, camera=None):
+    def __init__(
+        self,
+        session,
+        *,
+        camera=None,
+        structural_request_handler=None,
+    ):
         self.session = session
         self.camera = camera if camera is not None else CameraController()
+        self._structural_request_handler = structural_request_handler
         self.runtime = RuntimeChannel()
         self.safety = SafetyGate()
         self._estop_latched = False
@@ -72,6 +79,17 @@ class RuntimeCoordinator:
 
         if self._estop_latched:
             self.session.state.pause()
+
+        # A structural selection must claim authority before the safety
+        # decision for this same control tick.  Otherwise one final human
+        # actuator command could leak after the reconfiguration has started.
+        structural_request = status.get("structural_macro_request")
+        if (
+            structural_request is not None
+            and not self._estop_latched
+            and self._structural_request_handler is not None
+        ):
+            self._structural_request_handler(structural_request)
 
         ready = self.runtime.ready(now)
 

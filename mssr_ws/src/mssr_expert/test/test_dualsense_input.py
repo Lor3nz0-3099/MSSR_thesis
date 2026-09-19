@@ -247,13 +247,24 @@ def test_invalid_bindings_fail_before_any_input(mapping, kind):
         InputConfig.from_mapping(mapping)
 
 
-def test_shipped_configuration_keeps_all_deferred_commands_disabled():
+def test_shipped_configuration_enables_only_approved_commands():
     path = Path(__file__).parents[1] / "config/smores_dualsense.yaml"
     reader = DualSenseInput(load_input_config(path))
     packet(reader)
-    packet(reader, pressed=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
-           at=10.1)
-    assert reader.snapshot(10.2).command_edges == frozenset({"record_toggle", "home", "estop_toggle"})
+    packet(
+        reader,
+        pressed=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14],
+        at=10.1,
+    )
+
+    assert reader.snapshot(10.2).command_edges == frozenset({
+        "record_toggle",
+        "home",
+        "estop_toggle",
+        "select_rc",
+        "select_snake",
+        "select_mm8",
+    })
 
 
 def test_configuration_loader_reports_malformed_yaml(tmp_path):

@@ -32,11 +32,12 @@ buttons:
   dpad_right: 14
 commands:
   record_toggle: start
-  # Assembly/reconfiguration will use the D-pad, never either analog stick.
-  # Direction assignments and structural macros remain deferred.
-  select_rc: null
-  select_snake: null
-  select_mm8: null
+  # Structural morphology selection uses the D-pad, never either analog stick.
+  # Left = RC-Car8, Up = Snake8, Right = MobileManipulator8.
+  # Down remains free for a future self-assembly/structural macro.
+  select_rc: dpad_left
+  select_snake: dpad_up
+  select_mm8: dpad_right
   home: circle
   estop_toggle: triangle  # Each new press alternates structure E-stop/resume.
   estop: null

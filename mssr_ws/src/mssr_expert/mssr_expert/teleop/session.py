@@ -20,9 +20,16 @@ def input_payload(sample: InputSnapshot) -> dict:
 
 
 class TeleopSession:
-    def __init__(self, input_config: InputConfig) -> None:
+    def __init__(
+        self,
+        input_config: InputConfig,
+        *,
+        controller_morphologies=None,
+    ) -> None:
         self.input = DualSenseInput(input_config)
-        self.state = TeleopState()
+        self.state = TeleopState(
+            controller_morphologies=controller_morphologies,
+        )
         self.state.start_ready()
         self._previous_connected = False
         self._valid_packets = 0
@@ -41,6 +48,7 @@ class TeleopSession:
         self.state.set_connected(sample.connected)
         events = []
         rejected = []
+        structural_macro_request = None
         if sample.connected != self._previous_connected:
             events.append("controller_connected" if sample.connected else "controller_disconnected")
             self._previous_connected = sample.connected
@@ -56,10 +64,15 @@ class TeleopSession:
         if len(selections) > 1:
             rejected.append("ambiguous_morphology_selection")
         elif selections:
-            if not self.state.request_morphology(next(iter(selections))):
+            requested = next(iter(selections))
+            if not self.state.request_morphology(requested):
                 rejected.append("morphology_selection_unavailable")
+            elif requested != self.state.detected_morphology:
+                structural_macro_request = requested
         return {"schema_version": "mssr.teleop_status.v1", "stamp_monotonic": now,
-                **self.state.status(), "controller_input": input_payload(sample),
+                **self.state.status(),
+                "structural_macro_request": structural_macro_request,
+                "controller_input": input_payload(sample),
                 "events": events, "rejected_commands": rejected,
                 "valid_joy_packets": self._valid_packets,
                 "invalid_joy_packets": self._invalid_packets}

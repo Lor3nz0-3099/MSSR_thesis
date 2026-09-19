@@ -207,3 +207,101 @@ def test_invalid_driver_config_fails_before_shell_startup(tmp_path, field, value
     path.write_text(yaml.safe_dump(mapping))
     with pytest.raises(ValueError):
         component("config").load_teleop_config(path)
+
+
+
+def test_different_morphology_selection_emits_one_shot_structural_macro_request():
+    """T5: selection requests a macro, but launch owns STRUCTURAL_MACRO entry."""
+
+    core = session()
+
+    # Controller online and verified current morphology.
+    send(core, at=10.0)
+    core.state.observe_topology("rc_car8")
+    baseline = core.tick(10.01)
+
+    assert baseline["authority"] == "TELEOP"
+    assert baseline["active_controller"] == "rc_car8"
+
+    # Synthetic test binding: triangle -> select_snake.
+    send(core, [3], 10.10)
+    payload = core.tick(10.11)
+
+    assert payload["requested_morphology"] == "snake8"
+
+    # New T5 contract:
+    # the input edge exposes one structural launch request.
+    assert payload["structural_macro_request"] == "snake8"
+
+    # Merely requesting the launcher must NOT claim macro authority yet.
+    assert payload["authority"] == "TELEOP"
+    assert payload["macro_active"] is False
+
+    # It is an edge/event, not a continuously repeated request.
+    following = core.tick(10.12)
+    assert following["structural_macro_request"] is None
+
+
+
+def test_detected_morphology_without_runtime_controller_has_no_teleop_authority():
+    state = component("state").TeleopState(
+        controller_morphologies={"rc_car8"},
+    )
+
+    state.start_ready()
+    state.set_connected(True)
+
+    # The physical topology is authoritative and must still be reported.
+    state.observe_topology("snake8")
+
+    assert state.detected_morphology == "snake8"
+
+    # But no Snake teleop runtime exists yet.
+    assert state.active_controller is None
+    assert state.authority == "NONE"
+
+    # Structural intent must remain available even without locomotion authority.
+    assert state.request_morphology("rc_car8")
+    assert state.requested_morphology == "rc_car8"
+
+
+def test_detected_morphology_with_runtime_controller_claims_teleop_authority():
+    state = component("state").TeleopState(
+        controller_morphologies={"rc_car8"},
+    )
+
+    state.start_ready()
+    state.set_connected(True)
+    state.observe_topology("rc_car8")
+
+    assert state.detected_morphology == "rc_car8"
+    assert state.active_controller == "rc_car8"
+    assert state.authority == "TELEOP"
+
+
+
+def test_session_propagates_available_controller_morphologies():
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+
+    core = component("session").TeleopSession(
+        InputConfig.from_mapping(mapping),
+        controller_morphologies={"rc_car8"},
+    )
+
+    send(core, at=10.0)
+    core.state.observe_topology("snake8")
+
+    payload = core.tick(10.01)
+
+    assert payload["detected_morphology"] == "snake8"
+    assert payload["active_controller"] is None
+    assert payload["authority"] == "NONE"
+
+    core.state.observe_topology("rc_car8")
+    payload = core.tick(10.02)
+
+    assert payload["detected_morphology"] == "rc_car8"
+    assert payload["active_controller"] == "rc_car8"
+    assert payload["authority"] == "TELEOP"

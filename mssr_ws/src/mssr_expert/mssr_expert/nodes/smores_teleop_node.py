@@ -23,11 +23,19 @@ from mssr_expert.teleop.camera import CameraController
 from mssr_expert.teleop.input import load_input_config
 from mssr_expert.teleop.session import TeleopSession
 from mssr_expert.teleop.safety import SafetyDecision
+from mssr_expert.teleop.structural_macro import StructuralMacroLauncher
 from mssr_expert.teleop.action_transport import RcCarRuntime
 from mssr_expert.teleop.rc_car import load_geometry
 from mssr_expert.teleop.recording import TeleopRecordingController
+from mssr_expert.teleop.topology import TeleopTopologyDetector
 from mssr_expert.behaviors.morphology_library import MorphologyLibrary
-from mssr_expert.graph.serialization import load_attributed_graph
+from mssr_expert.graph.serialization import (
+    attributed_graph_from_dict,
+    load_attributed_graph,
+)
+from mssr_expert.planning.smores_ep.self_reconfiguration_planner import (
+    SmoresSelfReconfigurationPlanner,
+)
 
 
 def _repository_root() -> Path:
@@ -61,13 +69,70 @@ class SmoresTeleopNode(Node):
         input_path = self.declare_parameter("input_config_path", str(config_dir / "smores_dualsense.yaml")).value
         teleop_path = self.declare_parameter("teleop_config_path", str(config_dir / "smores_teleop.yaml")).value
         config = load_teleop_config(teleop_path)
-        self.session = TeleopSession(load_input_config(input_path))
+        self.session = TeleopSession(
+            load_input_config(input_path),
+            controller_morphologies={"rc_car8"},
+        )
+        self._structural_macro = StructuralMacroLauncher()
+
         self.coordinator = RuntimeCoordinator(
             self.session,
             camera=CameraController(radius_m=config.camera_radius_m),
+            structural_request_handler=self._start_structural_macro,
         )
 
+        self._topology_detector = TeleopTopologyDetector(
+            catalog={
+                morphology: load_attributed_graph(
+                    config_dir / f"smores_{morphology}.json"
+                )
+                for morphology in (
+                    "rc_car8",
+                    "snake8",
+                    "mobile_manipulator8",
+                )
+            },
+            matcher=SmoresSelfReconfigurationPlanner(),
+        )
+
+        topology_timeout = float(
+            self.declare_parameter(
+                "topology_observation_timeout_s",
+                0.5,
+            ).value
+        )
+        if not 0.0 < topology_timeout <= 10.0:
+            raise ValueError(
+                "topology_observation_timeout_s must be in (0, 10]"
+            )
+
+        self._topology_observation_timeout_s = topology_timeout
+        self._topology_received_at: float | None = None
+        self._topology_name: str | None = None
+
         repo_root = _repository_root()
+        self._repo_root = repo_root
+        self._structural_dataset_root = Path(
+            self.declare_parameter(
+                "structural_dataset_root",
+                str(repo_root / "logs/teleop/structural"),
+            ).value
+        )
+
+        structural_exit_grace_s = float(
+            self.declare_parameter(
+                "structural_exit_grace_s",
+                0.5,
+            ).value
+        )
+
+        if not 0.0 <= structural_exit_grace_s <= 10.0:
+            raise ValueError(
+                "structural_exit_grace_s must be in [0, 10]"
+            )
+
+        self._structural_exit_grace_s = structural_exit_grace_s
+
         recording_root = Path(
             self.declare_parameter(
                 "recording_root",
@@ -88,6 +153,12 @@ class SmoresTeleopNode(Node):
         self._cancel = self.create_publisher(String, "/mssr/primitives/cancel", 10)
         self._graph = self.create_subscription(String, "/mssr/robot_graph", self._on_graph, 10)
         self._primitive_status = self.create_subscription(String, "/mssr/primitives/status", self._on_primitive_status, 10)
+        self._self_reconfiguration_state = self.create_subscription(
+            String,
+            "/mssr/expert/self_reconfiguration/state",
+            self._on_self_reconfiguration_state,
+            10,
+        )
         joy_topic = self.declare_parameter("joy_topic", config.joy_topic).value
         status_topic = self.declare_parameter("status_topic", "/mssr/teleop/status").value
         rate = control_rate(self.declare_parameter("control_rate_hz", config.control_rate_hz).value)
@@ -103,17 +174,144 @@ class SmoresTeleopNode(Node):
         self.get_logger().info(f"RC-Car8 teleop at {rate:g} Hz; live topology and runtime safety required")
 
     def _on_graph(self, message: String) -> None:
+        now = time.monotonic()
+
         try:
             payload = json.loads(message.data)
         except (ValueError, TypeError):
             payload = None
-        self._rc.observe_graph(payload, now=time.monotonic())
+
+        self._rc.observe_graph(payload, now=now)
+
+        try:
+            current_graph = attributed_graph_from_dict(payload)
+        except (
+            AttributeError,
+            KeyError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
+            self._topology_name = None
+            self._topology_received_at = None
+            return
+
+        self._topology_name = self._topology_detector.detect(
+            current_graph
+        )
+        self._topology_received_at = now
+
+    def _detected_topology(self, now: float) -> str | None:
+        received_at = self._topology_received_at
+
+        if received_at is None:
+            return None
+
+        age = now - received_at
+
+        if (
+            age < 0.0
+            or age > self._topology_observation_timeout_s
+        ):
+            return None
+
+        return self._topology_name
 
     def _on_primitive_status(self, message: String) -> None:
         try:
             self._rc.observe_status(json.loads(message.data))
         except (KeyError, RuntimeError, TypeError, ValueError):
             return
+
+    def _start_structural_macro(self, target_morphology: str) -> bool:
+        stamp = time.time_ns()
+        execution_id = f"teleop-reconfiguration-{stamp}"
+
+        manager = self._recording.manager
+        recording_episode_id = self._recording.episode_id
+
+        if (
+            manager is not None
+            and manager.recording
+            and manager.episode_dir is not None
+            and recording_episode_id is not None
+        ):
+            episode_id = recording_episode_id
+            dataset_path = (
+                manager.episode_dir
+                / "structural"
+                / f"{execution_id}.jsonl"
+            )
+        else:
+            episode_id = f"teleop-structural-{stamp}"
+            dataset_path = (
+                self._structural_dataset_root
+                / f"{execution_id}.jsonl"
+            )
+
+        try:
+            self._structural_macro.start(
+                state=self.session.state,
+                target_morphology=target_morphology,
+                execution_id=execution_id,
+                episode_id=episode_id,
+                dataset_path=dataset_path,
+            )
+        except (OSError, RuntimeError, ValueError) as error:
+            self.get_logger().error(
+                "Cannot start structural macro "
+                f"{target_morphology!r}: {error}"
+            )
+            return False
+
+        # Only a successfully launched deterministic expert belongs in the
+        # T4 demonstration manifest.  A failed spawn must never leave a
+        # structural-stream reference to data that was never produced.
+        if (
+            manager is not None
+            and manager.recording
+            and recording_episode_id is not None
+        ):
+            try:
+                self._recording.register_structural_stream(
+                    stream_id=execution_id,
+                    phase="self_reconfiguration",
+                    path=dataset_path,
+                    producer="deterministic_expert",
+                )
+            except RuntimeError as error:
+                # Dataset bookkeeping must not revoke structural authority
+                # from an expert that already started controlling the robot.
+                self.get_logger().error(
+                    "Cannot link structural stream into recording manifest: "
+                    f"{error}"
+                )
+
+        self.get_logger().info(
+            "Started structural macro "
+            f"{target_morphology!r} as {execution_id!r}."
+        )
+        return True
+
+    def _on_self_reconfiguration_state(
+        self,
+        message: String,
+    ) -> None:
+        try:
+            payload = json.loads(message.data)
+        except (ValueError, TypeError):
+            return
+
+        consumed = self._structural_macro.observe_expert_state(
+            state=self.session.state,
+            payload=payload,
+        )
+
+        if consumed:
+            self.get_logger().info(
+                "Structural macro terminal state consumed: "
+                f"success={self.session.state.last_macro_success}."
+            )
 
     def _on_joy(self, message: Joy) -> None:
         self.session.update_joy(message.axes, message.buttons, time.monotonic())
@@ -127,8 +325,53 @@ class SmoresTeleopNode(Node):
 
     def _tick(self) -> None:
         now = time.monotonic()
-        self.session.state.observe_topology(self._rc.topology(now))
+        self.session.state.observe_topology(
+            self._detected_topology(now)
+        )
         status, runtime_request = self.coordinator.tick(now)
+
+        if (
+            status["authority"] == "ESTOP"
+            and self._structural_macro.process is not None
+        ):
+            cancel_goal_ids = self._structural_macro.interrupt()
+
+            for goal_id in cancel_goal_ids:
+                self._cancel.publish(
+                    String(
+                        data=json.dumps(
+                            {"goal_id": goal_id},
+                            allow_nan=False,
+                        )
+                    )
+                )
+
+        watchdog_cancel_goal_ids = (
+            None
+            if status["authority"] == "ESTOP"
+            else self._structural_macro.check_process(
+                state=self.session.state,
+                now=now,
+                exit_grace_s=self._structural_exit_grace_s,
+            )
+        )
+
+        if watchdog_cancel_goal_ids is not None:
+            for goal_id in watchdog_cancel_goal_ids:
+                self._cancel.publish(
+                    String(
+                        data=json.dumps(
+                            {"goal_id": goal_id},
+                            allow_nan=False,
+                        )
+                    )
+                )
+
+            self.get_logger().error(
+                "Structural expert exited without an authoritative "
+                "terminal state; macro marked failed."
+            )
+
         output = self._rc.step(SimpleNamespace(**status["controller_input"]),
                                safety=SafetyDecision(**status["safety"]), now=now)
         if output.envelope is not None:
@@ -171,7 +414,9 @@ class SmoresTeleopNode(Node):
             actuator_commands_enabled=bool(
                 status["safety"]["motion_enabled"] and output.envelope
             ),
-            topology_verification_ready=self._rc.topology(now) is not None,
+            topology_verification_ready=(
+                self._detected_topology(now) is not None
+            ),
             recording_backend_ready=self._recording.backend_ready,
             recording_episode_id=self._recording.episode_id,
             recording_error=self._recording.error,

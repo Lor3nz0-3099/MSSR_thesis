@@ -62,6 +62,12 @@ class SafetyGate:
             self._last_receipt = received_at
         if not connected or not valid or self._paused:
             self._disarm()
+        elif macro_active:
+            # Structural authority invalidates any previously armed human
+            # locomotion.  _disarm() also advances the neutral fence to the
+            # latest received packet, so only a genuinely newer neutral
+            # packet may re-arm TELEOP after the macro terminates.
+            self._disarm()
         elif not self._armed and l2 == 0.0 and r2 == 0.0:
             # A cached neutral snapshot cannot satisfy a post-resume latch.
             if self._neutral_after is None or received_at > self._neutral_after:

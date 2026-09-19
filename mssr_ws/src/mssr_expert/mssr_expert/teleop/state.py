@@ -10,7 +10,27 @@ ACTIVE_MORPHOLOGIES = frozenset({"rc_car8", "snake8", "mobile_manipulator8"})
 
 
 class TeleopState:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        controller_morphologies=None,
+    ) -> None:
+        if controller_morphologies is None:
+            controller_morphologies = ACTIVE_MORPHOLOGIES
+
+        controller_morphologies = frozenset(
+            str(name)
+            for name in controller_morphologies
+        )
+
+        unsupported = controller_morphologies - ACTIVE_MORPHOLOGIES
+        if unsupported:
+            raise ValueError(
+                "unsupported teleop controller morphologies: "
+                f"{sorted(unsupported)}"
+            )
+
+        self._controller_morphologies = controller_morphologies
         self._started = False
         self._macro_active = False
         self._estop_active = False
@@ -41,7 +61,11 @@ class TeleopState:
 
     @property
     def active_controller(self) -> str | None:
-        return self._detected_morphology if self._started else None
+        if not self._started:
+            return None
+        if self._detected_morphology not in self._controller_morphologies:
+            return None
+        return self._detected_morphology
 
     @property
     def requested_morphology(self) -> str | None:

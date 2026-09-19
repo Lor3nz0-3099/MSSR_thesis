@@ -55,11 +55,23 @@ def test_approved_home_and_toggle_bindings():
     assert config.commands["record_toggle"] == "start"
 
 
-def test_circle_emits_home_and_dpad_does_not_launch_future_macros():
+def test_circle_emits_home_and_ambiguous_dpad_selection_is_rejected():
     result = core()
     send(result, 10.01, 1, 11, 12, 13, 14)
     status, payload = result.tick(10.01)
-    assert status["controller_input"]["command_events"] == ["home"]
+
+    assert status["controller_input"]["command_events"] == [
+        "home",
+        "select_snake",
+        "select_rc",
+        "select_mm8",
+    ]
+    assert status["rejected_commands"] == [
+        "ambiguous_morphology_selection"
+    ]
+
+    # No structural handler is installed in this unit-level coordinator,
+    # and an ambiguous selection must never claim macro authority anyway.
     assert payload["structure_stop_request"] is None
     assert not result.session.state.macro_active
 
