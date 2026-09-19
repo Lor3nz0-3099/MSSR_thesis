@@ -135,7 +135,7 @@ def test_shell_config_produces_driver_parameters_without_double_deadzone():
     assert config.joy_parameters()["deadzone"] == 0.0
     assert config.joy_parameters()["sticky_buttons"] is False
     assert config.control_rate_hz == 50.0
-    assert config.dataset_rate_hz == 25.0
+    assert config.dataset_rate_hz == 10.0
     assert config.joy_topic == "/joy"
 
 

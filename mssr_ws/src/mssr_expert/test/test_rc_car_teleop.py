@@ -74,10 +74,10 @@ def rates(result):
 
 
 @pytest.mark.parametrize("trigger,value,front,rear", [
-    ("r2", 0.1, 0.3184713376, -0.3184713376),
-    ("r2", 0.2, 0.6369426752, -0.6369426752),
-    ("l2", 0.1, -0.3184713376, 0.3184713376),
-    ("l2", 0.2, -0.6369426752, 0.6369426752),
+    ("r2", 0.1, 0.4777070064, -0.4777070064),
+    ("r2", 0.2, 0.9554140127, -0.9554140127),
+    ("l2", 0.1, -0.4777070064, 0.4777070064),
+    ("l2", 0.2, -0.9554140127, 0.9554140127),
 ])
 def test_analog_triggers_use_existing_pan_traction_signs(trigger, value, front, rear):
     controller, observation = setup_controller()
@@ -86,14 +86,31 @@ def test_analog_triggers_use_existing_pan_traction_signs(trigger, value, front, 
                                           "physical_v5": front, "physical_v6": rear})
 
 
+def test_full_forward_uses_rc_car8_overdrive_speed() -> None:
+    controller, observation = setup_controller()
+    result = step(controller, observation, r2=1.0)
+
+    expected = 0.15 / 0.0314
+
+    assert rates(result) == pytest.approx(
+        {
+            "physical_v3": expected,
+            "physical_v4": -expected,
+            "physical_v5": expected,
+            "physical_v6": -expected,
+        }
+    )
+
+
+
 def test_trigger_release_zeroes_traction_in_same_tick():
     controller, observation = setup_controller()
     step(controller, observation, r2=1.0)
     assert all(rate == 0 for rate in rates(step(controller, observation, dt=0)).values())
 
 
-@pytest.mark.parametrize("x,front,rear", [(0.1, 0.6242038217, -0.0127388535),
-                                       (-0.1, 0.0127388535, -0.6242038217)])
+@pytest.mark.parametrize("x,front,rear", [(0.1, 0.7834394904, -0.1719745223),
+                                       (-0.1, 0.1719745223, -0.7834394904)])
 def test_right_x_turns_right_with_existing_role_and_yaw_conventions(x, front, rear):
     controller, observation = setup_controller()
     result = step(controller, observation, right_x=x, r2=0.1)
@@ -156,7 +173,8 @@ def test_home_slews_to_library_nominal_without_teleport():
 def test_pan_defers_tilt_per_module_and_release_resumes_held_height():
     controller, observation = setup_controller()
     # vx=.0096 and yaw=-.08 cancel PAN only for rear support modules.
-    busy = step(controller, observation, r2=0.096, right_x=0.1, right_y=1)
+    # With the 0.15 m/s overdrive profile, 0.064 * 0.15 = 0.0096.
+    busy = step(controller, observation, r2=0.064, right_x=0.1, right_y=1)
     assert {item.module_id for item in busy.joint_targets} == {"physical_v4", "physical_v6"}
     desired = busy.intent["chassis_height_m"]
     released = step(controller, observation)
@@ -258,7 +276,7 @@ def test_exact_action_envelope_round_trips_effective_commands_to_native_parser()
     assert decoded["expert"]["pan_traction_module_ids"] == ["physical_v3", "physical_v4", "physical_v5", "physical_v6"]
     assert "cmd_vel" not in payload
     native, diagnostics = ActionFileChannel._parse(payload)
-    assert native["physical_v3"].pan_velocity_rad_s == pytest.approx(0.3184713376)
+    assert native["physical_v3"].pan_velocity_rad_s == pytest.approx(0.4777070064)
     assert diagnostics.command_id == "rc-test"
 
 

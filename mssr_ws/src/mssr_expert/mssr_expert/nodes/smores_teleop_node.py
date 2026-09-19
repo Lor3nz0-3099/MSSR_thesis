@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import subprocess
 import time
 from types import SimpleNamespace
 
@@ -24,8 +25,33 @@ from mssr_expert.teleop.session import TeleopSession
 from mssr_expert.teleop.safety import SafetyDecision
 from mssr_expert.teleop.action_transport import RcCarRuntime
 from mssr_expert.teleop.rc_car import load_geometry
+from mssr_expert.teleop.recording import TeleopRecordingController
 from mssr_expert.behaviors.morphology_library import MorphologyLibrary
 from mssr_expert.graph.serialization import load_attributed_graph
+
+
+def _repository_root() -> Path:
+    try:
+        return Path(
+            subprocess.check_output(
+                ["git", "rev-parse", "--show-toplevel"],
+                text=True,
+                stderr=subprocess.DEVNULL,
+            ).strip()
+        )
+    except (OSError, subprocess.SubprocessError):
+        return Path.cwd()
+
+
+def _git_commit(root: Path) -> str:
+    try:
+        return subprocess.check_output(
+            ["git", "-C", str(root), "rev-parse", "HEAD"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        ).strip()
+    except (OSError, subprocess.SubprocessError):
+        return "unknown"
 
 
 class SmoresTeleopNode(Node):
@@ -36,7 +62,23 @@ class SmoresTeleopNode(Node):
         teleop_path = self.declare_parameter("teleop_config_path", str(config_dir / "smores_teleop.yaml")).value
         config = load_teleop_config(teleop_path)
         self.session = TeleopSession(load_input_config(input_path))
-        self.coordinator = RuntimeCoordinator(self.session, camera=CameraController(radius_m=config.camera_radius_m))
+        self.coordinator = RuntimeCoordinator(
+            self.session,
+            camera=CameraController(radius_m=config.camera_radius_m),
+        )
+
+        repo_root = _repository_root()
+        recording_root = Path(
+            self.declare_parameter(
+                "recording_root",
+                str(repo_root / "logs/teleop/recordings"),
+            ).value
+        )
+        self._recording = TeleopRecordingController(
+            root=recording_root,
+            git_commit=_git_commit(repo_root),
+            dataset_rate_hz=config.dataset_rate_hz,
+        )
         rc_config = yaml.safe_load(Path(teleop_path).read_text()).get("rc_car", {})
         self._rc = RcCarRuntime(MorphologyLibrary.load(config_dir / "smores_morphology_behaviors.json"),
                                 load_attributed_graph(config_dir / "smores_rc_car8.json"),
@@ -95,12 +137,47 @@ class SmoresTeleopNode(Node):
             self._goal.publish(String(data=json.dumps(output.posture.goal.to_dict(), allow_nan=False)))
         if output.posture.cancel_goal_id is not None:
             self._cancel.publish(String(data=json.dumps({"goal_id": output.posture.cancel_goal_id})))
+        recording_events = tuple(
+            {
+                "kind": "command",
+                "name": str(name),
+                "stamp_monotonic": now,
+            }
+            for name in status["controller_input"]["command_events"]
+        ) + tuple(
+            {
+                "kind": "session",
+                "name": str(name),
+                "stamp_monotonic": now,
+            }
+            for name in status["events"]
+        )
+
+        self._recording.update(
+            recording_requested=status["recording"],
+            authority=status["authority"],
+            graph=self._rc.latest_graph,
+            controller_input=status["controller_input"],
+            intent=output.actions.intent,
+            effective_actions=output.actions.module_actions,
+            morphology=status["active_controller"],
+            now=now,
+            wall_time=time.time(),
+            events=recording_events,
+        )
+
         status["stamp_ros"] = self.get_clock().now().nanoseconds * 1e-9
-        status.update(actuator_commands_enabled=bool(status["safety"]["motion_enabled"] and output.envelope),
-                      topology_verification_ready=self._rc.topology(now) is not None,
-                      recording_backend_ready=False,
-                      rc_car_intent=output.actions.intent,
-                      rc_car_effective_actions=output.actions.module_actions)
+        status.update(
+            actuator_commands_enabled=bool(
+                status["safety"]["motion_enabled"] and output.envelope
+            ),
+            topology_verification_ready=self._rc.topology(now) is not None,
+            recording_backend_ready=self._recording.backend_ready,
+            recording_episode_id=self._recording.episode_id,
+            recording_error=self._recording.error,
+            rc_car_intent=output.actions.intent,
+            rc_car_effective_actions=output.actions.module_actions,
+        )
         message = String()
         message.data = json.dumps(status, allow_nan=False)
         self._status.publish(message)

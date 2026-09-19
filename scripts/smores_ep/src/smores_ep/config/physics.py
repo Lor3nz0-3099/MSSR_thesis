@@ -6,7 +6,16 @@ import math
 from smores_ep.config.geometry import SmoresGeometry
 
 
+# Hardware/reference no-load speed for the internal PAN/TILT DOFs.
 SMORES_DOF_NO_LOAD_SPEED_RAD_S = 23.0 * 2.0 * math.pi / 60.0
+
+# Simulation-only overdrive.  Keep the hardware/reference value above
+# unchanged so experimental acceleration is explicit and traceable.
+SMORES_DOF_SIMULATION_SPEED_SCALE = 2.0
+SMORES_DOF_SIMULATION_MAX_SPEED_RAD_S = (
+    SMORES_DOF_NO_LOAD_SPEED_RAD_S
+    * SMORES_DOF_SIMULATION_SPEED_SCALE
+)
 SMORES_EP_CHARACTERISTIC_LENGTH_M = 0.080
 SMORES_MAX_LAND_SPEED_BODY_LENGTHS_S = 1.1
 SMORES_EP_MAX_LAND_SPEED_M_S = (
@@ -32,7 +41,7 @@ class SmoresActuatorConfig:
     hold_stiffness_nm_per_rad: float = 24.0
     hold_damping_nm_s_per_rad: float = 1.2
     wheel_max_speed_rad_s: float = SMORES_EP_MAX_WHEEL_SPEED_RAD_S
-    internal_max_speed_rad_s: float = SMORES_DOF_NO_LOAD_SPEED_RAD_S
+    internal_max_speed_rad_s: float = SMORES_DOF_SIMULATION_MAX_SPEED_RAD_S
 
     def __post_init__(self) -> None:
         if not all(
@@ -101,7 +110,7 @@ class SmoresActuatorConfig:
                 1.2, 1.60 * resolved_tilt_scale
             ),
             wheel_max_speed_rad_s=wheel_max_speed_rad_s,
-            internal_max_speed_rad_s=SMORES_DOF_NO_LOAD_SPEED_RAD_S,
+            internal_max_speed_rad_s=SMORES_DOF_SIMULATION_MAX_SPEED_RAD_S,
         )
 
 

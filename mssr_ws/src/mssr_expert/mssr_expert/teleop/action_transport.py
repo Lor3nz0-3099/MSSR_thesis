@@ -184,6 +184,11 @@ class RcCarRuntime:
             return None
         return self._observation
 
+    @property
+    def latest_graph(self):
+        """Return the latest accepted physical graph for dataset recording."""
+        return self._last_graph
+
     def topology(self, now):
         return "rc_car8" if self._fresh_observation(now) is not None else None
 

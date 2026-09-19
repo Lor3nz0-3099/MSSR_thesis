@@ -16,11 +16,13 @@ class DatasetLogger:
     """Append expert transitions to a JSONL dataset."""
 
     path: Path
+    label_source: str = "deterministic_expert"
+    executed_action_source: str = "deterministic_expert"
 
     def __post_init__(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
 
-    def log_step(
+    def build_record(
         self,
         episode_id: str,
         timestep: int,
@@ -38,8 +40,8 @@ class DatasetLogger:
         next_observation: Mapping[str, Any] | None = None,
         episode_done: bool | None = None,
         episode_success: bool | None = None,
-    ) -> None:
-        """Log one expert transition with current, target and task graphs.
+    ) -> dict[str, Any]:
+        """Build one transition without writing the JSONL file.
 
         Optional arguments keep legacy experts compatible.  Self-assembly and
         reconfiguration experts provide them so IL receives the full
@@ -111,8 +113,8 @@ class DatasetLogger:
                 ),
             },
             "supervision": {
-                "label_source": "deterministic_expert",
-                "executed_action_source": "deterministic_expert",
+                "label_source": self.label_source,
+                "executed_action_source": self.executed_action_source,
                 "expert_intervention": False,
                 "valid_for_behavior_cloning": not terminal,
             },
@@ -132,5 +134,10 @@ class DatasetLogger:
             "done": terminal,
             "debug": dict(expert_output.debug),
         }
+        return record
+
+    def log_step(self, *args: Any, **kwargs: Any) -> None:
+        """Build and append one transition to the configured JSONL file."""
+        record = self.build_record(*args, **kwargs)
         with self.path.open("a", encoding="utf-8") as stream:
             stream.write(dumps_json(record) + "\n")

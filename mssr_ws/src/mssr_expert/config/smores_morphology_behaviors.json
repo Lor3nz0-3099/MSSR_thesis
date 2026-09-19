@@ -1295,11 +1295,11 @@
       },
       "drive": {
         "actuation": "pan",
-        "max_linear_m_s": 0.1,
+        "max_linear_m_s": 0.15,
         "max_yaw_rate_rad_s": 0.8,
         "turn_radius_m": 0.12,
         "effective_radius_m": 0.0314,
-        "max_pan_rate_rad_s": 2.0,
+        "max_pan_rate_rad_s": 4.8,
         "selectors": [
           {
             "target_role": "wheel_left_front",

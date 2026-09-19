@@ -5,6 +5,7 @@ import pytest
 from smores_ep.config.geometry import SmoresGeometry
 from smores_ep.config.physics import (
     SMORES_DOF_NO_LOAD_SPEED_RAD_S,
+    SMORES_DOF_SIMULATION_MAX_SPEED_RAD_S,
     SMORES_EP_MAX_LAND_SPEED_M_S,
     SMORES_EP_MAX_WHEEL_SPEED_RAD_S,
     SmoresActuatorConfig,
@@ -67,6 +68,16 @@ def test_pan_face_collision_proxy_is_inset_from_visual_rim() -> None:
     assert geometry.pan_face_radius_m - PAN_FACE_COLLISION_RADIUS_M <= 0.002
 
 
+def test_internal_dof_simulation_speed_is_double_reference_rpm() -> None:
+    assert SMORES_DOF_NO_LOAD_SPEED_RAD_S == pytest.approx(
+        23.0 * 2.0 * 3.141592653589793 / 60.0
+    )
+    assert SMORES_DOF_SIMULATION_MAX_SPEED_RAD_S == pytest.approx(
+        46.0 * 2.0 * 3.141592653589793 / 60.0
+    )
+
+
+
 def test_payload_overdrive_scales_effort_and_stiffens_holding_drives() -> None:
     nominal = SmoresActuatorConfig()
     payload = SmoresActuatorConfig.payload_overdrive(
@@ -91,7 +102,7 @@ def test_payload_overdrive_scales_effort_and_stiffens_holding_drives() -> None:
     )
     assert payload.wheel_max_speed_rad_s == pytest.approx(5.0)
     assert payload.internal_max_speed_rad_s == pytest.approx(
-        SMORES_DOF_NO_LOAD_SPEED_RAD_S
+        SMORES_DOF_SIMULATION_MAX_SPEED_RAD_S
     )
 
 
