@@ -305,6 +305,15 @@ def test_file_channel_delivers_new_goal_once_and_writes_status(tmp_path) -> None
     assert decoded["statuses"][0]["goal_id"] == "tilt-001"
 
 
+def test_file_channel_accepts_atomic_batch_of_snake_goal_cancellations(tmp_path):
+    channel = PrimitiveFileChannel(tmp_path / "goal.json", tmp_path / "cancel.json",
+                                   tmp_path / "status.json")
+    (tmp_path / "cancel.json").write_text(
+        json.dumps({"goal_ids": ["snake-pan", "snake-tilt"]}), encoding="utf-8")
+    assert channel.poll_cancels() == ("snake-pan", "snake-tilt")
+    assert channel.poll_cancels() == ()
+
+
 def test_file_channel_detects_same_goal_payload_rewritten_atomically(
     tmp_path,
 ) -> None:
@@ -1861,6 +1870,46 @@ def test_rc_teleop_cancel_retains_reached_tilt_before_pan_or_disconnect_hold(pan
     assert articulation.targets["tilt_joint_position_rad"] == pytest.approx(0.80)
     drive.apply(SmoresCommand(internal_motion=InternalMotionMode.HOLD))
     assert articulation.targets["tilt_joint_position_rad"] == pytest.approx(0.80)
+
+
+def test_snake_pan_cancel_retains_measured_posture_instead_of_old_destination():
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    state = _MutableStateReader(tilt_rad=-0.785, pan_rad=0.2)
+    executor = IsaacPrimitiveExecutor(
+        stage=object(), module_roots={"module_a": "/A", "module_b": "/B"},
+        states={"module_a": state, "module_b": _MutableStateReader()},
+        docking=_FakeDocking(),
+    )
+    goal = _goal("snake-relative-pan", PrimitiveName.ROTATE_PAN_BY, ("module_a",),
+                 {"delta_rad": 0.4, "retain_reached_on_interrupt": True})
+    assert executor.submit(goal, 0).state is PrimitiveState.ACCEPTED
+    executor.step(0.1)
+    state.state.pan_joint_rad = 0.3
+    assert executor.cancel(goal.goal_id, 0.2).state is PrimitiveState.CANCELED
+    retained = executor._retained_internal_commands["module_a"]
+    assert retained.pan_target_rad == pytest.approx(0.3)
+    assert retained.tilt_target_rad == pytest.approx(-0.785)
+    assert retained.internal_motion is InternalMotionMode.STRUCTURAL_HOLD
+
+
+def test_retired_snake_pan_cancel_holds_measured_posture_and_rejects_late_retry():
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    state = _MutableStateReader(tilt_rad=-0.785, pan_rad=0.2)
+    executor = IsaacPrimitiveExecutor(
+        stage=object(), module_roots={"module_a": "/A", "module_b": "/B"},
+        states={"module_a": state, "module_b": _MutableStateReader()},
+        docking=_FakeDocking(),
+    )
+    goal = _goal("snake-retired-pan", PrimitiveName.ROTATE_PAN_BY, ("module_a",),
+                 {"delta_rad": 0.0, "retain_reached_on_interrupt": True})
+    assert executor.submit(goal, 0).state is PrimitiveState.ACCEPTED
+    assert executor.step(0.1).status.state is PrimitiveState.SUCCEEDED
+    state.state.pan_joint_rad = 0.23
+    assert executor.cancel(goal.goal_id, 0.2).state is PrimitiveState.CANCELED
+    assert executor._retained_internal_commands["module_a"].pan_target_rad == pytest.approx(0.23)
+    assert executor.submit(goal, 0.3).state is PrimitiveState.CANCELED
 
 
 @pytest.mark.parametrize("pan_velocity", [0.0, 1.0])

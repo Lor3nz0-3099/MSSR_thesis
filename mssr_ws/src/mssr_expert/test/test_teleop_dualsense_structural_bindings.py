@@ -25,12 +25,9 @@ def test_structural_morphology_commands_use_three_distinct_dpad_buttons():
     assert config.commands["select_rc"] != config.commands["select_mm8"]
     assert config.commands["select_snake"] != config.commands["select_mm8"]
 
-    # Keep D-pad down available for a later structural macro/self-assembly.
-    assert "dpad_down" not in {
-        config.commands["select_rc"],
-        config.commands["select_snake"],
-        config.commands["select_mm8"],
-    }
+    assert config.commands["override"] == "dpad_down"
+    assert config.commands["previous_module"] == "l1"
+    assert config.commands["next_module"] == "r1"
 
 
 @pytest.mark.parametrize(

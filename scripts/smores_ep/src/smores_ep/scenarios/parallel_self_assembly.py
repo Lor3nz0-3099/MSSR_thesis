@@ -893,8 +893,7 @@ def run_parallel_self_assembly_scenario(
                     f"[primitive] {accepted.state.value.upper()} "
                     f"{accepted.goal_id}: {accepted.message}"
                 )
-            cancel_goal_id = primitive_channel.poll_cancel()
-            if cancel_goal_id is not None:
+            for cancel_goal_id in primitive_channel.poll_cancels():
                 canceled = primitive_executor.cancel(
                     cancel_goal_id,
                     now_s,

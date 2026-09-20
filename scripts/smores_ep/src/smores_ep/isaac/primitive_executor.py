@@ -440,7 +440,8 @@ class IsaacPrimitiveExecutor:
 
     def submit(self, goal: PrimitiveGoal, now_s: float) -> PrimitiveStatus:
         if (
-            goal.primitive is PrimitiveName.SET_TILT
+            goal.primitive in {PrimitiveName.SET_TILT, PrimitiveName.SET_PAN,
+                               PrimitiveName.ROTATE_PAN_BY}
             and goal.parameters.get("retain_reached_on_interrupt") is True
             and goal.goal_id in self._rc_posture_terminal_statuses
         ):
@@ -4003,7 +4004,8 @@ class IsaacPrimitiveExecutor:
     ) -> PrimitiveStatus:
         goal = runtime.goal
         if (
-            goal.primitive is PrimitiveName.SET_TILT
+            goal.primitive in {PrimitiveName.SET_TILT, PrimitiveName.SET_PAN,
+                               PrimitiveName.ROTATE_PAN_BY}
             and goal.parameters.get("retain_reached_on_interrupt") is True
             and state in {PrimitiveState.CANCELED, PrimitiveState.FAILED, PrimitiveState.REJECTED}
         ):
@@ -4027,7 +4029,9 @@ class IsaacPrimitiveExecutor:
             message=message,
         )
         self._status = status
-        if goal.primitive is PrimitiveName.SET_TILT and goal.parameters.get("retain_reached_on_interrupt") is True:
+        if (goal.primitive in {PrimitiveName.SET_TILT, PrimitiveName.SET_PAN,
+                               PrimitiveName.ROTATE_PAN_BY}
+                and goal.parameters.get("retain_reached_on_interrupt") is True):
             self._rc_posture_terminal_statuses[goal.goal_id] = status
             if state is PrimitiveState.SUCCEEDED:
                 self._rc_retained_posture_goal_ids[goal.module_ids[0]] = goal.goal_id

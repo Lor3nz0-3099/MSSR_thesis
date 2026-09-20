@@ -78,23 +78,36 @@ class PrimitiveFileChannel:
         return PrimitiveGoal.from_json(payload)
 
     def poll_cancel(self) -> str | None:
+        goal_ids = self.poll_cancels()
+        if len(goal_ids) > 1:
+            raise ValueError("Primitive cancel batch requires poll_cancels")
+        return goal_ids[0] if goal_ids else None
+
+    def poll_cancels(self) -> tuple[str, ...]:
+        """Read one atomic single-goal or multi-goal cancel request."""
         snapshot = self._snapshot(self._cancel_file)
         if snapshot is None:
-            return None
+            return ()
         signature, payload = snapshot
         if signature == self._last_cancel_signature:
-            return None
+            return ()
         self._last_cancel_signature = signature
         decoded = json.loads(payload)
         if isinstance(decoded, str):
-            goal_id = decoded
+            goal_ids = (decoded,)
         elif isinstance(decoded, dict):
-            goal_id = str(decoded.get("goal_id", ""))
+            if "goal_ids" in decoded:
+                raw = decoded["goal_ids"]
+                if not isinstance(raw, list | tuple):
+                    raise ValueError("Primitive cancel goal_ids must be an array")
+                goal_ids = tuple(str(item) for item in raw)
+            else:
+                goal_ids = (str(decoded.get("goal_id", "")),)
         else:
             raise ValueError("Primitive cancel payload must name a goal_id")
-        if not goal_id:
-            raise ValueError("Primitive cancel goal_id cannot be empty")
-        return goal_id
+        if not goal_ids or any(not goal_id for goal_id in goal_ids) or len(set(goal_ids)) != len(goal_ids):
+            raise ValueError("Primitive cancel goal IDs must be distinct and non-empty")
+        return goal_ids
 
     def publish(self, status: PrimitiveStatus) -> None:
         self._write_atomic(self._status_file, status.to_json())
