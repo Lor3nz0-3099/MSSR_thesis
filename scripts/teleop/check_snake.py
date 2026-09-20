@@ -148,7 +148,7 @@ def recorded_snake_actions(path):
         selected = intent.get("selected_module_id")
 
         if (
-            intent.get("control_mode") == "single_module"
+            intent.get("control_mode") == "manual"
             and selected in actions
         ):
             manual_selected_modules.add(selected)
@@ -326,7 +326,9 @@ def main():
         wait("snake_neutral", "Rilascia tutti i controlli; attendi il fresh-neutral fence.",
              lambda: latest["status"] is not None
              and state()["safety"]["motion_enabled"] and zero()
-             and state()["active_controller"] == "snake8")
+             and state()["active_controller"] == "snake8"
+             and state()["snake_intent"].get("control_mode") == "manual"
+             and bool(state()["snake_intent"].get("selected_module_id")))
         wait("recording_start", "Premi START una volta per registrare la dimostrazione.",
              lambda: state()["recording"] and bool(state()["recording_episode_id"])
              and state()["recording_backend_ready"])
@@ -338,73 +340,9 @@ def main():
         wait("reverse", "Premi L2 circa 1/3: la testa deve arretrare.", drive(-1), timeout=60)
         wait("reverse_release", "Rilascia L2.",
              lambda: state()["controller_input"]["l2"] == 0 and zero())
-        before = metrics()
-        vertical_start = state()["snake_intent"]["vertical_offset_m"]
-        def vertical():
-            status, current = state(), metrics()
-            module_tilt = max(abs(current["tilt"][module] - value)
-                              for module, value in before["tilt"].items())
-            dz = current["head"][2] - before["head"][2]
-            summary["vertical_evidence"] = {"tilt_delta_max_rad": module_tilt,
-                                             "head_delta_z_m": dz,
-                                             "offset_m": status["snake_intent"]["vertical_offset_m"]}
-            return (status["controller_input"]["right_y"] > 0.45
-                    and status["snake_intent"]["vertical_offset_m"] > vertical_start + 0.002
-                    and module_tilt > 0.01 and dz > 0.001)
-        wait("vertical_tilt_up", "Trigger neutri; tieni lo stick destro verso ALTO finché TILT alza la testa.",
-             vertical, timeout=60)
-        wait("vertical_release", "Rilascia completamente lo stick destro.",
-             lambda: abs(state()["controller_input"]["right_y"]) < 0.05)
-        held_offset = state()["snake_intent"]["vertical_offset_m"]
-        held_since = time.monotonic()
-        wait("vertical_hold", "Lascia lo stick neutro: l'altezza impostata deve restare ferma.",
-             lambda: abs(state()["controller_input"]["right_y"]) < 0.05
-             and abs(state()["snake_intent"]["vertical_offset_m"] - held_offset) < 0.002
-             and time.monotonic() - held_since > 1)
-        before = metrics()
-        vertical_start = state()["snake_intent"]["vertical_offset_m"]
-        def downward():
-            status, current = state(), metrics()
-            module_tilt = max(abs(current["tilt"][module] - value)
-                              for module, value in before["tilt"].items())
-            dz = current["head"][2] - before["head"][2]
-            summary["downward_evidence"] = {"tilt_delta_max_rad": module_tilt,
-                                             "head_delta_z_m": dz,
-                                             "offset_m": status["snake_intent"]["vertical_offset_m"]}
-            return (status["controller_input"]["right_y"] < -0.45
-                    and status["snake_intent"]["vertical_offset_m"] < vertical_start - 0.002
-                    and module_tilt > 0.01 and dz < -0.001)
-        wait("vertical_tilt_down", "Tieni lo stick destro verso BASSO finché TILT abbassa la testa.",
-             downward, timeout=60)
-        wait("down_release", "Rilascia completamente lo stick destro.",
-             lambda: abs(state()["controller_input"]["right_y"]) < 0.05)
-        before = metrics()
-        def whole_body():
-            status, current = state(), metrics()
-            moved = [module for module, angle in before["tilt"].items()
-                     if abs(current["tilt"][module] - angle) > 0.015]
-            summary["whole_body_evidence"] = {"tilt_modules_moved": moved,
-                                              "head": current["head"],
-                                              "backbone": status["snake_intent"].get("backbone_m")}
-            return (status["controller_input"]["r2"] > 0.15
-                    and status["controller_input"]["right_y"] > 0.4
-                    and wheel_invariant(actions()) and len(moved) >= 2)
-        wait("whole_body_follow", "Tieni R2 circa 1/3 e stick destro ALTO: almeno due TILT devono seguire.",
-             whole_body, timeout=90)
-        wait("whole_body_release", "Rilascia R2 e lo stick destro.",
-             lambda: state()["controller_input"]["r2"] == 0
-             and abs(state()["controller_input"]["right_y"]) < 0.05 and zero())
-
-        wait(
-            "manual_mode_enter",
-            "Con stick destro neutro premi D-pad GIU una volta: entra nel controllo singolo modulo.",
-            lambda: state()["snake_intent"].get("control_mode") == "single_module"
-            and bool(state()["snake_intent"].get("selected_module_id"))
-            and not state()["snake_intent"].get("manual_transition_pending"),
-            timeout=45,
-        )
-
         first_manual_module = state()["snake_intent"]["selected_module_id"]
+        if not first_manual_module:
+            raise RuntimeError("Snake manual mode has no selected module")
         before_manual_pan = metrics()
 
         def manual_pan():
@@ -430,7 +368,7 @@ def main():
             }
 
             return (
-                status["snake_intent"].get("control_mode") == "single_module"
+                status["snake_intent"].get("control_mode") == "manual"
                 and selected == first_manual_module
                 and status["controller_input"]["right_x"] > 0.45
                 and status["controller_input"]["r2"] > 0.15
@@ -445,7 +383,7 @@ def main():
 
         wait(
             "manual_pan",
-            "In single-module tieni R2 circa 1/3 e stick destro a DESTRA: PAN solo del modulo selezionato, ruote di tutti gli 8 moduli attive.",
+            "Tieni R2 circa 1/3 e stick destro a DESTRA: PAN solo del modulo selezionato, ruote di tutti gli 8 moduli attive.",
             manual_pan,
             timeout=90,
         )
@@ -461,7 +399,7 @@ def main():
         wait(
             "manual_next_module",
             "Con stick destro neutro premi R1 una volta per selezionare il modulo successivo.",
-            lambda: state()["snake_intent"].get("control_mode") == "single_module"
+            lambda: state()["snake_intent"].get("control_mode") == "manual"
             and state()["snake_intent"].get("selected_module_id") != first_manual_module
             and not state()["snake_intent"].get("manual_transition_pending"),
             timeout=45,
@@ -528,24 +466,6 @@ def main():
             timeout=45,
         )
 
-        wait(
-            "manual_mode_exit",
-            "Premi D-pad GIU una volta per tornare alla modalita head-led.",
-            lambda: state()["snake_intent"].get("control_mode") == "head_led"
-            and state()["snake_intent"].get("selected_module_id") is None
-            and not state()["snake_intent"].get("manual_transition_pending"),
-            timeout=45,
-        )
-
-        before_home = abs(state()["snake_intent"]["vertical_offset_m"])
-        seen_home = False
-        def homed():
-            nonlocal seen_home
-            status = state()
-            seen_home |= "home" in status["controller_input"]["command_events"]
-            return seen_home and abs(status["snake_intent"]["vertical_offset_m"]) < max(0.001, before_home - 0.002)
-        wait("soft_home", "Premi CERCHIO una volta e lascia gli stick: ritorno graduale.",
-             homed, timeout=45)
         wait("pre_estop_drive", "Premi R2 circa 1/3.", drive(1), timeout=60)
         wait("estop", "Mantieni R2 e premi TRIANGOLO (E-stop).",
              lambda: state()["safety"]["authority"] == "ESTOP"

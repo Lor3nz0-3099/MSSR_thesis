@@ -34,7 +34,7 @@ commands:
   record_toggle: start
   # Structural morphology selection uses the D-pad, never either analog stick.
   # Left = RC-Car8, Up = Snake8, Right = MobileManipulator8.
-  # Down toggles Snake8 single-module control; L1/R1 select the module.
+  # Down is free; Snake8 is always manual and L1/R1 select the module.
   select_rc: dpad_left
   select_snake: dpad_up
   select_mm8: dpad_right
@@ -42,7 +42,7 @@ commands:
   estop_toggle: triangle  # Each new press alternates structure E-stop/resume.
   estop: null
   resume: null
-  override: dpad_down
+  override: null
   previous_module: l1
   next_module: r1
   manual_pan_positive: null

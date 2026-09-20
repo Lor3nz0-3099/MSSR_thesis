@@ -43,11 +43,11 @@ def test_wheel_invariant_and_recording_require_actual_snake_actions(tmp_path, mo
     human.write_text("\n".join(json.dumps(row) for row in (
         {"task_type": "rc_car8_teleop", "expert_action": {"locomotion": {"a": {"vx": 1}}}},
         {"task_type": "snake8_teleop", "observation": {"intent": {
-            "control_mode": "single_module", "selected_module_id": "physical_v6"}},
+            "control_mode": "manual", "selected_module_id": "physical_v6"}},
          "expert_action": {"locomotion": {
             "physical_v6": {"vx": 0.0, "pan_target_rad": 0.1}}}},
         {"task_type": "snake8_teleop", "observation": {"intent": {
-            "control_mode": "single_module", "selected_module_id": "physical_v5"}},
+            "control_mode": "manual", "selected_module_id": "physical_v5"}},
          "expert_action": {"locomotion": {
             "physical_v5": {"vx": 0.03, "tilt_target_rad": 0.1}}}},
     )) + "\n")

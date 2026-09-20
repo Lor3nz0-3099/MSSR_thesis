@@ -25,7 +25,7 @@ def test_structural_morphology_commands_use_three_distinct_dpad_buttons():
     assert config.commands["select_rc"] != config.commands["select_mm8"]
     assert config.commands["select_snake"] != config.commands["select_mm8"]
 
-    assert config.commands["override"] == "dpad_down"
+    assert config.commands["override"] is None
     assert config.commands["previous_module"] == "l1"
     assert config.commands["next_module"] == "r1"
 
