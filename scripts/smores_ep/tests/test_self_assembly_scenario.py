@@ -14,6 +14,7 @@ from smores_ep.scenarios.parallel_self_assembly import (
     self_assembly_module_roots,
     self_assembly_spawn_layout,
     sparse_behavior_commands,
+    prepare_initial_snake_teleop_handoff,
     triangular_spawn_layout,
 )
 from smores_ep.self_assembly_cli import build_argument_parser
@@ -304,3 +305,85 @@ def test_terminal_primitive_status_remains_in_parallel_file_snapshot() -> None:
         "already-finished",
     }
     assert terminal_cache["already-finished"].state is PrimitiveState.SUCCEEDED
+
+
+
+class _HandoffDrive:
+    def __init__(self) -> None:
+        self.captures = 0
+
+    def initialize_from_measured_posture(self) -> None:
+        self.captures += 1
+
+
+class _BehaviorDiagnostics:
+    def __init__(self, phase: str) -> None:
+        self.phase = phase
+
+
+def test_direct_assembly_first_snake_teleop_recaptures_posture_once() -> None:
+    commands = {
+        "m1": SmoresCommand(),
+        "m2": SmoresCommand(),
+    }
+    drives = {
+        "m1": _HandoffDrive(),
+        "m2": _HandoffDrive(),
+    }
+
+    seen = prepare_initial_snake_teleop_handoff(
+        commands,
+        _BehaviorDiagnostics("snake8_teleop"),
+        drives,
+        behavior_source_seen=False,
+    )
+
+    assert seen is True
+    assert drives["m1"].captures == 1
+    assert drives["m2"].captures == 1
+
+    # Ordinary subsequent Snake packets must never recapture the posture.
+    seen = prepare_initial_snake_teleop_handoff(
+        commands,
+        _BehaviorDiagnostics("snake8_teleop"),
+        drives,
+        behavior_source_seen=seen,
+    )
+
+    assert seen is True
+    assert drives["m1"].captures == 1
+    assert drives["m2"].captures == 1
+
+
+def test_rc_before_snake_prevents_direct_assembly_handoff_recapture() -> None:
+    commands = {
+        "m1": SmoresCommand(),
+        "m2": SmoresCommand(),
+    }
+    drives = {
+        "m1": _HandoffDrive(),
+        "m2": _HandoffDrive(),
+    }
+
+    # This models RC-Car -> self-reconfiguration -> Snake.
+    seen = prepare_initial_snake_teleop_handoff(
+        commands,
+        _BehaviorDiagnostics("rc_car8_teleop"),
+        drives,
+        behavior_source_seen=False,
+    )
+
+    assert seen is True
+    assert drives["m1"].captures == 0
+    assert drives["m2"].captures == 0
+
+    seen = prepare_initial_snake_teleop_handoff(
+        commands,
+        _BehaviorDiagnostics("snake8_teleop"),
+        drives,
+        behavior_source_seen=seen,
+    )
+
+    assert seen is True
+    assert drives["m1"].captures == 0
+    assert drives["m2"].captures == 0

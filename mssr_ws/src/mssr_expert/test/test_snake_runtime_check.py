@@ -112,3 +112,64 @@ def test_missing_recording_binding_fails_preflight_before_runtime(tmp_path):
         text=True, timeout=5)
     assert result.returncode == 2
     assert "record_toggle must use the approved start button" in result.stderr
+
+
+def test_handoff_diagnostic_snapshot_exposes_physical_and_native_ownership(monkeypatch):
+    smoke = checker(monkeypatch)
+
+    physical = {
+        "stamp": 12.5,
+        "head": (1.0, 0.0, 0.12),
+        "neck": (0.9, 0.0, 0.08),
+        "positions": {
+            "physical_v6": (0.9, 0.0, 0.08),
+            "physical_v7": (1.0, 0.0, 0.12),
+        },
+        "pan": {
+            "physical_v6": 0.1,
+            "physical_v7": 0.2,
+        },
+        "tilt": {
+            "physical_v6": -0.3,
+            "physical_v7": 0.5,
+        },
+        "roles": {
+            "snake_neck": "physical_v6",
+            "snake_head": "physical_v7",
+        },
+    }
+
+    status = {
+        "active_controller": "snake8",
+        "authority": "TELEOP",
+        "snake_intent": {
+            "control_mode": "manual",
+            "selected_module_id": "physical_v7",
+        },
+        "snake_effective_actions": {
+            "physical_v7": {
+                "vx": 0.0,
+                "tilt_target_rad": 0.5,
+            }
+        },
+    }
+
+    snapshot = smoke.handoff_diagnostic_snapshot(
+        "teleop_neutral",
+        physical,
+        teleop_status=status,
+        native_runtime_status={"structure_stopped": False},
+        native_goal={"primitive": "set_tilt"},
+        primitive_status={"state": "succeeded"},
+        native_actions={"locomotion": {"physical_v7": {"vx": 0.0}}},
+    )
+
+    assert snapshot["label"] == "teleop_neutral"
+    assert snapshot["tilt_rad_by_module"]["physical_v7"] == pytest.approx(0.5)
+    assert snapshot["tilt_span_rad"] == pytest.approx(0.8)
+    assert snapshot["max_abs_tilt_rad"] == pytest.approx(0.5)
+    assert snapshot["z_span_m"] == pytest.approx(0.04)
+    assert snapshot["active_controller"] == "snake8"
+    assert snapshot["selected_module_id"] == "physical_v7"
+    assert snapshot["native_goal"]["primitive"] == "set_tilt"
+    assert snapshot["primitive_status"]["state"] == "succeeded"

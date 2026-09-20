@@ -233,3 +233,104 @@ def test_l2_drives_all_modules_in_reverse_without_automatic_shape_target():
         for command in reverse.actions.module_actions.values()
     )
     assert reverse.actions.joint_targets == ()
+
+
+
+def test_resume_renews_snake_command_identity_after_estop_quarantine(
+    tmp_path,
+):
+    snake = runtime()
+
+    assert snake.observe_graph(
+        graph(stamp=1.0).to_dict(),
+        now=1.0,
+    )
+
+    first = snake.step(
+        sample(r2=0.5),
+        safety=ENABLED,
+        now=1.0,
+    )
+
+    assert first.envelope is not None
+
+    first_id = json.loads(first.envelope)[
+        "expert"
+    ]["debug"]["command_id"]
+
+    action_file = tmp_path / "actions.json"
+    action_file.write_text(
+        first.envelope,
+        encoding="utf-8",
+    )
+
+    native = ActionFileChannel(
+        action_file,
+        timeout_s=1.0,
+        ignore_existing=False,
+    )
+
+    before_stop = native.commands(1.0)
+
+    assert before_stop
+
+    # Native E-stop quarantines the currently active behavior identity.
+    native.invalidate_modules(tuple(before_stop))
+
+    stopped = snake.step(
+        sample(),
+        safety=STOPPED,
+        now=1.1,
+    )
+
+    assert stopped.envelope is None
+
+    assert snake.observe_graph(
+        graph(stamp=2.0).to_dict(),
+        now=1.2,
+    )
+
+    resumed = snake.step(
+        sample(r2=0.5),
+        safety=ENABLED,
+        now=1.2,
+    )
+
+    assert resumed.envelope is not None
+
+    resumed_id = json.loads(resumed.envelope)[
+        "expert"
+    ]["debug"]["command_id"]
+
+    # A resumed human-control epoch must have a fresh source identity,
+    # otherwise ActionFileChannel correctly keeps it quarantined.
+    assert resumed_id != first_id
+
+    temporary = action_file.with_suffix(".json.tmp")
+    temporary.write_text(
+        resumed.envelope,
+        encoding="utf-8",
+    )
+    temporary.replace(action_file)
+
+    after_resume = native.commands(1.2)
+
+    assert set(after_resume) == set(before_stop)
+    assert all(
+        abs(command.linear_x_m_s) > 1.0e-6
+        for command in after_resume.values()
+    )
+
+    # Do not generate a new identity every tick: it stays stable for the
+    # duration of this newly armed TELEOP epoch.
+    continued = snake.step(
+        sample(r2=0.5),
+        safety=ENABLED,
+        now=1.21,
+    )
+
+    continued_id = json.loads(continued.envelope)[
+        "expert"
+    ]["debug"]["command_id"]
+
+    assert continued_id == resumed_id

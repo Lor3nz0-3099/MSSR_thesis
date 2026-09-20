@@ -389,6 +389,7 @@ class SnakeRuntime:
         self._received_at = None
         self._last_graph = None
         self._previous_tick = None
+        self._motion_enabled = False
 
         self._command_id = (
             "teleop-snake-" + uuid4().hex
@@ -735,12 +736,27 @@ class SnakeRuntime:
             intent=intent,
         )
 
+        enabled = bool(
+            safety.motion_enabled
+            and observation is not None
+            and fresh
+        )
+
+        # E-stop/native ownership invalidates the previous behavior command
+        # identity.  Match RcCarRuntime: a newly armed TELEOP epoch gets a
+        # fresh command ID, while ordinary enabled ticks retain one stable ID.
+        if enabled and not self._motion_enabled:
+            self._command_id = (
+                "teleop-snake-" + uuid4().hex
+            )
+
+        self._motion_enabled = enabled
+
         envelope = None
 
         if (
             actions.module_actions
-            and safety.motion_enabled
-            and fresh
+            and enabled
         ):
             envelope = self.transport.serialize(
                 actions,

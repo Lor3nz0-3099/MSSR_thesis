@@ -226,6 +226,53 @@ def sparse_behavior_commands(
     return dict(commands)
 
 
+def prepare_initial_snake_teleop_handoff(
+    behavior_commands: Mapping[str, SmoresCommand],
+    diagnostics: Any,
+    drives: Mapping[str, DynamicDriveController],
+    *,
+    behavior_source_seen: bool,
+) -> bool:
+    """Capture direct-assembly posture before the first Snake teleop HOLD.
+
+    This is deliberately narrower than a generic HOLD transition.
+
+    If Snake teleoperation is the first operational behavior source in the
+    current Isaac session, the robot came directly from self-assembly.  The
+    assembly's structural hold has the correct physical posture, but the
+    DynamicDriveController can still contain its old startup PAN/TILT targets.
+
+    Capture the physically reached posture exactly once before the first
+    Snake behavior packet is applied.
+
+    If any operational behavior has already been seen (for example RC-Car8
+    before RC-Car8 -> Snake8 self-reconfiguration), do nothing.
+    """
+
+    if not behavior_commands:
+        return behavior_source_seen
+
+    if not behavior_source_seen and diagnostics.phase == "snake8_teleop":
+        unknown = set(behavior_commands) - set(drives)
+        if unknown:
+            raise ValueError(
+                "Snake handoff references unknown drives: "
+                + ", ".join(sorted(unknown))
+            )
+
+        for module_id in behavior_commands:
+            drives[module_id].initialize_from_measured_posture()
+
+        print(
+            "[behavior] DIRECT-ASSEMBLY -> SNAKE HANDOFF: "
+            "captured measured PAN/TILT for "
+            + ", ".join(sorted(behavior_commands))
+        )
+
+    # From now on this is no longer a direct-assembly first-controller case.
+    return True
+
+
 def invalidate_module_command_sources(
     module_ids: tuple[str, ...], *, action_channel: ActionFileChannel,
     held_primitive_commands: dict[str, SmoresCommand],
@@ -790,6 +837,7 @@ def run_parallel_self_assembly_scenario(
 
     previous_connection_count = 0
     previous_behavior_commands: dict[str, SmoresCommand] = {}
+    behavior_source_seen = False
     behavior_started_step: int | None = None
     last_behavior_diagnostic_step = 0
     previous_pan_traction_module_ids: frozenset[str] = frozenset()
@@ -937,6 +985,14 @@ def run_parallel_self_assembly_scenario(
         except (TypeError, ValueError) as error:
             print(f"[behavior] REJECTED malformed action payload: {error}")
         diagnostics = action_channel.diagnostics
+
+        behavior_source_seen = prepare_initial_snake_teleop_handoff(
+            behavior_baseline,
+            diagnostics,
+            drives,
+            behavior_source_seen=behavior_source_seen,
+        )
+
         pan_traction_module_ids = frozenset(
             diagnostics.pan_traction_module_ids
         )
