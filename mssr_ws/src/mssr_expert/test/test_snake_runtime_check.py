@@ -46,11 +46,19 @@ def test_wheel_invariant_and_recording_require_actual_snake_actions(tmp_path, mo
             "control_mode": "single_module", "selected_module_id": "physical_v6"}},
          "expert_action": {"locomotion": {
             "physical_v6": {"vx": 0.0, "pan_target_rad": 0.1}}}},
-        {"task_type": "snake8_teleop", "expert_action": {"locomotion": {
-            "physical_v6": {"vx": 0.03, "tilt_target_rad": 0.1}}}},
+        {"task_type": "snake8_teleop", "observation": {"intent": {
+            "control_mode": "single_module", "selected_module_id": "physical_v5"}},
+         "expert_action": {"locomotion": {
+            "physical_v5": {"vx": 0.03, "tilt_target_rad": 0.1}}}},
     )) + "\n")
-    assert smoke.recorded_snake_actions(human) == {"rows": 2, "wheel_rows": 1,
-                                                    "shape_rows": 1, "manual_pan_rows": 1}
+    assert smoke.recorded_snake_actions(human) == {
+        "rows": 2,
+        "wheel_rows": 1,
+        "shape_rows": 1,
+        "manual_pan_rows": 1,
+        "manual_tilt_rows": 1,
+        "manual_selected_modules": ["physical_v5", "physical_v6"],
+    }
 
 
 def test_reverse_gate_rejects_alternating_wheel_direction(monkeypatch):

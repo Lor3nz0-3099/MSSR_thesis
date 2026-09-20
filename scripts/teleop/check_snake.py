@@ -104,27 +104,69 @@ class OppositeWheelWindow:
 
 
 def recorded_snake_actions(path):
-    rows = wheel_rows = shape_rows = manual_pan_rows = 0
+    rows = wheel_rows = shape_rows = manual_pan_rows = manual_tilt_rows = 0
+    manual_selected_modules = set()
+
+    empty = {
+        "rows": 0,
+        "wheel_rows": 0,
+        "shape_rows": 0,
+        "manual_pan_rows": 0,
+        "manual_tilt_rows": 0,
+        "manual_selected_modules": [],
+    }
+
     if not path.is_file():
-        return {"rows": 0, "wheel_rows": 0, "shape_rows": 0, "manual_pan_rows": 0}
+        return empty
+
     for line in path.read_text(encoding="utf-8").splitlines():
         if not line:
             continue
+
         row = json.loads(line)
+
         if row.get("task_type") != "snake8_teleop":
             continue
+
         rows += 1
+
         actions = row.get("expert_action", {}).get("locomotion", {})
-        if any(abs(float(command.get("vx", 0.0))) > 1e-5 for command in actions.values()):
+
+        if any(
+            abs(float(command.get("vx", 0.0))) > 1e-5
+            for command in actions.values()
+        ):
             wheel_rows += 1
-        if any("tilt_target_rad" in command for command in actions.values()):
+
+        if any(
+            "tilt_target_rad" in command
+            for command in actions.values()
+        ):
             shape_rows += 1
-        selected = row.get("observation", {}).get("intent", {}).get("selected_module_id")
-        if (row.get("observation", {}).get("intent", {}).get("control_mode") == "single_module"
-                and selected in actions and "pan_target_rad" in actions[selected]):
-            manual_pan_rows += 1
-    return {"rows": rows, "wheel_rows": wheel_rows, "shape_rows": shape_rows,
-            "manual_pan_rows": manual_pan_rows}
+
+        intent = row.get("observation", {}).get("intent", {})
+        selected = intent.get("selected_module_id")
+
+        if (
+            intent.get("control_mode") == "single_module"
+            and selected in actions
+        ):
+            manual_selected_modules.add(selected)
+
+            if "pan_target_rad" in actions[selected]:
+                manual_pan_rows += 1
+
+            if "tilt_target_rad" in actions[selected]:
+                manual_tilt_rows += 1
+
+    return {
+        "rows": rows,
+        "wheel_rows": wheel_rows,
+        "shape_rows": shape_rows,
+        "manual_pan_rows": manual_pan_rows,
+        "manual_tilt_rows": manual_tilt_rows,
+        "manual_selected_modules": sorted(manual_selected_modules),
+    }
 
 
 def main():
@@ -352,6 +394,149 @@ def main():
         wait("whole_body_release", "Rilascia R2 e lo stick destro.",
              lambda: state()["controller_input"]["r2"] == 0
              and abs(state()["controller_input"]["right_y"]) < 0.05 and zero())
+
+        wait(
+            "manual_mode_enter",
+            "Con stick destro neutro premi D-pad GIU una volta: entra nel controllo singolo modulo.",
+            lambda: state()["snake_intent"].get("control_mode") == "single_module"
+            and bool(state()["snake_intent"].get("selected_module_id"))
+            and not state()["snake_intent"].get("manual_transition_pending"),
+            timeout=45,
+        )
+
+        first_manual_module = state()["snake_intent"]["selected_module_id"]
+        before_manual_pan = metrics()
+
+        def manual_pan():
+            status = state()
+            current = metrics()
+            selected = status["snake_intent"].get("selected_module_id")
+            commands_now = actions()
+
+            pan_delta = (
+                abs(
+                    current["pan"][selected]
+                    - before_manual_pan["pan"][selected]
+                )
+                if selected in current["pan"]
+                else 0.0
+            )
+
+            summary["manual_pan_evidence"] = {
+                "selected_module_id": selected,
+                "pan_delta_rad": pan_delta,
+                "wheel_modules": sorted(commands_now),
+                "commands": commands_now,
+            }
+
+            return (
+                status["snake_intent"].get("control_mode") == "single_module"
+                and selected == first_manual_module
+                and status["controller_input"]["right_x"] > 0.45
+                and status["controller_input"]["r2"] > 0.15
+                and len(commands_now) == 8
+                and wheel_invariant(commands_now)
+                and all(
+                    abs(float(command.get("vx", 0.0))) > 0.005
+                    for command in commands_now.values()
+                )
+                and pan_delta > 0.01
+            )
+
+        wait(
+            "manual_pan",
+            "In single-module tieni R2 circa 1/3 e stick destro a DESTRA: PAN solo del modulo selezionato, ruote di tutti gli 8 moduli attive.",
+            manual_pan,
+            timeout=90,
+        )
+
+        wait(
+            "manual_pan_release",
+            "Rilascia R2 e lo stick destro.",
+            lambda: state()["controller_input"]["r2"] == 0
+            and abs(state()["controller_input"]["right_x"]) < 0.05
+            and zero(),
+        )
+
+        wait(
+            "manual_next_module",
+            "Con stick destro neutro premi R1 una volta per selezionare il modulo successivo.",
+            lambda: state()["snake_intent"].get("control_mode") == "single_module"
+            and state()["snake_intent"].get("selected_module_id") != first_manual_module
+            and not state()["snake_intent"].get("manual_transition_pending"),
+            timeout=45,
+        )
+
+        second_manual_module = state()["snake_intent"]["selected_module_id"]
+        before_manual_tilt = metrics()
+
+        def manual_tilt():
+            status = state()
+            current = metrics()
+            selected = status["snake_intent"].get("selected_module_id")
+            commands_now = actions()
+
+            tilt_delta = (
+                abs(
+                    current["tilt"][selected]
+                    - before_manual_tilt["tilt"][selected]
+                )
+                if selected in current["tilt"]
+                else 0.0
+            )
+
+            summary["manual_tilt_evidence"] = {
+                "selected_module_id": selected,
+                "tilt_delta_rad": tilt_delta,
+                "wheel_modules": sorted(commands_now),
+                "commands": commands_now,
+            }
+
+            return (
+                selected == second_manual_module
+                and status["controller_input"]["right_y"] > 0.45
+                and status["controller_input"]["l2"] > 0.15
+                and len(commands_now) == 8
+                and wheel_invariant(commands_now)
+                and all(
+                    abs(float(command.get("vx", 0.0))) > 0.005
+                    for command in commands_now.values()
+                )
+                and tilt_delta > 0.01
+            )
+
+        wait(
+            "manual_tilt",
+            "Tieni L2 circa 1/3 e stick destro verso ALTO: TILT del nuovo modulo, ruote di tutti gli 8 moduli in retromarcia.",
+            manual_tilt,
+            timeout=90,
+        )
+
+        wait(
+            "manual_tilt_release",
+            "Rilascia L2 e lo stick destro.",
+            lambda: state()["controller_input"]["l2"] == 0
+            and abs(state()["controller_input"]["right_y"]) < 0.05
+            and zero(),
+        )
+
+        wait(
+            "manual_previous_module",
+            "Con stick destro neutro premi L1 una volta: deve tornare al modulo precedente.",
+            lambda: state()["snake_intent"].get("selected_module_id") == first_manual_module
+            and not state()["snake_intent"].get("manual_transition_pending"),
+            timeout=45,
+        )
+
+        wait(
+            "manual_mode_exit",
+            "Premi D-pad GIU una volta per tornare alla modalita head-led.",
+            lambda: state()["snake_intent"].get("control_mode") == "head_led"
+            and state()["snake_intent"].get("selected_module_id") is None
+            and not state()["snake_intent"].get("manual_transition_pending"),
+            timeout=45,
+        )
+
         before_home = abs(state()["snake_intent"]["vertical_offset_m"])
         seen_home = False
         def homed():
@@ -397,9 +582,15 @@ def main():
             summary["recording_evidence"] = {**counts, "path": str(human),
                                              "manifest": str(manifest_path),
                                              "eligible_for_import": manifest.get("eligible_for_import")}
-            return (manifest.get("eligible_for_import") is True and counts["rows"] > 0
-                    and counts["wheel_rows"] > 0 and counts["shape_rows"] > 0
-                    and counts["manual_pan_rows"] > 0)
+            return (
+                manifest.get("eligible_for_import") is True
+                and counts["rows"] > 0
+                and counts["wheel_rows"] > 0
+                and counts["shape_rows"] > 0
+                and counts["manual_pan_rows"] > 0
+                and counts["manual_tilt_rows"] > 0
+                and len(counts["manual_selected_modules"]) >= 2
+            )
         wait("recorded_effective_actions", "Attendi la finalizzazione del dataset Snake.",
              recording_written, timeout=30)
         summary["passed"] = True

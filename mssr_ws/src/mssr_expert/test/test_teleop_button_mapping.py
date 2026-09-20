@@ -63,6 +63,7 @@ def test_circle_emits_home_and_ambiguous_dpad_selection_is_rejected():
     assert status["controller_input"]["command_events"] == [
         "home",
         "select_snake",
+        "override",
         "select_rc",
         "select_mm8",
     ]

@@ -19,7 +19,7 @@ rc_car:
   max_dt_s: 0.1
   observation_timeout_s: 0.5
 snake:
-  # Head-led vertical target, sampled at CAD TOP-to-BOTTOM spacing. PAN disabled.
+  # Head-led mode uses TILT only; single-module override may command PAN/TILT.
   vertical_rate_m_s: 0.025
   recenter_rate_m_s: 0.01
   max_head_offset_m: 0.2
