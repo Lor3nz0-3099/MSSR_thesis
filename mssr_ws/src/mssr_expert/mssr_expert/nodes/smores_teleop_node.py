@@ -24,8 +24,10 @@ from mssr_expert.teleop.input import load_input_config
 from mssr_expert.teleop.session import TeleopSession
 from mssr_expert.teleop.safety import SafetyDecision
 from mssr_expert.teleop.structural_macro import StructuralMacroLauncher
-from mssr_expert.teleop.action_transport import RcCarRuntime
+from mssr_expert.teleop.action_transport import ActionTransport, RcCarRuntime
 from mssr_expert.teleop.rc_car import load_geometry
+from mssr_expert.teleop.snake import SnakeActions, SnakeRuntime
+from mssr_expert.teleop.mobile_manipulator import MobileManipulatorRuntime
 from mssr_expert.teleop.recording import TeleopRecordingController
 from mssr_expert.teleop.topology import TeleopTopologyDetector
 from mssr_expert.behaviors.morphology_library import MorphologyLibrary
@@ -71,7 +73,7 @@ class SmoresTeleopNode(Node):
         config = load_teleop_config(teleop_path)
         self.session = TeleopSession(
             load_input_config(input_path),
-            controller_morphologies={"rc_car8"},
+            controller_morphologies={"rc_car8", "snake8", "mobile_manipulator8"},
         )
         self._structural_macro = StructuralMacroLauncher()
 
@@ -148,6 +150,19 @@ class SmoresTeleopNode(Node):
         self._rc = RcCarRuntime(MorphologyLibrary.load(config_dir / "smores_morphology_behaviors.json"),
                                 load_attributed_graph(config_dir / "smores_rc_car8.json"),
                                 geometry=load_geometry(str(teleop_path)), **rc_config)
+        snake_config = yaml.safe_load(Path(teleop_path).read_text()).get("snake", {})
+        self._snake = SnakeRuntime(MorphologyLibrary.load(config_dir / "smores_morphology_behaviors.json"),
+                                   load_attributed_graph(config_dir / "smores_snake8.json"),
+                                   geometry=load_geometry(str(teleop_path)), **snake_config)
+        mm8_config = yaml.safe_load(Path(teleop_path).read_text()).get("mobile_manipulator", {})
+        self._mm8 = MobileManipulatorRuntime(
+            MorphologyLibrary.load(config_dir / "smores_morphology_behaviors.json"),
+            load_attributed_graph(config_dir / "smores_mobile_manipulator8.json"),
+            geometry=load_geometry(str(teleop_path)),
+            **mm8_config,
+        )
+        self._action_transport = ActionTransport()
+        self._last_actuator_controller = None
         self._actions = self.create_publisher(String, "/mssr/actions", 10)
         self._goal = self.create_publisher(String, "/mssr/primitives/goal", 10)
         self._cancel = self.create_publisher(String, "/mssr/primitives/cancel", 10)
@@ -171,7 +186,7 @@ class SmoresTeleopNode(Node):
         # Input age and diagnostics use a steady wall clock independent of Isaac simulation time.
         self._wall_clock = Clock(clock_type=ClockType.STEADY_TIME)
         self._timer = self.create_timer(1.0 / rate, self._tick, clock=self._wall_clock)
-        self.get_logger().info(f"RC-Car8 teleop at {rate:g} Hz; live topology and runtime safety required")
+        self.get_logger().info(f"RC-Car8/Snake8/MobileManipulator8 teleop at {rate:g} Hz; live topology and runtime safety required")
 
     def _on_graph(self, message: String) -> None:
         now = time.monotonic()
@@ -182,6 +197,8 @@ class SmoresTeleopNode(Node):
             payload = None
 
         self._rc.observe_graph(payload, now=now)
+        self._snake.observe_graph(payload, now=now)
+        self._mm8.observe_graph(payload, now=now)
 
         try:
             current_graph = attributed_graph_from_dict(payload)
@@ -215,11 +232,21 @@ class SmoresTeleopNode(Node):
         ):
             return None
 
+        if self._topology_name == "snake8" and self._snake.topology(now) is None:
+            return None
+        if (
+            self._topology_name == "mobile_manipulator8"
+            and self._mm8.topology(now) is None
+        ):
+            return None
         return self._topology_name
 
     def _on_primitive_status(self, message: String) -> None:
         try:
-            self._rc.observe_status(json.loads(message.data))
+            payload = json.loads(message.data)
+            self._rc.observe_status(payload)
+            self._snake.observe_status(payload)
+            self._mm8.observe_status(payload)
         except (KeyError, RuntimeError, TypeError, ValueError):
             return
 
@@ -372,14 +399,59 @@ class SmoresTeleopNode(Node):
                 "terminal state; macro marked failed."
             )
 
-        output = self._rc.step(SimpleNamespace(**status["controller_input"]),
-                               safety=SafetyDecision(**status["safety"]), now=now)
-        if output.envelope is not None:
+        controller_input = SimpleNamespace(**status["controller_input"])
+        decision = SafetyDecision(**status["safety"])
+        controller = status["active_controller"] if decision.motion_enabled else None
+        disabled = SafetyDecision("NONE", False, True, False)
+        rc_output = self._rc.step(controller_input,
+                                  safety=decision if controller == "rc_car8" else disabled, now=now)
+        snake_output = self._snake.step(controller_input,
+                                        safety=decision if controller == "snake8" else disabled, now=now)
+        mm8_output = self._mm8.step(
+            controller_input,
+            safety=decision if controller == "mobile_manipulator8" else disabled,
+            now=now,
+        )
+
+        outputs = {
+            "rc_car8": rc_output,
+            "snake8": snake_output,
+            "mobile_manipulator8": mm8_output,
+        }
+
+        output = outputs.get(controller)
+
+        # While motion authority is disabled, retain the active morphology's
+        # effective-action view for diagnostics/recording. No native action
+        # is published unless controller is actually motion-enabled.
+        if output is None:
+            output = outputs.get(status["active_controller"], rc_output)
+
+        if controller is not None and output.envelope is not None:
             self._actions.publish(String(data=output.envelope))
-        if output.posture.goal is not None:
-            self._goal.publish(String(data=json.dumps(output.posture.goal.to_dict(), allow_nan=False)))
-        if output.posture.cancel_goal_id is not None:
-            self._cancel.publish(String(data=json.dumps({"goal_id": output.posture.cancel_goal_id})))
+            self._last_actuator_controller = controller
+        elif self._last_actuator_controller is not None and status["authority"] != "STRUCTURAL_MACRO":
+            # An empty action packet clears the native dead-man cache on the
+            # same tick as input/topology authority is lost.
+            clear = self._action_transport.serialize(
+                SnakeActions(), stamp=time.time(),
+                command_id="teleop-clear-" + str(time.time_ns()),
+                morphology=self._last_actuator_controller,
+            )
+            self._actions.publish(String(data=clear))
+            self._last_actuator_controller = None
+        cancellations = []
+        for delivery in (rc_output.posture, snake_output.posture, mm8_output.posture):
+            if delivery.goal is not None:
+                self._goal.publish(String(data=json.dumps(delivery.goal.to_dict(), allow_nan=False)))
+            if delivery.cancel_goal_id is not None:
+                cancellations.append(delivery.cancel_goal_id)
+            cancellations.extend(delivery.cancel_goal_ids)
+        if cancellations:
+            unique = tuple(dict.fromkeys(cancellations))
+            cancel_payload = ({"goal_id": unique[0]} if len(unique) == 1
+                              else {"goal_ids": list(unique)})
+            self._cancel.publish(String(data=json.dumps(cancel_payload)))
         recording_events = tuple(
             {
                 "kind": "command",
@@ -396,10 +468,16 @@ class SmoresTeleopNode(Node):
             for name in status["events"]
         )
 
+        recording_graphs = {
+            "rc_car8": self._rc.latest_graph,
+            "snake8": self._snake.latest_graph,
+            "mobile_manipulator8": self._mm8.latest_graph,
+        }
+
         self._recording.update(
             recording_requested=status["recording"],
             authority=status["authority"],
-            graph=self._rc.latest_graph,
+            graph=recording_graphs.get(status["active_controller"]),
             controller_input=status["controller_input"],
             intent=output.actions.intent,
             effective_actions=output.actions.module_actions,
@@ -420,8 +498,12 @@ class SmoresTeleopNode(Node):
             recording_backend_ready=self._recording.backend_ready,
             recording_episode_id=self._recording.episode_id,
             recording_error=self._recording.error,
-            rc_car_intent=output.actions.intent,
-            rc_car_effective_actions=output.actions.module_actions,
+            rc_car_intent=rc_output.actions.intent,
+            rc_car_effective_actions=rc_output.actions.module_actions,
+            snake_intent=snake_output.actions.intent,
+            snake_effective_actions=snake_output.actions.module_actions,
+            mm8_intent=mm8_output.actions.intent,
+            mm8_effective_actions=mm8_output.actions.module_actions,
         )
         message = String()
         message.data = json.dumps(status, allow_nan=False)

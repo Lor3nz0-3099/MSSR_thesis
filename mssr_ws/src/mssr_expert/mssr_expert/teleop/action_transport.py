@@ -12,7 +12,7 @@ from mssr_expert.teleop.rc_car import RcCarObservation, RcCarTeleopController, f
 class ActionTransport:
     topic = "/mssr/actions"
 
-    def serialize(self, result, *, stamp, command_id):
+    def serialize(self, result, *, stamp, command_id, morphology="rc_car8"):
         if not finite(stamp):
             raise ValueError("Action timestamp must be finite")
         # Validate intent as well: diagnostics must never contaminate the
@@ -22,12 +22,12 @@ class ActionTransport:
             "schema_version": "mssr.actions.v2", "stamp": stamp, "stage_id": 0,
             "task_type": "morphology_behavior", "reset": False,
             "locomotion": result.module_actions, "magnetic": [],
-            "expert": {"debug": {"command_id": command_id, "message": "RC-Car8 teleoperation"}, "fsm_state": "TELEOP",
-                       "active_primitive": "rc_car8", "primitive_params": {},
+            "expert": {"debug": {"command_id": command_id, "message": f"{morphology} teleoperation"}, "fsm_state": "TELEOP",
+                       "active_primitive": morphology, "primitive_params": {},
                        "module_roles": result.module_roles,
                        "pan_traction_module_ids": sorted(module for module, role in result.module_roles.items()
                                                          if role.startswith("wheel_")),
-                       "task_metrics": {"progress": 0.0, "phase": "rc_car8_teleop"},
+                       "task_metrics": {"progress": 0.0, "phase": f"{morphology}_teleop"},
                        "success": False, "done": False}}, allow_nan=False)
 
 
@@ -36,6 +36,7 @@ class PostureDelivery:
     goal: object = None
     cancel_goal_id: str | None = None
     blocked_module_ids: tuple = ()
+    cancel_goal_ids: tuple = ()
 
 
 class RcCarPostureTransport:

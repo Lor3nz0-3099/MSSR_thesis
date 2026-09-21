@@ -264,6 +264,8 @@ def test_shipped_configuration_enables_only_approved_commands():
         "select_rc",
         "select_snake",
         "select_mm8",
+        "previous_module",
+        "next_module",
     })
 
 

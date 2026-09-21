@@ -1,20 +1,26 @@
-# Initial rates are configurable targets; measured runtime values remain pending.
 control_rate_hz: 50.0
 dataset_rate_hz: 10.0
 camera:
-  # Match the initial parallel assembly view at its default 0.34 m spawn
-  # radius: eye=(0.7956,-0.7344,0.5202), target=(0,0,0.03), about 1.19 m.
   radius_m: 1.1885363940578346
 joy:
   topic: /joy
   device_id: 0
-  device_name: ""
+  device_name: ''
   deadzone: 0.0
   autorepeat_rate: 50.0
   sticky_buttons: false
 rc_car:
-  # Calibrated support clearance; the inverse geometry uses the branch
-  # containing the library's nominal ready TILT and intersects live DOF limits.
   height_rate_m_s: 0.005
+  max_dt_s: 0.1
+  observation_timeout_s: 0.5
+snake:
+  joint_rate_rad_s: 0.5
+  joint_deadband_rad: 0.025
+  max_dt_s: 0.1
+  observation_timeout_s: 0.5
+
+mobile_manipulator:
+  joint_rate_rad_s: 0.5
+  joint_deadband_rad: 0.025
   max_dt_s: 0.1
   observation_timeout_s: 0.5
