@@ -14,7 +14,7 @@ from smores_ep.scenarios.parallel_self_assembly import (
     self_assembly_module_roots,
     self_assembly_spawn_layout,
     sparse_behavior_commands,
-    prepare_initial_snake_teleop_handoff,
+    prepare_initial_manual_teleop_handoff,
     triangular_spawn_layout,
 )
 from smores_ep.self_assembly_cli import build_argument_parser
@@ -331,7 +331,7 @@ def test_direct_assembly_first_snake_teleop_recaptures_posture_once() -> None:
         "m2": _HandoffDrive(),
     }
 
-    seen = prepare_initial_snake_teleop_handoff(
+    seen = prepare_initial_manual_teleop_handoff(
         commands,
         _BehaviorDiagnostics("snake8_teleop"),
         drives,
@@ -343,7 +343,7 @@ def test_direct_assembly_first_snake_teleop_recaptures_posture_once() -> None:
     assert drives["m2"].captures == 1
 
     # Ordinary subsequent Snake packets must never recapture the posture.
-    seen = prepare_initial_snake_teleop_handoff(
+    seen = prepare_initial_manual_teleop_handoff(
         commands,
         _BehaviorDiagnostics("snake8_teleop"),
         drives,
@@ -366,7 +366,7 @@ def test_rc_before_snake_prevents_direct_assembly_handoff_recapture() -> None:
     }
 
     # This models RC-Car -> self-reconfiguration -> Snake.
-    seen = prepare_initial_snake_teleop_handoff(
+    seen = prepare_initial_manual_teleop_handoff(
         commands,
         _BehaviorDiagnostics("rc_car8_teleop"),
         drives,
@@ -377,9 +377,81 @@ def test_rc_before_snake_prevents_direct_assembly_handoff_recapture() -> None:
     assert drives["m1"].captures == 0
     assert drives["m2"].captures == 0
 
-    seen = prepare_initial_snake_teleop_handoff(
+    seen = prepare_initial_manual_teleop_handoff(
         commands,
         _BehaviorDiagnostics("snake8_teleop"),
+        drives,
+        behavior_source_seen=seen,
+    )
+
+    assert seen is True
+    assert drives["m1"].captures == 0
+    assert drives["m2"].captures == 0
+
+
+def test_direct_assembly_first_mm8_teleop_recaptures_posture_once() -> None:
+    """MM8 must not inherit stale DynamicDriveController PAN/TILT targets."""
+    commands = {
+        "m1": SmoresCommand(),
+        "m2": SmoresCommand(),
+    }
+
+    drives = {
+        "m1": _HandoffDrive(),
+        "m2": _HandoffDrive(),
+    }
+
+    seen = prepare_initial_manual_teleop_handoff(
+        commands,
+        _BehaviorDiagnostics("mobile_manipulator8_teleop"),
+        drives,
+        behavior_source_seen=False,
+    )
+
+    assert seen is True
+    assert drives["m1"].captures == 1
+    assert drives["m2"].captures == 1
+
+    # Recapture is a one-shot handoff operation, never a per-packet reset.
+    seen = prepare_initial_manual_teleop_handoff(
+        commands,
+        _BehaviorDiagnostics("mobile_manipulator8_teleop"),
+        drives,
+        behavior_source_seen=seen,
+    )
+
+    assert seen is True
+    assert drives["m1"].captures == 1
+    assert drives["m2"].captures == 1
+
+
+def test_prior_operational_source_prevents_mm8_direct_handoff_recapture() -> None:
+    """Do not broaden the direct-assembly fix into ordinary reconfiguration."""
+    commands = {
+        "m1": SmoresCommand(),
+        "m2": SmoresCommand(),
+    }
+
+    drives = {
+        "m1": _HandoffDrive(),
+        "m2": _HandoffDrive(),
+    }
+
+    # Models an already-running morphology before a later MM8 transition.
+    seen = prepare_initial_manual_teleop_handoff(
+        commands,
+        _BehaviorDiagnostics("rc_car8_teleop"),
+        drives,
+        behavior_source_seen=False,
+    )
+
+    assert seen is True
+    assert drives["m1"].captures == 0
+    assert drives["m2"].captures == 0
+
+    seen = prepare_initial_manual_teleop_handoff(
+        commands,
+        _BehaviorDiagnostics("mobile_manipulator8_teleop"),
         drives,
         behavior_source_seen=seen,
     )

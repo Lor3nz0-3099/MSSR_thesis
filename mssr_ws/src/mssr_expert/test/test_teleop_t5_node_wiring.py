@@ -14,13 +14,17 @@ def node_source() -> str:
     return NODE.read_text(encoding="utf-8")
 
 
-def test_node_declares_only_the_runtime_controller_it_really_has():
+def test_node_declares_all_runtime_controllers_it_really_has():
     text = node_source()
 
-    assert 'controller_morphologies={"rc_car8", "snake8"}' in text
+    assert (
+        'controller_morphologies={'
+        '"rc_car8", "snake8", "mobile_manipulator8"}'
+        in text
+    )
     assert "self._rc = RcCarRuntime(" in text
     assert "self._snake = SnakeRuntime(" in text
-    assert '"mobile_manipulator8"},' not in text
+    assert "self._mm8 = MobileManipulatorRuntime(" in text
 
 
 def test_node_feeds_robot_graph_to_rc_runtime_and_generic_topology_detector():

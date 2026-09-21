@@ -334,3 +334,100 @@ def test_resume_renews_snake_command_identity_after_estop_quarantine(
     ]["debug"]["command_id"]
 
     assert continued_id == resumed_id
+
+
+def test_snake_resume_recaptures_measured_joint_before_manual_motion():
+    """Snake must also discard stale manual integration across E-stop."""
+    snake = runtime()
+
+    assert snake.observe_graph(
+        graph(stamp=1.0).to_dict(),
+        now=1.0,
+    )
+
+    snake.step(
+        sample(),
+        safety=ENABLED,
+        now=1.0,
+    )
+
+    before_stop = snake.step(
+        sample(right_y=1.0),
+        safety=ENABLED,
+        now=1.1,
+    )
+
+    active_goal = before_stop.posture.goal
+    assert active_goal is not None
+    assert active_goal.primitive == "set_tilt"
+
+    before_id = json.loads(
+        before_stop.envelope
+    )["expert"]["debug"]["command_id"]
+
+    stopped = snake.step(
+        sample(),
+        safety=STOPPED,
+        now=1.2,
+    )
+
+    assert active_goal.goal_id in (
+        stopped.posture.cancel_goal_ids
+        + (
+            (stopped.posture.cancel_goal_id,)
+            if stopped.posture.cancel_goal_id is not None
+            else ()
+        )
+    )
+
+    snake.observe_status(
+        {
+            "goal_id": active_goal.goal_id,
+            "primitive": "set_tilt",
+            "state": "canceled",
+            "module_ids": list(active_goal.module_ids),
+        }
+    )
+
+    payload = graph(stamp=2.0).to_dict()
+
+    selected = active_goal.module_ids[0]
+
+    for node in payload["nodes"]:
+        if node["node_id"] == selected:
+            node["attributes"]["actuators"]["tilt"][
+                "position_rad"
+            ] = 0.03
+            break
+    else:
+        raise AssertionError("selected Snake module missing")
+
+    assert snake.observe_graph(
+        payload,
+        now=1.3,
+    )
+
+    resumed = snake.step(
+        sample(),
+        safety=ENABLED,
+        now=1.3,
+    )
+
+    resumed_id = json.loads(
+        resumed.envelope
+    )["expert"]["debug"]["command_id"]
+
+    assert resumed_id != before_id
+
+    moved = snake.step(
+        sample(right_y=1.0),
+        safety=ENABLED,
+        now=1.4,
+    )
+
+    assert moved.posture.goal is not None
+    assert moved.posture.goal.primitive == "set_tilt"
+
+    assert moved.posture.goal.parameters[
+        "angle_rad"
+    ] == pytest.approx(0.08)

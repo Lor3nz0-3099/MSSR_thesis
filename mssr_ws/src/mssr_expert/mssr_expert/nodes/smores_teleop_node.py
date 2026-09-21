@@ -27,6 +27,7 @@ from mssr_expert.teleop.structural_macro import StructuralMacroLauncher
 from mssr_expert.teleop.action_transport import ActionTransport, RcCarRuntime
 from mssr_expert.teleop.rc_car import load_geometry
 from mssr_expert.teleop.snake import SnakeActions, SnakeRuntime
+from mssr_expert.teleop.mobile_manipulator import MobileManipulatorRuntime
 from mssr_expert.teleop.recording import TeleopRecordingController
 from mssr_expert.teleop.topology import TeleopTopologyDetector
 from mssr_expert.behaviors.morphology_library import MorphologyLibrary
@@ -72,7 +73,7 @@ class SmoresTeleopNode(Node):
         config = load_teleop_config(teleop_path)
         self.session = TeleopSession(
             load_input_config(input_path),
-            controller_morphologies={"rc_car8", "snake8"},
+            controller_morphologies={"rc_car8", "snake8", "mobile_manipulator8"},
         )
         self._structural_macro = StructuralMacroLauncher()
 
@@ -153,6 +154,13 @@ class SmoresTeleopNode(Node):
         self._snake = SnakeRuntime(MorphologyLibrary.load(config_dir / "smores_morphology_behaviors.json"),
                                    load_attributed_graph(config_dir / "smores_snake8.json"),
                                    geometry=load_geometry(str(teleop_path)), **snake_config)
+        mm8_config = yaml.safe_load(Path(teleop_path).read_text()).get("mobile_manipulator", {})
+        self._mm8 = MobileManipulatorRuntime(
+            MorphologyLibrary.load(config_dir / "smores_morphology_behaviors.json"),
+            load_attributed_graph(config_dir / "smores_mobile_manipulator8.json"),
+            geometry=load_geometry(str(teleop_path)),
+            **mm8_config,
+        )
         self._action_transport = ActionTransport()
         self._last_actuator_controller = None
         self._actions = self.create_publisher(String, "/mssr/actions", 10)
@@ -178,7 +186,7 @@ class SmoresTeleopNode(Node):
         # Input age and diagnostics use a steady wall clock independent of Isaac simulation time.
         self._wall_clock = Clock(clock_type=ClockType.STEADY_TIME)
         self._timer = self.create_timer(1.0 / rate, self._tick, clock=self._wall_clock)
-        self.get_logger().info(f"RC-Car8/Snake8 teleop at {rate:g} Hz; live topology and runtime safety required")
+        self.get_logger().info(f"RC-Car8/Snake8/MobileManipulator8 teleop at {rate:g} Hz; live topology and runtime safety required")
 
     def _on_graph(self, message: String) -> None:
         now = time.monotonic()
@@ -190,6 +198,7 @@ class SmoresTeleopNode(Node):
 
         self._rc.observe_graph(payload, now=now)
         self._snake.observe_graph(payload, now=now)
+        self._mm8.observe_graph(payload, now=now)
 
         try:
             current_graph = attributed_graph_from_dict(payload)
@@ -225,12 +234,19 @@ class SmoresTeleopNode(Node):
 
         if self._topology_name == "snake8" and self._snake.topology(now) is None:
             return None
+        if (
+            self._topology_name == "mobile_manipulator8"
+            and self._mm8.topology(now) is None
+        ):
+            return None
         return self._topology_name
 
     def _on_primitive_status(self, message: String) -> None:
         try:
-            self._rc.observe_status(json.loads(message.data))
-            self._snake.observe_status(json.loads(message.data))
+            payload = json.loads(message.data)
+            self._rc.observe_status(payload)
+            self._snake.observe_status(payload)
+            self._mm8.observe_status(payload)
         except (KeyError, RuntimeError, TypeError, ValueError):
             return
 
@@ -391,7 +407,26 @@ class SmoresTeleopNode(Node):
                                   safety=decision if controller == "rc_car8" else disabled, now=now)
         snake_output = self._snake.step(controller_input,
                                         safety=decision if controller == "snake8" else disabled, now=now)
-        output = snake_output if controller == "snake8" else rc_output
+        mm8_output = self._mm8.step(
+            controller_input,
+            safety=decision if controller == "mobile_manipulator8" else disabled,
+            now=now,
+        )
+
+        outputs = {
+            "rc_car8": rc_output,
+            "snake8": snake_output,
+            "mobile_manipulator8": mm8_output,
+        }
+
+        output = outputs.get(controller)
+
+        # While motion authority is disabled, retain the active morphology's
+        # effective-action view for diagnostics/recording. No native action
+        # is published unless controller is actually motion-enabled.
+        if output is None:
+            output = outputs.get(status["active_controller"], rc_output)
+
         if controller is not None and output.envelope is not None:
             self._actions.publish(String(data=output.envelope))
             self._last_actuator_controller = controller
@@ -406,7 +441,7 @@ class SmoresTeleopNode(Node):
             self._actions.publish(String(data=clear))
             self._last_actuator_controller = None
         cancellations = []
-        for delivery in (rc_output.posture, snake_output.posture):
+        for delivery in (rc_output.posture, snake_output.posture, mm8_output.posture):
             if delivery.goal is not None:
                 self._goal.publish(String(data=json.dumps(delivery.goal.to_dict(), allow_nan=False)))
             if delivery.cancel_goal_id is not None:
@@ -433,10 +468,16 @@ class SmoresTeleopNode(Node):
             for name in status["events"]
         )
 
+        recording_graphs = {
+            "rc_car8": self._rc.latest_graph,
+            "snake8": self._snake.latest_graph,
+            "mobile_manipulator8": self._mm8.latest_graph,
+        }
+
         self._recording.update(
             recording_requested=status["recording"],
             authority=status["authority"],
-            graph=self._rc.latest_graph if controller == "rc_car8" else self._snake.latest_graph,
+            graph=recording_graphs.get(status["active_controller"]),
             controller_input=status["controller_input"],
             intent=output.actions.intent,
             effective_actions=output.actions.module_actions,
@@ -461,6 +502,8 @@ class SmoresTeleopNode(Node):
             rc_car_effective_actions=rc_output.actions.module_actions,
             snake_intent=snake_output.actions.intent,
             snake_effective_actions=snake_output.actions.module_actions,
+            mm8_intent=mm8_output.actions.intent,
+            mm8_effective_actions=mm8_output.actions.module_actions,
         )
         message = String()
         message.data = json.dumps(status, allow_nan=False)

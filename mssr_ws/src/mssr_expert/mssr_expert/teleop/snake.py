@@ -742,6 +742,13 @@ class SnakeRuntime:
             and fresh
         )
 
+        # Leaving an armed TELEOP epoch invalidates the manual integrator.
+        # The next manual joint command must start from the newly observed
+        # physical posture, never from a pre-E-stop/stale target.
+        if not enabled and self._motion_enabled:
+            self._manual_key = None
+            self._manual_target = None
+
         # E-stop/native ownership invalidates the previous behavior command
         # identity.  Match RcCarRuntime: a newly armed TELEOP epoch gets a
         # fresh command ID, while ordinary enabled ticks retain one stable ID.
