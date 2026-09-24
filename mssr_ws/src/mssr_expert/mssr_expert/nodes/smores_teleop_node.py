@@ -29,7 +29,10 @@ from mssr_expert.teleop.rc_car import load_geometry
 from mssr_expert.teleop.snake import SnakeActions, SnakeRuntime
 from mssr_expert.teleop.mobile_manipulator import MobileManipulatorRuntime
 from mssr_expert.teleop.recording import TeleopRecordingController
-from mssr_expert.teleop.topology import TeleopTopologyDetector
+from mssr_expert.teleop.topology import (
+    TeleopTopologyDetector,
+    is_authoritative_loose_graph,
+)
 from mssr_expert.behaviors.morphology_library import MorphologyLibrary
 from mssr_expert.graph.serialization import (
     attributed_graph_from_dict,
@@ -77,6 +80,14 @@ class SmoresTeleopNode(Node):
         )
         self._structural_macro = StructuralMacroLauncher()
 
+        self._structural_target_graphs = {
+            "rc_car8": config_dir / "smores_rc_car8.json",
+            "snake8": config_dir / "smores_snake8.json",
+            "mobile_manipulator8": (
+                config_dir / "smores_mobile_manipulator8.json"
+            ),
+        }
+
         self.coordinator = RuntimeCoordinator(
             self.session,
             camera=CameraController(radius_m=config.camera_radius_m),
@@ -111,6 +122,7 @@ class SmoresTeleopNode(Node):
         self._topology_observation_timeout_s = topology_timeout
         self._topology_received_at: float | None = None
         self._topology_name: str | None = None
+        self._initial_assembly_loose = False
 
         repo_root = _repository_root()
         self._repo_root = repo_root
@@ -166,6 +178,11 @@ class SmoresTeleopNode(Node):
         self._actions = self.create_publisher(String, "/mssr/actions", 10)
         self._goal = self.create_publisher(String, "/mssr/primitives/goal", 10)
         self._cancel = self.create_publisher(String, "/mssr/primitives/cancel", 10)
+        self._morphology_command = self.create_publisher(
+            String,
+            "/mssr/morphology/command",
+            10,
+        )
         self._graph = self.create_subscription(String, "/mssr/robot_graph", self._on_graph, 10)
         self._primitive_status = self.create_subscription(String, "/mssr/primitives/status", self._on_primitive_status, 10)
         self._self_reconfiguration_state = self.create_subscription(
@@ -174,9 +191,21 @@ class SmoresTeleopNode(Node):
             self._on_self_reconfiguration_state,
             10,
         )
+        self._self_assembly_state = self.create_subscription(
+            String,
+            "/mssr/expert/self_assembly/state",
+            self._on_self_assembly_state,
+            10,
+        )
         joy_topic = self.declare_parameter("joy_topic", config.joy_topic).value
         status_topic = self.declare_parameter("status_topic", "/mssr/teleop/status").value
         rate = control_rate(self.declare_parameter("control_rate_hz", config.control_rate_hz).value)
+        self._morphology_behavior_status = self.create_subscription(
+            String,
+            "/mssr/morphology/status",
+            self._on_morphology_behavior_status,
+            10,
+        )
         self._status = self.create_publisher(String, status_topic, 10)
         runtime_request_topic = self.declare_parameter("runtime_request_topic", "/mssr/teleop/runtime_request").value
         runtime_status_topic = self.declare_parameter("runtime_status_topic", "/mssr/teleop/runtime_status").value
@@ -211,12 +240,30 @@ class SmoresTeleopNode(Node):
         ):
             self._topology_name = None
             self._topology_received_at = None
+            self._initial_assembly_loose = False
             return
 
         self._topology_name = self._topology_detector.detect(
             current_graph
         )
+        self._initial_assembly_loose = is_authoritative_loose_graph(current_graph)
         self._topology_received_at = now
+
+    def _initial_assembly_ready(self, now: float) -> bool:
+        received_at = self._topology_received_at
+
+        if received_at is None:
+            return False
+
+        age = now - received_at
+
+        if (
+            age < 0.0
+            or age > self._topology_observation_timeout_s
+        ):
+            return False
+
+        return self._initial_assembly_loose
 
     def _detected_topology(self, now: float) -> str | None:
         received_at = self._topology_received_at
@@ -250,9 +297,28 @@ class SmoresTeleopNode(Node):
         except (KeyError, RuntimeError, TypeError, ValueError):
             return
 
-    def _start_structural_macro(self, target_morphology: str) -> bool:
+    def _reset_runtime_for_morphology_exit(
+        self,
+        morphology: str | None,
+    ) -> None:
+        """Discard controller state belonging to the morphology being left."""
+        runtimes = {
+            "rc_car8": self._rc,
+            "snake8": self._snake,
+            "mobile_manipulator8": self._mm8,
+        }
+
+        runtime = runtimes.get(morphology)
+
+        if runtime is not None:
+            runtime.reset_for_morphology_exit()
+
+    def _start_structural_macro(
+        self, target_morphology: str, kind: str
+    ) -> bool:
+        source_morphology = self.session.state.detected_morphology
         stamp = time.time_ns()
-        execution_id = f"teleop-reconfiguration-{stamp}"
+        execution_id = f"teleop-{kind}-{stamp}"
 
         manager = self._recording.manager
         recording_episode_id = self._recording.episode_id
@@ -276,6 +342,12 @@ class SmoresTeleopNode(Node):
                 / f"{execution_id}.jsonl"
             )
 
+        target_graph_path = (
+            self._structural_target_graphs[target_morphology]
+            if kind == "self_assembly"
+            else None
+        )
+
         try:
             self._structural_macro.start(
                 state=self.session.state,
@@ -283,6 +355,8 @@ class SmoresTeleopNode(Node):
                 execution_id=execution_id,
                 episode_id=episode_id,
                 dataset_path=dataset_path,
+                kind=kind,
+                target_graph_path=target_graph_path,
             )
         except (OSError, RuntimeError, ValueError) as error:
             self.get_logger().error(
@@ -290,6 +364,9 @@ class SmoresTeleopNode(Node):
                 f"{target_morphology!r}: {error}"
             )
             return False
+
+        if kind == "self_reconfiguration":
+            self._reset_runtime_for_morphology_exit(source_morphology)
 
         # Only a successfully launched deterministic expert belongs in the
         # T4 demonstration manifest.  A failed spawn must never leave a
@@ -302,7 +379,7 @@ class SmoresTeleopNode(Node):
             try:
                 self._recording.register_structural_stream(
                     stream_id=execution_id,
-                    phase="self_reconfiguration",
+                    phase=kind,
                     path=dataset_path,
                     producer="deterministic_expert",
                 )
@@ -335,8 +412,60 @@ class SmoresTeleopNode(Node):
         )
 
         if consumed:
+            if (
+                payload.get("schema_version")
+                == "mssr.self_reconfiguration_state.v1"
+                and payload.get("success") is True
+                and payload.get("target_morphology") == "rc_car8"
+            ):
+                # The structural fold has completed, but the RC runtime may
+                # still hold a graph sampled before that final posture.
+                # Wait for the first genuinely newer physical graph before
+                # recapturing the RC TELEOP reference.
+                self._rc.prepare_for_morphology_entry()
+
             self.get_logger().info(
                 "Structural macro terminal state consumed: "
+                f"success={self.session.state.last_macro_success}."
+            )
+
+    def _on_self_assembly_state(
+        self,
+        message: String,
+    ) -> None:
+        try:
+            payload = json.loads(message.data)
+        except (ValueError, TypeError):
+            return
+
+        consumed = self._structural_macro.observe_expert_state(
+            state=self.session.state,
+            payload=payload,
+        )
+
+        if consumed:
+            self.get_logger().info(
+                "Structural macro terminal state consumed: "
+                f"success={self.session.state.last_macro_success}."
+            )
+
+    def _on_morphology_behavior_status(
+        self,
+        message: String,
+    ) -> None:
+        try:
+            payload = json.loads(message.data)
+        except (ValueError, TypeError):
+            return
+
+        consumed = self._structural_macro.observe_expert_state(
+            state=self.session.state,
+            payload=payload,
+        )
+
+        if consumed:
+            self.get_logger().info(
+                "Snake behavior macro terminal state consumed: "
                 f"success={self.session.state.last_macro_success}."
             )
 
@@ -355,12 +484,20 @@ class SmoresTeleopNode(Node):
         self.session.state.observe_topology(
             self._detected_topology(now)
         )
+        self.session.state.observe_initial_assembly_ready(
+            self._initial_assembly_ready(now)
+        )
         status, runtime_request = self.coordinator.tick(now)
 
         if (
             status["authority"] == "ESTOP"
             and self._structural_macro.process is not None
         ):
+            interrupted_kind = self._structural_macro.kind
+            interrupted_execution_id = (
+                self._structural_macro.execution_id
+            )
+
             cancel_goal_ids = self._structural_macro.interrupt()
 
             for goal_id in cancel_goal_ids:
@@ -369,6 +506,33 @@ class SmoresTeleopNode(Node):
                         data=json.dumps(
                             {"goal_id": goal_id},
                             allow_nan=False,
+                        )
+                    )
+                )
+
+            if interrupted_kind in {
+                "snake_gap",
+                "snake_stairs",
+            }:
+                stop_command_id = (
+                    f"{interrupted_execution_id}-estop-stop"
+                    if interrupted_execution_id
+                    else "teleop-snake-estop-stop"
+                )
+
+                self._morphology_command.publish(
+                    String(
+                        data=json.dumps(
+                            {
+                                "schema_version":
+                                    "mssr.morphology_command.v1",
+                                "command_id": stop_command_id,
+                                "morphology": "snake8",
+                                "behavior": "stop",
+                                "parameters": {},
+                            },
+                            allow_nan=False,
+                            sort_keys=True,
                         )
                     )
                 )
@@ -402,14 +566,36 @@ class SmoresTeleopNode(Node):
         controller_input = SimpleNamespace(**status["controller_input"])
         decision = SafetyDecision(**status["safety"])
         controller = status["active_controller"] if decision.motion_enabled else None
-        disabled = SafetyDecision("NONE", False, True, False)
-        rc_output = self._rc.step(controller_input,
-                                  safety=decision if controller == "rc_car8" else disabled, now=now)
-        snake_output = self._snake.step(controller_input,
-                                        safety=decision if controller == "snake8" else disabled, now=now)
+        inactive_decision = (
+            decision
+            if decision.authority == "STRUCTURAL_MACRO"
+            else SafetyDecision("NONE", False, True, False)
+        )
+        rc_output = self._rc.step(
+            controller_input,
+            safety=(
+                decision
+                if controller == "rc_car8"
+                else inactive_decision
+            ),
+            now=now,
+        )
+        snake_output = self._snake.step(
+            controller_input,
+            safety=(
+                decision
+                if controller == "snake8"
+                else inactive_decision
+            ),
+            now=now,
+        )
         mm8_output = self._mm8.step(
             controller_input,
-            safety=decision if controller == "mobile_manipulator8" else disabled,
+            safety=(
+                decision
+                if controller == "mobile_manipulator8"
+                else inactive_decision
+            ),
             now=now,
         )
 
@@ -523,7 +709,20 @@ def main(args=None) -> None:
         pass
     finally:
         if node is not None:
+            try:
+                node._recording.shutdown(
+                    ended_at=time.time(),
+                    task_success=None,
+                    timeout=30.0,
+                )
+            except Exception as error:
+                node.get_logger().error(
+                    "Recording shutdown finalization failed: "
+                    f"{type(error).__name__}: {error}"
+                )
+
             node.destroy_node()
+
         if rclpy.ok():
             rclpy.shutdown()
 

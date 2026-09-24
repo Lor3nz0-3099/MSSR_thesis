@@ -36,6 +36,9 @@ def build_command_payload(
     morphology: str,
     behavior: str,
     parameters: Mapping[str, Any],
+    dataset_path: str = "",
+    episode_id: str = "",
+    stage_name: str = "",
 ) -> dict[str, Any]:
     """Build and validate the exact payload consumed by the behavior node."""
 
@@ -46,6 +49,19 @@ def build_command_payload(
         "behavior": behavior,
         "parameters": dict(parameters),
     }
+
+    recording_values = (
+        str(dataset_path).strip(),
+        str(episode_id).strip(),
+        str(stage_name).strip(),
+    )
+    if any(recording_values):
+        payload["recording"] = {
+            "dataset_path": recording_values[0],
+            "episode_id": recording_values[1],
+            "stage_name": recording_values[2],
+        }
+
     # Keep client and server validation identical.
     MorphologyCommand.from_mapping(payload)
     return payload
@@ -133,6 +149,9 @@ def build_argument_parser() -> argparse.ArgumentParser:
     parser.add_argument("--behavior", required=True)
     parser.add_argument("--command-id", required=True)
     parser.add_argument("--parameters-json", default="{}")
+    parser.add_argument("--dataset-path", default="")
+    parser.add_argument("--episode-id", default="")
+    parser.add_argument("--stage-name", default="")
     parser.add_argument("--discovery-timeout-s", type=float, default=5.0)
     parser.add_argument(
         "--timeout-s",
@@ -159,6 +178,9 @@ def main(args: Sequence[str] | None = None) -> None:
             morphology=parsed.morphology,
             behavior=parsed.behavior,
             parameters=parse_parameters_json(parsed.parameters_json),
+            dataset_path=parsed.dataset_path,
+            episode_id=parsed.episode_id,
+            stage_name=parsed.stage_name,
         )
     except ValueError as error:
         raise SystemExit(str(error)) from error

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from dataclasses import replace
 import time
 from pathlib import Path
 from typing import Any, Mapping
@@ -35,6 +36,7 @@ from mssr_expert.behaviors.snake_stair_concertina import (
     SnakeStairConcertinaPlanner,
 )
 from mssr_expert.behaviors.snake_gap_gait import SnakeGapGaitPlanner
+from mssr_expert.behaviors.snake_gait_frame import resolve_gait_parameters
 from mssr_expert.behaviors.morphology_dof_model import (
     MorphologyDofInventory,
     SmoresMorphologyDofAnalyzer,
@@ -150,7 +152,7 @@ def graph_with_command_course(
 
     obstacle_updates = {
         key: dict(value)
-        for key in ("gap", "stairs")
+        for key in ("gap", "stairs", "stage_frame")
         if isinstance((value := parameters.get(key)), Mapping)
     }
     if not obstacle_updates:
@@ -164,6 +166,8 @@ def graph_with_command_course(
         else {}
     )
     course.update(obstacle_updates)
+    if parameters.get("task_id"):
+        course["active_task_id"] = str(parameters["task_id"])
     global_attributes["course"] = course
     global_attributes["active_composite_task_id"] = str(
         parameters.get("task_id", "")
@@ -447,6 +451,9 @@ class SmoresMorphologyBehaviorNode(Node):
             Mapping[str, str],
         ] | None = None
         self._behavior_dataset_pending_decision = None
+        self._command_dataset_path = ""
+        self._command_dataset_episode_id = ""
+        self._command_dataset_stage_name = ""
         self.add_on_set_parameters_callback(
             self._on_behavior_dataset_parameters
         )
@@ -847,6 +854,11 @@ class SmoresMorphologyBehaviorNode(Node):
                     planner = self._gap_gait_planner.plan
                 elif command.behavior == "crawl_stairs_spatial_concertina":
                     planner = self._stair_concertina_planner.plan
+                command = replace(command, parameters=resolve_gait_parameters(
+                    self._latest_robot_graph, self._assignments,
+                    command.parameters,
+                    "gap" if command.behavior == "gap_crossing" else "stairs",
+                ))
                 planning_graph = graph_with_command_course(
                     self._latest_robot_graph,
                     command.parameters,
@@ -872,6 +884,14 @@ class SmoresMorphologyBehaviorNode(Node):
                 neutral_tilts,
                 program_override,
             )
+
+            if command.dataset_path:
+                self._activate_command_dataset(command)
+            elif self._command_dataset_path:
+                # A STOP or unrelated command closes the previous
+                # command-owned expert stream before taking over.
+                self._clear_command_dataset()
+
             self._active_command_parameters = dict(command.parameters)
             self._last_terminal_command_id = ""
             self._publish_status(
@@ -967,6 +987,9 @@ class SmoresMorphologyBehaviorNode(Node):
         if decision.done:
             self._last_terminal_command_id = decision.command_id
 
+            if self._command_dataset_path:
+                self._clear_command_dataset()
+
     def _build_behavior_dataset_observation(
         self,
         decision,
@@ -1028,15 +1051,22 @@ class SmoresMorphologyBehaviorNode(Node):
             self._latest_robot_graph,
             self._active_command_parameters,
         )
-        episode_id = str(
-            self.get_parameter(
-                "behavior_dataset_episode_id"
-            ).value
-        ).strip() or decision.command_id
-        stage_name = str(
-            self.get_parameter(
-                "behavior_dataset_stage_name"
-            ).value
+        episode_id = (
+            self._command_dataset_episode_id
+            or str(
+                self.get_parameter(
+                    "behavior_dataset_episode_id"
+                ).value
+            ).strip()
+            or decision.command_id
+        )
+        stage_name = (
+            self._command_dataset_stage_name
+            or str(
+                self.get_parameter(
+                    "behavior_dataset_stage_name"
+                ).value
+            )
         )
         difficulty = float(
             self.get_parameter(
@@ -1104,10 +1134,38 @@ class SmoresMorphologyBehaviorNode(Node):
 
         return SetParametersResult(successful=True)
 
+    def _activate_command_dataset(
+        self,
+        command: MorphologyCommand,
+    ) -> None:
+        """Switch recording to one command-owned expert stream."""
+
+        self._flush_behavior_dataset_pending()
+
+        self._command_dataset_path = command.dataset_path
+        self._command_dataset_episode_id = command.episode_id
+        self._command_dataset_stage_name = command.stage_name
+
+        self._refresh_behavior_dataset_logger()
+
+    def _clear_command_dataset(self) -> None:
+        """Return from command-owned recording to configured default."""
+
+        self._flush_behavior_dataset_pending()
+
+        self._command_dataset_path = ""
+        self._command_dataset_episode_id = ""
+        self._command_dataset_stage_name = ""
+
+        self._refresh_behavior_dataset_logger()
+
     def _refresh_behavior_dataset_logger(self):
-        requested_text = str(
-            self.get_parameter("behavior_dataset_path").value
-        ).strip()
+        requested_text = (
+            self._command_dataset_path
+            or str(
+                self.get_parameter("behavior_dataset_path").value
+            ).strip()
+        )
         requested_path = Path(requested_text) if requested_text else None
 
         current_logger = self._behavior_dataset_logger
@@ -1148,11 +1206,22 @@ class SmoresMorphologyBehaviorNode(Node):
             self._latest_robot_graph,
             self._active_command_parameters,
         )
-        episode_id = str(
-            self.get_parameter("behavior_dataset_episode_id").value
-        ).strip() or decision.command_id
-        stage_name = str(
-            self.get_parameter("behavior_dataset_stage_name").value
+        episode_id = (
+            self._command_dataset_episode_id
+            or str(
+                self.get_parameter(
+                    "behavior_dataset_episode_id"
+                ).value
+            ).strip()
+            or decision.command_id
+        )
+        stage_name = (
+            self._command_dataset_stage_name
+            or str(
+                self.get_parameter(
+                    "behavior_dataset_stage_name"
+                ).value
+            )
         )
         difficulty = float(
             self.get_parameter("behavior_dataset_difficulty").value
@@ -1474,6 +1543,8 @@ class SmoresMorphologyBehaviorNode(Node):
                                 {
                                     "target_module_id": position_goal.module_id,
                                     "target_x_m": float(position_goal.target_x_m),
+                                    "origin_world_xy_m": list(position_goal.origin_world_xy_m),
+                                    "axis_world_xy": list(position_goal.axis_world_xy),
                                     "target_tolerance_m": float(
                                         position_goal.tolerance_m
                                     ),
@@ -1510,6 +1581,9 @@ class SmoresMorphologyBehaviorNode(Node):
                     "command_id": command_id,
                     "morphology": morphology,
                     "behavior": behavior,
+                    "active_goal_ids": list(
+                        self._executor.active_goal_ids
+                    ),
                     "state": state,
                     "phase": phase,
                     "progress": float(progress),

@@ -228,3 +228,136 @@ def test_request_stop_finalizes_in_background(tmp_path):
     manifest = read_manifest(manager)
     assert manifest["status"] == "completed"
     assert manifest["human_stream"]["records"] == 1
+
+
+
+def test_stop_uses_incremental_record_count_without_rereading_stream(
+    tmp_path,
+    monkeypatch,
+):
+    """Finalization must stay O(1) in dataset size after writer drain."""
+
+    manager = RecordingManager(
+        root=tmp_path,
+        git_commit="abc123",
+        dataset_rate_hz=10.0,
+        queue_capacity=16,
+    )
+
+    manager.start(
+        episode_id="demo-incremental-finalize",
+        started_at=100.0,
+    )
+
+    manager.enqueue_record(
+        {"timestep": 0, "value": "first"}
+    )
+    manager.enqueue_record(
+        {"timestep": 1, "value": "second"}
+    )
+    manager.enqueue_record(
+        {"timestep": 2, "value": "third"}
+    )
+
+    human_path = manager.human_path
+    assert human_path is not None
+
+    original_read_text = Path.read_text
+
+    def guarded_read_text(self, *args, **kwargs):
+        if self == human_path:
+            raise AssertionError(
+                "stop() reread the complete human JSONL"
+            )
+
+        return original_read_text(
+            self,
+            *args,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        guarded_read_text,
+    )
+
+    manager.stop(
+        ended_at=101.0,
+        task_success=None,
+    )
+
+    # Restore normal reads before inspecting the manifest.
+    monkeypatch.setattr(
+        Path,
+        "read_text",
+        original_read_text,
+    )
+
+    manifest = json.loads(
+        manager.manifest_path.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert manifest["status"] == "completed"
+    assert manifest["human_stream"]["records"] == 3
+    assert (
+        manifest["human_stream"]["bytes"]
+        == human_path.stat().st_size
+    )
+    assert manifest["unwritten_records"] == 0
+
+
+
+def test_recording_controller_shutdown_finalizes_active_episode(
+    tmp_path,
+):
+    """Process shutdown must never leave an active episode as RUNNING."""
+    from mssr_expert.teleop.recording import TeleopRecordingController
+
+    controller = TeleopRecordingController(
+        root=tmp_path,
+        git_commit="abc123",
+        dataset_rate_hz=10.0,
+        queue_capacity=16,
+        episode_id_factory=lambda: "shutdown-demo",
+    )
+
+    # Start an episode exactly as the runtime would.
+    controller._ensure_started(
+        wall_time=100.0,
+    )
+
+    manager = controller.manager
+    assert manager is not None
+    assert manager.recording
+
+    manager.enqueue_record(
+        {
+            "timestep": 0,
+            "value": "persist-me",
+        }
+    )
+
+    controller.shutdown(
+        ended_at=101.0,
+        task_success=None,
+        timeout=2.0,
+    )
+
+    assert not manager.recording
+    assert not manager.finalizing
+
+    manifest = json.loads(
+        manager.manifest_path.read_text(
+            encoding="utf-8"
+        )
+    )
+
+    assert manifest["status"] == "completed"
+    assert manifest["ended_at"] == 101.0
+    assert manifest["task_success"] is None
+    assert manifest["eligible_for_import"] is True
+    assert manifest["human_stream"]["records"] == 1
+    assert manifest["unwritten_records"] == 0

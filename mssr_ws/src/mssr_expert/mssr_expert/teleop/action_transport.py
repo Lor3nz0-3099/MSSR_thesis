@@ -156,6 +156,28 @@ class RcCarRuntime:
         self._motion_enabled = False
         self._command_id = "teleop-rc-" + uuid4().hex
 
+        # After a structural transition into RC-Car8, the graph already
+        # cached here may still describe the pre-fold posture.  Do not let
+        # TELEOP recapture from it.  Wait for the first genuinely newer
+        # physical graph produced after the structural terminal boundary.
+        self._entry_capture_pending = False
+        self._entry_after_graph_stamp = None
+
+    def prepare_for_morphology_entry(self):
+        """Require a genuinely new graph before RC posture recapture."""
+
+        self._entry_capture_pending = True
+        self._entry_after_graph_stamp = (
+            None
+            if self._last_graph is None
+            else self._last_graph.stamp
+        )
+
+        # The first accepted post-boundary graph must become the new
+        # physical RC reference rather than inheriting an older epoch.
+        self.controller.recapture = True
+        self._motion_enabled = False
+
     def observe_graph(self, payload, *, now):
         try:
             if not finite(now):
@@ -177,9 +199,53 @@ class RcCarRuntime:
             self.controller.recapture = True
             return False
         self._received_at = now
+
+        if self._entry_capture_pending:
+            boundary = self._entry_after_graph_stamp
+
+            if (
+                boundary is None
+                or (
+                    self._last_graph is not None
+                    and self._last_graph.stamp > boundary
+                )
+            ):
+                self._entry_capture_pending = False
+                self._entry_after_graph_stamp = None
+                self.controller.recapture = True
+
         return True
 
+    def reset_for_morphology_exit(self):
+
+        self._entry_capture_pending = False
+        self._entry_after_graph_stamp = None
+        """Discard teleop state belonging to the previous RC visit.
+
+        Posture transport ownership is intentionally preserved so any
+        retained native TILT primitive can still be explicitly canceled
+        while structural authority is active.
+        """
+        self._observation = None
+        self._received_at = None
+        self._last_graph = None
+        self._previous_tick = None
+        self._motion_enabled = False
+
+        self._command_id = (
+            "teleop-rc-" + uuid4().hex
+        )
+
+        self.controller._assignments = ()
+        self.controller._targets = {}
+        self.controller.desired_chassis_height = None
+        self.controller._home = False
+        self.controller.recapture = True
+
     def _fresh_observation(self, now):
+        if self._entry_capture_pending:
+            return None
+
         if self._received_at is None or not 0 <= now - self._received_at <= self.observation_timeout_s:
             self.controller.recapture = True
             return None

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 import random
 from typing import Any, Mapping
@@ -1089,9 +1089,10 @@ class CompositeObstacleCourse:
     navigation_cones: tuple[CompositeNavigationCone, ...]
     final_floor_height_m: float
     goal_center_xyz_m: tuple[float, float, float]
+    layout_metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def to_observation(self) -> dict[str, Any]:
-        return {
+        observation = {
             "frame_id": "world",
             "course_profile": "composite_mission_v1",
             "mission": {
@@ -1111,6 +1112,11 @@ class CompositeObstacleCourse:
             ],
             "collision_boxes": _collision_box_observations(self.boxes),
         }
+
+        if self.layout_metadata:
+            observation.update(dict(self.layout_metadata))
+            observation["mission"].update(dict(self.layout_metadata))
+        return observation
 
 
 def _support_box(
@@ -1154,6 +1160,13 @@ def composite_obstacle_course(
     the generated course therefore never asks an expert to descend stairs.
     """
 
+    profile = mission.get("layout_profile")
+    if profile == "teleop_connected_v1":
+        from .teleop_composite_course import build_teleop_course
+
+        return build_teleop_course(mission, validated_seeds)
+    if profile is not None:
+        raise ValueError(f"Unsupported layout_profile: {profile!r}")
     if mission.get("schema_version") != "mssr.composite_mission.v1":
         raise ValueError("Unsupported composite mission schema")
     raw_tasks = mission.get("tasks")
@@ -3020,6 +3033,11 @@ def install_composite_obstacle_course(
     """Install an ordered multi-obstacle course and all button joints."""
 
     course = composite_obstacle_course(mission, validated_seeds)
+    if mission.get("layout_profile") == "teleop_connected_v1":
+        from .course_geometry_audit import validate_teleop_course
+        audit = validate_teleop_course(course)
+        if not audit["valid"]:
+            raise ValueError(f"Invalid teleoperation course: {audit['errors']}")
     root_path = "/World/CompositeObstacleCourse"
     _install_course_boxes(stage, root_path, course.boxes)
     _install_composite_navigation_cones(

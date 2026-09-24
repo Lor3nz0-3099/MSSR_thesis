@@ -1,0 +1,318 @@
+{
+  "schema_version": "mssr.composite_campaign.v1",
+  "description": "T01-T13: teleoperation-only oriented seeded fixtures with connected maneuver platforms. Legacy C01-C10 unchanged. Physical rollouts required.",
+  "episodes": [
+    {
+      "episode_id": "teleop-t01",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "stairs-1",
+          "type": "stairs",
+          "seed": 3102,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 5101,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "button-3",
+          "type": "button",
+          "seed": 6103,
+          "yaw_deg": -90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t02",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4106,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 6053,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "button-3",
+          "type": "button",
+          "seed": 6107,
+          "yaw_deg": -90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t03",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation",
+          "seed": 5102,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "gap-2",
+          "type": "gap",
+          "seed": 4104,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-3",
+          "type": "flat_navigation",
+          "seed": 6001,
+          "yaw_deg": 0
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t04",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "stairs-1",
+          "type": "stairs",
+          "seed": 4689,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 5106,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "gap-3",
+          "type": "gap",
+          "seed": 4103,
+          "yaw_deg": 90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t05",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation",
+          "seed": 6000,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 6056,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "button-3",
+          "type": "button",
+          "seed": 6251,
+          "yaw_deg": 90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t06",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4102,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 6004,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "button-3",
+          "type": "button",
+          "seed": 8568,
+          "yaw_deg": 90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t07",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "stairs-1",
+          "type": "stairs",
+          "seed": 3104,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 5103,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "button-3",
+          "type": "button",
+          "seed": 8936,
+          "yaw_deg": -90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t08",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation",
+          "seed": 5104,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "gap-2",
+          "type": "gap",
+          "seed": 4105,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-3",
+          "type": "flat_navigation",
+          "seed": 5105,
+          "yaw_deg": 0
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t09",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4107,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "stairs-2",
+          "type": "stairs",
+          "seed": 3101,
+          "yaw_deg": 90
+        },
+        {
+          "task_id": "button-3",
+          "type": "button",
+          "seed": 9974,
+          "yaw_deg": 90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t10",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation",
+          "seed": 6017,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "stairs-2",
+          "type": "stairs",
+          "seed": 3105,
+          "yaw_deg": -90
+        },
+        {
+          "task_id": "flat_navigation-3",
+          "type": "flat_navigation",
+          "seed": 5100,
+          "yaw_deg": -90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t11",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4106,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "stairs-2",
+          "type": "stairs",
+          "seed": 3102,
+          "yaw_deg": 90
+        },
+        {
+          "task_id": "gap-3",
+          "type": "gap",
+          "seed": 4104,
+          "yaw_deg": 90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t12",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation",
+          "seed": 5102,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 6053,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-3",
+          "type": "flat_navigation",
+          "seed": 6000,
+          "yaw_deg": -90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t13",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "gap-1",
+          "type": "gap",
+          "seed": 4103,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 6001,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "button-3",
+          "type": "button",
+          "seed": 6101,
+          "yaw_deg": 90
+        }
+      ]
+    }
+  ]
+}

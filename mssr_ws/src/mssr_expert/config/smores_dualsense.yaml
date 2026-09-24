@@ -39,6 +39,12 @@ commands:
   select_snake: dpad_up
   select_mm8: dpad_right
   home: circle
+
+  # Snake8 deterministic obstacle macros.
+  # X alone is resolved on release so X+D-pad remains initial assembly.
+  snake_gap: cross
+  snake_stairs: square
+
   estop_toggle: triangle  # Each new press alternates structure E-stop/resume.
   estop: null
   resume: null

@@ -671,35 +671,6 @@ class MobileManipulatorRuntime:
                 for item in observation.assignments
             )
 
-            if self._assembly_drive_targets is None:
-                dofs = {
-                    (item.module_id, item.name): item
-                    for item in observation.inventory.dofs
-                }
-
-                self._assembly_drive_targets = tuple(
-                    JointTarget(
-                        module_id=assignment.module_id,
-                        joint=joint,
-                        angle_rad=float(
-                            dofs[
-                                (
-                                    assignment.module_id,
-                                    joint,
-                                )
-                            ].position_rad
-                        ),
-                        target_vertex_id=(
-                            assignment.target_vertex_id
-                        ),
-                        target_role=(
-                            assignment.target_role
-                        ),
-                    )
-                    for assignment in observation.assignments
-                    for joint in ("pan", "tilt")
-                )
-
             if (
                 self._assignment_ids
                 and assignment_ids
@@ -732,6 +703,51 @@ class MobileManipulatorRuntime:
             self._manual_target = None
 
             return False
+
+    def reset_for_morphology_exit(self):
+        """Discard all teleop state belonging to the previous MM8 visit.
+
+        Native posture ownership is not blindly forgotten here.  Existing
+        retained PAN/TILT primitives remain visible to PostureTransport so
+        the disabled/structural tick can explicitly cancel them.
+        """
+
+        # Live-topology / timing epoch.
+        self._observation = None
+        self._received_at = None
+        self._last_graph = None
+        self._previous_tick = None
+        self._motion_enabled = False
+
+        # Never reuse an action identity across morphology lifecycles.
+        self._command_id = (
+            "teleop-mm8-" + uuid4().hex
+        )
+
+        # Drive/manipulation mode belongs only to the old MM8 visit.
+        self._mode = "drive_ready"
+        self._mode_transition_pending = False
+        self._mode_transition_behavior = None
+        self._mode_transition_destination = None
+        self._mode_transition_targets = ()
+        self._mode_transition_index = 0
+        self._mode_transition_goal_id = None
+
+        # The next RC->MM8 must establish a NEW physical Scorpion
+        # reference; never restore one captured during an earlier visit.
+        self._assembly_drive_targets = None
+
+        # Manual arm-selection/integration state.
+        self._manual_index = 0
+        self._manual_key = None
+        self._manual_target = None
+        self._manual_transition = False
+        self._manual_transition_module_id = None
+        self._assignment_ids = ()
+
+        # Do not erase PostureTransport ownership here: a retained native
+        # primitive must be explicitly canceled before new posture control.
+        self._posture_reset_pending = True
 
     @property
     def latest_graph(self):
@@ -792,6 +808,39 @@ class MobileManipulatorRuntime:
         self._mode_transition_goal_id = None
         self._manual_key = None
         self._manual_target = None
+
+    def _capture_drive_ready_posture(
+        self,
+        observation,
+    ) -> None:
+        """Capture the physical Scorpion only at armed TELEOP handoff."""
+        dofs = {
+            (item.module_id, item.name): item
+            for item in observation.inventory.dofs
+        }
+
+        self._assembly_drive_targets = tuple(
+            JointTarget(
+                module_id=assignment.module_id,
+                joint=joint,
+                angle_rad=float(
+                    dofs[
+                        (
+                            assignment.module_id,
+                            joint,
+                        )
+                    ].position_rad
+                ),
+                target_vertex_id=(
+                    assignment.target_vertex_id
+                ),
+                target_role=(
+                    assignment.target_role
+                ),
+            )
+            for assignment in observation.assignments
+            for joint in ("pan", "tilt")
+        )
 
     def _begin_mode_transition(
         self,
@@ -1154,6 +1203,15 @@ class MobileManipulatorRuntime:
         )
 
         manual_rejection = None
+
+        if (
+            observation is not None
+            and safety.motion_enabled
+            and self._assembly_drive_targets is None
+        ):
+            self._capture_drive_ready_posture(
+                observation
+            )
 
         if (
             self._mode_transition_pending

@@ -153,10 +153,31 @@ class RcCarTeleopController:
                         tilt.lower_limit_rad if finite(tilt.lower_limit_rad) else self.geometry.tilt_min_rad)
             upper = min(0.0, self.geometry.tilt_max_rad,
                         tilt.upper_limit_rad if finite(tilt.upper_limit_rad) else self.geometry.tilt_max_rad)
-            if lower > upper or not lower - 1e-9 <= tilt.position_rad <= upper + 1e-9:
+            # Loaded joints can settle a fraction of a milliradian beyond
+            # the ideal geometric branch boundary.  Accept only a very small
+            # physical tolerance, then clamp back onto the true geometric
+            # interval for all controller calculations.
+            bound_tolerance_rad = 1.0e-3
+
+            if (
+                lower > upper
+                or not (
+                    lower - bound_tolerance_rad
+                    <= tilt.position_rad
+                    <= upper + bound_tolerance_rad
+                )
+            ):
                 return self._safe()
+
             bounds[target.module_id] = (lower, upper)
-            positions[target.module_id] = tilt.position_rad
+
+            positions[target.module_id] = max(
+                lower,
+                min(
+                    upper,
+                    tilt.position_rad,
+                ),
+            )
         min_height = max(self._height(upper) for lower, upper in bounds.values())
         max_height = min(self._height(lower) for lower, upper in bounds.values())
         if min_height > max_height:

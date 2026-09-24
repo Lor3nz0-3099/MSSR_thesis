@@ -40,6 +40,7 @@ class TeleopState:
         self._recording = False
         self._recording_stop_pending = False
         self._last_macro_success: bool | None = None
+        self._initial_assembly_ready = False
 
     @property
     def phase(self) -> str:
@@ -99,6 +100,10 @@ class TeleopState:
     def last_macro_success(self) -> bool | None:
         return self._last_macro_success
 
+    @property
+    def initial_assembly_ready(self) -> bool:
+        return self._initial_assembly_ready
+
     def start_ready(self) -> None:
         self._started = True
 
@@ -115,6 +120,9 @@ class TeleopState:
 
     def observe_topology(self, name: str | None) -> None:
         self._detected_morphology = name if name in ACTIVE_MORPHOLOGIES else None
+
+    def observe_initial_assembly_ready(self, ready: bool) -> None:
+        self._initial_assembly_ready = bool(ready)
 
     def begin_macro(self) -> bool:
         if self.phase != "READY" or self.requested_morphology is None:
@@ -179,4 +187,5 @@ class TeleopState:
             "recording_stop_pending": self.recording_stop_pending,
             "estop_active": self.estop_active,
             "last_macro_success": self.last_macro_success,
+            "initial_assembly_ready": self.initial_assembly_ready,
         }

@@ -43,11 +43,23 @@ class JointTarget:
 
 @dataclass(frozen=True)
 class LongitudinalPositionGoal:
-    """World-X stop condition for a connected-morphology drive phase."""
+    """Longitudinal stop condition; default frame is legacy world +X."""
 
     module_id: str
     target_x_m: float
     tolerance_m: float
+    origin_world_xy_m: tuple[float, float] = (0.0, 0.0)
+    axis_world_xy: tuple[float, float] = (1.0, 0.0)
+
+    def coordinate(self, world_position: Sequence[float]) -> float:
+        if (len(self.origin_world_xy_m) != 2 or len(self.axis_world_xy) != 2
+                or len(world_position) != 3
+                or not all(math.isfinite(float(v)) for v in
+                           (*self.origin_world_xy_m, *self.axis_world_xy, *world_position))
+                or not math.isclose(math.hypot(*self.axis_world_xy), 1.0, abs_tol=1e-8)):
+            raise MorphologyLibraryError("Invalid longitudinal goal frame or live position")
+        return sum((float(world_position[i])-self.origin_world_xy_m[i])*self.axis_world_xy[i]
+                   for i in (0, 1))
 
 
 @dataclass(frozen=True)

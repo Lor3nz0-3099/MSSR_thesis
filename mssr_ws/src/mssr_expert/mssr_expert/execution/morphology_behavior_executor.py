@@ -27,6 +27,9 @@ class MorphologyCommand:
     morphology: str
     behavior: str
     parameters: Mapping[str, Any] = field(default_factory=dict)
+    dataset_path: str = ""
+    episode_id: str = ""
+    stage_name: str = ""
 
     @classmethod
     def from_mapping(cls, payload: Mapping[str, Any]) -> "MorphologyCommand":
@@ -40,11 +43,42 @@ class MorphologyCommand:
         parameters = payload.get("parameters", {})
         if not isinstance(parameters, Mapping):
             raise ValueError("Morphology command parameters must be an object")
+
+        recording = payload.get("recording", {})
+        if not isinstance(recording, Mapping):
+            raise ValueError(
+                "Morphology command recording metadata must be an object"
+            )
+
+        dataset_path = str(
+            recording.get("dataset_path", "")
+        ).strip()
+        episode_id = str(
+            recording.get("episode_id", "")
+        ).strip()
+        stage_name = str(
+            recording.get("stage_name", "")
+        ).strip()
+
+        recording_values = (
+            dataset_path,
+            episode_id,
+            stage_name,
+        )
+        if any(recording_values) and not all(recording_values):
+            raise ValueError(
+                "Morphology command recording metadata requires "
+                "dataset_path, episode_id, and stage_name together"
+            )
+
         command = cls(
             command_id=str(payload.get("command_id", "")),
             morphology=str(payload.get("morphology", "")),
             behavior=str(payload.get("behavior", "")),
             parameters=dict(parameters),
+            dataset_path=dataset_path,
+            episode_id=episode_id,
+            stage_name=stage_name,
         )
         if not command.command_id.strip():
             raise ValueError("Morphology command_id cannot be empty")
@@ -106,6 +140,12 @@ class MorphologyBehaviorExecutor:
             "SUCCEEDED",
             "FAILED",
         }
+
+    @property
+    def active_goal_ids(self) -> tuple[str, ...]:
+        """Native primitive goals currently owned by this behavior."""
+
+        return tuple(sorted(self._active_goal_ids))
 
     @property
     def active_position_goal(self) -> LongitudinalPositionGoal | None:
@@ -1116,7 +1156,7 @@ class MorphologyBehaviorExecutor:
             raise MorphologyLibraryError(
                 "Position tracking gains or speed limits are invalid"
             )
-        current_x_m = float(module_positions[goal.module_id][0])
+        current_x_m = goal.coordinate(module_positions[goal.module_id])
         sample = self._position_tracking_sample
         if sample is None or sample[0] != self._program_step_index:
             measured_velocity_m_s = 0.0
@@ -1185,7 +1225,7 @@ class MorphologyBehaviorExecutor:
             raise MorphologyLibraryError(
                 f"Invalid live position for {goal.module_id}"
             )
-        current_x_m = float(position[0])
+        current_x_m = goal.coordinate(position)
         error_m = goal.target_x_m - current_x_m
         if linear_m_s > 0.0:
             reached = error_m <= goal.tolerance_m

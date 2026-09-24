@@ -139,6 +139,7 @@ def select_episode(campaign: Mapping[str, Any], episode_id: str) -> dict[str, An
     return {
         "schema_version": "mssr.composite_mission.v1",
         "episode_id": episode_id,
+        **({"layout_profile": matches[0]["layout_profile"]} if "layout_profile" in matches[0] else {}),
         "tasks": [dict(task) for task in tasks],
     }
 
@@ -1084,8 +1085,15 @@ def execute_stages(
 def main() -> int:
     args = argument_parser().parse_args()
     mission = select_episode(_object(args.campaign), args.episode)
+    if mission.get("layout_profile") == "teleop_connected_v1" and args.execute and not args.plan_only:
+        raise ValueError("Oriented teleoperation courses require --preview-only; legacy task experts assume world +X.")
     catalog = ValidatedSeedCatalog.load(args.seed_catalog.resolve())
     course = composite_obstacle_course(mission, catalog.seeds_by_task_type)
+    if mission.get("layout_profile") == "teleop_connected_v1":
+        from smores_ep.isaac.course_geometry_audit import validate_teleop_course
+        audit = validate_teleop_course(course)
+        if not audit["valid"]:
+            raise ValueError(f"Invalid teleoperation course: {audit['errors']}")
     planner = CompositeMissionPlanner(
         ObstacleCoursePolicy(morphology_capabilities())
     )

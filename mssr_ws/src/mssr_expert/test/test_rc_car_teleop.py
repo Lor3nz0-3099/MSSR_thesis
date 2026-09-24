@@ -691,3 +691,304 @@ def test_runtime_uses_existing_unix_wall_timestamp_in_action_envelope():
     before = time.time()
     envelope = json.loads(core.step(sample(), safety=ENABLED, now=10).envelope)
     assert before <= envelope["stamp"] <= time.time()
+
+
+
+def test_structural_macro_prevents_intermediate_rc_posture_capture():
+    """Snake->RC must capture only the final reached RC posture."""
+
+    rc = component("rc_car")
+
+    target = load_attributed_graph(
+        CONFIG / "smores_rc_car8.json"
+    )
+
+    controller = rc.RcCarTeleopController(
+        MorphologyLibrary.load(
+            CONFIG / "smores_morphology_behaviors.json"
+        ),
+        geometry=GEOMETRY,
+        height_rate_m_s=0.005,
+        max_dt_s=0.1,
+    )
+
+    # During Snake->RC the target connectivity can become valid
+    # before the coordinated final -45 degree fold is complete.
+    intermediate_angle = -0.20
+
+    intermediate = rc.RcCarObservation.from_graph(
+        graph(tilt=intermediate_angle),
+        target,
+    )
+
+    assert intermediate is not None
+
+    during_macro = controller.step(
+        sample(),
+        intermediate,
+        0.02,
+        safety=SafetyDecision(
+            "STRUCTURAL_MACRO",
+            False,
+            False,
+            False,
+        ),
+    )
+
+    # Structural authority must not allow the newly detected RC
+    # controller to capture this temporary posture.
+    assert during_macro.module_actions == {}
+    assert not during_macro.joint_targets
+    assert controller.recapture is True
+    assert controller.desired_chassis_height is None
+
+    # The structural expert now reaches the actual RC-Car posture.
+    final_angle = -0.785398
+
+    final_observation = rc.RcCarObservation.from_graph(
+        graph(tilt=final_angle),
+        target,
+    )
+
+    assert final_observation is not None
+
+    after_macro = controller.step(
+        sample(),
+        final_observation,
+        0.02,
+        safety=ENABLED,
+    )
+
+    # First TELEOP tick captures what was physically reached.
+    # It must not command the car back toward the intermediate fold.
+    assert not after_macro.joint_targets
+    assert controller.recapture is False
+    assert after_macro.intent["chassis_height_m"] == pytest.approx(
+        GEOMETRY.ground_contact_height_m(final_angle)
+    )
+
+
+
+def test_rc_reset_for_morphology_exit_discards_previous_lifecycle():
+    """A future RC visit must not inherit teleop state from the old one."""
+
+    transport = component("action_transport")
+
+    rc = transport.RcCarRuntime(
+        MorphologyLibrary.load(
+            CONFIG / "smores_morphology_behaviors.json"
+        ),
+        load_attributed_graph(
+            CONFIG / "smores_rc_car8.json"
+        ),
+        geometry=GEOMETRY,
+        observation_timeout_s=0.5,
+        height_rate_m_s=0.005,
+        max_dt_s=0.1,
+    )
+
+    old_command_id = rc._command_id
+
+    rc._observation = object()
+    rc._received_at = 10.0
+    rc._last_graph = object()
+    rc._previous_tick = 10.0
+    rc._motion_enabled = True
+
+    rc.controller._assignments = ("stale",)
+    rc.controller._targets = {"stale": -0.4}
+    rc.controller.desired_chassis_height = 0.123
+    rc.controller._home = True
+    rc.controller.recapture = False
+
+    rc.reset_for_morphology_exit()
+
+    assert rc._observation is None
+    assert rc._received_at is None
+    assert rc._last_graph is None
+    assert rc._previous_tick is None
+    assert rc._motion_enabled is False
+
+    assert rc.controller._assignments == ()
+    assert rc.controller._targets == {}
+    assert rc.controller.desired_chassis_height is None
+    assert rc.controller._home is False
+    assert rc.controller.recapture is True
+
+    assert rc._command_id != old_command_id
+
+
+def test_production_observation_lease_covers_gui_graph_progress_period():
+    transport = component("action_transport")
+
+    configuration = yaml.safe_load(
+        (CONFIG / "smores_teleop.yaml").read_text()
+    )["rc_car"]
+
+    core = transport.RcCarRuntime(
+        MorphologyLibrary.load(
+            CONFIG / "smores_morphology_behaviors.json"
+        ),
+        load_attributed_graph(
+            CONFIG / "smores_rc_car8.json"
+        ),
+        geometry=GEOMETRY,
+        **configuration,
+    )
+
+    assert core.observe_graph(
+        graph().to_dict(),
+        now=10.0,
+    )
+
+    core.step(
+        sample(),
+        safety=ENABLED,
+        now=10.0,
+    )
+
+    # RC must use the same production lease as the other morphology runtimes.
+    assert core.topology(10.8) == "rc_car8"
+
+    moving = core.step(
+        sample(r2=0.5),
+        safety=ENABLED,
+        now=10.8,
+    )
+
+    assert moving.envelope is not None
+    assert any(
+        abs(rate) > 1.0e-9
+        for rate in rates(moving.actions).values()
+    )
+
+
+def test_tiny_loaded_tilt_overshoot_at_geometric_bound_still_allows_traction():
+    # Real GUI diagnostic measured support TILT values only ~0.0003 rad
+    # beyond the geometric monotonic-branch boundary after raising RC-Car8.
+    pan_x, _, pan_z = GEOMETRY.pan_center_body_m
+
+    branch_min = -math.atan2(
+        pan_x + GEOMETRY.pan_visual_thickness_m / 2,
+        GEOMETRY.pan_visual_radius_m - pan_z,
+    )
+
+    controller, observation = setup_controller(
+        tilt=branch_min - 0.0005,
+    )
+
+    result = step(
+        controller,
+        observation,
+        r2=1.0,
+    )
+
+    # A sub-milliradian loaded/settling error must not kill the whole RC
+    # controller. Geometry calculations may clamp it back to branch_min.
+    assert any(
+        abs(rate) > 1.0e-9
+        for rate in rates(result).values()
+    )
+
+
+def test_material_tilt_overshoot_beyond_geometric_bound_still_fails_closed():
+    pan_x, _, pan_z = GEOMETRY.pan_center_body_m
+
+    branch_min = -math.atan2(
+        pan_x + GEOMETRY.pan_visual_thickness_m / 2,
+        GEOMETRY.pan_visual_radius_m - pan_z,
+    )
+
+    controller, observation = setup_controller(
+        tilt=branch_min - 0.02,
+    )
+
+    result = step(
+        controller,
+        observation,
+        r2=1.0,
+    )
+
+    # The tolerance is only for realistic loaded-joint settling. A genuinely
+    # invalid configuration must still fail closed.
+    assert all(
+        abs(rate) <= 1.0e-12
+        for rate in rates(result).values()
+    )
+
+
+def test_rc_entry_waits_for_first_new_graph_after_reconfiguration_before_capturing_posture():
+    core = runtime()
+
+    # During the structural macro RC topology already exists, but this is
+    # still the pre-fold / nearly-flat physical posture.
+    pre_fold = graph(
+        tilt=-0.10,
+        lower=GEOMETRY.tilt_min_rad,
+        upper=GEOMETRY.tilt_max_rad,
+    ).to_dict()
+
+    pre_fold["stamp"] = 10.0
+
+    assert core.observe_graph(
+        pre_fold,
+        now=10.0,
+    )
+
+    # Structural reconfiguration finishes here. The RC runtime must not use
+    # the already-cached pre-fold graph as the new TELEOP reference.
+    assert hasattr(
+        core,
+        "prepare_for_morphology_entry",
+    ), (
+        "RcCarRuntime needs an explicit target-entry boundary so the "
+        "post-reconfiguration posture is captured from a graph newer "
+        "than the structural terminal state."
+    )
+
+    core.prepare_for_morphology_entry()
+
+    # TELEOP may start before Isaac has published the next genuinely new
+    # graph. The cached pre-fold pose must not generate a posture correction
+    # that drags the freshly folded RC back to the floor.
+    waiting = core.step(
+        sample(),
+        safety=ENABLED,
+        now=10.1,
+    )
+
+    assert waiting.posture.goal is None
+    assert waiting.envelope is None
+
+    # Now Isaac publishes the first genuinely new graph after structural
+    # completion. This contains the actual final ~45 deg RC fold.
+    post_fold = graph(
+        tilt=-0.785398,
+        lower=GEOMETRY.tilt_min_rad,
+        upper=GEOMETRY.tilt_max_rad,
+    ).to_dict()
+
+    post_fold["stamp"] = 11.0
+
+    assert core.observe_graph(
+        post_fold,
+        now=10.8,
+    )
+
+    captured = core.step(
+        sample(),
+        safety=ENABLED,
+        now=10.8,
+    )
+
+    # The reached post-fold pose becomes the RC reference. Neutral TELEOP
+    # must not command it back toward the stale pre-fold posture.
+    assert captured.posture.goal is None
+
+    expected = GEOMETRY.ground_contact_height_m(
+        -0.785398
+    )
+
+    assert captured.actions.intent[
+        "chassis_height_m"
+    ] == pytest.approx(expected)

@@ -40,6 +40,9 @@ def _fake_node(
         _behavior_dataset_pending=pending,
         _behavior_dataset_timestep=timestep,
         _behavior_dataset_tick=tick,
+        _command_dataset_path="",
+        _command_dataset_episode_id="",
+        _command_dataset_stage_name="",
     )
     node.get_parameter = lambda name: _Parameter(
         requested if name == "behavior_dataset_path" else ""

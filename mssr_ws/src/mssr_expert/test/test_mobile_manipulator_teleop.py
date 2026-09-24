@@ -817,15 +817,17 @@ def test_stale_mm8_observation_fails_closed():
         now=1.1,
     ).envelope is not None
 
+    # Production observation lease is 2.0 s: a graph older than that
+    # still fails closed.
     stale = mm8.step(
         sample(r2=1.0),
         safety=ENABLED,
-        now=1.6,
+        now=3.1,
     )
 
     assert stale.envelope is None
     assert stale.actions.module_actions == {}
-    assert mm8.topology(1.6) is None
+    assert mm8.topology(3.1) is None
 
 
 
@@ -1396,9 +1398,18 @@ def test_prepare_manipulation_reaches_stable_manipulation_ready():
 def test_restore_drive_targets_measured_initial_assembly_posture():
     mm8 = runtime()
 
-    # First valid MM8 observation = physical Scorpion produced by assembly.
+    # Graph recognition alone is not authoritative because MM8 can become
+    # recognizable before structural folding has actually finished.
     assert mm8.observe_graph(
         graph(stamp=1.0).to_dict(),
+        now=1.0,
+    )
+    assert mm8._assembly_drive_targets is None
+
+    # First armed TELEOP tick is the authoritative Scorpion handoff.
+    mm8.step(
+        sample(),
+        safety=ENABLED,
         now=1.0,
     )
 
@@ -1530,3 +1541,158 @@ def test_restore_drive_reaches_stable_scorpion_and_reenables_locomotion():
         moving.actions.module_actions[module]["vx"] > 0.0
         for module in expected
     )
+
+
+
+def test_mm8_reset_for_morphology_exit_discards_previous_lifecycle():
+    """A future MM8 visit must start as a new teleop lifecycle."""
+
+    mm8 = runtime()
+
+    # Reproduce state that may belong to the previous MM8 visit.
+    mm8._mode = "transition_interrupted"
+    mm8._mode_transition_pending = True
+    mm8._mode_transition_behavior = "restore_drive"
+    mm8._mode_transition_destination = "drive_ready"
+    mm8._mode_transition_targets = ("stale",)
+    mm8._mode_transition_index = 3
+    mm8._mode_transition_goal_id = "stale-goal"
+
+    mm8._manual_index = 2
+    mm8._manual_key = ("physical_smores_06", "tilt")
+    mm8._manual_target = 1.23
+    mm8._manual_transition = True
+    mm8._manual_transition_module_id = "physical_smores_06"
+
+    # This is especially important: a later RC->MM8 must not restore
+    # the Scorpion captured during the previous MM8 visit.
+    mm8._assembly_drive_targets = ("stale-scorpion",)
+
+    mm8.reset_for_morphology_exit()
+
+    assert mm8._mode == "drive_ready"
+
+    assert mm8._mode_transition_pending is False
+    assert mm8._mode_transition_behavior is None
+    assert mm8._mode_transition_destination is None
+    assert mm8._mode_transition_targets == ()
+    assert mm8._mode_transition_index == 0
+    assert mm8._mode_transition_goal_id is None
+
+    assert mm8._manual_index == 0
+    assert mm8._manual_key is None
+    assert mm8._manual_target is None
+    assert mm8._manual_transition is False
+    assert mm8._manual_transition_module_id is None
+
+    assert mm8._assembly_drive_targets is None
+
+
+
+def test_mm8_scorpion_reference_is_captured_only_after_teleop_handoff():
+    """Intermediate MM8 topology during folding must not become Scorpion."""
+
+    mm8 = runtime()
+
+    macro = SafetyDecision(
+        "STRUCTURAL_MACRO",
+        False,
+        False,
+        False,
+    )
+
+    # During RC->MM8 the topology may already match MM8 while the final
+    # folding posture is still being produced.
+    intermediate = graph(stamp=1.0).to_dict()
+
+    for node in intermediate["nodes"]:
+        actuators = node["attributes"]["actuators"]
+        actuators["pan"]["position_rad"] = 0.20
+        actuators["tilt"]["position_rad"] = -0.20
+
+    assert mm8.observe_graph(
+        intermediate,
+        now=1.0,
+    )
+
+    # Merely recognizing MM8 must NOT capture the drive/Scorpion reference.
+    assert mm8._assembly_drive_targets is None
+
+    mm8.step(
+        sample(),
+        safety=macro,
+        now=1.0,
+    )
+
+    assert mm8._assembly_drive_targets is None
+
+    # Structural expert finishes in a different, final Scorpion posture.
+    final = graph(stamp=2.0).to_dict()
+
+    expected = {}
+
+    for node in final["nodes"]:
+        actuators = node["attributes"]["actuators"]
+        actuators["pan"]["position_rad"] = 0.37
+        actuators["tilt"]["position_rad"] = -0.41
+
+        module_id = node["node_id"]
+
+        expected[(module_id, "pan")] = 0.37
+        expected[(module_id, "tilt")] = -0.41
+
+    assert mm8.observe_graph(
+        final,
+        now=1.1,
+    )
+
+    # Still not captured merely from graph reception.
+    assert mm8._assembly_drive_targets is None
+
+    # First armed TELEOP tick is the authoritative handoff point.
+    mm8.step(
+        sample(),
+        safety=ENABLED,
+        now=1.1,
+    )
+
+    captured = {
+        (target.module_id, target.joint): target.angle_rad
+        for target in mm8._assembly_drive_targets
+    }
+
+    assert len(captured) == 16
+    assert captured == pytest.approx(
+        expected,
+        abs=1.0e-12,
+    )
+
+
+def test_production_observation_lease_covers_gui_graph_progress_period():
+    mm8 = runtime()
+
+    assert mm8.observe_graph(
+        graph(stamp=10.0).to_dict(),
+        now=10.0,
+    )
+
+    mm8.step(
+        sample(),
+        safety=ENABLED,
+        now=10.0,
+    )
+
+    # Same measured GUI cadence as Snake: do not drop MM8 authority
+    # between genuinely advancing physical graph samples.
+    assert mm8.topology(10.8) == "mobile_manipulator8"
+
+    moving = mm8.step(
+        sample(r2=0.5),
+        safety=ENABLED,
+        now=10.8,
+    )
+
+    assert moving.envelope is not None
+    assert moving.actions.intent[
+        "longitudinal_m_s"
+    ] > 0.0

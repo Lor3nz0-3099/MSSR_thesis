@@ -309,3 +309,23 @@ def test_composite_launch_arguments_use_disabled_dataset_default(tmp_path, monke
     declaration.execute(context)
     assert LaunchConfiguration("behavior_dataset_path").perform(context) == ""
     assert not list(runtime_dir.rglob("*.jsonl"))
+
+
+def test_select_episode_preserves_teleop_layout_profile():
+    campaign = {"schema_version": "mssr.composite_campaign.v1", "episodes": [{
+        "episode_id": "teleop-test", "layout_profile": "teleop_connected_v1",
+        "tasks": [{"type": "stairs", "seed": 3102, "yaw_deg": 90}]}]}
+    selected = MODULE.select_episode(campaign, "teleop-test")
+    assert selected["layout_profile"] == "teleop_connected_v1"
+
+
+def test_teleop_campaign_refuses_automatic_expert_execution(tmp_path):
+    import json, subprocess, sys
+    campaign = tmp_path / "campaign.json"
+    campaign.write_text(json.dumps({"schema_version": "mssr.composite_campaign.v1", "episodes": [{
+        "episode_id": "teleop-test", "layout_profile": "teleop_connected_v1",
+        "tasks": [{"type": "stairs", "seed": 3102, "yaw_deg": 90}]}]}))
+    result = subprocess.run([sys.executable, str(SCRIPT), "--campaign", str(campaign),
+                             "--episode", "teleop-test", "--execute"], capture_output=True, text=True)
+    assert result.returncode != 0
+    assert "--preview-only" in result.stderr

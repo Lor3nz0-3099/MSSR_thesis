@@ -402,6 +402,16 @@ class SnakeRuntime:
         self._manual_transition = False
         self._assignment_ids = ()
 
+        # Physical Snake posture captured at the first enabled neutral
+        # TELEOP tick after structural handoff. Circle/Home restores this
+        # exact PAN/TILT configuration rather than a theoretical posture.
+        self._home_targets = None
+        self._home_restore_pending = False
+        self._home_restore_targets = ()
+        self._home_restore_index = 0
+        self._home_restore_goal_id = None
+        self._home_restore_interrupted = False
+
     def observe_graph(self, payload, *, now):
         try:
             graph = attributed_graph_from_dict(payload)
@@ -464,6 +474,34 @@ class SnakeRuntime:
 
         return False
 
+    def reset_for_morphology_exit(self):
+        self._home_targets = None
+        self._home_restore_pending = False
+        self._home_restore_targets = ()
+        self._home_restore_index = 0
+        self._home_restore_goal_id = None
+        self._home_restore_interrupted = False
+        """Discard teleop state belonging to the previous Snake visit.
+
+        Posture transport ownership remains alive so retained PAN/TILT
+        primitives can be explicitly retired under structural authority.
+        """
+        self._observation = None
+        self._received_at = None
+        self._last_graph = None
+        self._previous_tick = None
+        self._motion_enabled = False
+
+        self._command_id = (
+            "teleop-snake-" + uuid4().hex
+        )
+
+        self._manual_index = 0
+        self._manual_key = None
+        self._manual_target = None
+        self._manual_transition = False
+        self._assignment_ids = ()
+
     @property
     def latest_graph(self):
         return self._last_graph
@@ -482,7 +520,37 @@ class SnakeRuntime:
         )
 
     def observe_status(self, payload):
+        statuses = parse_primitive_statuses(payload)
+
         self.posture.observe(payload)
+
+        goal_id = self._home_restore_goal_id
+
+        if (
+            not self._home_restore_pending
+            or goal_id is None
+        ):
+            return
+
+        status = statuses.get(goal_id)
+
+        if (
+            status is None
+            or not status.terminal
+            or (
+                status.state == "rejected"
+                and status.code == "DUPLICATE_GOAL_ID"
+            )
+        ):
+            return
+
+        if status.state == "succeeded":
+            self._home_restore_goal_id = None
+            self._home_restore_index += 1
+            return
+
+        # No automatic resume after failed/canceled Home motion.
+        self._interrupt_home_restore()
 
     def _selected(self, observation):
         return tuple(
@@ -578,6 +646,163 @@ class SnakeRuntime:
             ),
         ), None
 
+    def _capture_home_posture(self, observation):
+        """Capture the actual physical Snake PAN/TILT posture."""
+
+        dofs = {
+            (item.module_id, item.name): item
+            for item in observation.inventory.dofs
+        }
+
+        targets = []
+
+        for assignment in observation.assignments:
+            for joint in ("pan", "tilt"):
+                dof = dofs.get(
+                    (
+                        assignment.module_id,
+                        joint,
+                    )
+                )
+
+                if (
+                    dof is None
+                    or not finite(dof.position_rad)
+                ):
+                    raise ValueError(
+                        "Snake Home capture requires finite PAN/TILT"
+                    )
+
+                targets.append(
+                    (
+                        assignment.module_id,
+                        joint,
+                        float(dof.position_rad),
+                    )
+                )
+
+        self._home_targets = tuple(targets)
+
+    def _begin_home_restore(self, observation):
+        if self._home_targets is None:
+            return False
+
+        dofs = {
+            (item.module_id, item.name): item
+            for item in observation.inventory.dofs
+        }
+
+        targets = []
+
+        for module, joint, target in self._home_targets:
+            dof = dofs.get((module, joint))
+
+            if (
+                dof is None
+                or not finite(dof.position_rad)
+            ):
+                continue
+
+            # Do not generate primitives for joints already at Home.
+            if abs(
+                float(target)
+                - float(dof.position_rad)
+            ) <= 1.0e-6:
+                continue
+
+            targets.append(
+                (
+                    module,
+                    joint,
+                    float(target),
+                )
+            )
+
+        self._home_restore_targets = tuple(targets)
+        self._home_restore_index = 0
+        self._home_restore_goal_id = None
+        self._home_restore_pending = bool(targets)
+        self._home_restore_interrupted = False
+
+        self._manual_transition = False
+        self._manual_key = None
+        self._manual_target = None
+
+        return self._home_restore_pending
+
+    def _current_home_joint_target(
+        self,
+        observation,
+    ):
+        if (
+            not self._home_restore_pending
+            or self._home_restore_goal_id is not None
+            or self._home_restore_index
+            >= len(self._home_restore_targets)
+        ):
+            return ()
+
+        module, joint, target = (
+            self._home_restore_targets[
+                self._home_restore_index
+            ]
+        )
+
+        dof = next(
+            (
+                item
+                for item in observation.inventory.dofs
+                if (
+                    item.module_id == module
+                    and item.name == joint
+                )
+            ),
+            None,
+        )
+
+        if (
+            dof is None
+            or not finite(dof.position_rad)
+        ):
+            raise ValueError(
+                "Snake Home target has no finite measured joint"
+            )
+
+        return (
+            (
+                module,
+                joint,
+                target,
+                float(dof.position_rad),
+            ),
+        )
+
+    def _finish_home_restore_if_ready(self):
+        if (
+            not self._home_restore_pending
+            or self._home_restore_goal_id is not None
+            or self._home_restore_index
+            < len(self._home_restore_targets)
+        ):
+            return False
+
+        self._home_restore_pending = False
+        self._home_restore_targets = ()
+        self._home_restore_index = 0
+        self._home_restore_goal_id = None
+
+        return True
+
+    def _interrupt_home_restore(self):
+        if not self._home_restore_pending:
+            return
+
+        self._home_restore_pending = False
+        self._home_restore_targets = ()
+        self._home_restore_index = 0
+        self._home_restore_goal_id = None
+        self._home_restore_interrupted = True
+
     def step(self, input, *, safety, now):
         if not finite(now):
             raise ValueError(
@@ -615,6 +840,41 @@ class SnakeRuntime:
         )
 
         manual_rejection = None
+
+        controls_neutral = (
+            stick_neutral
+            and abs(float(getattr(input, "r2", 0.0))) < 0.05
+            and abs(float(getattr(input, "l2", 0.0))) < 0.05
+        )
+
+        # The fresh-neutral safety handshake after structural handoff is
+        # also the deterministic Home capture boundary. This gives physics
+        # time to settle without adding a second gravity-settle command.
+        if (
+            observation is not None
+            and safety.motion_enabled
+            and self._home_targets is None
+            and controls_neutral
+        ):
+            self._capture_home_posture(
+                observation
+            )
+
+        if (
+            self._home_restore_pending
+            and not safety.motion_enabled
+        ):
+            self._interrupt_home_restore()
+
+        if (
+            observation is not None
+            and safety.motion_enabled
+            and "home" in events
+            and not self._home_restore_pending
+        ):
+            self._begin_home_restore(
+                observation
+            )
 
         if (
             observation is not None
@@ -667,9 +927,16 @@ class SnakeRuntime:
         ):
             selected = self._selected(observation)
 
-            if self._manual_transition:
+            if self._home_restore_pending:
+                targets = self._current_home_joint_target(
+                    observation
+                )
+                rejected = None
+
+            elif self._manual_transition:
                 targets = ()
                 rejected = None
+
             else:
                 targets, rejected = (
                     self._manual_joint_target(
@@ -697,6 +964,26 @@ class SnakeRuntime:
             selected_role = None
 
         if (
+            observation is not None
+            and safety.motion_enabled
+            and self._home_restore_pending
+        ):
+            zero_commands = (
+                self.controller.library.drive_commands(
+                    "snake8",
+                    observation.assignments,
+                    linear_m_s=0.0,
+                    yaw_rate_rad_s=0.0,
+                )
+            )
+
+            actions = replace(
+                actions,
+                module_actions=zero_commands,
+                manual_override=True,
+            )
+
+        if (
             self._manual_transition
             or not safety.motion_enabled
         ):
@@ -721,6 +1008,17 @@ class SnakeRuntime:
                 now=now,
             )
 
+        if (
+            self._home_restore_pending
+            and self._home_restore_goal_id is None
+            and delivery.goal is not None
+        ):
+            self._home_restore_goal_id = (
+                delivery.goal.goal_id
+            )
+
+        self._finish_home_restore_if_ready()
+
         intent = dict(actions.intent)
 
         intent.update(
@@ -729,6 +1027,15 @@ class SnakeRuntime:
             selected_role=selected_role,
             manual_transition_pending=self._manual_transition,
             manual_rejection=manual_rejection,
+            home_captured=(
+                self._home_targets is not None
+            ),
+            home_restore_pending=(
+                self._home_restore_pending
+            ),
+            home_restore_interrupted=(
+                self._home_restore_interrupted
+            ),
         )
 
         actions = replace(

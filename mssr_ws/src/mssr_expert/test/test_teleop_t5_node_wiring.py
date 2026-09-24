@@ -112,7 +112,11 @@ def test_recording_manifest_links_successfully_started_structural_stream():
 
     assert "self._recording.register_structural_stream(" in text
     assert "stream_id=execution_id" in text
-    assert 'phase="self_reconfiguration"' in text
+
+    # Every deterministic macro belongs to the same episode manifest, but
+    # its phase must preserve the real macro identity rather than pretending
+    # that assembly / gap / stairs are self-reconfiguration.
+    assert "phase=kind" in text
     assert "path=dataset_path" in text
     assert 'producer="deterministic_expert"' in text
 
@@ -160,3 +164,305 @@ def test_watchdog_failure_cancels_remaining_owned_primitive_goals():
     assert "if watchdog_cancel_goal_ids is not None:" in text
     assert "for goal_id in watchdog_cancel_goal_ids:" in text
     assert '{"goal_id": goal_id}' in text
+
+
+def test_t8_node_forwards_structural_kind_and_initial_assembly_target_graph():
+    """T8: X+D-pad assembly intent must reach the real structural launcher."""
+
+    text = node_source()
+
+    # Coordinator now invokes the handler with:
+    #   (target_morphology, structural_macro_kind)
+    assert "def _start_structural_macro(" in text
+    assert "self, target_morphology: str, kind: str" in text
+
+    # The node must retain authoritative target-graph paths for
+    # all three teleoperated morphologies.
+    assert "self._structural_target_graphs" in text
+    assert '"rc_car8"' in text
+    assert '"snake8"' in text
+    assert '"mobile_manipulator8"' in text
+
+    # The actual launcher receives the semantic operation kind.
+    assert "kind=kind" in text
+
+    # Initial self-assembly needs the concrete target graph; the
+    # reconfiguration path may continue using target_morphology.
+    assert "target_graph_path=" in text
+    assert "self._structural_target_graphs" in text
+
+
+def test_t8_node_observes_real_self_assembly_terminal_state():
+    """T8: completed initial assembly must release STRUCTURAL_MACRO."""
+
+    text = node_source()
+
+    assert '"/mssr/expert/self_assembly/state"' in text
+    assert "def _on_self_assembly_state(" in text
+
+    callback_at = text.index(
+        "def _on_self_assembly_state("
+    )
+    callback_tail = text[callback_at:]
+
+    assert "self._structural_macro.observe_expert_state(" in callback_tail
+    assert "state=self.session.state" in callback_tail
+    assert "payload=payload" in callback_tail
+
+
+
+def test_t8_macro_authority_is_not_downgraded_for_inactive_controllers():
+    """A newly detected target must not capture posture during its macro."""
+
+    text = node_source()
+    flat = " ".join(text.split())
+
+    assert (
+        'inactive_decision = ( decision '
+        'if decision.authority == "STRUCTURAL_MACRO" '
+        'else SafetyDecision("NONE", False, True, False) )'
+        in flat
+    )
+
+    assert (
+        'if controller == "rc_car8" '
+        'else inactive_decision'
+        in flat
+    )
+    assert (
+        'if controller == "snake8" '
+        'else inactive_decision'
+        in flat
+    )
+    assert (
+        'if controller == "mobile_manipulator8" '
+        'else inactive_decision'
+        in flat
+    )
+
+
+
+def test_initial_assembly_ready_comes_only_from_fresh_live_graph():
+    text = node_source()
+
+    # The same parsed live graph used for morphology detection must
+    # explicitly prove that all modules are disconnected.
+    assert "is_authoritative_loose_graph" in text
+    assert (
+        "self._initial_assembly_loose = "
+        "is_authoritative_loose_graph(current_graph)"
+        in text
+    )
+
+    # Loose authority must have the same freshness lease as topology.
+    assert "def _initial_assembly_ready(" in text
+    assert "self._topology_received_at" in text
+    assert "self._topology_observation_timeout_s" in text
+
+    # Every tick updates the ROS-independent session state.
+    assert (
+        "self.session.state.observe_initial_assembly_ready("
+        in text
+    )
+    assert (
+        "self._initial_assembly_ready(now)"
+        in text
+    )
+
+
+
+def test_successful_reconfiguration_resets_source_teleop_lifecycle():
+    text = node_source()
+
+    # The source morphology must be captured before launching the expert.
+    assert (
+        "source_morphology = self.session.state.detected_morphology"
+        in text
+    )
+
+    # There must be one explicit lifecycle-reset boundary.
+    assert "def _reset_runtime_for_morphology_exit(" in text
+
+    assert (
+        '"rc_car8": self._rc'
+        in text
+    )
+    assert (
+        '"snake8": self._snake'
+        in text
+    )
+    assert (
+        '"mobile_manipulator8": self._mm8'
+        in text
+    )
+
+    assert "reset_for_morphology_exit()" in text
+
+    # Initial self-assembly has no source controller to reset.
+    # Only a successfully launched self-reconfiguration performs the reset.
+    assert (
+        'if kind == "self_reconfiguration":'
+        in text
+    )
+    assert (
+        "self._reset_runtime_for_morphology_exit(source_morphology)"
+        in text
+    )
+
+
+
+def test_node_shutdown_finalizes_recording_before_destroying_ros_node():
+    """Ctrl+C must finalize the recording before ROS teardown."""
+    from pathlib import Path
+
+    source_path = (
+        Path(__file__).resolve().parents[1]
+        / "mssr_expert"
+        / "nodes"
+        / "smores_teleop_node.py"
+    )
+    source = source_path.read_text(
+        encoding="utf-8"
+    )
+
+    main_start = source.index("def main(")
+    main_source = source[main_start:]
+
+    finally_start = main_source.index("    finally:")
+    finally_source = main_source[finally_start:]
+
+    shutdown_call = "node._recording.shutdown("
+    destroy_call = "node.destroy_node()"
+
+    assert shutdown_call in finally_source
+    assert destroy_call in finally_source
+
+    assert (
+        finally_source.index(shutdown_call)
+        < finally_source.index(destroy_call)
+    )
+
+    assert "ended_at=time.time()" in finally_source
+
+
+def test_successful_reconfiguration_into_rc_arms_post_fold_entry_capture():
+    text = node_source()
+
+    start = text.index(
+        "def _on_self_reconfiguration_state("
+    )
+
+    end = text.find(
+        "\n    def ",
+        start + 1,
+    )
+
+    callback = (
+        text[start:]
+        if end == -1
+        else text[start:end]
+    )
+
+    # The structural launcher clears its own target/kind when it consumes
+    # the terminal packet, so the node must use the authoritative terminal
+    # payload itself.
+    assert 'payload.get("target_morphology")' in callback
+
+    # Only a successfully consumed self-reconfiguration into RC-Car8 may
+    # establish the post-fold capture boundary.
+    assert 'payload.get("success") is True' in callback
+    assert 'payload.get("schema_version")' in callback
+    assert '"mssr.self_reconfiguration_state.v1"' in callback
+    assert '"rc_car8"' in callback
+
+    assert "self._rc.prepare_for_morphology_entry()" in callback
+
+    # The entry boundary must be downstream of authoritative terminal
+    # consumption, never before the expert has actually completed.
+    consume_at = callback.index(
+        "self._structural_macro.observe_expert_state("
+    )
+
+    prepare_at = callback.index(
+        "self._rc.prepare_for_morphology_entry()"
+    )
+
+    assert prepare_at > consume_at
+
+
+def test_t8_node_routes_morphology_behavior_status_to_macro_lifecycle():
+    text = node_source()
+
+    assert '"/mssr/morphology/status"' in text
+    assert "def _on_morphology_behavior_status(" in text
+
+    start = text.index(
+        "def _on_morphology_behavior_status("
+    )
+    end = text.find(
+        "\n    def ",
+        start + 1,
+    )
+
+    callback = (
+        text[start:]
+        if end == -1
+        else text[start:end]
+    )
+
+    assert "self._structural_macro.observe_expert_state(" in callback
+
+
+def test_t8_macro_dataset_identity_uses_actual_macro_kind():
+    text = node_source()
+
+    start = text.index(
+        "def _start_structural_macro("
+    )
+    end = text.find(
+        "\n    def ",
+        start + 1,
+    )
+
+    block = (
+        text[start:]
+        if end == -1
+        else text[start:end]
+    )
+
+    assert 'execution_id = f"teleop-{kind}-' in block
+    assert "phase=kind" in block
+
+    assert 'execution_id = f"teleop-reconfiguration-' not in block
+    assert 'phase="self_reconfiguration"' not in block
+
+
+def test_t8_estop_stops_resident_snake_behavior_and_cancels_native_goals():
+    text = node_source()
+
+    # Same native primitive cancellation path already used by
+    # assembly/reconfiguration.
+    assert "cancel_goal_ids = self._structural_macro.interrupt()" in text
+    assert "for goal_id in cancel_goal_ids:" in text
+    assert "self._cancel.publish(" in text
+
+    # Gap/stairs live in the persistent morphology behavior node, so killing
+    # only the spawned command client is insufficient. TELEOP must also send
+    # an explicit morphology 'stop' command when E-stop interrupts them.
+    assert '"/mssr/morphology/command"' in text
+    assert "self._structural_macro.kind" in text
+
+    assert '"snake_gap"' in text
+    assert '"snake_stairs"' in text
+    assert '"behavior": "stop"' in text
+    assert '"morphology": "snake8"' in text
+
+    # Capture macro identity before interrupt(), because interrupt clears it.
+    kind_at = text.index(
+        "self._structural_macro.kind"
+    )
+    interrupt_at = text.index(
+        "self._structural_macro.interrupt()"
+    )
+
+    assert kind_at < interrupt_at

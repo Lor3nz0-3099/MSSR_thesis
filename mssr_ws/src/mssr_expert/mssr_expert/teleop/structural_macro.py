@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import json
 import os
 import signal
 import subprocess
@@ -12,6 +13,33 @@ from mssr_expert.teleop.state import TeleopState
 
 
 Command = tuple[str, ...]
+
+
+_SNAKE_BEHAVIOR_MACROS = {
+    "snake_gap": (
+        "gap_crossing",
+        {
+            "approach_linear_m_s": 0.050,
+            "linear_m_s": 0.040,
+            "gap_profile_substeps": 3,
+            "far_bank_transition_links": 1.0,
+            "arch_clearance_wheel_radii": 2.0,
+            "landing_release_support_modules": 3,
+            "landing_release_ramp_links": 1.0,
+            "far_bank_traction_preload_wheel_radii": 0.25,
+            "gap_goal_tolerance_m": 0.004,
+        },
+    ),
+    "snake_stairs": (
+        "crawl_stairs_spatial_concertina",
+        {
+            "linear_m_s": 0.040,
+            "crawl_goal_tolerance_m": 0.016,
+            "path_corner_safety_m": 0.020,
+            "trajectory_step_m": 0.005,
+        },
+    ),
+}
 
 
 def _default_spawn(command: Sequence[str]):
@@ -56,6 +84,9 @@ class StructuralMacroLauncher:
         self._spawn = spawn if spawn is not None else _default_spawn
         self._process = None
         self._target_morphology: str | None = None
+        self._kind: str | None = None
+        self._execution_id: str | None = None
+        self._behavior: str | None = None
         self._active_goal_ids: tuple[str, ...] = ()
         self._process_exit_observed_at: float | None = None
 
@@ -66,6 +97,14 @@ class StructuralMacroLauncher:
     @property
     def target_morphology(self) -> str | None:
         return self._target_morphology
+
+    @property
+    def kind(self) -> str | None:
+        return self._kind
+
+    @property
+    def execution_id(self) -> str | None:
+        return self._execution_id
 
     @property
     def active(self) -> bool:
@@ -83,8 +122,10 @@ class StructuralMacroLauncher:
         execution_id: str,
         episode_id: str,
         dataset_path: Path,
+        kind: str = "self_reconfiguration",
+        target_graph_path: Path | None = None,
     ):
-        """Spawn reconfiguration, then claim macro authority."""
+        """Spawn one structural expert, then claim macro authority."""
 
         if self.active:
             raise RuntimeError("structural macro already active")
@@ -97,23 +138,89 @@ class StructuralMacroLauncher:
                 "teleop request"
             )
 
-        command: Command = (
-            "ros2",
-            "run",
-            "mssr_expert",
-            "mssr_smores_self_reconfiguration_node",
-            "--ros-args",
-            "-p",
-            "source_graph_path:=auto",
-            "-p",
-            f"target_morphology:={target}",
-            "-p",
-            f"execution_id:={execution_id}",
-            "-p",
-            f"episode_id:={episode_id}",
-            "-p",
-            f"dataset_path:={Path(dataset_path)}",
-        )
+        if kind in _SNAKE_BEHAVIOR_MACROS:
+            if target != "snake8":
+                raise ValueError(
+                    f"{kind} requires target_morphology='snake8'"
+                )
+
+            if state.detected_morphology != "snake8":
+                raise RuntimeError(
+                    f"{kind} requires live detected morphology snake8"
+                )
+
+        if kind == "self_reconfiguration":
+            command: Command = (
+                "ros2",
+                "run",
+                "mssr_expert",
+                "mssr_smores_self_reconfiguration_node",
+                "--ros-args",
+                "-p",
+                "source_graph_path:=auto",
+                "-p",
+                f"target_morphology:={target}",
+                "-p",
+                f"execution_id:={execution_id}",
+                "-p",
+                f"episode_id:={episode_id}",
+                "-p",
+                f"dataset_path:={Path(dataset_path)}",
+            )
+        elif kind == "self_assembly":
+            if target_graph_path is None:
+                raise ValueError(
+                    "self_assembly requires target_graph_path"
+                )
+
+            command = (
+                "ros2",
+                "run",
+                "mssr_expert",
+                "mssr_smores_self_assembly_node",
+                "--ros-args",
+                "-p",
+                f"target_graph_path:={Path(target_graph_path)}",
+                "-p",
+                f"execution_id:={execution_id}",
+                "-p",
+                f"episode_id:={episode_id}",
+                "-p",
+                f"dataset_path:={Path(dataset_path)}",
+            )
+
+        elif kind in _SNAKE_BEHAVIOR_MACROS:
+            behavior, parameters = _SNAKE_BEHAVIOR_MACROS[kind]
+
+            command = (
+                "ros2",
+                "run",
+                "mssr_expert",
+                "mssr_smores_morphology_command_client",
+                "--morphology",
+                "snake8",
+                "--command-id",
+                execution_id,
+                "--behavior",
+                behavior,
+                "--parameters-json",
+                json.dumps(
+                    parameters,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
+                "--dataset-path",
+                str(Path(dataset_path)),
+                "--episode-id",
+                episode_id,
+                "--stage-name",
+                kind,
+            )
+
+        else:
+            raise ValueError(
+                f"unsupported structural macro kind: {kind!r}"
+            )
 
         # Do not change authority before a process exists.
         process = self._spawn(command)
@@ -132,6 +239,13 @@ class StructuralMacroLauncher:
 
         self._process = process
         self._target_morphology = target
+        self._kind = kind
+        self._execution_id = execution_id
+        self._behavior = (
+            _SNAKE_BEHAVIOR_MACROS[kind][0]
+            if kind in _SNAKE_BEHAVIOR_MACROS
+            else None
+        )
         self._active_goal_ids = ()
         self._process_exit_observed_at = None
         return process
@@ -153,13 +267,36 @@ class StructuralMacroLauncher:
         if not isinstance(payload, dict):
             return False
 
-        if (
-            payload.get("schema_version")
-            != "mssr.self_reconfiguration_state.v1"
-        ):
-            return False
+        schema = payload.get("schema_version")
 
-        if payload.get("target_morphology") != self._target_morphology:
+        if self._kind == "self_reconfiguration":
+            if schema != "mssr.self_reconfiguration_state.v1":
+                return False
+
+            if (
+                payload.get("target_morphology")
+                != self._target_morphology
+            ):
+                return False
+
+        elif self._kind == "self_assembly":
+            if schema != "mssr.self_assembly_state.v1":
+                return False
+
+        elif self._kind in _SNAKE_BEHAVIOR_MACROS:
+            if schema != "mssr.morphology_status.v1":
+                return False
+
+            if payload.get("command_id") != self._execution_id:
+                return False
+
+            if payload.get("morphology") != "snake8":
+                return False
+
+            if payload.get("behavior") != self._behavior:
+                return False
+
+        else:
             return False
 
         active_goal_ids = payload.get("active_goal_ids", ())
@@ -193,6 +330,9 @@ class StructuralMacroLauncher:
 
         self._process = None
         self._target_morphology = None
+        self._kind = None
+        self._execution_id = None
+        self._behavior = None
         self._active_goal_ids = ()
         self._process_exit_observed_at = None
         return True
@@ -247,6 +387,9 @@ class StructuralMacroLauncher:
 
         self._process = None
         self._target_morphology = None
+        self._kind = None
+        self._execution_id = None
+        self._behavior = None
         self._active_goal_ids = ()
         self._process_exit_observed_at = None
 
@@ -270,6 +413,9 @@ class StructuralMacroLauncher:
 
         self._process = None
         self._target_morphology = None
+        self._kind = None
+        self._execution_id = None
+        self._behavior = None
         self._active_goal_ids = ()
         self._process_exit_observed_at = None
 

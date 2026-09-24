@@ -39,6 +39,8 @@ class FlatGap:
         raw = course.get("gap")
         if not isinstance(raw, Mapping):
             raise SnakeGapGaitError("Course has no gap landmarks")
+        if raw.get("coordinate_frame", "world") != "world":
+            raise SnakeGapGaitError("Stage-local gap landmarks require the gait stage_frame adapter")
         try:
             near = float(raw["near_edge_x_m"])
             far = float(raw["far_edge_x_m"])
@@ -87,7 +89,15 @@ class SnakeGapGaitPlanner:
         }
     )
 
-    def plan(
+    def plan(self, graph, assignments, parameters):
+        from mssr_expert.behaviors.snake_gait_frame import local_planning_graph
+        projected = local_planning_graph(graph, parameters, "gap")
+        if projected is None:
+            return self._plan_axis_aligned(graph, assignments, parameters)
+        local_graph, frame = projected
+        return frame.bind_program(self._plan_axis_aligned(local_graph, assignments, parameters))
+
+    def _plan_axis_aligned(
         self,
         graph: AttributedRobotGraph,
         assignments: Sequence[AssignedModule],

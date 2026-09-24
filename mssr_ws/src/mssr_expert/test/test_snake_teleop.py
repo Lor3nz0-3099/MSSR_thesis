@@ -125,9 +125,11 @@ def test_stale_or_invalid_graph_and_authority_change_emit_no_snake_motion():
     snake.observe_graph(graph().to_dict(), now=1.0)
     assert snake.step(sample(r2=1.0), safety=MACRO, now=1.1).envelope is None
     assert snake.step(sample(r2=1.0), safety=STOPPED, now=1.2).actions.module_actions == {}
-    assert snake.step(sample(r2=1.0), safety=ENABLED, now=1.8).envelope is None
-    assert not snake.observe_graph(graph(stamp=2.0, missing=True).to_dict(), now=1.9)
-    assert snake.step(sample(r2=1.0), safety=ENABLED, now=1.9).envelope is None
+    # Production observation lease is 2.0 s: a graph older than that
+    # still fails closed.
+    assert snake.step(sample(r2=1.0), safety=ENABLED, now=3.1).envelope is None
+    assert not snake.observe_graph(graph(stamp=2.0, missing=True).to_dict(), now=3.2)
+    assert snake.step(sample(r2=1.0), safety=ENABLED, now=3.2).envelope is None
 
 
 def test_effective_actions_and_morphology_are_in_existing_envelope():
@@ -431,3 +433,153 @@ def test_snake_resume_recaptures_measured_joint_before_manual_motion():
     assert moved.posture.goal.parameters[
         "angle_rad"
     ] == pytest.approx(0.08)
+
+
+
+def test_snake_reset_for_morphology_exit_discards_previous_lifecycle():
+    """A future Snake visit must start from a fresh teleop lifecycle."""
+
+    snake = runtime()
+
+    old_command_id = snake._command_id
+
+    snake._observation = object()
+    snake._received_at = 10.0
+    snake._last_graph = object()
+    snake._previous_tick = 10.0
+    snake._motion_enabled = True
+
+    snake._manual_index = 4
+    snake._manual_key = ("physical_v4", "tilt")
+    snake._manual_target = 0.75
+    snake._manual_transition = True
+    snake._assignment_ids = ("stale",)
+
+    snake.reset_for_morphology_exit()
+
+    assert snake._observation is None
+    assert snake._received_at is None
+    assert snake._last_graph is None
+    assert snake._previous_tick is None
+    assert snake._motion_enabled is False
+
+    assert snake._manual_index == 0
+    assert snake._manual_key is None
+    assert snake._manual_target is None
+    assert snake._assignment_ids == ()
+
+    assert snake._command_id != old_command_id
+
+
+def test_circle_home_restores_captured_snake_post_assembly_pose_and_stops_drive():
+    snake = runtime()
+
+    # First stable Snake graph after structural handoff:
+    # this physical PAN/TILT posture becomes the Home reference.
+    home_payload = graph(stamp=10.0).to_dict()
+
+    for index, node in enumerate(home_payload["nodes"]):
+        node["attributes"]["actuators"]["pan"]["position_rad"] = (
+            0.03 * index
+        )
+        node["attributes"]["actuators"]["tilt"]["position_rad"] = (
+            -0.02 * index
+        )
+
+    assert snake.observe_graph(
+        home_payload,
+        now=10.0,
+    )
+
+    # First enabled neutral TELEOP tick is the capture boundary.
+    snake.step(
+        sample(),
+        safety=ENABLED,
+        now=10.0,
+    )
+
+    # Human has subsequently reshaped the Snake.
+    changed_payload = graph(stamp=11.0).to_dict()
+
+    for index, node in enumerate(changed_payload["nodes"]):
+        node["attributes"]["actuators"]["pan"]["position_rad"] = (
+            0.03 * index
+        )
+        node["attributes"]["actuators"]["tilt"]["position_rad"] = (
+            -0.02 * index
+        )
+
+    # Change both joints of the physical head away from captured Home.
+    changed_payload["nodes"][7]["attributes"]["actuators"][
+        "pan"
+    ]["position_rad"] += 0.35
+
+    changed_payload["nodes"][7]["attributes"]["actuators"][
+        "tilt"
+    ]["position_rad"] += 0.30
+
+    assert snake.observe_graph(
+        changed_payload,
+        now=11.0,
+    )
+
+    # HOME has priority over locomotion: R2 must not move the Snake while
+    # physical posture restoration is pending.
+    out = snake.step(
+        sample(
+            r2=1.0,
+            command_events=("home",),
+        ),
+        safety=ENABLED,
+        now=11.0,
+    )
+
+    assert out.actions.intent["home_restore_pending"] is True
+
+    assert out.actions.module_actions
+    assert all(
+        command["vx"] == pytest.approx(0.0)
+        for command in out.actions.module_actions.values()
+    )
+
+    # Restoring the captured physical posture must start a PAN/TILT primitive,
+    # rather than merely releasing the robot for a gravity settle.
+    assert out.posture.goal is not None
+    assert out.posture.goal.primitive in {
+        "rotate_pan_by",
+        "set_tilt",
+    }
+
+
+def test_production_observation_lease_covers_gui_graph_progress_period():
+    snake = runtime()
+
+    assert snake.observe_graph(
+        graph(stamp=10.0).to_dict(),
+        now=10.0,
+    )
+
+    first = snake.step(
+        sample(),
+        safety=ENABLED,
+        now=10.0,
+    )
+
+    first_selected = first.actions.intent[
+        "selected_module_id"
+    ]
+
+    # GUI measurement: a genuinely new physical graph can take
+    # ~0.7-1.1 wall seconds even though the ROS bridge republishes at 20 Hz.
+    # Human authority must not disappear between those samples.
+    assert snake.topology(10.8) == "snake8"
+
+    switched = snake.step(
+        sample(command_events=("next_module",)),
+        safety=ENABLED,
+        now=10.8,
+    )
+
+    assert switched.actions.intent[
+        "selected_module_id"
+    ] != first_selected
