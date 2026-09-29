@@ -59,6 +59,40 @@ def parameter_value(command, name):
     )
 
 
+
+@pytest.mark.parametrize(
+    "kind",
+    ["self_reconfiguration", "self_assembly", "snake_gap", "snake_stairs"],
+)
+def test_macro_without_active_recording_does_not_request_dataset(kind, tmp_path):
+    commands = []
+    launcher = StructuralMacroLauncher(
+        spawn=lambda command: commands.append(tuple(command)) or FakeProcess()
+    )
+    state = snake_ready_state() if kind.startswith("snake_") else ready_state()
+
+    launcher.start(
+        state=state,
+        target_morphology="snake8",
+        execution_id=f"unrecorded-{kind}",
+        episode_id="unrecorded-session",
+        dataset_path=None,
+        kind=kind,
+        target_graph_path=tmp_path / "target.json"
+        if kind == "self_assembly" else None,
+    )
+
+    command = commands[0]
+    if kind.startswith("snake_"):
+        assert command[command.index("--dataset-path") + 1] == ""
+        assert command[command.index("--episode-id") + 1] == ""
+        assert command[command.index("--stage-name") + 1] == ""
+    else:
+        assert parameter_value(command, "record_dataset") == "false"
+        assert not any(
+            item.startswith("dataset_path:=") for item in command
+        )
+
 def test_successful_spawn_claims_structural_macro_and_builds_real_reconfiguration_command(
     tmp_path,
 ):

@@ -1696,3 +1696,35 @@ def test_production_observation_lease_covers_gui_graph_progress_period():
     assert moving.actions.intent[
         "longitudinal_m_s"
     ] > 0.0
+
+
+def test_posture_pan_restore_uses_nearest_periodic_equivalent():
+    """T05: the saved and measured pan branches differed by two turns."""
+    import math
+
+    from mssr_expert.teleop.mobile_manipulator import (
+        MobileManipulatorActions,
+        MobileManipulatorPostureTransport,
+    )
+
+    transport = MobileManipulatorPostureTransport()
+    actions = MobileManipulatorActions(
+        joint_targets=((
+            "smores_06", "pan", -5.896766185760498,
+            6.280893802642822,
+        ),),
+        allow_joint_updates=True,
+        manual_override=True,
+    )
+
+    delivery = transport.step(actions, now=0.0)
+
+    assert delivery.goal is not None
+    assert delivery.goal.primitive == "rotate_pan_by"
+    assert delivery.goal.parameters["delta_rad"] == pytest.approx(
+        math.remainder(
+            -5.896766185760498 - 6.280893802642822,
+            math.tau,
+        )
+    )
+    assert delivery.goal.parameters["periodic_equivalent"] is True

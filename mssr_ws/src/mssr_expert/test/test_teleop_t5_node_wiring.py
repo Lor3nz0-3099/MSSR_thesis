@@ -135,8 +135,9 @@ def test_recorded_structural_dataset_uses_same_teleop_episode():
     assert '/ "structural"' in text
     assert "episode_id = recording_episode_id" in text
 
-    # Standalone structural runs remain separate when no T4 recording exists.
-    assert "self._structural_dataset_root" in text
+    # START off must not create an unlinked structural dataset.
+    assert "dataset_path = None" in text
+    assert "self._structural_dataset_root" not in text
     assert 'episode_id = f"teleop-structural-{stamp}"' in text
 
 

@@ -1,6 +1,6 @@
 {
   "schema_version": "mssr.composite_campaign.v1",
-  "description": "T01-T13: teleoperation-only oriented seeded fixtures with connected maneuver platforms. Legacy C01-C10 unchanged. Physical rollouts required.",
+  "description": "T01-T16 teleoperation-only seeded fixtures; T14-T16 add button-first and gap-last IL coverage. Static geometry is audited; physical rollout required.",
   "episodes": [
     {
       "episode_id": "teleop-t01",
@@ -16,13 +16,17 @@
           "task_id": "flat_navigation-2",
           "type": "flat_navigation",
           "seed": 5101,
-          "yaw_deg": 0
+          "yaw_deg": 0,
+          "handoff_mode": "shared",
+          "cone_pattern": "zigzag",
+          "cone_count": 7
         },
         {
           "task_id": "button-3",
           "type": "button",
           "seed": 6103,
-          "yaw_deg": -90
+          "yaw_deg": -90,
+          "handoff_mode": "shared"
         }
       ]
     },
@@ -40,13 +44,17 @@
           "task_id": "flat_navigation-2",
           "type": "flat_navigation",
           "seed": 6053,
-          "yaw_deg": 0
+          "yaw_deg": 0,
+          "handoff_mode": "shared",
+          "cone_pattern": "zigzag",
+          "cone_count": 8
         },
         {
           "task_id": "button-3",
           "type": "button",
           "seed": 6107,
-          "yaw_deg": -90
+          "yaw_deg": -90,
+          "handoff_mode": "shared"
         }
       ]
     },
@@ -64,13 +72,15 @@
           "task_id": "gap-2",
           "type": "gap",
           "seed": 4104,
-          "yaw_deg": 0
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
         },
         {
           "task_id": "flat_navigation-3",
           "type": "flat_navigation",
           "seed": 6001,
-          "yaw_deg": 0
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
         }
       ]
     },
@@ -88,13 +98,23 @@
           "task_id": "flat_navigation-2",
           "type": "flat_navigation",
           "seed": 5106,
-          "yaw_deg": 0
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
         },
         {
           "task_id": "gap-3",
           "type": "gap",
           "seed": 4103,
-          "yaw_deg": 90
+          "yaw_deg": 90,
+          "handoff_mode": "shared"
+        },
+        {
+          "task_id": "button-4",
+          "type": "button",
+          "seed": 6103,
+          "yaw_deg": 90,
+          "mount_on_previous_support": true,
+          "button_inset_m": 0.2
         }
       ]
     },
@@ -106,19 +126,23 @@
           "task_id": "flat_navigation-1",
           "type": "flat_navigation",
           "seed": 6000,
-          "yaw_deg": 0
+          "yaw_deg": 0,
+          "extra_cones": 2
         },
         {
           "task_id": "flat_navigation-2",
           "type": "flat_navigation",
           "seed": 6056,
-          "yaw_deg": 0
+          "yaw_deg": 0,
+          "handoff_mode": "shared",
+          "extra_cones": 2
         },
         {
           "task_id": "button-3",
           "type": "button",
           "seed": 6251,
-          "yaw_deg": 90
+          "yaw_deg": 90,
+          "handoff_mode": "shared"
         }
       ]
     },
@@ -136,13 +160,15 @@
           "task_id": "flat_navigation-2",
           "type": "flat_navigation",
           "seed": 6004,
-          "yaw_deg": 0
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
         },
         {
           "task_id": "button-3",
           "type": "button",
           "seed": 8568,
-          "yaw_deg": 90
+          "yaw_deg": 90,
+          "handoff_mode": "shared"
         }
       ]
     },
@@ -153,20 +179,22 @@
         {
           "task_id": "stairs-1",
           "type": "stairs",
-          "seed": 3104,
+          "seed": 6403,
           "yaw_deg": 0
         },
         {
           "task_id": "flat_navigation-2",
           "type": "flat_navigation",
           "seed": 5103,
-          "yaw_deg": 0
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
         },
         {
           "task_id": "button-3",
           "type": "button",
           "seed": 8936,
-          "yaw_deg": -90
+          "yaw_deg": -90,
+          "handoff_mode": "shared"
         }
       ]
     },
@@ -175,22 +203,39 @@
       "layout_profile": "teleop_connected_v1",
       "tasks": [
         {
-          "task_id": "flat_navigation-1",
-          "type": "flat_navigation",
-          "seed": 5104,
-          "yaw_deg": 0
-        },
-        {
-          "task_id": "gap-2",
+          "task_id": "gap-1",
           "type": "gap",
           "seed": 4105,
           "yaw_deg": 0
         },
         {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 5100,
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
+        },
+        {
           "task_id": "flat_navigation-3",
           "type": "flat_navigation",
-          "seed": 5105,
-          "yaw_deg": 0
+          "seed": 6001,
+          "yaw_deg": 90,
+          "handoff_mode": "shared"
+        },
+        {
+          "task_id": "stairs-4",
+          "type": "stairs",
+          "seed": 3105,
+          "yaw_deg": 180,
+          "handoff_mode": "shared"
+        },
+        {
+          "task_id": "button-5",
+          "type": "button",
+          "seed": 6101,
+          "yaw_deg": 180,
+          "mount_on_previous_support": true,
+          "button_inset_m": 0.2
         }
       ]
     },
@@ -208,13 +253,16 @@
           "task_id": "stairs-2",
           "type": "stairs",
           "seed": 3101,
-          "yaw_deg": 90
+          "yaw_deg": 90,
+          "connector_length_m": 1.4
         },
         {
           "task_id": "button-3",
           "type": "button",
           "seed": 9974,
-          "yaw_deg": 90
+          "yaw_deg": 90,
+          "mount_on_previous_support": true,
+          "button_inset_m": 0.2
         }
       ]
     },
@@ -232,13 +280,15 @@
           "task_id": "stairs-2",
           "type": "stairs",
           "seed": 3105,
-          "yaw_deg": -90
+          "yaw_deg": -90,
+          "handoff_mode": "shared"
         },
         {
           "task_id": "flat_navigation-3",
           "type": "flat_navigation",
           "seed": 5100,
-          "yaw_deg": -90
+          "yaw_deg": -90,
+          "handoff_mode": "shared"
         }
       ]
     },
@@ -273,13 +323,13 @@
         {
           "task_id": "flat_navigation-1",
           "type": "flat_navigation",
-          "seed": 5102,
+          "seed": 5104,
           "yaw_deg": 0
         },
         {
           "task_id": "flat_navigation-2",
           "type": "flat_navigation",
-          "seed": 6053,
+          "seed": 5105,
           "yaw_deg": 0
         },
         {
@@ -311,6 +361,84 @@
           "type": "button",
           "seed": 6101,
           "yaw_deg": 90
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t14",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "button-1",
+          "type": "button",
+          "seed": 6103,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 6017,
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
+        },
+        {
+          "task_id": "stairs-3",
+          "type": "stairs",
+          "seed": 3105,
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t15",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "button-1",
+          "type": "button",
+          "seed": 6101,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation",
+          "seed": 5104,
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
+        },
+        {
+          "task_id": "gap-3",
+          "type": "gap",
+          "seed": 4105,
+          "yaw_deg": 0,
+          "handoff_mode": "shared"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-t16",
+      "layout_profile": "teleop_connected_v1",
+      "tasks": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation",
+          "seed": 5100,
+          "yaw_deg": 0
+        },
+        {
+          "task_id": "stairs-2",
+          "type": "stairs",
+          "seed": 3101,
+          "yaw_deg": 90,
+          "handoff_mode": "shared"
+        },
+        {
+          "task_id": "gap-3",
+          "type": "gap",
+          "seed": 4103,
+          "yaw_deg": 90,
+          "handoff_mode": "shared"
         }
       ]
     }

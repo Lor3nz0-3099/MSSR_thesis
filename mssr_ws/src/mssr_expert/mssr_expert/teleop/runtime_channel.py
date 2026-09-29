@@ -5,7 +5,7 @@ from uuid import uuid4
 
 
 class RuntimeChannel:
-    def __init__(self, timeout_s=0.5):
+    def __init__(self, timeout_s=2.0):
         self._timeout = timeout_s
         self._pending = deque()
         self._stamp = None

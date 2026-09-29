@@ -185,6 +185,91 @@ def self_assembly_spawn_layout(
     return radial_spawn_layout(config)
 
 
+
+def place_composite_spawn_layout(
+    layout: Mapping[
+        str,
+        tuple[
+            float,
+            float,
+            float,
+            float,
+        ],
+    ],
+    obstacle_course: Any,
+    *,
+    layout_profile: str | None,
+) -> dict[
+    str,
+    tuple[
+        float,
+        float,
+        float,
+        float,
+    ],
+]:
+    """Place loose modules on the real composite start support.
+
+    Teleop-connected courses use the physical CompositeStartPlatform
+    centre as the swarm/root centre. Legacy composite layouts preserve
+    the historical -1.50 m X translation.
+    """
+
+    if layout_profile != "teleop_connected_v1":
+        return {
+            module_id: (
+                x_m - 1.50,
+                y_m,
+                z_m,
+                yaw_deg,
+            )
+            for module_id, (
+                x_m,
+                y_m,
+                z_m,
+                yaw_deg,
+            ) in layout.items()
+        }
+
+    start_box = next(
+        (
+            box
+            for box in obstacle_course.boxes
+            if box.semantic
+            == "composite_start_platform"
+        ),
+        None,
+    )
+
+    if start_box is None:
+        raise RuntimeError(
+            "teleop_connected_v1 requires "
+            "CompositeStartPlatform"
+        )
+
+    center_x = float(
+        start_box.center_xyz_m[0]
+    )
+
+    center_y = float(
+        start_box.center_xyz_m[1]
+    )
+
+    return {
+        module_id: (
+            x_m + center_x,
+            y_m + center_y,
+            z_m,
+            yaw_deg,
+        )
+        for module_id, (
+            x_m,
+            y_m,
+            z_m,
+            yaw_deg,
+        ) in layout.items()
+    }
+
 def closest_module_to_centroid(
     layout: Mapping[str, tuple[float, float, float, float]],
 ) -> str:
@@ -488,6 +573,8 @@ def run_parallel_self_assembly_scenario(
         PHYSICS_ROOT,
     )
     obstacle_course = None
+    composite_layout_profile = None
+
     if config.composite_mission_path is not None:
         from smores_ep.isaac.obstacle_course import (
             install_composite_obstacle_course,
@@ -496,6 +583,17 @@ def run_parallel_self_assembly_scenario(
         mission = json.loads(
             config.composite_mission_path.read_text(encoding="utf-8")
         )
+
+        raw_layout_profile = mission.get(
+            "layout_profile"
+        )
+
+        composite_layout_profile = (
+            None
+            if raw_layout_profile is None
+            else str(raw_layout_profile)
+        )
+
         seed_catalog = json.loads(
             config.composite_seed_catalog_path.read_text(encoding="utf-8")
         )
@@ -578,11 +676,19 @@ def run_parallel_self_assembly_scenario(
             ),
         )
     layout = self_assembly_spawn_layout(config)
+
     if config.composite_mission_path is not None:
-        layout = {
-            module_id: (x_m - 1.50, y_m, z_m, yaw_deg)
-            for module_id, (x_m, y_m, z_m, yaw_deg) in layout.items()
-        }
+        if obstacle_course is None:
+            raise RuntimeError(
+                "Composite mission did not create an obstacle course"
+            )
+
+        layout = place_composite_spawn_layout(
+            layout,
+            obstacle_course,
+            layout_profile=composite_layout_profile,
+        )
+
     elif config.manual_obstacle_course:
         layout = {
             module_id: (

@@ -126,13 +126,6 @@ class SmoresTeleopNode(Node):
 
         repo_root = _repository_root()
         self._repo_root = repo_root
-        self._structural_dataset_root = Path(
-            self.declare_parameter(
-                "structural_dataset_root",
-                str(repo_root / "logs/teleop/structural"),
-            ).value
-        )
-
         structural_exit_grace_s = float(
             self.declare_parameter(
                 "structural_exit_grace_s",
@@ -337,10 +330,7 @@ class SmoresTeleopNode(Node):
             )
         else:
             episode_id = f"teleop-structural-{stamp}"
-            dataset_path = (
-                self._structural_dataset_root
-                / f"{execution_id}.jsonl"
-            )
+            dataset_path = None
 
         target_graph_path = (
             self._structural_target_graphs[target_morphology]
@@ -375,6 +365,7 @@ class SmoresTeleopNode(Node):
             manager is not None
             and manager.recording
             and recording_episode_id is not None
+            and dataset_path is not None
         ):
             try:
                 self._recording.register_structural_stream(

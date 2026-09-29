@@ -30,3 +30,16 @@ def test_teleop_node_wires_effective_actions_into_recording_backend():
 
     # Il vecchio placeholder T1/T3 non deve rimanere.
     assert "recording_backend_ready=False" not in text
+
+
+
+def test_structural_ros_nodes_have_explicit_recording_gate():
+    nodes = ROOT / "mssr_ws/src/mssr_expert/mssr_expert/nodes"
+    for filename in (
+        "smores_parallel_self_assembly_node.py",
+        "smores_self_reconfiguration_node.py",
+    ):
+        source = (nodes / filename).read_text(encoding="utf-8")
+        assert '"record_dataset"' in source
+        assert 'record_dataset = bool(self.get_parameter("record_dataset").value)' in source
+        assert 'if record_dataset and dataset_path else None' in source

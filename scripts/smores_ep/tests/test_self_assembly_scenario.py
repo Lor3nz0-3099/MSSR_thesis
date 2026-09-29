@@ -459,3 +459,107 @@ def test_prior_operational_source_prevents_mm8_direct_handoff_recapture() -> Non
     assert seen is True
     assert drives["m1"].captures == 0
     assert drives["m2"].captures == 0
+
+
+
+def test_v6_teleop_composite_spawn_centers_on_start_platform():
+    from types import SimpleNamespace
+
+    from smores_ep.scenarios import parallel_self_assembly
+
+    assert hasattr(
+        parallel_self_assembly,
+        "place_composite_spawn_layout",
+    )
+
+    layout = {
+        "smores_01": (
+            0.0,
+            0.0,
+            0.0316,
+            0.0,
+        ),
+        "smores_02": (
+            +0.34,
+            0.0,
+            0.0316,
+            180.0,
+        ),
+        "smores_03": (
+            -0.34,
+            0.0,
+            0.0316,
+            0.0,
+        ),
+    }
+
+    start = SimpleNamespace(
+        semantic="composite_start_platform",
+        center_xyz_m=(-1.05, 0.0, -0.01),
+    )
+
+    course = SimpleNamespace(
+        boxes=(start,),
+    )
+
+    placed = (
+        parallel_self_assembly
+        .place_composite_spawn_layout(
+            layout,
+            course,
+            layout_profile="teleop_connected_v1",
+        )
+    )
+
+    # Physical/root candidate is exactly in the middle
+    # of the real start platform.
+    assert placed["smores_01"][:2] == pytest.approx(
+        (-1.05, 0.0)
+    )
+
+    # Whole radial layout receives the same translation.
+    assert placed["smores_02"][:2] == pytest.approx(
+        (-0.71, 0.0)
+    )
+
+    assert placed["smores_03"][:2] == pytest.approx(
+        (-1.39, 0.0)
+    )
+
+
+def test_v6_legacy_composite_spawn_keeps_old_offset():
+    from types import SimpleNamespace
+
+    from smores_ep.scenarios import parallel_self_assembly
+
+    assert hasattr(
+        parallel_self_assembly,
+        "place_composite_spawn_layout",
+    )
+
+    layout = {
+        "root": (
+            0.0,
+            0.0,
+            0.0316,
+            0.0,
+        ),
+    }
+
+    course = SimpleNamespace(
+        boxes=(),
+    )
+
+    placed = (
+        parallel_self_assembly
+        .place_composite_spawn_layout(
+            layout,
+            course,
+            layout_profile=None,
+        )
+    )
+
+    assert placed["root"][:2] == (
+        -1.50,
+        0.0,
+    )

@@ -153,24 +153,13 @@ class RcCarTeleopController:
                         tilt.lower_limit_rad if finite(tilt.lower_limit_rad) else self.geometry.tilt_min_rad)
             upper = min(0.0, self.geometry.tilt_max_rad,
                         tilt.upper_limit_rad if finite(tilt.upper_limit_rad) else self.geometry.tilt_max_rad)
-            # Loaded joints can settle a fraction of a milliradian beyond
-            # the ideal geometric branch boundary.  Accept only a very small
-            # physical tolerance, then clamp back onto the true geometric
-            # interval for all controller calculations.
-            bound_tolerance_rad = 1.0e-3
-
-            if (
-                lower > upper
-                or not (
-                    lower - bound_tolerance_rad
-                    <= tilt.position_rad
-                    <= upper + bound_tolerance_rad
-                )
-            ):
+            if lower > upper:
                 return self._safe()
 
+            # A loaded support can leave the calibrated height branch.
+            # Clamp only height calculations; keep RC traction available so
+            # the operator can continue driving without restarting the run.
             bounds[target.module_id] = (lower, upper)
-
             positions[target.module_id] = max(
                 lower,
                 min(

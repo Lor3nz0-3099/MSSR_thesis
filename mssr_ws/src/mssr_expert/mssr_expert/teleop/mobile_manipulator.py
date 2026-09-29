@@ -525,10 +525,13 @@ class MobileManipulatorPostureTransport:
                         if joint == "pan"
                         else "angle_rad"
                     ): (
-                        angle - measured
+                        math.remainder(angle - measured, math.tau)
                         if joint == "pan"
                         else angle
                     ),
+                    # Restoring a saved orientation must not replay turns
+                    # caused by a different continuous-angle branch.
+                    **({"periodic_equivalent": True} if joint == "pan" else {}),
                     "retain_reached_on_interrupt":
                         True,
                 },

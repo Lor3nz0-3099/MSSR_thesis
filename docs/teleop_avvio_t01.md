@@ -23,17 +23,18 @@ colcon build --packages-select mssr_expert --symlink-install
 cd ..
 PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 \
 MPLCONFIGDIR=/tmp/mssr-teleop-mpl \
-python3 scripts/smores_ep/preview_teleop_composite_campaign.py
+python3 scripts/smores_ep/preview_teleop_composite_campaign.py \
+  --output-dir logs/teleop/course_previews/t01-t16-v2
 BASH
 ```
 
-Controlla l'anteprima `logs/teleop/course_previews/t01-t13-v1/teleop-t01.png`.
+Controlla l'anteprima `logs/teleop/course_previews/t01-t16-v2/teleop-t01.png`.
 La generazione aggiorna le anteprime e le missioni in quella cartella; ogni avvio
 qui sotto ne conserva una copia nella propria cartella di sessione.
 
 ## 2. Avvio completo — copia tutto il blocco
 
-Per partire dal primo stage lascia `EPISODE=teleop-t01`.
+Per partire dal primo stage lascia `EPISODE=teleop-t01`. Per i nuovi percorsi usa `EPISODE=teleop-t14`, `teleop-t15` o `teleop-t16` nello stesso blocco, dopo avere generato le anteprime T01–T16.
 
 ```bash
 cd ~/MSSR_thesis && bash <<'BASH'
@@ -48,7 +49,7 @@ export ROS_DOMAIN_ID=0
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export PYTHONPATH="$PWD/scripts/teleop:$PWD/mssr_ws/src/mssr_expert:$PWD/scripts/smores_ep/src${PYTHONPATH:+:$PYTHONPATH}"
 
-PREVIEW="$PWD/logs/teleop/course_previews/t01-t13-v1"
+PREVIEW="$PWD/logs/teleop/course_previews/t01-t16-v2"
 CATALOG="$PWD/mssr_ws/src/mssr_expert/config/smores_composite_seed_catalog.json"
 test -s "$PREVIEW/$EPISODE.mission.json"
 test -s "$PREVIEW/$EPISODE.course.json"
@@ -212,9 +213,20 @@ Le prove da includere in `datasets/expert_v1` vanno selezionate dopo tale verifi
 
 Per una nuova prova chiudi prima la sessione precedente e rilancia il blocco del
 punto 2 cambiando soltanto `EPISODE=teleop-t02`, poi `teleop-t03`, fino a
-`teleop-t13`. Non serve ricompilare o rigenerare se non hai modificato il codice
+`teleop-t16`. Non serve ricompilare o rigenerare se non hai modificato il codice
 oppure la campagna. Per T02 il primo ostacolo è un gap: parti ancora da Snake8,
 ma usa **X da solo** al posto di SQUARE. Negli stage che iniziano con RC usa
 **X + D-pad SINISTRA** per l'assemblaggio iniziale.
 
-Sequenze e anteprime: [campagna T01–T13](teleop_composite_campaign13.md).
+Sequenze e anteprime: [campagna T01–T16](teleop_composite_campaign13.md).
+
+Per **T14/T15**, dopo START assembla RC-Car8 con **X + D-pad SINISTRA**.
+Il pulsante è il primo ostacolo: allineati, usa **D-pad DESTRA** per
+RC→MobileManipulator8, premi il pulsante, poi **D-pad SINISTRA** per tornare
+in RC. Percorri il tratto RC. Sul terzo ostacolo usa **D-pad SU** per Snake8:
+**SQUARE** per le scale T14, **X premuto e rilasciato** per il gap T15.
+Per **T16**, assembla RC, supera il tratto iniziale, passa a Snake8 con
+**D-pad SU**, esegui **SQUARE** sulle scale e poi **X** sul gap orientato +Y.
+Teleopera l'allineamento prima di ciascuna macro e mantieni START attivo fino
+al goal e alle riconfigurazioni finali richieste. Verifica fisicamente il
+percorso prima di considerare riuscita la dimostrazione.

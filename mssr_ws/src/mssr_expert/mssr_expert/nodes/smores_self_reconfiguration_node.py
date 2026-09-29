@@ -153,8 +153,10 @@ class SmoresSelfReconfigurationNode(Node):
         self._terminal_reached = False
         self._pending_transition: _PendingTransition | None = None
         self._timestep = 0
-        self._dataset_logger = DatasetLogger(
-            Path(str(self.get_parameter("dataset_path").value))
+        dataset_path = str(self.get_parameter("dataset_path").value).strip()
+        record_dataset = bool(self.get_parameter("record_dataset").value)
+        self._dataset_logger = (
+            DatasetLogger(Path(dataset_path)) if record_dataset and dataset_path else None
         )
 
         self._goal_publisher = self.create_publisher(
@@ -230,6 +232,7 @@ class SmoresSelfReconfigurationNode(Node):
             "execution_id": "morphology-transition",
             "episode_id": "smores_reconfiguration_0001",
             "dataset_path": "logs/datasets/smores_reconfiguration.jsonl",
+            "record_dataset": True,
             "control_rate_hz": 20.0,
             "joint_timeout_s": 30.0,
             "undock_timeout_s": 10.0,
@@ -666,6 +669,10 @@ class SmoresSelfReconfigurationNode(Node):
         pending = self._pending_transition
         if pending is None or self._plan is None:
             return
+        if self._dataset_logger is None:
+            self._pending_transition = None
+            return
+
         self._dataset_logger.log_step(
             episode_id=str(self.get_parameter("episode_id").value),
             timestep=pending.timestep,

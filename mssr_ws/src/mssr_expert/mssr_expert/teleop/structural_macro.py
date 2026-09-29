@@ -121,7 +121,7 @@ class StructuralMacroLauncher:
         target_morphology: str,
         execution_id: str,
         episode_id: str,
-        dataset_path: Path,
+        dataset_path: Path | None,
         kind: str = "self_reconfiguration",
         target_graph_path: Path | None = None,
     ):
@@ -149,6 +149,15 @@ class StructuralMacroLauncher:
                     f"{kind} requires live detected morphology snake8"
                 )
 
+        dataset_value = str(dataset_path) if dataset_path is not None else ""
+        recording_episode_id = episode_id if dataset_path is not None else ""
+        recording_stage_name = kind if dataset_path is not None else ""
+        dataset_args = (
+            ("-p", f"dataset_path:={dataset_value}")
+            if dataset_path is not None
+            else ("-p", "record_dataset:=false")
+        )
+
         if kind == "self_reconfiguration":
             command: Command = (
                 "ros2",
@@ -164,8 +173,7 @@ class StructuralMacroLauncher:
                 f"execution_id:={execution_id}",
                 "-p",
                 f"episode_id:={episode_id}",
-                "-p",
-                f"dataset_path:={Path(dataset_path)}",
+                *dataset_args,
             )
         elif kind == "self_assembly":
             if target_graph_path is None:
@@ -185,8 +193,7 @@ class StructuralMacroLauncher:
                 f"execution_id:={execution_id}",
                 "-p",
                 f"episode_id:={episode_id}",
-                "-p",
-                f"dataset_path:={Path(dataset_path)}",
+                *dataset_args,
             )
 
         elif kind in _SNAKE_BEHAVIOR_MACROS:
@@ -210,11 +217,11 @@ class StructuralMacroLauncher:
                     separators=(",", ":"),
                 ),
                 "--dataset-path",
-                str(Path(dataset_path)),
+                dataset_value,
                 "--episode-id",
-                episode_id,
+                recording_episode_id,
                 "--stage-name",
-                kind,
+                recording_stage_name,
             )
 
         else:

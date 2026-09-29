@@ -1067,6 +1067,9 @@ class CompositeButtonFixture:
     plunger_name: str
     center_xyz_m: tuple[float, float, float]
     press_direction_world_xy: tuple[float, float]
+    # Authored world yaw shared by ButtonWall and ButtonPlunger.
+    # Legacy axis-aligned composite fixtures remain at zero.
+    yaw_deg: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -2994,6 +2997,7 @@ def _install_button_prismatic_joint(
     plunger_name: str,
     center_xyz_m: tuple[float, float, float],
     press_direction_world_xy: tuple[float, float],
+    plunger_yaw_deg: float = 0.0,
     joint_name: str,
 ) -> None:
     """Make one course plunger independently depressible."""
@@ -3022,7 +3026,24 @@ def _install_button_prismatic_joint(
     joint.CreateLocalPos0Attr().Set(Gf.Vec3f(*center_xyz_m))
     joint.CreateLocalRot0Attr().Set(Gf.Quatf(1.0))
     joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0.0, 0.0, 0.0))
-    joint.CreateLocalRot1Attr().Set(Gf.Quatf(1.0))
+
+    # Body0 is the world frame.  ButtonPlunger, however, can already carry
+    # an authored world yaw because the complete button fixture was rotated
+    # with its stage.  An identity body-side joint frame would therefore
+    # force PhysX to rotate the dynamic plunger until the two joint frames
+    # agree, while the static ButtonWall stays in place.
+    #
+    # Express the world-aligned joint frame in the plunger's local frame:
+    # R_world_plunger * R_local1 = I  ->  R_local1 = R_world_plunger^-1.
+    half_inverse_yaw = -0.5 * math.radians(plunger_yaw_deg)
+    joint.CreateLocalRot1Attr().Set(
+        Gf.Quatf(
+            math.cos(half_inverse_yaw),
+            0.0,
+            0.0,
+            math.sin(half_inverse_yaw),
+        )
+    )
 
 
 def install_composite_obstacle_course(
@@ -3052,6 +3073,7 @@ def install_composite_obstacle_course(
             plunger_name=fixture.plunger_name,
             center_xyz_m=fixture.center_xyz_m,
             press_direction_world_xy=fixture.press_direction_world_xy,
+            plunger_yaw_deg=fixture.yaw_deg,
             joint_name=f"ButtonPrismaticJoint{index + 1:02d}",
         )
     return course

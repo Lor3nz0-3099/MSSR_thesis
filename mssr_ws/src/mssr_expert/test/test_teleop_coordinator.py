@@ -374,3 +374,47 @@ def test_external_structure_stop_requires_explicit_resume_not_neutral_alone():
     status, _ = core.tick(10.03)
 
     assert status["phase"] == "ESTOP_PAUSED"
+
+
+
+def test_runtime_heartbeat_survives_gui_stall_but_still_expires():
+    """Isaac GUI stalls must not repeatedly revoke TELEOP authority.
+
+    The ROS file bridge may republish the last runtime-status file every
+    50 ms while Isaac is temporarily busy rendering.  Freshness is therefore
+    determined by Isaac's embedded monotonic timestamp, not ROS arrival rate.
+
+    A bounded 2 s heartbeat still fails closed if Isaac really stops updating.
+    """
+    from mssr_expert.teleop.runtime_channel import RuntimeChannel
+
+    channel = RuntimeChannel()
+
+    payload = {
+        "schema_version":
+            "mssr.teleop_runtime_status.v1",
+        "stamp_monotonic": 10.0,
+        "structure_stopped": False,
+        "structure_stop_ack": None,
+    }
+
+    channel.observe(
+        payload,
+        10.0,
+    )
+
+    assert channel.ready(10.0)
+
+    # Re-publishing stale file contents must not pretend Isaac produced
+    # a new heartbeat.
+    channel.observe(
+        payload,
+        10.55,
+    )
+
+    # Physical GUI runs can spend >0.5 s between actual Isaac updates.
+    # TELEOP must remain armed through that bounded stall.
+    assert channel.ready(10.75)
+
+    # But loss of the actual Isaac heartbeat still fails closed.
+    assert not channel.ready(12.01)

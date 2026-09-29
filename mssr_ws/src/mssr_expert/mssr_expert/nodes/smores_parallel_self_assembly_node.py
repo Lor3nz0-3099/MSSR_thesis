@@ -134,14 +134,10 @@ class SmoresParallelSelfAssemblyNode(Node):
             ParallelAssemblyExecutor | None
         ) = None
 
-        self._dataset_logger = DatasetLogger(
-            Path(
-                str(
-                    self.get_parameter(
-                        "dataset_path"
-                    ).value
-                )
-            )
+        dataset_path = str(self.get_parameter("dataset_path").value).strip()
+        record_dataset = bool(self.get_parameter("record_dataset").value)
+        self._dataset_logger = (
+            DatasetLogger(Path(dataset_path)) if record_dataset and dataset_path else None
         )
 
         self._latest_observation: dict[str, Any] = {}
@@ -279,6 +275,7 @@ class SmoresParallelSelfAssemblyNode(Node):
             "logs/datasets/"
             "smores_parallel_self_assembly.jsonl",
         )
+        self.declare_parameter("record_dataset", True)
         self.declare_parameter(
             "orientation_weight_m_per_rad",
             0.0,
@@ -955,6 +952,10 @@ class SmoresParallelSelfAssemblyNode(Node):
             pending is None
             or self._planning_result is None
         ):
+            return
+
+        if self._dataset_logger is None:
+            self._pending_transition = None
             return
 
         self._dataset_logger.log_step(

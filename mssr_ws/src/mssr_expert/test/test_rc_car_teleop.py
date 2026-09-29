@@ -891,7 +891,7 @@ def test_tiny_loaded_tilt_overshoot_at_geometric_bound_still_allows_traction():
     )
 
 
-def test_material_tilt_overshoot_beyond_geometric_bound_still_fails_closed():
+def test_material_tilt_overshoot_beyond_geometric_bound_still_allows_traction():
     pan_x, _, pan_z = GEOMETRY.pan_center_body_m
 
     branch_min = -math.atan2(
@@ -909,11 +909,11 @@ def test_material_tilt_overshoot_beyond_geometric_bound_still_fails_closed():
         r2=1.0,
     )
 
-    # The tolerance is only for realistic loaded-joint settling. A genuinely
-    # invalid configuration must still fail closed.
-    assert all(
-        abs(rate) <= 1.0e-12
-        for rate in rates(result).values()
+    # A support outside the height branch no longer disables the RC drive.
+    # Height calculation remains clamped to the calibrated branch.
+    assert any(abs(rate) > 1.0e-9 for rate in rates(result).values())
+    assert result.intent["chassis_height_m"] == pytest.approx(
+        GEOMETRY.ground_contact_height_m(branch_min)
     )
 
 
@@ -992,3 +992,18 @@ def test_rc_entry_waits_for_first_new_graph_after_reconfiguration_before_capturi
     assert captured.actions.intent[
         "chassis_height_m"
     ] == pytest.approx(expected)
+
+
+@pytest.mark.parametrize("tilt", [-1.2, 0.1])
+def test_rc_drive_continues_when_height_tilt_leaves_calibrated_branch(tilt):
+    """An overshot support must not disable traction for the whole RC car."""
+    controller, observation = setup_controller(tilt=tilt)
+
+    driving = step(controller, observation, r2=0.2, right_x=0.1)
+
+    assert any(abs(rate) > 0 for rate in rates(driving).values())
+    assert not driving.joint_targets
+    bound = controller._branch_min if tilt < controller._branch_min else 0.0
+    assert driving.intent["chassis_height_m"] == pytest.approx(
+        GEOMETRY.ground_contact_height_m(bound)
+    )

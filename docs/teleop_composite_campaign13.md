@@ -1,4 +1,4 @@
-# Campagna teleoperata T01–T13
+# Campagna teleoperata T01–T16
 
 Configurazione: `mssr_ws/src/mssr_expert/config/smores_teleop_composite_campaign13.json`.
 Profilo: `teleop_connected_v1`. Gli stage C01–C10 mantengono la geometria precedente.
@@ -14,7 +14,7 @@ dei seed riguarda gli ostacoli sorgenti, non automaticamente ogni nuova composiz
 - Dopo un gap: sponda piana lunga **almeno 1,20 m** e larga 1,20 m, misurata lungo
   l'attraversamento. Questa lunghezza non include il raccordo successivo.
 - Dopo le scale: pianerottolo lungo almeno **1,20 m** (attualmente 1,32 m dai seed).
-- Pedane di manovra: **2,40 × 2,40 m**. Raccordi: **1,40 m** di larghezza.
+- Pedane di manovra: **1,20 × 1,20 m**; pedana iniziale 1,60 m. Raccordi: **1,20 m** di larghezza e circa 0,80 m di lunghezza nominale.
 - Il raccordo arriva alla pedana e il nuovo ostacolo parte dal suo bordo: girare
   sulla pedana, dopo aver fatto salire tutto Snake sulla sponda di arrivo.
 - Alzate, pedate, numero di gradini, larghezza del gap e geometria del pulsante
@@ -37,18 +37,21 @@ direzione di uscita; le pedane raccordano tale direzione con l'ostacolo seguente
 | T01 | scale 3102 → RC 5101 → pulsante 6103 | 0°, 0°, −90° |
 | T02 | gap 4106 → RC 6053 → pulsante 6107 | 0°, 0°, −90° |
 | T03 | RC 5102 → gap 4104 → RC 6001 | 0°, 0°, 0° |
-| T04 | scale 4689 → RC 5106 → gap 4103 | 0°, 0°, +90° |
+| T04 | scale 4689 → RC 5106 → gap 4103 → pulsante 6103 | 0°, 0°, +90°, +90° |
 | T05 | RC 6000 → RC 6056 → pulsante 6251 | 0°, 0°, +90° |
 | T06 | gap 4102 → RC 6004 → pulsante 8568 | 0°, 0°, +90° |
-| T07 | scale 3104 → RC 5103 → pulsante 8936 | 0°, 0°, −90° |
-| T08 | RC 5104 → gap 4105 → RC 5105 | 0°, 0°, 0° |
+| T07 | scale 6403 → RC 5103 → pulsante 8936 | 0°, 0°, −90° |
+| T08 | gap 4105 → RC 5100 → RC 6001 → scale 3105 → pulsante 6101 | 0°, 0°, +90°, 180°, 180° |
 | T09 | gap 4107 → scale 3101 → pulsante 9974 | 0°, +90°, +90° |
 | T10 | RC 6017 → scale 3105 → RC 5100 | 0°, −90°, −90° |
 | T11 | gap 4106 → scale 3102 → gap 4104 | 0°, +90°, +90° |
-| T12 | RC 5102 → RC 6053 → RC 6000 | 0°, 0°, −90° |
+| T12 | RC 5104 → RC 5105 → RC 6000 | 0°, 0°, −90° |
 | T13 | gap 4103 → RC 6001 → pulsante 6101 | 0°, 0°, +90° |
+| T14 (A) | pulsante 6103 → RC 6017 → scale 3105 | 0°, 0°, 0° |
+| T15 (B) | pulsante 6101 → RC 5104 → gap 4105 | 0°, 0°, 0° |
+| T16 (C) | RC 5100 → scale 3101 → gap 4103 | 0°, +90°, +90° |
 
-Copertura: 13 seed RC e 7 pulsanti distinti, tutti nel catalogo validato.
+I 16 stage usano soltanto seed presenti nel catalogo validato. T14–T16 sono verificati geometricamente ma richiedono una prima prova fisica in Isaac. Il pulsante iniziale in T14/T15 e i gap finali in T15/T16 aggiungono ordini assenti dalle prove complete raccolte.
 Le curve RC vanno controllate tramite `rc_car_planar_obstacle_layout`: il vecchio
 campo `route_kind` non descrive necessariamente la centerline fisica attuale.
 
@@ -59,13 +62,14 @@ Dalla radice del repository:
 ```bash
 PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1 \
 MPLCONFIGDIR=/tmp/mssr-teleop-mpl \
-python3 scripts/smores_ep/preview_teleop_composite_campaign.py
+python3 scripts/smores_ep/preview_teleop_composite_campaign.py \
+  --output-dir logs/teleop/course_previews/t01-t16-v2
 ```
 
 `PYTHONNOUSERSITE=1` evita il conflitto locale fra NumPy 2 installato nell'utente
 e Matplotlib compilato per NumPy 1 presente nel sistema.
 
-Output: `logs/teleop/course_previews/t01-t13-v1/`:
+Output: `logs/teleop/course_previews/t01-t16-v2/`:
 
 - `overview.png` e `overview.pdf`: viste dall'alto di tutta la campagna;
 - `teleop-tXX.png`: dettaglio di ogni stage;
@@ -96,7 +100,7 @@ Nel launcher con bridge, nodo morphology e DualSense, sostituire **i tre argomen
 con, per esempio, T11:
 
 ```bash
---composite-mission "$PWD/logs/teleop/course_previews/t01-t13-v1/teleop-t11.mission.json" \
+--composite-mission "$PWD/logs/teleop/course_previews/t01-t16-v2/teleop-t11.mission.json" \
 --composite-seed-catalog "$PWD/mssr_ws/src/mssr_expert/config/smores_composite_seed_catalog.json" \
 ```
 
