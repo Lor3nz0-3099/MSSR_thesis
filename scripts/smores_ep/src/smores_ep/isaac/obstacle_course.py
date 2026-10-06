@@ -2131,6 +2131,14 @@ BUTTON_REFERENCE_CENTER_XYZ_M = (
 BUTTON_PLATFORM_CENTER_XY_M = (1.10, 0.0)
 BUTTON_PLATFORM_SIZE_XY_M = (5.60, 4.20)
 
+# Button rerecording starts from loose modules directly in front of
+# the fixture.  The root candidate is intentionally a little closer
+# than the manipulation standoff, so restore_drive is followed by a
+# short signed back-away/reposition step.  The outer modules stay on
+# the robot side of the wall with conservative clearance.
+BUTTON_ASSEMBLY_SPAWN_STANDOFF_M = 1.200
+BUTTON_ASSEMBLY_SPAWN_RADIUS_M = 0.340
+
 BUTTON_SAMPLE_X_RANGE_M = (0.65, 2.95)
 BUTTON_SAMPLE_Y_RANGE_M = (-1.20, 1.20)
 BUTTON_SAMPLE_Z_RANGE_M = (0.10, 0.17623346377092517)
@@ -2285,6 +2293,9 @@ class ButtonTestCourse:
     press_direction_world_xy: tuple[float, float]
     base_standoff_xy_m: tuple[float, float]
     base_standoff_yaw_rad: float
+    assembly_spawn_center_xy_m: tuple[float, float]
+    assembly_spawn_yaw_rad: float
+    assembly_spawn_radius_m: float
     spec: ButtonTargetSpec
 
     def to_observation(self) -> dict[str, Any]:
@@ -2342,6 +2353,20 @@ class ButtonTestCourse:
 
                 "base_standoff_yaw_rad":
                     self.base_standoff_yaw_rad,
+
+                "assembly_spawn": {
+                    "layout":
+                        "button_relative_scaled_radial_v1",
+
+                    "center_xy_m":
+                        list(self.assembly_spawn_center_xy_m),
+
+                    "yaw_rad":
+                        self.assembly_spawn_yaw_rad,
+
+                    "radius_m":
+                        self.assembly_spawn_radius_m,
+                },
 
                 "plunger_depth_m":
                     BUTTON_PLUNGER_DEPTH_M,
@@ -2714,6 +2739,30 @@ def mobile_manipulator_button_test_course(
         BUTTON_PLATFORM_SIZE_XY_M
     )
 
+    assembly_spawn_standoff_m = {
+        6341: 0.60,
+        6265: 0.60,
+    }.get(
+        spec.seed,
+        BUTTON_ASSEMBLY_SPAWN_STANDOFF_M,
+    )
+
+    assembly_spawn_center = (
+        button_center[0]
+        - nx * assembly_spawn_standoff_m,
+
+        button_center[1]
+        - ny * assembly_spawn_standoff_m,
+    )
+
+    # Match the validated RC->MM8 handoff orientation: the robot's
+    # longitudinal +X points away from the button so its rear/manipulator
+    # side faces the fixture.
+    assembly_spawn_yaw = math.atan2(
+        -ny,
+        -nx,
+    )
+
     return ButtonTestCourse(
         boxes=(
             CourseBox(
@@ -2774,6 +2823,15 @@ def mobile_manipulator_button_test_course(
         # +Y => +90 degrees.
         base_standoff_yaw_rad=
             math.atan2(ny, nx),
+
+        assembly_spawn_center_xy_m=
+            assembly_spawn_center,
+
+        assembly_spawn_yaw_rad=
+            assembly_spawn_yaw,
+
+        assembly_spawn_radius_m=
+            BUTTON_ASSEMBLY_SPAWN_RADIUS_M,
 
         spec=spec,
     )

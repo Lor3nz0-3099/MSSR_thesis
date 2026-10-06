@@ -490,11 +490,6 @@ class SmoresParallelSelfAssemblyNode(Node):
             decision
         )
 
-        self._publish_decision(
-            decision,
-            task_graph,
-        )
-
         # Normally there is one pending IL transition per distinct
         # physical graph stamp.  Repeated 20 Hz control ticks over the
         # same cached graph must not create duplicate dataset records.
@@ -544,6 +539,14 @@ class SmoresParallelSelfAssemblyNode(Node):
                     "Parallel self-assembly failed: "
                     f"{decision.message}"
                 )
+
+        # Publish the structural state only after the corresponding dataset
+        # transition has been finalized.  A terminal packet allows teleop to
+        # terminate this expert process immediately.
+        self._publish_decision(
+            decision,
+            task_graph,
+        )
 
     def _create_plan(
         self,

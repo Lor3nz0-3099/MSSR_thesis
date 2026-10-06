@@ -201,8 +201,8 @@ def compact_episode(entry: dict) -> dict:
 
 def main() -> None:
     collection = json.loads((SOURCE / "manifest.json").read_text())
-    if len(collection["episodes"]) != 13:
-        raise ValueError("expected 13 curated teleoperation episodes before compaction")
+    if len(collection["episodes"]) != 21:
+        raise ValueError("expected 21 curated teleoperation episodes before compaction")
     (DEST / "episodes").mkdir(parents=True, exist_ok=True)
     summaries = [compact_episode(entry) for entry in collection["episodes"]]
     result = {

@@ -270,6 +270,55 @@ def place_composite_spawn_layout(
         ) in layout.items()
     }
 
+def place_button_spawn_layout(
+    layout: Mapping[str, tuple[float, float, float, float]],
+    obstacle_course: Any,
+) -> dict[str, tuple[float, float, float, float]]:
+    """Scale/rotate/translate a loose-module layout in front of a button.
+
+    The isolated button course owns the static spawn context.  This function
+    only maps the generic self-assembly layout into that context; it does not
+    hard-code a morphology or a runner-specific module assignment.
+    """
+
+    if not layout:
+        raise ValueError("Button assembly spawn layout cannot be empty")
+
+    center_x, center_y = (
+        float(obstacle_course.assembly_spawn_center_xy_m[0]),
+        float(obstacle_course.assembly_spawn_center_xy_m[1]),
+    )
+    target_radius = float(obstacle_course.assembly_spawn_radius_m)
+    yaw_rad = float(obstacle_course.assembly_spawn_yaw_rad)
+
+    source_center_x = sum(pose[0] for pose in layout.values()) / len(layout)
+    source_center_y = sum(pose[1] for pose in layout.values()) / len(layout)
+    source_radius = max(
+        math.hypot(pose[0] - source_center_x, pose[1] - source_center_y)
+        for pose in layout.values()
+    )
+    if source_radius <= 1.0e-9:
+        raise ValueError("Button assembly spawn source layout has zero radius")
+
+    scale = target_radius / source_radius
+    c = math.cos(yaw_rad)
+    s = math.sin(yaw_rad)
+    yaw_deg = math.degrees(yaw_rad)
+
+    placed = {}
+    for module_id, (x_m, y_m, z_m, module_yaw_deg) in layout.items():
+        dx = (float(x_m) - source_center_x) * scale
+        dy = (float(y_m) - source_center_y) * scale
+        placed[module_id] = (
+            center_x + c * dx - s * dy,
+            center_y + s * dx + c * dy,
+            float(z_m),
+            float(module_yaw_deg) + yaw_deg,
+        )
+
+    return placed
+
+
 def closest_module_to_centroid(
     layout: Mapping[str, tuple[float, float, float, float]],
 ) -> str:
@@ -687,6 +736,17 @@ def run_parallel_self_assembly_scenario(
             layout,
             obstacle_course,
             layout_profile=composite_layout_profile,
+        )
+
+    elif config.button_test_course:
+        if obstacle_course is None:
+            raise RuntimeError(
+                "Button test course did not create an obstacle course"
+            )
+
+        layout = place_button_spawn_layout(
+            layout,
+            obstacle_course,
         )
 
     elif config.manual_obstacle_course:
