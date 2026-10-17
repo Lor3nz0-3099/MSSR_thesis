@@ -1,0 +1,10 @@
+TORCH PROFILER OPERATOR SUMMARY — UNAVAILABLE
+
+The host interrupted before a torch.profiler result was published.
+No top-20 CPU/CUDA operator table or kernel-busy-time measurement was saved.
+No profiler was rerun during recovery, per the agreed closure using saved results.
+This file records missing evidence; it is not a profiler output.
+
+Available evidence: timings.json, including synchronized region timings,
+H1/H2 internal measurements, utilization, cardinality and numerical guards.
+Cause of host freeze: unconfirmed. No claim of a measured OOM or driver failure.

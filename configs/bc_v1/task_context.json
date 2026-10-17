@@ -1,0 +1,652 @@
+{
+  "schema_version": "mssr.bc_v1.task_context.v2",
+  "task_vocabulary": [
+    "UNKNOWN",
+    "navigation",
+    "gap",
+    "stairs",
+    "button"
+  ],
+  "task_aliases": {
+    "navigation": "navigation",
+    "flat_navigation": "navigation",
+    "nav2_planar_route": "navigation",
+    "gap": "gap",
+    "gap_crossing": "gap",
+    "snake_gap": "gap",
+    "stairs": "stairs",
+    "crawl_stairs_spatial_concertina": "stairs",
+    "snake_stairs": "stairs",
+    "button": "button",
+    "button_press": "button",
+    "press_button": "button",
+    "goal": "navigation"
+  },
+  "frames": [
+    "world",
+    "map",
+    "stage_local",
+    "body_local"
+  ],
+  "feature_naming": "Spatial values: <source-frame>.<group>.<field>. Uncertified frame: unframed with valid=false. Intrinsic values: <group>.<field>. Array indices address physical objects, never source IDs. No frame transformation.",
+  "geometry": {
+    "gap": {
+      "context": {
+        "width_m": "scalar",
+        "bank_width_m": "scalar",
+        "bank_thickness_m": "scalar",
+        "landing_length_m": "scalar"
+      },
+      "spatial": {
+        "near_edge_x_m": "scalar",
+        "far_edge_x_m": "scalar",
+        "near_edge_world_xyz_m": "vector3",
+        "far_edge_world_xyz_m": "vector3",
+        "near_edge_center_world_xyz_m": "vector3",
+        "far_edge_center_world_xyz_m": "vector3",
+        "crossing_direction_world_xy": "vector2"
+      }
+    },
+    "stairs": {
+      "context": {
+        "riser_depth_m": "scalar",
+        "rise_m": "scalar",
+        "tread_depth_m": "scalar",
+        "width_m": "scalar",
+        "step_count": "scalar"
+      },
+      "spatial": {
+        "first_riser_x_m": "scalar",
+        "base_height_m": "scalar",
+        "top_heights_m": "numbers",
+        "first_riser_center_world_xyz_m": "vector3",
+        "ascent_direction_world_xy": "vector2",
+        "top_heights_world_m": "numbers"
+      }
+    },
+    "button": {
+      "context": {
+        "face_size_tangent_z_m": "vector2",
+        "plunger_depth_m": "scalar",
+        "plunger_stroke_m": "scalar"
+      },
+      "dynamic": {
+        "depression_m": "scalar",
+        "current_center_xyz_m": "vector3"
+      },
+      "spatial": {
+        "center_xyz_m": "vector3",
+        "press_direction_world_xy": "vector2",
+        "press_direction_world_xyz": "vector3",
+        "press_yaw_rad": "scalar"
+      }
+    },
+    "cones": {
+      "context": {
+        "cone_radius_m": "scalar",
+        "cone_height_m": "scalar",
+        "corridor_width_m": "scalar"
+      }
+    },
+    "environment": {
+      "context": {
+        "clear_landing_length_m": "scalar"
+      },
+      "spatial": {
+        "floor_height_m": "scalar",
+        "upper_deck_height_m": "scalar",
+        "platform_bounds_xy_m": "vector4"
+      }
+    },
+    "goal": {
+      "spatial": {
+        "center_xyz_m": "vector3"
+      }
+    }
+  },
+  "policy_context_semantics": "Current externally specified problem and current-task static/global geometry only. No stage/mode, configuration destination, executor/FSM, future task sequence or outcome. Dynamic measurements remain in o_t; source frames and validity are retained without transformation.",
+  "physical_static_objects": {
+    "navigation_cones": {
+      "group": "environment_cones",
+      "fields": {
+        "center_xyz_m": {
+          "kind": "vector3",
+          "spatial": true
+        },
+        "radius_m": {
+          "kind": "scalar",
+          "spatial": false
+        },
+        "height_m": {
+          "kind": "scalar",
+          "spatial": false
+        }
+      }
+    }
+  },
+  "mission_geometry_scope": {
+    "object_ownership": "declared task_id or generator-authored sanitized task_id name prefix; never waypoint inference",
+    "shared_object_names": [
+      "CompositeStartPlatform"
+    ],
+    "terminal_goal_object_names": [
+      "CompositeGoalPlatform"
+    ]
+  },
+  "historical_imputation_semantics": {
+    "version": "successor-mission-task.v1",
+    "evidence_class": "HISTORICAL_PROTOCOL_IMPUTATION",
+    "assumption": "The structural intervals in a handoff prepare its declared successor problem. Multiple intervals may prepare the same successor. Goal is terminal navigation. No task was directly recorded before the historical structural actions. The assignment is reconstructed from the predeclared mission plan, not target morphology, future states/actions, outcomes or the next Canonical row.",
+    "boundary": "Switch at interval start; preserve the successor as a floor after the interval so stale predecessor locators cannot switch the task back. Current modern geometric mission locators may advance to later segments; legacy morphology-based locators are ignored.",
+    "geometry": "Only the selected segment parameters and owned physical fixtures plus explicitly listed shared physical support are exposed."
+  },
+  "historical_mission_imputations": [
+    {
+      "episode_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+      "mission_order": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "stairs-2",
+          "type": "stairs"
+        },
+        {
+          "task_id": "flat_navigation-3",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 1725,
+          "end_index": 2902,
+          "predecessor_task_id": "flat_navigation-1",
+          "successor_task_id": "stairs-2"
+        },
+        {
+          "start_index": 7297,
+          "end_index": 8349,
+          "predecessor_task_id": "stairs-2",
+          "successor_task_id": "flat_navigation-3"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+      "mission_order": [
+        {
+          "task_id": "gap-1",
+          "type": "gap"
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "button-3",
+          "type": "button"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 649,
+          "end_index": 1827,
+          "predecessor_task_id": null,
+          "successor_task_id": "gap-1"
+        },
+        {
+          "start_index": 3673,
+          "end_index": 4739,
+          "predecessor_task_id": "gap-1",
+          "successor_task_id": "flat_navigation-2"
+        },
+        {
+          "start_index": 7220,
+          "end_index": 7891,
+          "predecessor_task_id": "flat_navigation-2",
+          "successor_task_id": "button-3"
+        },
+        {
+          "start_index": 8591,
+          "end_index": 9234,
+          "predecessor_task_id": "button-3",
+          "successor_task_id": "goal"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+      "mission_order": [
+        {
+          "task_id": "button-1",
+          "type": "button"
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "gap-3",
+          "type": "gap"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 1124,
+          "end_index": 1801,
+          "predecessor_task_id": null,
+          "successor_task_id": "button-1"
+        },
+        {
+          "start_index": 2456,
+          "end_index": 3101,
+          "predecessor_task_id": "button-1",
+          "successor_task_id": "flat_navigation-2"
+        },
+        {
+          "start_index": 5527,
+          "end_index": 6696,
+          "predecessor_task_id": "flat_navigation-2",
+          "successor_task_id": "gap-3"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+      "mission_order": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "gap-2",
+          "type": "gap"
+        },
+        {
+          "task_id": "flat_navigation-3",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 1662,
+          "end_index": 2804,
+          "predecessor_task_id": "flat_navigation-1",
+          "successor_task_id": "gap-2"
+        },
+        {
+          "start_index": 4446,
+          "end_index": 5519,
+          "predecessor_task_id": "gap-2",
+          "successor_task_id": "flat_navigation-3"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-5bb5a4712d924617aab5604b6deb20b4",
+      "mission_order": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "button-3",
+          "type": "button"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 3647,
+          "end_index": 4347,
+          "predecessor_task_id": "flat_navigation-2",
+          "successor_task_id": "button-3"
+        },
+        {
+          "start_index": 4929,
+          "end_index": 5580,
+          "predecessor_task_id": "button-3",
+          "successor_task_id": "goal"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-5e0c4d97db80492bbb561b16ef132949",
+      "mission_order": [
+        {
+          "task_id": "flat_navigation-1",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "stairs-2",
+          "type": "stairs"
+        },
+        {
+          "task_id": "gap-3",
+          "type": "gap"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 1539,
+          "end_index": 2729,
+          "predecessor_task_id": "flat_navigation-1",
+          "successor_task_id": "stairs-2"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+      "mission_order": [
+        {
+          "task_id": "stairs-1",
+          "type": "stairs"
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "button-3",
+          "type": "button"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 3135,
+          "end_index": 4212,
+          "predecessor_task_id": "stairs-1",
+          "successor_task_id": "flat_navigation-2"
+        },
+        {
+          "start_index": 7096,
+          "end_index": 7783,
+          "predecessor_task_id": "flat_navigation-2",
+          "successor_task_id": "button-3"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-952c36750c624fb19de8421019325d13",
+      "mission_order": [
+        {
+          "task_id": "button-1",
+          "type": "button"
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "stairs-3",
+          "type": "stairs"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 1174,
+          "end_index": 1873,
+          "predecessor_task_id": null,
+          "successor_task_id": "button-1"
+        },
+        {
+          "start_index": 2504,
+          "end_index": 3154,
+          "predecessor_task_id": "button-1",
+          "successor_task_id": "flat_navigation-2"
+        },
+        {
+          "start_index": 4822,
+          "end_index": 5996,
+          "predecessor_task_id": "flat_navigation-2",
+          "successor_task_id": "stairs-3"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+      "mission_order": [
+        {
+          "task_id": "gap-1",
+          "type": "gap"
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "button-3",
+          "type": "button"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 575,
+          "end_index": 1730,
+          "predecessor_task_id": null,
+          "successor_task_id": "gap-1"
+        },
+        {
+          "start_index": 3393,
+          "end_index": 4466,
+          "predecessor_task_id": "gap-1",
+          "successor_task_id": "flat_navigation-2"
+        },
+        {
+          "start_index": 6794,
+          "end_index": 7487,
+          "predecessor_task_id": "flat_navigation-2",
+          "successor_task_id": "button-3"
+        },
+        {
+          "start_index": 8265,
+          "end_index": 8925,
+          "predecessor_task_id": "button-3",
+          "successor_task_id": "goal"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-adcf33433f954669838220b9f617d952",
+      "mission_order": [
+        {
+          "task_id": "stairs-1",
+          "type": "stairs"
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "gap-3",
+          "type": "gap"
+        },
+        {
+          "task_id": "button-4",
+          "type": "button"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 5090,
+          "end_index": 6167,
+          "predecessor_task_id": "stairs-1",
+          "successor_task_id": "flat_navigation-2"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-ce8293656bb444ac999f87c0520672fc",
+      "mission_order": [
+        {
+          "task_id": "gap-1",
+          "type": "gap"
+        },
+        {
+          "task_id": "stairs-2",
+          "type": "stairs"
+        },
+        {
+          "task_id": "button-3",
+          "type": "button"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 2766,
+          "end_index": 3829,
+          "predecessor_task_id": "gap-1",
+          "successor_task_id": "stairs-2"
+        },
+        {
+          "start_index": 5281,
+          "end_index": 6460,
+          "predecessor_task_id": "gap-1",
+          "successor_task_id": "stairs-2"
+        },
+        {
+          "start_index": 11178,
+          "end_index": 12237,
+          "predecessor_task_id": "stairs-2",
+          "successor_task_id": "button-3"
+        },
+        {
+          "start_index": 13281,
+          "end_index": 13987,
+          "predecessor_task_id": "stairs-2",
+          "successor_task_id": "button-3"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+      "mission_order": [
+        {
+          "task_id": "gap-1",
+          "type": "gap"
+        },
+        {
+          "task_id": "rc-1",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "button-1",
+          "type": "button"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 1906,
+          "end_index": 3000,
+          "predecessor_task_id": "gap-1",
+          "successor_task_id": "rc-1"
+        },
+        {
+          "start_index": 5365,
+          "end_index": 6063,
+          "predecessor_task_id": "rc-1",
+          "successor_task_id": "button-1"
+        }
+      ]
+    },
+    {
+      "episode_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+      "mission_order": [
+        {
+          "task_id": "stairs-1",
+          "type": "stairs"
+        },
+        {
+          "task_id": "flat_navigation-2",
+          "type": "flat_navigation"
+        },
+        {
+          "task_id": "button-3",
+          "type": "button"
+        },
+        {
+          "task_id": "goal",
+          "type": "goal"
+        }
+      ],
+      "intervals": [
+        {
+          "start_index": 460,
+          "end_index": 1893,
+          "predecessor_task_id": null,
+          "successor_task_id": "stairs-1"
+        },
+        {
+          "start_index": 8844,
+          "end_index": 9919,
+          "predecessor_task_id": "stairs-1",
+          "successor_task_id": "flat_navigation-2"
+        },
+        {
+          "start_index": 12687,
+          "end_index": 13385,
+          "predecessor_task_id": "flat_navigation-2",
+          "successor_task_id": "button-3"
+        },
+        {
+          "start_index": 14349,
+          "end_index": 14986,
+          "predecessor_task_id": "button-3",
+          "successor_task_id": "goal"
+        }
+      ]
+    }
+  ]
+}

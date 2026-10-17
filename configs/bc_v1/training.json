@@ -1,0 +1,32 @@
+{
+  "schema_version": "mssr.bc_v1.training.v1",
+  "source": {
+    "path": "datasets/expert_v1_canonical_v6",
+    "dataset_name": "expert_v1_canonical_v6",
+    "schema_version": "mssr.canonical_dataset_collection.v5",
+    "transition_schema_version": "mssr.canonical_transition.v5",
+    "manifest_sha256": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562"
+  },
+  "split": {
+    "schema_version": "mssr.bc_v1.episode_split.v1",
+    "algorithm": "stratified_grouped_holdout.v1",
+    "seed": 20261006,
+    "inventory_path": "artifacts/bc_v1/splits/f1_v1/episodes.json",
+    "manifest_path": "artifacts/bc_v1/splits/f1_v1/split.json",
+    "manifest_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+    "audit_path": "artifacts/bc_v1/splits/f1_v1/audit.json",
+    "frozen": true,
+    "strata_config": {
+      "schema_version": "mssr.bc_v1.strata.v1",
+      "eligible_count_field": "bc_valid_transitions",
+      "strata": [
+        {"name": "expert_gap", "match": {"kind": "expert", "task": "gap"}, "total": 18, "quotas": {"train": 12, "validation": 3, "test": 3}},
+        {"name": "expert_stairs", "match": {"kind": "expert", "task": "stairs"}, "total": 18, "quotas": {"train": 12, "validation": 3, "test": 3}},
+        {"name": "expert_navigation", "match": {"kind": "expert", "task": "rc_car"}, "total": 13, "quotas": {"train": 9, "validation": 2, "test": 2}},
+        {"name": "teleop_button", "match": {"kind": "teleop", "teleop_profile": "button"}, "total": 8, "quotas": {"train": 6, "validation": 1, "test": 1}},
+        {"name": "teleop_mission", "match": {"kind": "teleop", "teleop_profile": "mission"}, "total": 13, "quotas": {"train": 9, "validation": 2, "test": 2}},
+        {"name": "expert_assembly", "match": {"kind": "expert", "task": "assembly"}, "total": 3, "quotas": {"train": 1, "validation": 1, "test": 1}}
+      ]
+    }
+  }
+}

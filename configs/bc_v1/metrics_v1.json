@@ -1,0 +1,5 @@
+{
+  "schema_version": "mssr.bc_v1.metrics.v1",
+  "tolerances": {"rad/s": 0.1, "rad": 0.05, "s": 0.1},
+  "breakdowns": ["task", "morphology"]
+}

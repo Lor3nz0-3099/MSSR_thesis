@@ -1,0 +1,247 @@
+{
+  "schema_version": "mssr.bc_v1.post_j_performance_audit.v1",
+  "status": "recovered_measurements_with_explicit_profiler_gap",
+  "ready_for_review": true,
+  "original_requested_profile_complete": false,
+  "recovered_after_host_interruption": true,
+  "environment": {
+    "torch": "2.14.1+cu130",
+    "cuda": "13.0",
+    "gpu": "NVIDIA GeForce RTX 4070 Laptop GPU",
+    "device": "cuda:0",
+    "dtype": "float32",
+    "amp": false,
+    "deterministic": false,
+    "seed": 20261006,
+    "cpu_threads": 1
+  },
+  "production_changes": false,
+  "full_training_started": false,
+  "new_gpu_work_after_recovery": false,
+  "timings_sha256": "089575e64af92f46bfed98e41182862a1e9c2d4b4815ed19a24bcbaaa569beef",
+  "batch64_production_step": {
+    "n": 9,
+    "mean_ms": 28433.445435893696,
+    "median_ms": 28492.385935998755,
+    "p95_ms": 28811.70681240619,
+    "min_ms": 28081.61178402952,
+    "max_ms": 28823.992454010295
+  },
+  "batch64_components": {
+    "zero_grad": {
+      "n": 9,
+      "mean_ms": 0.4742755554616451,
+      "median_ms": 0.33603099291212857,
+      "p95_ms": 0.9323142003268003,
+      "min_ms": 0.2837670035660267,
+      "max_ms": 0.935667019803077
+    },
+    "h1": {
+      "n": 9,
+      "mean_ms": 38.90896689457198,
+      "median_ms": 39.328643993940204,
+      "p95_ms": 40.379822615068406,
+      "min_ms": 35.16443102853373,
+      "max_ms": 40.47290701419115
+    },
+    "h2": {
+      "n": 9,
+      "mean_ms": 27972.59545222106,
+      "median_ms": 27879.049656970892,
+      "p95_ms": 28552.954832592513,
+      "min_ms": 27449.613381002564,
+      "max_ms": 28574.87350498559
+    },
+    "i1": {
+      "n": 9,
+      "mean_ms": 161.6472473348646,
+      "median_ms": 160.46319002634846,
+      "p95_ms": 172.64768339809962,
+      "min_ms": 155.09729698533192,
+      "max_ms": 178.27171899261884
+    },
+    "backward": {
+      "n": 9,
+      "mean_ms": 399.0417848916776,
+      "median_ms": 398.0823580059223,
+      "p95_ms": 407.1720510022715,
+      "min_ms": 388.71800000197254,
+      "max_ms": 407.618700992316
+    },
+    "clip": {
+      "n": 9,
+      "mean_ms": 2.151055332635426,
+      "median_ms": 2.049290982540697,
+      "p95_ms": 2.5601387955248356,
+      "min_ms": 1.8462599837221205,
+      "max_ms": 2.646506007295102
+    },
+    "optimizer": {
+      "n": 9,
+      "mean_ms": 2.0035646642403058,
+      "median_ms": 1.9008769886568189,
+      "p95_ms": 2.53340519266203,
+      "min_ms": 1.79401901550591,
+      "max_ms": 2.9114659992046654
+    },
+    "diagnostics": {
+      "n": 9,
+      "mean_ms": 0.27519788515443605,
+      "median_ms": 0.26951899053528905,
+      "p95_ms": 0.3182118176482618,
+      "min_ms": 0.25883299531415105,
+      "max_ms": 0.3490910166874528
+    },
+    "full_wall_ms": {
+      "n": 9,
+      "mean_ms": 28578.245166446624,
+      "median_ms": 28483.15602299408,
+      "p95_ms": 29167.267829406774,
+      "min_ms": 28049.137933005113,
+      "max_ms": 29191.034604999004
+    }
+  },
+  "j_wall_decomposition": {
+    "historical_wall_s": 1123.0908395320002,
+    "estimated_train_s": 1099.1524958412629,
+    "estimated_periodic_forward_s": 21.968865478442748,
+    "estimated_periodic_loss_s": 0.058685162004549055,
+    "estimated_periodic_I2_s": 0.46220788002635044,
+    "checkpoint_and_final_verification_inside_historical_timer_s": 0,
+    "unattributed_difference_s": 1.448585170263641
+  },
+  "full_training_estimates": {
+    "production_step_only": {
+      "seconds_per_step": 28.433445435893695,
+      "seconds_per_epoch": 34802.537213533884,
+      "minutes_per_epoch": 580.0422868922313,
+      "hours_per_epoch": 9.667371448203857,
+      "hours_10_epochs": 96.67371448203856,
+      "hours_50_epochs": 483.3685724101928,
+      "hours_100_epochs": 966.7371448203857
+    },
+    "current_with_loader_transfer_and_J_eval_every_50": {
+      "seconds_per_step": 29.847444497425652,
+      "seconds_per_epoch": 36533.272064849,
+      "minutes_per_epoch": 608.8878677474834,
+      "hours_per_epoch": 10.148131129124723,
+      "hours_10_epochs": 101.48131129124722,
+      "hours_50_epochs": 507.4065564562361,
+      "hours_100_epochs": 1014.8131129124722
+    },
+    "excluding_periodic_eval_and_measured_family_diagnostics": {
+      "seconds_per_step": 29.256528369358016,
+      "seconds_per_epoch": 35809.99072409421,
+      "minutes_per_epoch": 596.8331787349035,
+      "hours_per_epoch": 9.947219645581725,
+      "hours_10_epochs": 99.47219645581725,
+      "hours_50_epochs": 497.3609822790863,
+      "hours_100_epochs": 994.7219645581725
+    }
+  },
+  "estimate_assumptions": {
+    "train_samples": 78302,
+    "batch_size": 64,
+    "steps_per_epoch": 1224,
+    "real_sampler_batches": 3,
+    "sampler": {
+      "general": 56,
+      "structural": 8,
+      "seed": 20261006
+    },
+    "loader_overlapped": false,
+    "periodic_eval_scenario_interval": 50,
+    "eval_loss_time_proxy": "split I1; exact combined periodic eval not timed",
+    "heldout_eval_and_checkpoint_cost_included": false
+  },
+  "numerical_checks": {
+    "j8": {
+      "output_tensors": 35,
+      "bitwise_equal_count": 35,
+      "max_output_absolute_difference": 0.0,
+      "shape_matches": true,
+      "dtype_matches": true,
+      "all_finite": true,
+      "assert_close": "PASS",
+      "rtol": 1e-06,
+      "atol": 1e-07
+    },
+    "b64_0": {
+      "output_tensors": 35,
+      "bitwise_equal_count": 35,
+      "max_output_absolute_difference": 0.0,
+      "shape_matches": true,
+      "dtype_matches": true,
+      "all_finite": true,
+      "assert_close": "PASS",
+      "rtol": 1e-06,
+      "atol": 1e-07
+    }
+  },
+  "frozen_checks": {
+    "sources_verified": true,
+    "identity": {
+      "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+      "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+      "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+      "f2_fingerprint": "890eca0b9f6d4deca2cac81d3a41bf535aa3d03ac16e0ff4b81cbc0ca163abf5",
+      "normalizer_sha": "ea8efbd9062acb8625e0618bcc5f86b975f20839bf3132a684a626c744e52003",
+      "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+      "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+      "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+      "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+      "tensorizer_fingerprint": "61e64fb426197b8f1926afad1856067aa3bb07273a05010cde2734dc420f9fda",
+      "storage_fingerprint": "9a5ae40bf224ae53901937883622d2c26935a47def2c93dd5c9c5866e4465bca"
+    },
+    "sidecar_fingerprint": "7bb9f77df7eefe7c3b0246cea10383ec484274093514b59294ea7d752458052a",
+    "sidecar_complete": true,
+    "sidecar_sample_count": 119600,
+    "train_sample_count": 78302,
+    "sidecar_matches_approved": true,
+    "checkpoint_sha256": "84d88d4332c65bd7f7c57f024668d4eb021647272519884505d1df2768e65e47",
+    "checkpoint_matches_approved": true,
+    "j_selection_matches_manifest": true,
+    "checkpoint_upstream_identity_matches": true,
+    "j_config_checks": {
+      "h1": true,
+      "h2": true,
+      "i1": true,
+      "i2": true
+    },
+    "recovery_branch": "wip/t8-c05-human-teleop-20260921",
+    "timings_sha256": "089575e64af92f46bfed98e41182862a1e9c2d4b4815ed19a24bcbaaa569beef"
+  },
+  "limitations": [
+    "Torch profiler operator trace/top-20 did not survive the host interruption and was not rerun. No CUDA kernel busy-time attribution is available.",
+    "Original scratch scripts, pre-profile file hashes and 163-file stat snapshot were lost with /tmp. Identity pins/checkpoint hash were freshly verified; exhaustive pre-interruption byte comparison cannot be reconstructed.",
+    "Root cause of host freeze is unconfirmed; checked current/previous kernel journal had no OOM/kill/Xid/lockup match.",
+    "Three real sampler batches (nine production steps) support estimates, not epoch-wide complexity or statistical confidence bounds. Held-out evaluation/checkpoint costs are not benchmarked."
+  ],
+  "git_audit": {
+    "branch": "wip/t8-c05-human-teleop-20260921",
+    "recovery_files_unchanged": 136,
+    "original_timings_unchanged": true,
+    "diff_check_exit": 0,
+    "new_recovery_status_entries": [
+      "?? artifacts/bc_v1/audits/post_j_performance_v1/report.md",
+      "?? artifacts/bc_v1/audits/post_j_performance_v1/summary.json",
+      "?? artifacts/bc_v1/audits/post_j_performance_v1/torch_profiler_top_ops.txt"
+    ],
+    "removed_status_entries": [],
+    "tracked_diff_stat_unchanged": true,
+    "staged_paths": [],
+    "status_entries": 368,
+    "status_sha256": "75eedb2977d9d6b72b9bd3a2d7a8842e7baac2e87b295f2054122a0b0644e726",
+    "tracked_dirty_files": [
+      "mssr_ws/src/mssr_expert/mssr_expert/execution/parallel_assembly_executor.py",
+      "mssr_ws/src/mssr_expert/mssr_expert/nodes/smores_parallel_self_assembly_node.py",
+      "mssr_ws/src/mssr_expert/test/test_parallel_assembly_executor.py",
+      "scripts/dataset_tools/build_expert_v1.py",
+      "scripts/smores_ep/run_button_expert_to_ik.py",
+      "scripts/smores_ep/src/smores_ep/control/button_ik_math.py",
+      "scripts/smores_ep/tests/test_button_ik_source_contract.py"
+    ],
+    "original_pre_interruption_baseline_available": false,
+    "production_changes_this_task": false
+  }
+}

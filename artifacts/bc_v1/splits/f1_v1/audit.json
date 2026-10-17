@@ -1,0 +1,232 @@
+{
+  "counts_source_sha256": "72464dfe52c80046a212e3697409e5ff7afe5b40f4206cb28150311df226404c",
+  "lineage_audit": {
+    "all_groups_singleton": true,
+    "eligible_groups": 73,
+    "excluded_episodes": [
+      "expert:button:seed-006101",
+      "expert:button:seed-006103",
+      "expert:button:seed-006107",
+      "expert:button:seed-006251",
+      "expert:button:seed-008568",
+      "expert:button:seed-008936",
+      "expert:button:seed-009974"
+    ],
+    "shared_identity_or_hash_conflicts": 0
+  },
+  "membership_selection": "seeded once; diagnostic audit never changes membership",
+  "schema_version": "mssr.bc_v1.split_audit.v1",
+  "split_manifest_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+  "splits": {
+    "test": {
+      "bc_valid_transitions": 18536,
+      "episode_support": {
+        "align_faces": 11,
+        "dock": 11,
+        "gravity_settle": 2,
+        "pan_delta": 0,
+        "pan_target": 2,
+        "pan_velocity": 4,
+        "tilt_delta": 0,
+        "tilt_target": 12,
+        "tilt_velocity": 0,
+        "undock": 2,
+        "wheel_velocity": 11
+      },
+      "episodes": 12,
+      "kind_counts": {
+        "expert": 9,
+        "teleop": 3
+      },
+      "largest_episodes": [
+        {
+          "bc_valid_transitions": 10384,
+          "episode_id": "teleop-ce8293656bb444ac999f87c0520672fc"
+        },
+        {
+          "bc_valid_transitions": 5273,
+          "episode_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53"
+        },
+        {
+          "bc_valid_transitions": 544,
+          "episode_id": "teleop-b1456ab292aa4a319c9d4bcc17e7e57f"
+        }
+      ],
+      "smallest_episodes": [
+        {
+          "bc_valid_transitions": 19,
+          "episode_id": "expert:assembly:seed-006284"
+        },
+        {
+          "bc_valid_transitions": 182,
+          "episode_id": "expert:stairs:seed-004676"
+        },
+        {
+          "bc_valid_transitions": 247,
+          "episode_id": "expert:gap:seed-004107"
+        }
+      ],
+      "stratum_counts": {
+        "expert_assembly": 1,
+        "expert_gap": 3,
+        "expert_navigation": 2,
+        "expert_stairs": 3,
+        "teleop_button": 1,
+        "teleop_mission": 2
+      },
+      "supervised_instances": {
+        "align_faces": 85,
+        "dock": 81,
+        "gravity_settle": 3,
+        "pan_delta": 0,
+        "pan_target": 37,
+        "pan_velocity": 26756,
+        "tilt_delta": 0,
+        "tilt_target": 10677,
+        "tilt_velocity": 0,
+        "undock": 22,
+        "wheel_velocity": 96880
+      }
+    },
+    "train": {
+      "bc_valid_transitions": 78302,
+      "episode_support": {
+        "align_faces": 48,
+        "dock": 48,
+        "gravity_settle": 8,
+        "pan_delta": 0,
+        "pan_target": 13,
+        "pan_velocity": 18,
+        "tilt_delta": 0,
+        "tilt_target": 49,
+        "tilt_velocity": 0,
+        "undock": 9,
+        "wheel_velocity": 48
+      },
+      "episodes": 49,
+      "kind_counts": {
+        "expert": 34,
+        "teleop": 15
+      },
+      "largest_episodes": [
+        {
+          "bc_valid_transitions": 9725,
+          "episode_id": "teleop-5e0c4d97db80492bbb561b16ef132949"
+        },
+        {
+          "bc_valid_transitions": 7770,
+          "episode_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8"
+        },
+        {
+          "bc_valid_transitions": 7751,
+          "episode_id": "teleop-952c36750c624fb19de8421019325d13"
+        }
+      ],
+      "smallest_episodes": [
+        {
+          "bc_valid_transitions": 19,
+          "episode_id": "expert:assembly:seed-006307"
+        },
+        {
+          "bc_valid_transitions": 188,
+          "episode_id": "expert:stairs:seed-004007"
+        },
+        {
+          "bc_valid_transitions": 231,
+          "episode_id": "expert:rc_car:seed-005103"
+        }
+      ],
+      "stratum_counts": {
+        "expert_assembly": 1,
+        "expert_gap": 12,
+        "expert_navigation": 9,
+        "expert_stairs": 12,
+        "teleop_button": 6,
+        "teleop_mission": 9
+      },
+      "supervised_instances": {
+        "align_faces": 332,
+        "dock": 313,
+        "gravity_settle": 15,
+        "pan_delta": 0,
+        "pan_target": 527,
+        "pan_velocity": 121016,
+        "tilt_delta": 0,
+        "tilt_target": 58324,
+        "tilt_velocity": 0,
+        "undock": 60,
+        "wheel_velocity": 374122
+      }
+    },
+    "validation": {
+      "bc_valid_transitions": 22762,
+      "episode_support": {
+        "align_faces": 11,
+        "dock": 11,
+        "gravity_settle": 2,
+        "pan_delta": 0,
+        "pan_target": 3,
+        "pan_velocity": 4,
+        "tilt_delta": 0,
+        "tilt_target": 12,
+        "tilt_velocity": 0,
+        "undock": 2,
+        "wheel_velocity": 11
+      },
+      "episodes": 12,
+      "kind_counts": {
+        "expert": 9,
+        "teleop": 3
+      },
+      "largest_episodes": [
+        {
+          "bc_valid_transitions": 12350,
+          "episode_id": "teleop-fb69637be28d49ccbff572e721cfae24"
+        },
+        {
+          "bc_valid_transitions": 7016,
+          "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c"
+        },
+        {
+          "bc_valid_transitions": 1017,
+          "episode_id": "teleop-170338d489a64eb397a10cf9910392a1"
+        }
+      ],
+      "smallest_episodes": [
+        {
+          "bc_valid_transitions": 19,
+          "episode_id": "expert:assembly:seed-006217"
+        },
+        {
+          "bc_valid_transitions": 238,
+          "episode_id": "expert:gap:seed-005855"
+        },
+        {
+          "bc_valid_transitions": 256,
+          "episode_id": "expert:rc_car:seed-005105"
+        }
+      ],
+      "stratum_counts": {
+        "expert_assembly": 1,
+        "expert_gap": 3,
+        "expert_navigation": 2,
+        "expert_stairs": 3,
+        "teleop_button": 1,
+        "teleop_mission": 2
+      },
+      "supervised_instances": {
+        "align_faces": 86,
+        "dock": 83,
+        "gravity_settle": 6,
+        "pan_delta": 0,
+        "pan_target": 47,
+        "pan_velocity": 38712,
+        "tilt_delta": 0,
+        "tilt_target": 15759,
+        "tilt_velocity": 0,
+        "undock": 24,
+        "wheel_velocity": 105940
+      }
+    }
+  }
+}

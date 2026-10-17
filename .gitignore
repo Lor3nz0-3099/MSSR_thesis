@@ -73,3 +73,15 @@ assets/freebot/usd_visual/
 assets/smores-ep/usd_physics/
 
 assets/smores-ep/usd_visual/
+
+
+# BC-v1 generated/runtime artifacts
+artifacts/bc_v1/cache/**/episodes/
+artifacts/bc_v1/cache/**/*.pt
+artifacts/bc_v1/cache/**/*.log
+artifacts/bc_v1/sidecar/**/*.sqlite3
+artifacts/bc_v1/checkpoints/**/*.pt
+artifacts/bc_v1/checkpoints/k1_baseline_v1/
+artifacts/bc_v1/runs/
+artifacts/bc_v1/audits/k1_baseline_v1/
+artifacts/bc_v1/audits/pre_j_data_inspection_v1/samples.json

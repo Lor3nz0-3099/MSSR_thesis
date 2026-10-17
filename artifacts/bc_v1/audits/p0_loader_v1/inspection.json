@@ -1,0 +1,3542 @@
+{
+  "benchmark_sampler_seed": 12345,
+  "benchmark_seed": 27,
+  "build": {
+    "build_elapsed_s": 7102.3300957530155,
+    "complete": true,
+    "episode_count": 73,
+    "sample_count": 119600,
+    "storage": {
+      "bytes": 1294589952,
+      "file": "data.sqlite3",
+      "format": "sqlite3+zlib1+pickle5-packed-tensors"
+    },
+    "template_count": 6107
+  },
+  "build_exit_code": 0,
+  "comparison": {
+    "batch64": {
+      "collate_speedup": 0.6228371926471757,
+      "direct_collate_s": 0.04417998401913792,
+      "direct_fetch_s": 85.96444728699862,
+      "direct_total_s": 86.00862727101776,
+      "fetch_speedup": 308.1400352480485,
+      "optimized_collate_s": 0.07093343901215121,
+      "optimized_fetch_s": 0.278978507994907,
+      "optimized_total_s": 0.3499119470070582,
+      "total_speedup": 245.8007736137196
+    },
+    "grouped12": {
+      "collate_speedup": 1.001680736186605,
+      "direct_collate_s": 0.012660366017371416,
+      "direct_fetch_s": 6.063037613988854,
+      "direct_total_s": 6.075697980006225,
+      "fetch_speedup": 57.21896107982787,
+      "optimized_collate_s": 0.012639122986001894,
+      "optimized_fetch_s": 0.105962036002893,
+      "optimized_total_s": 0.1186011589888949,
+      "total_speedup": 51.22798151217997
+    },
+    "random12": {
+      "collate_speedup": 1.5079581312658272,
+      "direct_collate_s": 0.019086125015746802,
+      "direct_fetch_s": 15.988771326985443,
+      "direct_total_s": 16.00785745200119,
+      "fetch_speedup": 2459.123554170465,
+      "optimized_collate_s": 0.0126569329877384,
+      "optimized_fetch_s": 0.006501816998934373,
+      "optimized_total_s": 0.019158749986672774,
+      "total_speedup": 835.5376766822777
+    },
+    "random256": {
+      "collate_speedup": 0.8229541215803495,
+      "direct_collate_s": 0.20018014599918388,
+      "direct_fetch_s": 342.93293212598655,
+      "direct_total_s": 343.13311227198574,
+      "fetch_speedup": 462.88322509390787,
+      "optimized_collate_s": 0.24324581498512998,
+      "optimized_fetch_s": 0.7408627349941526,
+      "optimized_total_s": 0.9841085499792825,
+      "total_speedup": 348.6740484870387
+    },
+    "sequential12": {
+      "collate_speedup": 0.7903475372309535,
+      "direct_collate_s": 0.009632706001866609,
+      "direct_fetch_s": 2.6101714019896463,
+      "direct_total_s": 2.619804107991513,
+      "fetch_speedup": 23.34974087978873,
+      "optimized_collate_s": 0.01218793701264076,
+      "optimized_fetch_s": 0.11178588299662806,
+      "optimized_total_s": 0.12397382000926882,
+      "total_speedup": 21.131914042784558
+    }
+  },
+  "diagnostic_workspace": "/tmp/mssr-p0-resume-5swnrnjw",
+  "direct": {
+    "batch64": {
+      "collate_s": 0.04417998401913792,
+      "episode_load_s": 78.86365913899499,
+      "episode_loads": 41,
+      "f2_s": 0.5121530729811639,
+      "fetch_per_s": 0.744493822967666,
+      "g2_without_f2_s": 6.5886350750224665,
+      "n": 64,
+      "wall_s": 85.96444728699862
+    },
+    "grouped12": {
+      "collate_s": 0.012660366017371416,
+      "episode_load_s": 4.023019682994345,
+      "episode_loads": 3,
+      "f2_s": 0.0909532630466856,
+      "fetch_per_s": 1.9792059300956961,
+      "g2_without_f2_s": 1.9490646679478232,
+      "n": 12,
+      "wall_s": 6.063037613988854
+    },
+    "random12": {
+      "collate_s": 0.019086125015746802,
+      "episode_load_s": 13.590091130987275,
+      "episode_loads": 10,
+      "f2_s": 0.09178319000056945,
+      "fetch_per_s": 0.7505267136910454,
+      "g2_without_f2_s": 2.306897005997598,
+      "n": 12,
+      "wall_s": 15.988771326985443
+    },
+    "random256": {
+      "collate_s": 0.20018014599918388,
+      "episode_load_s": 315.91930861090077,
+      "episode_loads": 142,
+      "f2_s": 2.039265198953217,
+      "fetch_per_s": 0.7465016509582428,
+      "g2_without_f2_s": 24.974358316132566,
+      "n": 256,
+      "wall_s": 342.93293212598655
+    },
+    "sequential12": {
+      "collate_s": 0.009632706001866609,
+      "episode_load_s": 1.1468643760017585,
+      "episode_loads": 1,
+      "f2_s": 0.08816070089233108,
+      "fetch_per_s": 4.597399232423128,
+      "g2_without_f2_s": 1.3751463250955567,
+      "n": 12,
+      "wall_s": 2.6101714019896463
+    }
+  },
+  "direct_benchmark_population": {
+    "episode_rows": {
+      "expert:assembly:seed-006307": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18
+      ],
+      "expert:gap:seed-004303": [
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26,
+        27,
+        28,
+        29,
+        30,
+        31,
+        32,
+        33,
+        34,
+        35,
+        36,
+        37,
+        38,
+        39,
+        40,
+        41,
+        42,
+        43,
+        44,
+        45,
+        46,
+        47,
+        48,
+        49,
+        50,
+        51,
+        52,
+        53,
+        54,
+        55,
+        56,
+        57,
+        58,
+        59,
+        60,
+        61,
+        62,
+        63,
+        64,
+        65,
+        66,
+        67,
+        68,
+        69,
+        70,
+        71,
+        72,
+        73,
+        74,
+        75,
+        76,
+        77,
+        78,
+        79,
+        80,
+        81,
+        82,
+        83,
+        84,
+        85,
+        86,
+        87,
+        88,
+        89,
+        90,
+        91,
+        92,
+        93,
+        94,
+        95,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119,
+        120,
+        121,
+        122,
+        123,
+        124,
+        125,
+        126,
+        127,
+        128,
+        129,
+        130,
+        131,
+        132,
+        133,
+        134,
+        135,
+        136,
+        137,
+        138,
+        139,
+        140,
+        141,
+        142,
+        143,
+        144,
+        145,
+        146,
+        147,
+        148,
+        149,
+        150,
+        151,
+        152,
+        153,
+        154,
+        155,
+        156,
+        157,
+        158,
+        159,
+        160,
+        161,
+        162,
+        163,
+        164,
+        165,
+        166,
+        167,
+        168,
+        169,
+        170,
+        171,
+        172,
+        173,
+        174,
+        175,
+        176,
+        177,
+        178,
+        179,
+        180,
+        181,
+        182,
+        183,
+        184,
+        185,
+        186,
+        187,
+        188,
+        189,
+        190,
+        191,
+        192,
+        193,
+        194,
+        195,
+        196,
+        197,
+        198,
+        199,
+        200,
+        201,
+        202,
+        203,
+        204,
+        205,
+        206,
+        207,
+        208,
+        209,
+        210,
+        211,
+        212,
+        213,
+        214,
+        215,
+        216,
+        217,
+        218,
+        219,
+        220,
+        221,
+        222,
+        223,
+        224,
+        225,
+        226,
+        227,
+        228,
+        229,
+        230,
+        231,
+        232,
+        233,
+        234,
+        235,
+        236,
+        237,
+        238,
+        239,
+        240,
+        241,
+        242,
+        243,
+        244,
+        245,
+        246,
+        247,
+        248,
+        249,
+        250,
+        251,
+        252,
+        253,
+        254,
+        255
+      ],
+      "expert:rc_car:seed-005100": [
+        256,
+        257,
+        258,
+        259,
+        260,
+        261,
+        262,
+        263,
+        264,
+        265,
+        266,
+        267,
+        268,
+        269,
+        270,
+        271,
+        272,
+        273,
+        274,
+        275,
+        276,
+        277,
+        278,
+        279,
+        280,
+        281,
+        282,
+        283,
+        284,
+        285,
+        286,
+        287,
+        288,
+        289,
+        290,
+        291,
+        292,
+        293,
+        294,
+        295,
+        296,
+        297,
+        298,
+        299,
+        300,
+        301,
+        302,
+        303,
+        304,
+        305,
+        306,
+        307,
+        308,
+        309,
+        310,
+        311,
+        312,
+        313,
+        314,
+        315,
+        316,
+        317,
+        318,
+        319,
+        320,
+        321,
+        322,
+        323,
+        324,
+        325,
+        326,
+        327,
+        328,
+        329,
+        330,
+        331,
+        332,
+        333,
+        334,
+        335,
+        336,
+        337,
+        338,
+        339,
+        340,
+        341,
+        342,
+        343,
+        344,
+        345,
+        346,
+        347,
+        348,
+        349,
+        350,
+        351,
+        352,
+        353,
+        354,
+        355,
+        356,
+        357,
+        358,
+        359,
+        360,
+        361,
+        362,
+        363,
+        364,
+        365,
+        366,
+        367,
+        368,
+        369,
+        370,
+        371,
+        372,
+        373,
+        374,
+        375,
+        376,
+        377,
+        378,
+        379,
+        380,
+        381,
+        382,
+        383,
+        384,
+        385,
+        386,
+        387,
+        388,
+        389,
+        390,
+        391,
+        392,
+        393,
+        394,
+        395,
+        396,
+        397,
+        398,
+        399,
+        400,
+        401,
+        402,
+        403,
+        404,
+        405,
+        406,
+        407,
+        408,
+        409,
+        410,
+        411,
+        412,
+        413,
+        414,
+        415,
+        416,
+        417,
+        418,
+        419,
+        420,
+        421,
+        422,
+        423,
+        424,
+        425,
+        426,
+        427,
+        428,
+        429,
+        430,
+        431,
+        432,
+        433,
+        434,
+        435,
+        436,
+        437,
+        438,
+        439,
+        440,
+        441,
+        442,
+        443,
+        444,
+        445,
+        446,
+        447,
+        448,
+        449,
+        450,
+        451,
+        452,
+        453,
+        454,
+        455,
+        456,
+        457,
+        458,
+        459,
+        460,
+        461,
+        462,
+        463,
+        464,
+        465,
+        466,
+        467,
+        468,
+        469,
+        470,
+        471,
+        472,
+        473,
+        474,
+        475,
+        476,
+        477,
+        478,
+        479,
+        480,
+        481,
+        482,
+        483,
+        484,
+        485,
+        486,
+        487,
+        488,
+        489,
+        490,
+        491,
+        492,
+        493,
+        494,
+        495,
+        496,
+        497,
+        498,
+        499,
+        500,
+        501,
+        502,
+        503,
+        504,
+        505,
+        506,
+        507,
+        508,
+        509,
+        510,
+        511,
+        512,
+        513,
+        514,
+        515,
+        516,
+        517,
+        518,
+        519,
+        520,
+        521,
+        522,
+        523,
+        524,
+        525,
+        526,
+        527,
+        528,
+        529,
+        530,
+        531,
+        532,
+        533,
+        534,
+        535,
+        536,
+        537,
+        538,
+        539,
+        540,
+        541,
+        542,
+        543,
+        544,
+        545,
+        546,
+        547,
+        548,
+        549,
+        550,
+        551,
+        552,
+        553,
+        554,
+        555,
+        556,
+        557,
+        558,
+        559,
+        560,
+        561,
+        562,
+        563,
+        564,
+        565,
+        566,
+        567,
+        568,
+        569,
+        570,
+        571,
+        572,
+        573,
+        574,
+        575,
+        576,
+        577,
+        578,
+        579,
+        580,
+        581,
+        582,
+        583,
+        584,
+        585,
+        586,
+        587,
+        588,
+        589,
+        590,
+        591,
+        592,
+        593,
+        594,
+        595,
+        596,
+        597,
+        598,
+        599,
+        600,
+        601,
+        602,
+        603,
+        604,
+        605,
+        606,
+        607,
+        608,
+        609,
+        610,
+        611,
+        612,
+        613,
+        614,
+        615,
+        616,
+        617,
+        618,
+        619,
+        620,
+        621,
+        622,
+        623,
+        624,
+        625,
+        626,
+        627,
+        628,
+        629,
+        630,
+        631,
+        632,
+        633,
+        634,
+        635,
+        636
+      ]
+    },
+    "identity": {
+      "split_name": "train"
+    },
+    "structural_rows": {
+      "expert:assembly:seed-006307": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11
+      ],
+      "expert:gap:seed-004303": [
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25,
+        26
+      ],
+      "expert:rc_car:seed-005100": [
+        256,
+        257,
+        258,
+        259,
+        260
+      ]
+    }
+  },
+  "disk_gate": {
+    "conservative_full_bytes": 4187140512.4999995,
+    "decision": "PASS",
+    "free_bytes": 258476937216,
+    "full_projection_bytes": 2093570256.2499998,
+    "pilot_bytes": 14563967,
+    "safety_reserve_bytes": 21474836480,
+    "temporary_bytes": 8374281024.999999,
+    "time": 1792073202.0535336
+  },
+  "feed": {
+    "benchmark": {
+      "batch64": {
+        "collate_s": 0.07093343901215121,
+        "fetch_s": 0.278978507994907,
+        "p50_s": 0.0005556700052693486,
+        "p95_s": 0.008781489013927057,
+        "samples": 64,
+        "samples_per_s": 229.40835285121096,
+        "total_s": 0.3499119470070582
+      },
+      "grouped12": {
+        "collate_s": 0.012639122986001894,
+        "fetch_s": 0.105962036002893,
+        "p50_s": 0.006015010992996395,
+        "p95_s": 0.008318431006046012,
+        "samples": 12,
+        "samples_per_s": 113.24810708311016,
+        "total_s": 0.1186011589888949
+      },
+      "random12": {
+        "collate_s": 0.0126569329877384,
+        "fetch_s": 0.006501816998934373,
+        "p50_s": 0.0005651690007653087,
+        "p95_s": 0.0006091010000091046,
+        "samples": 12,
+        "samples_per_s": 1845.6379196718026,
+        "total_s": 0.019158749986672774
+      },
+      "random256": {
+        "collate_s": 0.24324581498512998,
+        "fetch_s": 0.7408627349941526,
+        "p50_s": 0.00042506400495767593,
+        "p95_s": 0.0036284789966885,
+        "samples": 256,
+        "samples_per_s": 345.5430917334782,
+        "total_s": 0.9841085499792825
+      },
+      "sequential12": {
+        "collate_s": 0.01218793701264076,
+        "fetch_s": 0.11178588299662806,
+        "p50_s": 0.005139949003932998,
+        "p95_s": 0.007543104002252221,
+        "samples": 12,
+        "samples_per_s": 107.34808079801965,
+        "total_s": 0.12397382000926882
+      }
+    },
+    "cold_private_cache": {
+      "cached_templates": 16,
+      "fetch_s": 0.6216583870118484,
+      "rss_mib": 518.6328125,
+      "samples_per_s": 411.8017312217503
+    },
+    "feed": {
+      "batches_per_s": 1.4009763135609758,
+      "loader_only": true,
+      "samples_per_s": 89.66248406790245,
+      "seconds_for_1224_full_batches": 873.6764413160272,
+      "seconds_per_1000": 11.152936597682128,
+      "seconds_per_78302": 873.297241471706
+    },
+    "holdouts": {
+      "test": {
+        "batches": 290,
+        "count": 18536,
+        "deterministic": true,
+        "drop_last": false,
+        "last_batch": 40,
+        "logical_keys_fingerprint": "049d5aaf8158ba2e751bba53cc3c2fac0d0f865545b75cb9733b13fe38fe3b8e",
+        "replacement": false,
+        "sequential": true
+      },
+      "validation": {
+        "batches": 356,
+        "count": 22762,
+        "deterministic": true,
+        "drop_last": false,
+        "last_batch": 42,
+        "logical_keys_fingerprint": "106c33712621905eb2e37bb73477392c0cda206fe19fd4db6c213dea42b44b11",
+        "replacement": false,
+        "sequential": true
+      }
+    },
+    "identity": {
+      "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+      "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+      "f2_fingerprint": "890eca0b9f6d4deca2cac81d3a41bf535aa3d03ac16e0ff4b81cbc0ca163abf5",
+      "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+      "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+      "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+      "normalizer_sha": "ea8efbd9062acb8625e0618bcc5f86b975f20839bf3132a684a626c744e52003",
+      "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+      "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+      "storage_fingerprint": "9a5ae40bf224ae53901937883622d2c26935a47def2c93dd5c9c5866e4465bca",
+      "tensorizer_fingerprint": "61e64fb426197b8f1926afad1856067aa3bb07273a05010cde2734dc420f9fda"
+    },
+    "notes": [
+      "one fresh CPU process; no GPU/training/optimizer",
+      "private LRU cold differs from OS cold: OS page cache not flushed",
+      "same-request baseline population is three TRAIN episodes, full sampler draws span all49 TRAIN episodes"
+    ],
+    "rss_after_benchmark_mib": 513.859375,
+    "rss_before_mib": 220.546875,
+    "rss_end_mib": 541.41015625,
+    "rss_peak_mib": 745.41015625,
+    "sampler": {
+      "batch": 64,
+      "draws": [
+        [
+          64854,
+          10658,
+          37563,
+          37839,
+          66823,
+          25839,
+          73274,
+          30565,
+          68619,
+          68777,
+          71423,
+          4211,
+          14120,
+          1504,
+          30844,
+          15269,
+          10532,
+          33731,
+          60514,
+          75429,
+          55945,
+          48307,
+          28536,
+          731,
+          11259,
+          21429,
+          65359,
+          17594,
+          27805,
+          16785,
+          21769,
+          60005,
+          7857,
+          3833,
+          12791,
+          57160,
+          8255,
+          23938,
+          35787,
+          16143,
+          50747,
+          63493,
+          29876,
+          20834,
+          46775,
+          29737,
+          5044,
+          66870,
+          65003,
+          5,
+          32032,
+          27453,
+          12805,
+          16136,
+          5280,
+          53843,
+          10774,
+          279,
+          71627,
+          5944,
+          13695,
+          33341,
+          5132,
+          10395
+        ],
+        [
+          74339,
+          65161,
+          20203,
+          72547,
+          5993,
+          16988,
+          14646,
+          60784,
+          4413,
+          69183,
+          13930,
+          64747,
+          30079,
+          63341,
+          39462,
+          18507,
+          70688,
+          9254,
+          9512,
+          8600,
+          58262,
+          77043,
+          77801,
+          14879,
+          61120,
+          23229,
+          28529,
+          33347,
+          13794,
+          66725,
+          76278,
+          9784,
+          54342,
+          23863,
+          3002,
+          52787,
+          1052,
+          60080,
+          14120,
+          48725,
+          15043,
+          61873,
+          8506,
+          56665,
+          22254,
+          42428,
+          64395,
+          29891,
+          72003,
+          9814,
+          54157,
+          63833,
+          77669,
+          65799,
+          70448,
+          59536,
+          52703,
+          521,
+          8637,
+          3062,
+          1060,
+          67550,
+          4823,
+          10397
+        ],
+        [
+          14937,
+          58071,
+          17671,
+          63301,
+          1807,
+          64823,
+          859,
+          59657,
+          20172,
+          73473,
+          57498,
+          56016,
+          46669,
+          12842,
+          20698,
+          40404,
+          1563,
+          54603,
+          5033,
+          72450,
+          56507,
+          4037,
+          35015,
+          36871,
+          70152,
+          73345,
+          60155,
+          66203,
+          68975,
+          31751,
+          73776,
+          14681,
+          69607,
+          18607,
+          52442,
+          8876,
+          23546,
+          56527,
+          47927,
+          3316,
+          35387,
+          63511,
+          27854,
+          53872,
+          8336,
+          73119,
+          45138,
+          21334,
+          55683,
+          28201,
+          69858,
+          55953,
+          75159,
+          61935,
+          17437,
+          29917,
+          4822,
+          1321,
+          70566,
+          9013,
+          795,
+          4297,
+          21,
+          4529
+        ],
+        [
+          19030,
+          66278,
+          18584,
+          30402,
+          75541,
+          22101,
+          61185,
+          34642,
+          31357,
+          61886,
+          32221,
+          75968,
+          29250,
+          56098,
+          49752,
+          16027,
+          132,
+          60731,
+          14533,
+          59132,
+          20183,
+          10898,
+          41263,
+          51993,
+          69753,
+          54,
+          5708,
+          27037,
+          30633,
+          76133,
+          9975,
+          26031,
+          69165,
+          19584,
+          47831,
+          57452,
+          18112,
+          23798,
+          52332,
+          30,
+          1039,
+          75332,
+          26536,
+          31789,
+          4853,
+          15196,
+          49346,
+          7776,
+          55416,
+          32360,
+          29210,
+          69254,
+          14515,
+          57630,
+          17140,
+          38329,
+          11514,
+          6274,
+          2826,
+          2068,
+          77466,
+          3683,
+          77465,
+          5691
+        ]
+      ],
+      "episodes": 49,
+      "ordinary_quota": 56,
+      "replacement": "unchanged; legitimate repeated draws allowed",
+      "rows": 78302,
+      "seed": 20261006,
+      "seed_repeat": "exact",
+      "state_resume": "exact",
+      "structural_episodes": 48,
+      "structural_quota": 8,
+      "structural_rows": 466,
+      "structural_selection": "unchanged uniform episode then uniform row",
+      "timings": [
+        {
+          "batch": 0,
+          "cached_templates": 16,
+          "collate_s": 0.0496814209909644,
+          "fetch_s": 0.655659893003758,
+          "rss_mib": 541.41015625,
+          "total_s": 0.7053413139947224
+        },
+        {
+          "batch": 1,
+          "cached_templates": 16,
+          "collate_s": 0.042127632012125105,
+          "fetch_s": 0.6537803279934451,
+          "rss_mib": 541.41015625,
+          "total_s": 0.6959079600055702
+        },
+        {
+          "batch": 2,
+          "cached_templates": 16,
+          "collate_s": 0.04235441001947038,
+          "fetch_s": 0.6757969559985213,
+          "rss_mib": 541.41015625,
+          "total_s": 0.7181513660179917
+        },
+        {
+          "batch": 3,
+          "cached_templates": 16,
+          "collate_s": 0.04135348999989219,
+          "fetch_s": 0.6943976389884483,
+          "rss_mib": 541.41015625,
+          "total_s": 0.7357511289883405
+        }
+      ]
+    },
+    "warm_private_cache": {
+      "cached_templates": 16,
+      "fetch_s": 0.7763412740023341,
+      "rss_mib": 519.5546875,
+      "samples_per_s": 329.7518869249638
+    }
+  },
+  "final_free_disk_bytes": 256344711168,
+  "frozen_check": {
+    "branch_unchanged": true,
+    "content_changes": [],
+    "preexisting_content_hashes_checked": 128,
+    "preexisting_signatures_checked": 155,
+    "signature_changes": [],
+    "tracked_diff_identical": true
+  },
+  "full_integrity": {
+    "duplicates": 0,
+    "elapsed_s": 113.50294084698544,
+    "episodes": 73,
+    "grouping_preserved": true,
+    "groups_checked": 1110,
+    "inventory_matches_frozen_g1": true,
+    "missing": 0,
+    "operations": {
+      "align_faces": 503,
+      "dock": 477,
+      "gravity_settle": 24,
+      "undock": 106
+    },
+    "routing_failures": 0,
+    "samples": 119600,
+    "settle_endpoint_free_checked": 24,
+    "splits": {
+      "test": 18536,
+      "train": 78302,
+      "validation": 22762
+    },
+    "structural_samples": 723
+  },
+  "full_size": {
+    "dynamic_compressed_bytes": 886784175,
+    "file_bytes": 1294603414,
+    "files": [
+      "data.sqlite3",
+      "manifest.json"
+    ],
+    "naive_repeated_compressed_parts_bytes": 5772011387,
+    "templates": 6107,
+    "unique_template_compressed_bytes": 265048402
+  },
+  "gate": "YES",
+  "git_branch": "wip/t8-c05-human-teleop-20260921",
+  "logical_requests": {
+    "batch64": [
+      [
+        "expert:rc_car:seed-005100",
+        366
+      ],
+      [
+        "expert:assembly:seed-006307",
+        1797
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        245
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        317
+      ],
+      [
+        "expert:gap:seed-004303",
+        447
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        216
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        519
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        386
+      ],
+      [
+        "expert:gap:seed-004303",
+        414
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        322
+      ],
+      [
+        "expert:gap:seed-004303",
+        376
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        383
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        207
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        515
+      ],
+      [
+        "expert:gap:seed-004303",
+        427
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        566
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        506
+      ],
+      [
+        "expert:gap:seed-004303",
+        440
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        303
+      ],
+      [
+        "expert:gap:seed-004303",
+        342
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        483
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        362
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        539
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        456
+      ],
+      [
+        "expert:gap:seed-004303",
+        419
+      ],
+      [
+        "expert:gap:seed-004303",
+        400
+      ],
+      [
+        "expert:gap:seed-004303",
+        459
+      ],
+      [
+        "expert:gap:seed-004303",
+        328
+      ],
+      [
+        "expert:gap:seed-004303",
+        443
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        289
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        269
+      ],
+      [
+        "expert:gap:seed-004303",
+        215
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        409
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        287
+      ],
+      [
+        "expert:gap:seed-004303",
+        274
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        462
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        365
+      ],
+      [
+        "expert:assembly:seed-006307",
+        445
+      ],
+      [
+        "expert:assembly:seed-006307",
+        956
+      ],
+      [
+        "expert:gap:seed-004303",
+        416
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        534
+      ],
+      [
+        "expert:gap:seed-004303",
+        432
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        233
+      ],
+      [
+        "expert:gap:seed-004303",
+        350
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        364
+      ],
+      [
+        "expert:gap:seed-004303",
+        357
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        531
+      ],
+      [
+        "expert:gap:seed-004303",
+        435
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        324
+      ],
+      [
+        "expert:gap:seed-004303",
+        487
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        476
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        550
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        277
+      ],
+      [
+        "expert:gap:seed-004303",
+        290
+      ],
+      [
+        "expert:gap:seed-004303",
+        486
+      ],
+      [
+        "expert:gap:seed-004303",
+        371
+      ],
+      [
+        "expert:gap:seed-004303",
+        145
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        198
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        60
+      ],
+      [
+        "expert:gap:seed-004303",
+        216
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        60
+      ],
+      [
+        "expert:assembly:seed-006307",
+        444
+      ],
+      [
+        "expert:gap:seed-004303",
+        0
+      ],
+      [
+        "expert:assembly:seed-006307",
+        445
+      ]
+    ],
+    "grouped12": [
+      [
+        "expert:assembly:seed-006307",
+        0
+      ],
+      [
+        "expert:assembly:seed-006307",
+        1
+      ],
+      [
+        "expert:assembly:seed-006307",
+        444
+      ],
+      [
+        "expert:assembly:seed-006307",
+        445
+      ],
+      [
+        "expert:gap:seed-004303",
+        0
+      ],
+      [
+        "expert:gap:seed-004303",
+        86
+      ],
+      [
+        "expert:gap:seed-004303",
+        87
+      ],
+      [
+        "expert:gap:seed-004303",
+        145
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        0
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        60
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        61
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        133
+      ]
+    ],
+    "random12": [
+      [
+        "expert:gap:seed-004303",
+        86
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        133
+      ],
+      [
+        "expert:assembly:seed-006307",
+        1
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        0
+      ],
+      [
+        "expert:assembly:seed-006307",
+        444
+      ],
+      [
+        "expert:gap:seed-004303",
+        87
+      ],
+      [
+        "expert:assembly:seed-006307",
+        0
+      ],
+      [
+        "expert:assembly:seed-006307",
+        445
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        60
+      ],
+      [
+        "expert:gap:seed-004303",
+        0
+      ],
+      [
+        "expert:gap:seed-004303",
+        145
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        61
+      ]
+    ],
+    "random256": [
+      [
+        "expert:rc_car:seed-005100",
+        352
+      ],
+      [
+        "expert:gap:seed-004303",
+        436
+      ],
+      [
+        "expert:gap:seed-004303",
+        502
+      ],
+      [
+        "expert:gap:seed-004303",
+        494
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        442
+      ],
+      [
+        "expert:gap:seed-004303",
+        322
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        526
+      ],
+      [
+        "expert:gap:seed-004303",
+        329
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        565
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        375
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        367
+      ],
+      [
+        "expert:gap:seed-004303",
+        302
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        390
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        298
+      ],
+      [
+        "expert:assembly:seed-006307",
+        2084
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        429
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        133
+      ],
+      [
+        "expert:gap:seed-004303",
+        389
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        567
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        285
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        564
+      ],
+      [
+        "expert:gap:seed-004303",
+        481
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        476
+      ],
+      [
+        "expert:gap:seed-004303",
+        393
+      ],
+      [
+        "expert:gap:seed-004303",
+        350
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        341
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        249
+      ],
+      [
+        "expert:gap:seed-004303",
+        287
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        483
+      ],
+      [
+        "expert:gap:seed-004303",
+        335
+      ],
+      [
+        "expert:gap:seed-004303",
+        423
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        410
+      ],
+      [
+        "expert:gap:seed-004303",
+        404
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        211
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        493
+      ],
+      [
+        "expert:gap:seed-004303",
+        301
+      ],
+      [
+        "expert:gap:seed-004303",
+        426
+      ],
+      [
+        "expert:assembly:seed-006307",
+        2116
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        402
+      ],
+      [
+        "expert:gap:seed-004303",
+        403
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        294
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        527
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        528
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        365
+      ],
+      [
+        "expert:gap:seed-004303",
+        315
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        255
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        388
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        418
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        301
+      ],
+      [
+        "expert:assembly:seed-006307",
+        2084
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        309
+      ],
+      [
+        "expert:gap:seed-004303",
+        409
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        211
+      ],
+      [
+        "expert:gap:seed-004303",
+        430
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        434
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        305
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        468
+      ],
+      [
+        "expert:gap:seed-004303",
+        311
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        469
+      ],
+      [
+        "expert:gap:seed-004303",
+        504
+      ],
+      [
+        "expert:gap:seed-004303",
+        423
+      ],
+      [
+        "expert:gap:seed-004303",
+        461
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        440
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        509
+      ],
+      [
+        "expert:gap:seed-004303",
+        342
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        282
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        286
+      ],
+      [
+        "expert:gap:seed-004303",
+        307
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        342
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        291
+      ],
+      [
+        "expert:gap:seed-004303",
+        366
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        249
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        198
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        509
+      ],
+      [
+        "expert:gap:seed-004303",
+        333
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        247
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        407
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        414
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        231
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        465
+      ],
+      [
+        "expert:gap:seed-004303",
+        369
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        539
+      ],
+      [
+        "expert:gap:seed-004303",
+        146
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        231
+      ],
+      [
+        "expert:gap:seed-004303",
+        470
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        429
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        507
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        495
+      ],
+      [
+        "expert:gap:seed-004303",
+        372
+      ],
+      [
+        "expert:assembly:seed-006307",
+        445
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        546
+      ],
+      [
+        "expert:gap:seed-004303",
+        307
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        321
+      ],
+      [
+        "expert:gap:seed-004303",
+        443
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        243
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        568
+      ],
+      [
+        "expert:gap:seed-004303",
+        348
+      ],
+      [
+        "expert:gap:seed-004303",
+        281
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        515
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        373
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        360
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        411
+      ],
+      [
+        "expert:assembly:seed-006307",
+        445
+      ],
+      [
+        "expert:gap:seed-004303",
+        434
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        300
+      ],
+      [
+        "expert:assembly:seed-006307",
+        2106
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        575
+      ],
+      [
+        "expert:gap:seed-004303",
+        443
+      ],
+      [
+        "expert:gap:seed-004303",
+        481
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        330
+      ],
+      [
+        "expert:gap:seed-004303",
+        445
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        277
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        332
+      ],
+      [
+        "expert:gap:seed-004303",
+        313
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        293
+      ],
+      [
+        "expert:gap:seed-004303",
+        292
+      ],
+      [
+        "expert:gap:seed-004303",
+        436
+      ],
+      [
+        "expert:gap:seed-004303",
+        313
+      ],
+      [
+        "expert:gap:seed-004303",
+        329
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        241
+      ],
+      [
+        "expert:gap:seed-004303",
+        487
+      ],
+      [
+        "expert:gap:seed-004303",
+        389
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        413
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        559
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        428
+      ],
+      [
+        "expert:gap:seed-004303",
+        353
+      ],
+      [
+        "expert:gap:seed-004303",
+        487
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        549
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        317
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        227
+      ],
+      [
+        "expert:gap:seed-004303",
+        280
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        442
+      ],
+      [
+        "expert:gap:seed-004303",
+        414
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        259
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        487
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        418
+      ],
+      [
+        "expert:gap:seed-004303",
+        467
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        387
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        251
+      ],
+      [
+        "expert:gap:seed-004303",
+        457
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        461
+      ],
+      [
+        "expert:gap:seed-004303",
+        402
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        280
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        522
+      ],
+      [
+        "expert:gap:seed-004303",
+        308
+      ],
+      [
+        "expert:gap:seed-004303",
+        481
+      ],
+      [
+        "expert:gap:seed-004303",
+        376
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        420
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        562
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        570
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        562
+      ],
+      [
+        "expert:gap:seed-004303",
+        330
+      ],
+      [
+        "expert:gap:seed-004303",
+        498
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        384
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        265
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        253
+      ],
+      [
+        "expert:gap:seed-004303",
+        293
+      ],
+      [
+        "expert:gap:seed-004303",
+        378
+      ],
+      [
+        "expert:gap:seed-004303",
+        354
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        350
+      ],
+      [
+        "expert:gap:seed-004303",
+        337
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        323
+      ],
+      [
+        "expert:gap:seed-004303",
+        458
+      ],
+      [
+        "expert:gap:seed-004303",
+        418
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        498
+      ],
+      [
+        "expert:gap:seed-004303",
+        86
+      ],
+      [
+        "expert:gap:seed-004303",
+        440
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        394
+      ],
+      [
+        "expert:gap:seed-004303",
+        300
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        534
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        551
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        473
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        394
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        556
+      ],
+      [
+        "expert:gap:seed-004303",
+        300
+      ],
+      [
+        "expert:gap:seed-004303",
+        476
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        227
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        493
+      ],
+      [
+        "expert:gap:seed-004303",
+        456
+      ],
+      [
+        "expert:gap:seed-004303",
+        345
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        511
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        552
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        499
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        394
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        314
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        277
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        454
+      ],
+      [
+        "expert:gap:seed-004303",
+        462
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        341
+      ],
+      [
+        "expert:gap:seed-004303",
+        444
+      ],
+      [
+        "expert:gap:seed-004303",
+        414
+      ],
+      [
+        "expert:assembly:seed-006307",
+        1444
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        298
+      ],
+      [
+        "expert:gap:seed-004303",
+        495
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        473
+      ],
+      [
+        "expert:gap:seed-004303",
+        454
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        269
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        329
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        421
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        286
+      ],
+      [
+        "expert:gap:seed-004303",
+        316
+      ],
+      [
+        "expert:gap:seed-004303",
+        499
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        549
+      ],
+      [
+        "expert:gap:seed-004303",
+        324
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        536
+      ],
+      [
+        "expert:gap:seed-004303",
+        298
+      ],
+      [
+        "expert:gap:seed-004303",
+        382
+      ],
+      [
+        "expert:gap:seed-004303",
+        297
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        559
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        441
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        497
+      ],
+      [
+        "expert:gap:seed-004303",
+        344
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        398
+      ],
+      [
+        "expert:gap:seed-004303",
+        355
+      ],
+      [
+        "expert:gap:seed-004303",
+        386
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        254
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        527
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        437
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        279
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        482
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        493
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        331
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        284
+      ],
+      [
+        "expert:gap:seed-004303",
+        313
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        451
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        293
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        310
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        433
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        248
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        439
+      ],
+      [
+        "expert:gap:seed-004303",
+        441
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        569
+      ],
+      [
+        "expert:gap:seed-004303",
+        475
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        480
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        568
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        509
+      ],
+      [
+        "expert:gap:seed-004303",
+        494
+      ],
+      [
+        "expert:gap:seed-004303",
+        477
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        297
+      ],
+      [
+        "expert:gap:seed-004303",
+        359
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        255
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        242
+      ],
+      [
+        "expert:gap:seed-004303",
+        417
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        352
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        440
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        212
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        370
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        208
+      ],
+      [
+        "expert:gap:seed-004303",
+        278
+      ],
+      [
+        "expert:gap:seed-004303",
+        433
+      ],
+      [
+        "expert:gap:seed-004303",
+        361
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        479
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        412
+      ],
+      [
+        "expert:rc_car:seed-005100",
+        486
+      ],
+      [
+        "expert:gap:seed-004303",
+        291
+      ],
+      [
+        "expert:gap:seed-004303",
+        307
+      ]
+    ],
+    "sequential12": [
+      [
+        "expert:gap:seed-004303",
+        0
+      ],
+      [
+        "expert:gap:seed-004303",
+        86
+      ],
+      [
+        "expert:gap:seed-004303",
+        87
+      ],
+      [
+        "expert:gap:seed-004303",
+        145
+      ],
+      [
+        "expert:gap:seed-004303",
+        146
+      ],
+      [
+        "expert:gap:seed-004303",
+        215
+      ],
+      [
+        "expert:gap:seed-004303",
+        216
+      ],
+      [
+        "expert:gap:seed-004303",
+        273
+      ],
+      [
+        "expert:gap:seed-004303",
+        274
+      ],
+      [
+        "expert:gap:seed-004303",
+        275
+      ],
+      [
+        "expert:gap:seed-004303",
+        278
+      ],
+      [
+        "expert:gap:seed-004303",
+        279
+      ]
+    ]
+  },
+  "manifest": {
+    "complete": true,
+    "episode_count": 73,
+    "identity": {
+      "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+      "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+      "f2_fingerprint": "890eca0b9f6d4deca2cac81d3a41bf535aa3d03ac16e0ff4b81cbc0ca163abf5",
+      "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+      "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+      "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+      "normalizer_sha": "ea8efbd9062acb8625e0618bcc5f86b975f20839bf3132a684a626c744e52003",
+      "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+      "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+      "storage_fingerprint": "9a5ae40bf224ae53901937883622d2c26935a47def2c93dd5c9c5866e4465bca",
+      "tensorizer_fingerprint": "61e64fb426197b8f1926afad1856067aa3bb07273a05010cde2734dc420f9fda"
+    },
+    "inventory": {
+      "test": [
+        {
+          "episode_id": "expert:assembly:seed-006284",
+          "samples": 19,
+          "transition_indices_fingerprint": "3bf0056ee11cb9290b5e0d0a9b41c0919a8170e021903d45131b48c9fa2c5620"
+        },
+        {
+          "episode_id": "expert:gap:seed-004107",
+          "samples": 247,
+          "transition_indices_fingerprint": "dcdccff186d52180431cab7c9b4363e24951332573171130f6672ec2a843fb4f"
+        },
+        {
+          "episode_id": "expert:gap:seed-004110",
+          "samples": 251,
+          "transition_indices_fingerprint": "a43594062da88070d8024ebb3cd8d43a011f5afdaf8dd850af58aad6a5726de3"
+        },
+        {
+          "episode_id": "expert:gap:seed-014544",
+          "samples": 253,
+          "transition_indices_fingerprint": "5f9e0b5de7db54d77b565508df851335c87775eda84c9ce695e06788792d64e4"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-006000",
+          "samples": 303,
+          "transition_indices_fingerprint": "345567be1aa47023ce98e7587163f77b46200a3c1f6c14e9db807154b8407f65"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-006004",
+          "samples": 273,
+          "transition_indices_fingerprint": "db952e046a81256981c7c874f9afb8614de5c9d153ba468a2adff1221b7d195d"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003101",
+          "samples": 468,
+          "transition_indices_fingerprint": "1d5512f4b746dead98c3b4687b38d96534c47e4d23ea8d70d846474c6b4b6956"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003106",
+          "samples": 339,
+          "transition_indices_fingerprint": "839c98c774dcca0f197bdd98db51e167631e640c18df29fa49cf0bfcf58d0259"
+        },
+        {
+          "episode_id": "expert:stairs:seed-004676",
+          "samples": 182,
+          "transition_indices_fingerprint": "cbf508c7f27cea616ab1a315300535e79526b56564a7f5ea936600c8b3d6a75f"
+        },
+        {
+          "episode_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+          "samples": 5273,
+          "transition_indices_fingerprint": "35760e04abfce04b9b4d074ac3e8f11ee9d63c949a27fcb3bc936f0679904b34"
+        },
+        {
+          "episode_id": "teleop-b1456ab292aa4a319c9d4bcc17e7e57f",
+          "samples": 544,
+          "transition_indices_fingerprint": "919d6bc8be78c5861c630a441c6bc577a85af1227882e253964c1ecbd3dca698"
+        },
+        {
+          "episode_id": "teleop-ce8293656bb444ac999f87c0520672fc",
+          "samples": 10384,
+          "transition_indices_fingerprint": "ee1170966a73b35b8e290cd61ce9c2273142e9ff04a0f55451cf9bbe5c14fc6c"
+        }
+      ],
+      "train": [
+        {
+          "episode_id": "expert:assembly:seed-006307",
+          "samples": 19,
+          "transition_indices_fingerprint": "4d676fbfdbe9219038888b999e79d3d236e1f69f648e23fd6292e8e0603e425e"
+        },
+        {
+          "episode_id": "expert:gap:seed-004100",
+          "samples": 254,
+          "transition_indices_fingerprint": "b2bbfed29b2fcd426369ce92ac7f82f6f3aa5490ea52b6483e796dcc432f4873"
+        },
+        {
+          "episode_id": "expert:gap:seed-004102",
+          "samples": 244,
+          "transition_indices_fingerprint": "d658d9593c43ee96931ea813f5bd6301061ed360a5e5b364961576af8e9c9424"
+        },
+        {
+          "episode_id": "expert:gap:seed-004103",
+          "samples": 272,
+          "transition_indices_fingerprint": "e0938c593d352429dc3d0549d8d3b58e5670e8a14e96bd645bc2833dab95ca07"
+        },
+        {
+          "episode_id": "expert:gap:seed-004105",
+          "samples": 270,
+          "transition_indices_fingerprint": "b9ce5bff3af8b535211a9c72cea76d8082544afa94ea7a31a28fd0e26a114b4b"
+        },
+        {
+          "episode_id": "expert:gap:seed-004106",
+          "samples": 258,
+          "transition_indices_fingerprint": "0d3e57d9c54ffc19991971d6b825d092405f372949d17ecc084bcc5dedd143c3"
+        },
+        {
+          "episode_id": "expert:gap:seed-004108",
+          "samples": 251,
+          "transition_indices_fingerprint": "69b577ffe3df370ba8517bdc02804fd2e4557cf401d1a00d6bd90088c2974fbb"
+        },
+        {
+          "episode_id": "expert:gap:seed-004111",
+          "samples": 255,
+          "transition_indices_fingerprint": "8963948484172813e4338fcd6acc29500dabc1edd7e4d72d531256070e9c5b3a"
+        },
+        {
+          "episode_id": "expert:gap:seed-004303",
+          "samples": 237,
+          "transition_indices_fingerprint": "fea0ec09b81d388741793a135faa93600a69a10a7e5064ad6476f5eb9323ab5e"
+        },
+        {
+          "episode_id": "expert:gap:seed-005998",
+          "samples": 244,
+          "transition_indices_fingerprint": "79fec3abb4d817edeee96fd38d40ddd3de58ad0f3317de135d50b1983b9238c3"
+        },
+        {
+          "episode_id": "expert:gap:seed-006911",
+          "samples": 264,
+          "transition_indices_fingerprint": "a37ffae4474b3774290c6065ac8a75d40bb2e2c7c59a95517536142710597cdf"
+        },
+        {
+          "episode_id": "expert:gap:seed-007564",
+          "samples": 252,
+          "transition_indices_fingerprint": "e9a4441163329659286d58a788e4d44766b08753c7ef667ac6cb3c5c648b9f8b"
+        },
+        {
+          "episode_id": "expert:gap:seed-012398",
+          "samples": 239,
+          "transition_indices_fingerprint": "b6e3bdb0d06c910866e6213ef8fd8e97dcb0dfb02b086836af11bd82ce4341c6"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-005100",
+          "samples": 381,
+          "transition_indices_fingerprint": "b98d9ed1f92e00c426fea3e366999bc5f6ade864ca32cc6c02d0a5d4c8b4bc29"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-005101",
+          "samples": 237,
+          "transition_indices_fingerprint": "17a5dee807cf009d6f3ffa8129298a3dd8721b6b4dfa15c7b1ccb272f8d55a80"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-005102",
+          "samples": 617,
+          "transition_indices_fingerprint": "c076a2aa64c8953be3c8eb5295112e3bf381dbf02bcd0ce8271e26dc7499ac90"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-005103",
+          "samples": 231,
+          "transition_indices_fingerprint": "d8c3ef04a99bad2e8dd5f81a7533857496dd7cd45c5271c6af812724e03888ef"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-005104",
+          "samples": 294,
+          "transition_indices_fingerprint": "cb30556bbeecf2402878c50b3a4f887b8c1e1e2d138170bb2b794418f3c6cead"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-006001",
+          "samples": 311,
+          "transition_indices_fingerprint": "86329d2dd584ee9c327fed5502a99ea7131521b35b5c487471e07029a8fbf2ce"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-006017",
+          "samples": 269,
+          "transition_indices_fingerprint": "00280786b82f6140e3b2f2e5a12cdb84b945c8bda349fd1bd1f63dfa2c5f2108"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-006053",
+          "samples": 289,
+          "transition_indices_fingerprint": "45dba3b66409a3a9621135ba9b4807a1881e86f801423d6fa948ca788ae43b59"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-006056",
+          "samples": 255,
+          "transition_indices_fingerprint": "dc68104ee3fa0f07e05ee8245379f6b208be3034a16d30919f6aaf102ad38cc1"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003102",
+          "samples": 326,
+          "transition_indices_fingerprint": "fbf48c7c468510ba8c723d0fe68c6f5682f8253fe4f222e31611a7c0a229d0bf"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003104",
+          "samples": 425,
+          "transition_indices_fingerprint": "9839d24ba1a0107cc26a6adcc07d9354347fd02ea3aa04f56c0697e98ded4191"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003105",
+          "samples": 1489,
+          "transition_indices_fingerprint": "f91f066e39a048094d8b19a7cf4a26abb10911352ffb7b681c8d93a197fa24fd"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003107",
+          "samples": 453,
+          "transition_indices_fingerprint": "b00472a0eddfb08bb672fcb9ab876fd52931d3b5cb3f6c1fcbcf1560723ac1c9"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003108",
+          "samples": 373,
+          "transition_indices_fingerprint": "3f40a08c80d9668f8f425e26cd8c252ec0bca871c42463bddcabceef50b41fac"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003109",
+          "samples": 441,
+          "transition_indices_fingerprint": "3ad7f765f9239dc09eda33424bf77e14944566b6445f57245ece0e37b83770b6"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003110",
+          "samples": 317,
+          "transition_indices_fingerprint": "39d5e8880970f7cd09913e16bbaffc625bbd231d87a6e1a10edd4b60135a568c"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003292",
+          "samples": 439,
+          "transition_indices_fingerprint": "89e4d21cd81d37be429de0812a0d29a7eff6df24b521d7b6a0e3fed4960f96f3"
+        },
+        {
+          "episode_id": "expert:stairs:seed-004007",
+          "samples": 188,
+          "transition_indices_fingerprint": "19d88931f7efc2c0de610e15e01404f23e9e4bfef684b48c95b5986b465a5e50"
+        },
+        {
+          "episode_id": "expert:stairs:seed-004047",
+          "samples": 378,
+          "transition_indices_fingerprint": "e0d68a80caaa9986b5319dea912e00bf3850c8b2d15442921ccec0101227926b"
+        },
+        {
+          "episode_id": "expert:stairs:seed-006403",
+          "samples": 736,
+          "transition_indices_fingerprint": "3141a79de305d966cc271210a12c5f1d26a9fb55455d4559ae9f30fd100e05ce"
+        },
+        {
+          "episode_id": "expert:stairs:seed-006922",
+          "samples": 449,
+          "transition_indices_fingerprint": "ac0e95dd39238b08932f2232bb95bb918dd39cfdbb896511f8b424581c5e7db2"
+        },
+        {
+          "episode_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+          "samples": 7770,
+          "transition_indices_fingerprint": "5a307063eb8c11c7c5d757e2cf824da9c31b881e1ab3d6f91a29a65abd0f11bd"
+        },
+        {
+          "episode_id": "teleop-1f8b406b56f74377834cd863ebccf696",
+          "samples": 823,
+          "transition_indices_fingerprint": "308f2afc9279aafe1805eff2eac1437fd830ea2df7127b30b0ebcd28ce554d8d"
+        },
+        {
+          "episode_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+          "samples": 5745,
+          "transition_indices_fingerprint": "b2d403c1b6c712f657aef3d8227f3686d2ebb6bda27f432a06ce6280b2696869"
+        },
+        {
+          "episode_id": "teleop-5bb5a4712d924617aab5604b6deb20b4",
+          "samples": 5504,
+          "transition_indices_fingerprint": "9476ca3f3b1caff002a8ca7a1d574ee8ca5942db9acca3cac2a67996b4dbc9bf"
+        },
+        {
+          "episode_id": "teleop-5e0c4d97db80492bbb561b16ef132949",
+          "samples": 9725,
+          "transition_indices_fingerprint": "2b41c10c112f3d51a122ec3e4e677855c9eb3715ccc3c1960d7119de44f4af35"
+        },
+        {
+          "episode_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+          "samples": 6789,
+          "transition_indices_fingerprint": "f15b3d10d139145540358b9d2b209c03137b3ec84517c0fd40f8f9e073dab12d"
+        },
+        {
+          "episode_id": "teleop-8b55584534d24c86888b350e09c74e7b",
+          "samples": 887,
+          "transition_indices_fingerprint": "b5f66eb2c4510082a40b22678fd8dab4fc292053380256b6c65e467603b98040"
+        },
+        {
+          "episode_id": "teleop-952c36750c624fb19de8421019325d13",
+          "samples": 7751,
+          "transition_indices_fingerprint": "80a0d9fc872a41bd639fdd06f33a3da950c1aad6f7526a3873c6ec9ea7cf7d0e"
+        },
+        {
+          "episode_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+          "samples": 5797,
+          "transition_indices_fingerprint": "605db8735d9b088cf765464cfd9f95fd079f5bc11e311d4e4167610f11f6c8bc"
+        },
+        {
+          "episode_id": "teleop-adcf33433f954669838220b9f617d952",
+          "samples": 7018,
+          "transition_indices_fingerprint": "209d6ae7c9f2c03d05b608a0d6f97ba723cb3edb746b6527e93ac6615540a0d0"
+        },
+        {
+          "episode_id": "teleop-beaa63ebe5f347c6abc58baff9d1394a",
+          "samples": 792,
+          "transition_indices_fingerprint": "4a2be8cdc0c52660bceca945ba7e1abf502f895081cb6948f5adf621d0d4288f"
+        },
+        {
+          "episode_id": "teleop-c78e0455357147369ad16bc1bf39a0c2",
+          "samples": 1060,
+          "transition_indices_fingerprint": "84eb53ecd70ab3be548e8be1bfe24e7d2ac2d17f72d42dc3d9334ef3b417b58f"
+        },
+        {
+          "episode_id": "teleop-dd6bf8b9926d4a2aab6af7572646d026",
+          "samples": 575,
+          "transition_indices_fingerprint": "2f25d9c48cea465dd9a4e04cb5f04ed7ae6eb5420c50457d4a9ea1d5169175b5"
+        },
+        {
+          "episode_id": "teleop-edbefc66cecf40c180864b452aff8dab",
+          "samples": 984,
+          "transition_indices_fingerprint": "42b8fef72e983c2cf0272eecd4e0c8c54d438fc91ca74de948ee25dc307c30e3"
+        },
+        {
+          "episode_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+          "samples": 5125,
+          "transition_indices_fingerprint": "cf4064128ac6f09f67c6f627c626623345a5366817c52f5a0166c535daba59bf"
+        }
+      ],
+      "validation": [
+        {
+          "episode_id": "expert:assembly:seed-006217",
+          "samples": 19,
+          "transition_indices_fingerprint": "1abf3075945dd911c85dca7945f2aec9b25b0a794b00836dfbd0386e4f1e23d2"
+        },
+        {
+          "episode_id": "expert:gap:seed-004104",
+          "samples": 262,
+          "transition_indices_fingerprint": "06be1a0b6466f14ca9bf78a706a0d7123127facc4f96556b33398e269b56e866"
+        },
+        {
+          "episode_id": "expert:gap:seed-004109",
+          "samples": 266,
+          "transition_indices_fingerprint": "56c5be90118841373b1c9d31218351ba4737a5b592f5b8f26903d6856cbbd4f8"
+        },
+        {
+          "episode_id": "expert:gap:seed-005855",
+          "samples": 238,
+          "transition_indices_fingerprint": "402ca296e191a9b9067f664882038ba433f7fb716f7c6da3d48b6a6638af0bd6"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-005105",
+          "samples": 256,
+          "transition_indices_fingerprint": "aa9bfb0efd3ce1078b0c8de595c0deba60d72a093e2958238e977175d09df674"
+        },
+        {
+          "episode_id": "expert:rc_car:seed-005106",
+          "samples": 277,
+          "transition_indices_fingerprint": "cdd8d6d3f658852feee50c6a6fd90859c40c39286119856fad84c0b902c59017"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003100",
+          "samples": 398,
+          "transition_indices_fingerprint": "9cc92d9740d0896501a092b84ceaa6ade9b52bb8e98a70036a7a97ac3e2d50d8"
+        },
+        {
+          "episode_id": "expert:stairs:seed-003111",
+          "samples": 377,
+          "transition_indices_fingerprint": "5b290c99eaa48827dc1b43cae56f239566eec0c97f6c1447ed3b51e79978f10d"
+        },
+        {
+          "episode_id": "expert:stairs:seed-004689",
+          "samples": 286,
+          "transition_indices_fingerprint": "d799a49d175e142c03f26512ab7c9c023cb8537e58516578a5c674f788066aa7"
+        },
+        {
+          "episode_id": "teleop-170338d489a64eb397a10cf9910392a1",
+          "samples": 1017,
+          "transition_indices_fingerprint": "2a9c784aa00cef90fa5fb126750209c534454c7dd6d974fec96490eed64204d8"
+        },
+        {
+          "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+          "samples": 7016,
+          "transition_indices_fingerprint": "395e0ed601c51538e79ebfa9c2ebbd471613d96661aad101fa347e6840ba2c1c"
+        },
+        {
+          "episode_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+          "samples": 12350,
+          "transition_indices_fingerprint": "173e195603391567e524e67581fa5a343be6c258abe71daa677a2504cf5a9762"
+        }
+      ]
+    },
+    "manifest_fingerprint": "7bb9f77df7eefe7c3b0246cea10383ec484274093514b59294ea7d752458052a",
+    "membership_fingerprint": "1a0680f583252d21e3d406b91bf64923c5b468d4897ae2b7f40e2fe278fee56a",
+    "sample_count": 119600,
+    "schema_version": "mssr.bc_v1.g2_sidecar.v1",
+    "semantic_fingerprint": "0a449392ae39fca6e36a3ce5247808f0fe56e6283b79f710f2081a8deceda1d6",
+    "split_counts": {
+      "test": {
+        "episodes": 12,
+        "samples": 18536
+      },
+      "train": {
+        "episodes": 49,
+        "samples": 78302
+      },
+      "validation": {
+        "episodes": 12,
+        "samples": 22762
+      }
+    },
+    "storage": {
+      "bytes": 1294589952,
+      "file": "data.sqlite3",
+      "format": "sqlite3+zlib1+pickle5-packed-tensors"
+    },
+    "template_count": 6107,
+    "verification": "each dynamic record and each distinct template roundtripped exactly"
+  },
+  "new_repository_code_files": {
+    "configs/bc_v1/sidecar_v1.json": {
+      "bytes": 1176,
+      "sha256": "6ec68b021c6189a0640ea1f07670ee449d862455ca8d0f73906060b9bec3fe96"
+    },
+    "drl/IL/bc_v1/sidecar.py": {
+      "bytes": 23368,
+      "sha256": "8b201c7f0db8a269fa3bd90f26f5e3b165f728e79df4651f58c58bec1b119e20"
+    },
+    "drl/IL/bc_v1/sidecar_build.py": {
+      "bytes": 15456,
+      "sha256": "6c3fd2b866e475fcfb651c2d0bc6572613b24ca8e7f3815ce4536b2acbfd00c9"
+    },
+    "drl/IL/tests/bc_v1/test_sidecar.py": {
+      "bytes": 14413,
+      "sha256": "b78cbc379e1353d68f719d756f64b894e8c9580bf9f43935e59d6d6cb2d85256"
+    },
+    "drl/IL/tests/bc_v1/test_sidecar_build.py": {
+      "bytes": 6752,
+      "sha256": "993f9eb672bea77803e6b531ec24129c0fdd7d364b790e8344e656cb7f84f246"
+    }
+  },
+  "pilot": {
+    "benchmark": {
+      "batch64": {
+        "collate_s": 0.04261351400054991,
+        "fetch_s": 0.2340519739955198,
+        "p50_s": 0.000359753001248464,
+        "p95_s": 0.005745363014284521,
+        "samples": 64,
+        "samples_per_s": 273.4435386613107,
+        "total_s": 0.2766654879960697
+      },
+      "grouped12": {
+        "collate_s": 0.0128335649787914,
+        "fetch_s": 0.038790396007243544,
+        "p50_s": 0.0006957600126042962,
+        "p95_s": 0.007684229000005871,
+        "samples": 12,
+        "samples_per_s": 309.3549237744099,
+        "total_s": 0.051623960986034945
+      },
+      "random12": {
+        "collate_s": 0.012422756990417838,
+        "fetch_s": 0.007013402006123215,
+        "p50_s": 0.0005675310094375163,
+        "p95_s": 0.0006898239953443408,
+        "samples": 12,
+        "samples_per_s": 1711.0098621928587,
+        "total_s": 0.019436158996541053
+      },
+      "random256": {
+        "collate_s": 0.15482201598933898,
+        "fetch_s": 0.7917902179760858,
+        "p50_s": 0.0003395690000616014,
+        "p95_s": 0.003962032002164051,
+        "samples": 256,
+        "samples_per_s": 323.3179624956315,
+        "total_s": 0.9466122339654248
+      },
+      "sequential12": {
+        "collate_s": 0.009940104995621368,
+        "fetch_s": 0.278330085973721,
+        "p50_s": 0.004953430994646624,
+        "p95_s": 0.10344026499660686,
+        "samples": 12,
+        "samples_per_s": 43.114275476252324,
+        "total_s": 0.28827019096934237
+      }
+    },
+    "cold_private_cache": {
+      "fetch_s": 0.9660139659827109,
+      "samples_per_s": 265.0065206247564
+    },
+    "downstream": {
+      "H1": "exact",
+      "H2": "exact",
+      "I1": "exact",
+      "I2": "exact",
+      "cases": [
+        "assembly_align",
+        "assembly_dock",
+        "simultaneous_resource",
+        "rc_cones",
+        "teleop_structural",
+        "settle"
+      ],
+      "collate": "exact",
+      "untrained_eval_only": true
+    },
+    "integrity": {
+      "duplicates": 0,
+      "episodes": 6,
+      "missing": 0,
+      "operations": {
+        "align_faces": 43,
+        "dock": 39,
+        "gravity_settle": 1,
+        "undock": 8
+      },
+      "routing_failures": 0,
+      "samples": 832,
+      "splits": {
+        "test": 0,
+        "train": 832,
+        "validation": 0
+      },
+      "structural_samples": 63
+    },
+    "rss_peak_mib": 9236.86328125,
+    "semantic": {
+      "compared": 146,
+      "coverage": [
+        [
+          "button",
+          "assembling",
+          "expert"
+        ],
+        [
+          "button",
+          "assembling",
+          "teleop"
+        ],
+        [
+          "button",
+          "mobile_manipulator8",
+          "teleop"
+        ],
+        [
+          "gap",
+          "assembling",
+          "expert"
+        ],
+        [
+          "gap",
+          "snake8",
+          "expert"
+        ],
+        [
+          "navigation",
+          "assembling",
+          "expert"
+        ],
+        [
+          "navigation",
+          "rc_car8",
+          "expert"
+        ],
+        [
+          "navigation",
+          "rc_car8",
+          "teleop"
+        ],
+        [
+          "navigation",
+          "reconfiguring",
+          "teleop"
+        ],
+        [
+          "stairs",
+          "assembling",
+          "expert"
+        ],
+        [
+          "stairs",
+          "reconfiguring",
+          "teleop"
+        ],
+        [
+          "stairs",
+          "snake8",
+          "expert"
+        ],
+        [
+          "stairs",
+          "snake8",
+          "teleop"
+        ]
+      ],
+      "exact_all_sections": true,
+      "operations_in_comparison": {
+        "align_faces": 43,
+        "dock": 39,
+        "gravity_settle": 1,
+        "undock": 8
+      },
+      "oracle_load_s": 62.81512022996321
+    },
+    "size": {
+      "dynamic_compressed": 5254937,
+      "file_bytes": 14563967,
+      "naive_repeated_compressed_parts": 40795153,
+      "samples": 832,
+      "template_compressed": 7994906,
+      "templates": 167
+    },
+    "warm_private_cache": {
+      "fetch_s": 0.779644105990883,
+      "samples_per_s": 328.3549481524505
+    }
+  },
+  "profiling": {
+    "expert:assembly:seed-006307": {
+      "deserialize_s": 0.212580893014092,
+      "disk_read_s": 0.0017940370016731322,
+      "file_bytes": 4836931,
+      "integrity_s": 0.0018878350092563778,
+      "rows": 19,
+      "validated_episode_s": 0.23704200799693353
+    },
+    "expert:gap:seed-004303": {
+      "deserialize_s": 0.9031496959796641,
+      "disk_read_s": 0.009338252013549209,
+      "file_bytes": 23032259,
+      "integrity_s": 0.008903695008484647,
+      "rows": 237,
+      "validated_episode_s": 1.159701693977695
+    },
+    "expert:rc_car:seed-005100": {
+      "deserialize_s": 1.4571057189896237,
+      "disk_read_s": 0.014351107005495578,
+      "file_bytes": 37614723,
+      "integrity_s": 0.014501895988360047,
+      "rows": 381,
+      "validated_episode_s": 1.9038564619841054
+    }
+  },
+  "regression": "1571 passed, 1 skipped in 1054.02s (0:17:34)",
+  "reproduction": {
+    "benchmark": "python -B -u -m drl.IL.bc_v1.sidecar_build benchmark --requests artifacts/bc_v1/audits/p0_loader_v1/requests.json",
+    "build": "python -B -u -m drl.IL.bc_v1.sidecar_build build --workers 2",
+    "python": "/home/lorenzo/.local/share/mssr-bc-v1/venv/bin/python",
+    "tests": "PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -B -m pytest drl/IL/tests/bc_v1 -q --basetemp=/dev/shm/mssr-p0-final-full",
+    "verify": "python -B -u -m drl.IL.bc_v1.sidecar_build verify"
+  },
+  "schema_version": "mssr.bc_v1.p0_loader_inspection.v1",
+  "scope": {
+    "committed": false,
+    "f2_refit": false,
+    "full_g1_rerun": false,
+    "j_started": false,
+    "upstream_code_changed": false
+  },
+  "semantic_equivalence": {
+    "downstream": {
+      "H1": "exact",
+      "H2": "exact",
+      "I1": "exact",
+      "I2": "exact",
+      "cases": [
+        "assembly_align",
+        "assembly_dock",
+        "simultaneous_resource",
+        "rc_cones",
+        "settle",
+        "teleop_structural"
+      ],
+      "collate": "exact",
+      "untrained_eval_only": true
+    },
+    "holdout_equivalence_only": {
+      "expert:gap:seed-004107": {
+        "compared": 247,
+        "split": "test"
+      },
+      "expert:gap:seed-005855": {
+        "compared": 238,
+        "split": "validation"
+      },
+      "expert:rc_car:seed-005105": {
+        "compared": 130,
+        "split": "validation"
+      },
+      "expert:stairs:seed-004676": {
+        "compared": 182,
+        "split": "test"
+      }
+    },
+    "integrity": {
+      "duplicates": 0,
+      "elapsed_s": 113.50294084698544,
+      "episodes": 73,
+      "grouping_preserved": true,
+      "groups_checked": 1110,
+      "inventory_matches_frozen_g1": true,
+      "missing": 0,
+      "operations": {
+        "align_faces": 503,
+        "dock": 477,
+        "gravity_settle": 24,
+        "undock": 106
+      },
+      "routing_failures": 0,
+      "samples": 119600,
+      "settle_endpoint_free_checked": 24,
+      "splits": {
+        "test": 18536,
+        "train": 78302,
+        "validation": 22762
+      },
+      "structural_samples": 723
+    },
+    "rss_peak_mib": 9250.91015625,
+    "semantic": {
+      "compared": 2318,
+      "coverage": [
+        [
+          "button",
+          "assembling",
+          "expert"
+        ],
+        [
+          "button",
+          "assembling",
+          "teleop"
+        ],
+        [
+          "button",
+          "mobile_manipulator8",
+          "teleop"
+        ],
+        [
+          "gap",
+          "assembling",
+          "expert"
+        ],
+        [
+          "gap",
+          "snake8",
+          "expert"
+        ],
+        [
+          "navigation",
+          "assembling",
+          "expert"
+        ],
+        [
+          "navigation",
+          "rc_car8",
+          "expert"
+        ],
+        [
+          "navigation",
+          "rc_car8",
+          "teleop"
+        ],
+        [
+          "navigation",
+          "reconfiguring",
+          "teleop"
+        ],
+        [
+          "stairs",
+          "assembling",
+          "expert"
+        ],
+        [
+          "stairs",
+          "rc_car8",
+          "teleop"
+        ],
+        [
+          "stairs",
+          "reconfiguring",
+          "teleop"
+        ],
+        [
+          "stairs",
+          "snake8",
+          "expert"
+        ],
+        [
+          "stairs",
+          "snake8",
+          "teleop"
+        ]
+      ],
+      "exact_all_sections": true,
+      "operations_in_comparison": {
+        "align_faces": 64,
+        "dock": 60,
+        "gravity_settle": 1,
+        "undock": 8
+      },
+      "oracle_load_s": 78.53855817398289
+    },
+    "size": {
+      "dynamic_compressed": 886784175,
+      "file_bytes": 1294603414,
+      "naive_repeated_compressed_parts": 5772011387,
+      "samples": 78302,
+      "template_compressed": 265048402,
+      "templates": 6107
+    }
+  },
+  "semantic_oracle_coverage": "2318 independent direct comparisons in 10 selected episodes, including all rare rows of six selected TRAIN episodes; four holdout episodes are serialization equivalence only, no model quality evaluation. Not all119600 compared again against direct. Every dynamic record and distinct template roundtripped on initial materialization; full read/integrity coverage119600.",
+  "targeted_tests": "44 passed in 6.78s"
+}
