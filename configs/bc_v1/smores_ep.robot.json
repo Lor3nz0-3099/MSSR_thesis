@@ -1,0 +1,611 @@
+{
+  "schema_version": "mssr.bc_v1.robot_spec.v1",
+  "robot_id": "smores_ep",
+  "module_types": [
+    {
+      "type_id": "smores_ep_enhanced",
+      "connectors": [
+        {
+          "connector_id": "LEFT",
+          "kind": "fixed_port",
+          "local_position": [
+            -5e-07,
+            0.043455,
+            5e-07
+          ],
+          "local_orientation_xyzw": [
+            0.0,
+            0.0,
+            0.7071067811865475,
+            0.7071067811865476
+          ],
+          "capabilities": [
+            "ep_magnet",
+            "articulated_port"
+          ]
+        },
+        {
+          "connector_id": "RIGHT",
+          "kind": "fixed_port",
+          "local_position": [
+            -5e-07,
+            -0.043455,
+            5e-07
+          ],
+          "local_orientation_xyzw": [
+            0.0,
+            0.0,
+            -0.7071067811865475,
+            0.7071067811865476
+          ],
+          "capabilities": [
+            "ep_magnet",
+            "articulated_port"
+          ]
+        },
+        {
+          "connector_id": "TOP",
+          "kind": "fixed_port",
+          "local_position": [
+            0.043771,
+            -3.8e-05,
+            0.00287
+          ],
+          "local_orientation_xyzw": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "capabilities": [
+            "ep_magnet",
+            "articulated_port"
+          ]
+        },
+        {
+          "connector_id": "BOTTOM",
+          "kind": "fixed_port",
+          "local_position": [
+            -0.033999,
+            0.0,
+            0.0
+          ],
+          "local_orientation_xyzw": [
+            0.0,
+            0.0,
+            1.0,
+            6.123233995736766e-17
+          ],
+          "capabilities": [
+            "ep_magnet",
+            "body_fixed"
+          ]
+        }
+      ],
+      "resources": [
+        {
+          "resource_id": "locomotion",
+          "coordinates": [
+            {
+              "coordinate_id": "left_wheel",
+              "units": "rad",
+              "periodic": true
+            },
+            {
+              "coordinate_id": "right_wheel",
+              "units": "rad",
+              "periodic": true
+            }
+          ],
+          "modes": [
+            {
+              "mode_id": "wheel_velocity",
+              "payload_size": 2,
+              "units": [
+                "rad/s",
+                "rad/s"
+              ],
+              "kind": "continuous",
+              "codec": "continuous"
+            }
+          ],
+          "capabilities": [
+            "differential_drive"
+          ]
+        },
+        {
+          "resource_id": "internal_motion",
+          "coordinates": [
+            {
+              "coordinate_id": "pan",
+              "units": "rad",
+              "periodic": true,
+              "axis": [
+                1.0,
+                0.0,
+                0.0
+              ]
+            },
+            {
+              "coordinate_id": "tilt",
+              "units": "rad",
+              "limits": [
+                -1.5707963267948966,
+                1.5707963267948966
+              ],
+              "axis": [
+                0.0,
+                1.0,
+                0.0
+              ]
+            }
+          ],
+          "modes": [
+            {
+              "mode_id": "pan_velocity",
+              "payload_size": 1,
+              "units": [
+                "rad/s"
+              ],
+              "kind": "continuous",
+              "codec": "continuous"
+            },
+            {
+              "mode_id": "tilt_velocity",
+              "payload_size": 1,
+              "units": [
+                "rad/s"
+              ],
+              "kind": "continuous",
+              "codec": "continuous"
+            },
+            {
+              "mode_id": "pan_target",
+              "payload_size": 1,
+              "units": [
+                "rad"
+              ],
+              "kind": "discrete",
+              "codec": "continuous"
+            },
+            {
+              "mode_id": "tilt_target",
+              "payload_size": 1,
+              "units": [
+                "rad"
+              ],
+              "kind": "discrete",
+              "codec": "continuous"
+            },
+            {
+              "mode_id": "pan_delta",
+              "payload_size": 1,
+              "units": [
+                "rad"
+              ],
+              "kind": "discrete",
+              "codec": "continuous"
+            },
+            {
+              "mode_id": "tilt_delta",
+              "payload_size": 1,
+              "units": [
+                "rad"
+              ],
+              "kind": "discrete",
+              "codec": "continuous"
+            }
+          ],
+          "capabilities": [
+            "coupled_internal_motors",
+            "mutually_exclusive_modes"
+          ]
+        }
+      ],
+      "geometry": [
+        {
+          "name": "wheel_radius_m",
+          "values": [
+            0.0315
+          ]
+        },
+        {
+          "name": "wheel_width_m",
+          "values": [
+            0.0165
+          ]
+        },
+        {
+          "name": "track_width_m",
+          "values": [
+            0.07041
+          ]
+        },
+        {
+          "name": "module_mass_kg",
+          "values": [
+            0.454
+          ]
+        },
+        {
+          "name": "wheel_max_speed_rad_s",
+          "values": [
+            2.7936507936507935
+          ]
+        },
+        {
+          "name": "internal_simulation_max_speed_rad_s",
+          "values": [
+            4.817108735504349
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "action_id": "wheel_velocity",
+      "kind": "continuous",
+      "scope": "resource",
+      "parameters": [
+        {
+          "name": "left_rad_s",
+          "kind": "scalar",
+          "units": "rad/s",
+          "module_type_id": "smores_ep_enhanced",
+          "resource_id": "locomotion"
+        },
+        {
+          "name": "right_rad_s",
+          "kind": "scalar",
+          "units": "rad/s",
+          "module_type_id": "smores_ep_enhanced",
+          "resource_id": "locomotion"
+        }
+      ]
+    },
+    {
+      "action_id": "pan_velocity",
+      "kind": "continuous",
+      "scope": "resource",
+      "parameters": [
+        {
+          "name": "value",
+          "kind": "scalar",
+          "units": "rad/s",
+          "module_type_id": "smores_ep_enhanced",
+          "resource_id": "internal_motion"
+        }
+      ]
+    },
+    {
+      "action_id": "tilt_velocity",
+      "kind": "continuous",
+      "scope": "resource",
+      "parameters": [
+        {
+          "name": "value",
+          "kind": "scalar",
+          "units": "rad/s",
+          "module_type_id": "smores_ep_enhanced",
+          "resource_id": "internal_motion"
+        }
+      ]
+    },
+    {
+      "action_id": "pan_target",
+      "kind": "discrete",
+      "scope": "resource",
+      "parameters": [
+        {
+          "name": "value",
+          "kind": "scalar",
+          "units": "rad",
+          "module_type_id": "smores_ep_enhanced",
+          "resource_id": "internal_motion"
+        }
+      ]
+    },
+    {
+      "action_id": "tilt_target",
+      "kind": "discrete",
+      "scope": "resource",
+      "parameters": [
+        {
+          "name": "value",
+          "kind": "scalar",
+          "units": "rad",
+          "module_type_id": "smores_ep_enhanced",
+          "resource_id": "internal_motion"
+        }
+      ]
+    },
+    {
+      "action_id": "pan_delta",
+      "kind": "discrete",
+      "scope": "resource",
+      "parameters": [
+        {
+          "name": "value",
+          "kind": "scalar",
+          "units": "rad",
+          "module_type_id": "smores_ep_enhanced",
+          "resource_id": "internal_motion"
+        }
+      ]
+    },
+    {
+      "action_id": "tilt_delta",
+      "kind": "discrete",
+      "scope": "resource",
+      "parameters": [
+        {
+          "name": "value",
+          "kind": "scalar",
+          "units": "rad",
+          "module_type_id": "smores_ep_enhanced",
+          "resource_id": "internal_motion"
+        }
+      ]
+    },
+    {
+      "action_id": "align_faces",
+      "kind": "prepare_connection",
+      "scope": "connector_pair",
+      "parameters": [
+        {
+          "name": "face_a",
+          "kind": "connector_ref",
+          "module_type_id": "smores_ep_enhanced"
+        },
+        {
+          "name": "face_b",
+          "kind": "connector_ref",
+          "module_type_id": "smores_ep_enhanced"
+        },
+        {
+          "name": "clocking_quarter_turns",
+          "kind": "category",
+          "categories": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        {
+          "name": "top_bottom_contact_tolerance_m",
+          "kind": "scalar",
+          "units": "m",
+          "learnable": false
+        },
+        {
+          "name": "contact_quality_planar_tolerance_m",
+          "kind": "scalar",
+          "units": "m",
+          "learnable": false
+        },
+        {
+          "name": "contact_quality_retry_count",
+          "kind": "scalar",
+          "units": "1",
+          "limits": [
+            0,
+            10
+          ],
+          "learnable": false
+        },
+        {
+          "name": "contact_approach_feedback",
+          "kind": "boolean",
+          "learnable": false
+        },
+        {
+          "name": "staging_path_fallback_level",
+          "kind": "scalar",
+          "units": "1",
+          "limits": [
+            0,
+            2
+          ],
+          "learnable": false
+        },
+        {
+          "name": "snap_to_nominal",
+          "kind": "boolean",
+          "learnable": false
+        },
+        {
+          "name": "initial_straight_clearance_m",
+          "kind": "scalar",
+          "units": "m",
+          "learnable": false
+        },
+        {
+          "name": "initial_straight_clearance_reference_module_id",
+          "kind": "module_ref",
+          "module_type_id": "smores_ep_enhanced",
+          "learnable": false
+        }
+      ],
+      "required_capabilities": [
+        "ep_magnet"
+      ],
+      "enabled": true
+    },
+    {
+      "action_id": "dock",
+      "kind": "connect",
+      "scope": "connector_pair",
+      "parameters": [
+        {
+          "name": "face_a",
+          "kind": "connector_ref",
+          "module_type_id": "smores_ep_enhanced"
+        },
+        {
+          "name": "face_b",
+          "kind": "connector_ref",
+          "module_type_id": "smores_ep_enhanced"
+        },
+        {
+          "name": "clocking_quarter_turns",
+          "kind": "category",
+          "categories": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        {
+          "name": "top_bottom_contact_tolerance_m",
+          "kind": "scalar",
+          "units": "m",
+          "learnable": false
+        },
+        {
+          "name": "contact_quality_planar_tolerance_m",
+          "kind": "scalar",
+          "units": "m",
+          "learnable": false
+        },
+        {
+          "name": "contact_quality_retry_count",
+          "kind": "scalar",
+          "units": "1",
+          "limits": [
+            0,
+            10
+          ],
+          "learnable": false
+        },
+        {
+          "name": "contact_approach_feedback",
+          "kind": "boolean",
+          "learnable": false
+        },
+        {
+          "name": "staging_path_fallback_level",
+          "kind": "scalar",
+          "units": "1",
+          "limits": [
+            0,
+            2
+          ],
+          "learnable": false
+        },
+        {
+          "name": "snap_to_nominal",
+          "kind": "boolean",
+          "learnable": false
+        },
+        {
+          "name": "retain_mobile_structure_after_dock",
+          "kind": "boolean",
+          "learnable": false
+        }
+      ],
+      "required_capabilities": [
+        "ep_magnet"
+      ],
+      "enabled": true
+    },
+    {
+      "action_id": "undock",
+      "kind": "disconnect",
+      "scope": "connector_pair",
+      "parameters": [
+        {
+          "name": "face_a",
+          "kind": "connector_ref",
+          "module_type_id": "smores_ep_enhanced"
+        },
+        {
+          "name": "face_b",
+          "kind": "connector_ref",
+          "module_type_id": "smores_ep_enhanced"
+        },
+        {
+          "name": "clocking_quarter_turns",
+          "kind": "category",
+          "categories": [
+            "0",
+            "1",
+            "2",
+            "3"
+          ]
+        },
+        {
+          "name": "top_bottom_contact_tolerance_m",
+          "kind": "scalar",
+          "units": "m",
+          "learnable": false
+        },
+        {
+          "name": "contact_quality_planar_tolerance_m",
+          "kind": "scalar",
+          "units": "m",
+          "learnable": false
+        },
+        {
+          "name": "contact_quality_retry_count",
+          "kind": "scalar",
+          "units": "1",
+          "limits": [
+            0,
+            10
+          ],
+          "learnable": false
+        },
+        {
+          "name": "contact_approach_feedback",
+          "kind": "boolean",
+          "learnable": false
+        },
+        {
+          "name": "staging_path_fallback_level",
+          "kind": "scalar",
+          "units": "1",
+          "limits": [
+            0,
+            2
+          ],
+          "learnable": false
+        },
+        {
+          "name": "snap_to_nominal",
+          "kind": "boolean",
+          "learnable": false
+        }
+      ],
+      "required_capabilities": [
+        "ep_magnet"
+      ],
+      "enabled": true
+    },
+    {
+      "action_id": "gravity_settle",
+      "kind": "skill",
+      "scope": "modules",
+      "enabled": true,
+      "parameters": [
+        {
+          "name": "duration_s",
+          "kind": "scalar",
+          "units": "s"
+        },
+        {
+          "name": "passive_module_ids",
+          "kind": "module_refs",
+          "module_type_id": "smores_ep_enhanced"
+        },
+        {
+          "name": "clear_passive_policy_on_finish",
+          "kind": "boolean",
+          "learnable": false
+        }
+      ]
+    }
+  ]
+}

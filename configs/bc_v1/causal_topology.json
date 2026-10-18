@@ -1,0 +1,10 @@
+{
+  "schema_version": "mssr.bc_v1.causal_topology.v1",
+  "algorithm": "exact_pair_removal_and_occupancy.v1",
+  "ordering_contract": "strict_same_domain_event_order.v1",
+  "mixed_bucket_policy": "previous_bucket_dispatch_completed_before_current_decision.v1",
+  "operations": ["confirmed_disconnect"],
+  "current_bucket_disconnects": "defer",
+  "reattach": "invalidate_disconnect_only",
+  "reset": "invalidate_prior_segment"
+}

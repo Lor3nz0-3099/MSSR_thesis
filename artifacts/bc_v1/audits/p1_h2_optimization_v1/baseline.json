@@ -1,0 +1,1099 @@
+{
+  "branch": "wip/t8-c05-human-teleop-20260921",
+  "status": " M mssr_ws/src/mssr_expert/mssr_expert/execution/parallel_assembly_executor.py\n M mssr_ws/src/mssr_expert/mssr_expert/nodes/smores_parallel_self_assembly_node.py\n M mssr_ws/src/mssr_expert/test/test_parallel_assembly_executor.py\n M scripts/dataset_tools/build_expert_v1.py\n M scripts/smores_ep/run_button_expert_to_ik.py\n M scripts/smores_ep/src/smores_ep/control/button_ik_math.py\n M scripts/smores_ep/tests/test_button_ik_source_contract.py\n?? artifacts/bc_v1/audits/causal_repairs_v1.json\n?? artifacts/bc_v1/audits/g1_example_assembly_6284.txt\n?? artifacts/bc_v1/audits/g1_imbalance_audit_v1.json\n?? artifacts/bc_v1/audits/g1_imbalance_audit_v1.txt\n?? artifacts/bc_v1/audits/g2_tensor_inspection_v1.txt\n?? artifacts/bc_v1/audits/h2_prediction_inspection_v1.txt\n?? artifacts/bc_v1/audits/i1_loss_inspection_v1.txt\n?? artifacts/bc_v1/audits/i2_metrics_inspection_v1.txt\n?? artifacts/bc_v1/audits/j_small_overfit_v1/final_metrics.json\n?? artifacts/bc_v1/audits/j_small_overfit_v1/history.jsonl\n?? artifacts/bc_v1/audits/j_small_overfit_v1/initial_metrics.json\n?? artifacts/bc_v1/audits/j_small_overfit_v1/selection.json\n?? artifacts/bc_v1/audits/j_small_overfit_v1/summary.json\n?? artifacts/bc_v1/audits/p0_loader_v1/inspection.json\n?? artifacts/bc_v1/audits/p0_loader_v1/requests.json\n?? artifacts/bc_v1/audits/post_j_performance_v1/report.md\n?? artifacts/bc_v1/audits/post_j_performance_v1/summary.json\n?? artifacts/bc_v1/audits/post_j_performance_v1/timings.json\n?? artifacts/bc_v1/audits/post_j_performance_v1/torch_profiler_top_ops.txt\n?? artifacts/bc_v1/audits/pre_j_data_inspection_v1/report.md\n?? artifacts/bc_v1/audits/pre_j_data_inspection_v1/samples.json\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/053afc07aa59a016f176d3403a70db98510c2d97ce56e159811c8a83a3fb3fa4.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/0f86dd7b19608b033c0b2c0f3f71943ca1b18553b0f26141df8147264e0d07db.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/10f83521404eea3f336465bc59f8b7c50b6e501c909282aca51795cefc28f397.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/1150bd4b05e730ff27e8af8ee668acf03935189a597b6499e51e96de96f9abf5.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/1aae2144e66f4ef23a714dbc132333442bbb812751220cdea09429e79d5aeddc.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/23d30aea015372753ac16bad38fb15df36eff6b938b1e949230b70ca5c691e91.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/244fce2e99b378d8c324b8dca5a064dcd787b7036fb885d904eef56330185492.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/3bbdbdcce924db30958f4ea1f8ef469a59659f54a277b06e23d2b8dfe8dd5191.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/490d06af0678db1b073adcd7c0ec51b35aed0d1ea49dfa3fbd0093878c61c4fe.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/4ac888586a1280d1faa5dc43ecdcd751f3474bdc0e6ee7d1944708c57391956f.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/521b21cac25ac2c23708dea204a3f4ab1edbef066a20cb5da0d85ab67df8e08f.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/5b4767e2d2de50560ba84e4430fc1cbc26cb0b855bbc035f161cc45cfac78166.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/5c6c43fc41c1bcc7a766b8c9f84cfe2910d5713f00924b33c8a4a029dd565e1a.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/624dc9eeb62983cc01976f7dd2ca8eedf50e4cdef5aad2acb2daf9a09c746c52.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/63d17ff94d9adce783e13ee1720b17deb2a76ca5ae78de647f3903322f7fe826.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/66e1c07282c73e4b2a9a8e72c6c6e30e7652a05ef30f3efa92c4ed8645e9fd89.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/72b7b77d66d9f2373677e953777c458e00b0dd18587674ebd6b64063f0a717c8.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/755870690618c8199872dd8b834599649bc9b0c156245bb76d451f351465d298.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/783b527b24b10414be92ccf3feab2a262613a4dc31d710567f15c5b66f5648db.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/789521a77caf34ac5d0572d89f8935fd9d2c66702aa7aed6c7e22a0f2b39a553.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/8183db0e8315a024ded298c187828670d5c4540a6bb4eb228ff5ccd2f4cb47ba.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/8a43642de0ca371d408ee6cb7949c882161aabf26dacf0241864f59b8e24ffb7.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/96982f2df7f4269c603018906f2b92520430903bc5ba09ac751324d2c13581e7.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/97c87a50e3155bb769a7a65936dcba761d9dee6d63990b474c3d94cdb4c8f53f.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/9e5b8b0ad08a3b17d91b6362ced0ab6cb36b280afda2ef6e1ac090584486efd1.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/a24a831b2df5f627cce289d8cfbede0eb62377a651d6d4c6f341a23f5c7a9bae.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/a76c98d582b24ac9713ac4e13564f14ab15a232a161c920448b55b2c149f6e86.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/a85790f6469df158b0c1f324f9b80dc09cba7bb0b44372b4ac116b3304ec2b22.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/aca69f133d1b9ab76d097fbfe2e0bef9596d5f60ab3b1dc4be33432486bc6bc8.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/adc84ee431bd2af1e77c32048593bfe19afd73dbdb7c0b00b29ad3c32feec3a8.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/b67b66f59e7c42e8ba2c9070094a9c7aedc600fba138ab3ac3c6ad1936a77e64.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/b9a51a6557679e4a338f267ce35b197fd1e53e5e18775c31a0fa1489e66f5fa3.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/badcfb96366c5c392f453331e505103a29df88f13e02a12dcdcbfdd3dd3ef57b.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/bc23a976d32fbe7cbe8183ca0fb56ca28fc1622d0a344ab42c1c7c2f62b154ef.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/bda5fff5402d59127c40549c48b9eba0ef5fe8c312ac590bccd3f258ebcc362c.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/c19a01f81b49185eb8f3b59ccb555abe8099a8fa7212d93413eccf202f144251.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/c22ee5e94dc713fe49d24f418e7b7659de7f9cac1b44cf18c5abb6710a848b7e.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/c86dc49b39401959ddd4a360e4c0ccf5bc44a2688e474512cf07375cfa439049.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/cde24679e7470f24e8c74fddc67fda27be2c85da86f51bcfa86c4975de4e76a0.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/d34fff24c91740a17113e3ed54a6384972ca7325c7a1cb5eb29f3dfe24647acb.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/d89c7a7e658cab7235f42b50720127877bd0a1031fad491f3268cf0ddf9e5513.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/e1e9ef226211ca9d05eac79ede55dffb496c5ee38ba0b78cfdec771b8b1a7d05.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/e4c7dbde585d4859f25746d89c64960b946347a358f1f7604c4b48443a81716f.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/e8c20f1a5aa83e1380ccde4d7918cd3cec5cad6400aabd70ea8494de1040548e.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/e99a9ba0e50ea190a701b42ae96f8dad4a56203bb915692460e2e7b499f2e0c5.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/ec33d4c302612d199f3dd03f04482afecf61682437fe81e0e7e9f31cdba38b4f.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/ed8af43ddd58f8a4b1fc17aec232e0a6019dc45b66b4bb053b99aa5f166a76dc.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/efece1b7e3a26308b7d47f420a76479e3f8801a91b3fc4dad35e5ae013fed645.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/f0cf6c33810feb709ed807faf13af1d15d2c1552041fef30d86365152660be61.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/f6df4c83d87eef5ef8ee0e8bf3c6b4d893017a9103f1553262d676a12151631d.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/fa3be6c7560840ce2a776487a3e1d8bb327b621ddc35c5b568d8625546a6dbd1.pt\n?? artifacts/bc_v1/cache/.g1_v1_offline-zk0x51_o/episodes/fa53dd925c0f278153e55fb5ff05c8a91b07dee11908784f9bfca345a61cb6c0.pt\n?? artifacts/bc_v1/cache/g1_v1_blocked/canonical_hashes.json\n?? artifacts/bc_v1/cache/g1_v1_blocked/f1_f2_tests.txt\n?? artifacts/bc_v1/cache/g1_v1_blocked/final_tests.txt\n?? artifacts/bc_v1/cache/g1_v1_blocked/g1_tests.txt\n?? artifacts/bc_v1/cache/g1_v1_blocked/git_diff.txt\n?? artifacts/bc_v1/cache/g1_v1_blocked/git_status.txt\n?? artifacts/bc_v1/cache/g1_v1_blocked/integrity.json\n?? artifacts/bc_v1/cache/g1_v1_blocked/ledger.md\n?? artifacts/bc_v1/cache/g1_v1_blocked/performance.json\n?? artifacts/bc_v1/cache/g1_v1_blocked/prepare_failure.txt\n?? artifacts/bc_v1/cache/g1_v1_blocked/prepare_progress.jsonl\n?? artifacts/bc_v1/cache/g1_v1_blocked/real_census_tests.txt\n?? artifacts/bc_v1/cache/g1_v1_blocked/report.md\n?? artifacts/bc_v1/cache/g1_v1_blocked/repository_collection_errors.txt\n?? artifacts/bc_v1/cache/g1_v1_blocked/sequence.txt\n?? artifacts/bc_v1/cache/g1_v1_blocked/structural_audit.json\n?? artifacts/bc_v1/cache/g1_v1_causal_topology_blocked/diagnostic_dependency_hashes.json\n?? artifacts/bc_v1/cache/g1_v1_causal_topology_blocked/diff-check.txt\n?? artifacts/bc_v1/cache/g1_v1_causal_topology_blocked/git-status.txt\n?? artifacts/bc_v1/cache/g1_v1_causal_topology_blocked/integrity.json\n?? artifacts/bc_v1/cache/g1_v1_causal_topology_blocked/mixed_bundle_probe.json\n?? artifacts/bc_v1/cache/g1_v1_causal_topology_blocked/probe.py\n?? artifacts/bc_v1/cache/g1_v1_causal_topology_blocked/report.md\n?? artifacts/bc_v1/cache/g1_v1_causal_topology_blocked/targeted_preflight.json\n?? artifacts/bc_v1/cache/g1_v1_final.log\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/053afc07aa59a016f176d3403a70db98510c2d97ce56e159811c8a83a3fb3fa4.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/07fe30c199b469af62bddcec36754cfde2dd05602fe0b5f19e46db7cf3672a2b.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/0871bcd9e3b5cb906e6486e983d62a0d7eb4c684ddfdf625f4bb9e2c2bbb9e26.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/0f86dd7b19608b033c0b2c0f3f71943ca1b18553b0f26141df8147264e0d07db.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/10f83521404eea3f336465bc59f8b7c50b6e501c909282aca51795cefc28f397.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/1150bd4b05e730ff27e8af8ee668acf03935189a597b6499e51e96de96f9abf5.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/18926e54e1fdd9cb0c69b291dbf1ba657969d510f06bb8c67f4e54b54c977242.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/1aae2144e66f4ef23a714dbc132333442bbb812751220cdea09429e79d5aeddc.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/23d30aea015372753ac16bad38fb15df36eff6b938b1e949230b70ca5c691e91.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/244fce2e99b378d8c324b8dca5a064dcd787b7036fb885d904eef56330185492.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/32e2d43b967b0e01860998ce4b40c8d9d41437466fff9f836fed879a39fd68bb.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/3bbdbdcce924db30958f4ea1f8ef469a59659f54a277b06e23d2b8dfe8dd5191.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/452d33eaad2a7229787702e74b2bcd3ea3406ba38bfe92dceacd164bb1ea60ac.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/45628b45d54984fdc9d13d69c9fe7de9d8f17f7b3ea6f8faf811f64ab21a3eae.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/490d06af0678db1b073adcd7c0ec51b35aed0d1ea49dfa3fbd0093878c61c4fe.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/4ac888586a1280d1faa5dc43ecdcd751f3474bdc0e6ee7d1944708c57391956f.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/521b21cac25ac2c23708dea204a3f4ab1edbef066a20cb5da0d85ab67df8e08f.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/5b4767e2d2de50560ba84e4430fc1cbc26cb0b855bbc035f161cc45cfac78166.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/5c6c43fc41c1bcc7a766b8c9f84cfe2910d5713f00924b33c8a4a029dd565e1a.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/624dc9eeb62983cc01976f7dd2ca8eedf50e4cdef5aad2acb2daf9a09c746c52.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/63d17ff94d9adce783e13ee1720b17deb2a76ca5ae78de647f3903322f7fe826.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/661b159e80cf0b6e776b0382604a4b0905e6fa828eae6c7dc8baa413e23c4b84.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/66e1c07282c73e4b2a9a8e72c6c6e30e7652a05ef30f3efa92c4ed8645e9fd89.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/68c16682652368a2d7ccbc8a5b94bd511d3853c9ad47c98823f80f0ed5bd5cb1.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/6b5baa0e7b9013f7050a68e8d6d096f7b693c7a62126f157d8cbe46989bd07f8.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/72b7b77d66d9f2373677e953777c458e00b0dd18587674ebd6b64063f0a717c8.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/755870690618c8199872dd8b834599649bc9b0c156245bb76d451f351465d298.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/766621df8c0d66ac1b1f03020f4a9ebbe9caf9f6b2d61e40d5d9e3b26f5b97d0.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/783b527b24b10414be92ccf3feab2a262613a4dc31d710567f15c5b66f5648db.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/789521a77caf34ac5d0572d89f8935fd9d2c66702aa7aed6c7e22a0f2b39a553.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/7f22da73a6ff7b9eccc42b942069685f0ce076dffde6517c300c7f6367cdf5cc.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/7f482f8fdf0fa65c39a9b84235f0dce9d06dc28f4fb17aff333d3e578d59b92f.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/8183db0e8315a024ded298c187828670d5c4540a6bb4eb228ff5ccd2f4cb47ba.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/8517d36f5b4cc161ea8ca201ccd7455af4ab8111f3906d964a9253b73b308722.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/8a43642de0ca371d408ee6cb7949c882161aabf26dacf0241864f59b8e24ffb7.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/8eee0d95ebaddd186ed9644a7e3bcb37d065868a37f99c690dec24653074f46a.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/96982f2df7f4269c603018906f2b92520430903bc5ba09ac751324d2c13581e7.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/97c87a50e3155bb769a7a65936dcba761d9dee6d63990b474c3d94cdb4c8f53f.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/9c7b92e75273dd50669a0455e213822b94264d3e8e6be28cdd061fb7d978908a.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/9e5b8b0ad08a3b17d91b6362ced0ab6cb36b280afda2ef6e1ac090584486efd1.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/a24a831b2df5f627cce289d8cfbede0eb62377a651d6d4c6f341a23f5c7a9bae.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/a62793f23c659d001787366e3dbd0874e0f7d726a3792342e1f4c258a0ef8fdb.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/a76c98d582b24ac9713ac4e13564f14ab15a232a161c920448b55b2c149f6e86.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/a85790f6469df158b0c1f324f9b80dc09cba7bb0b44372b4ac116b3304ec2b22.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/aca69f133d1b9ab76d097fbfe2e0bef9596d5f60ab3b1dc4be33432486bc6bc8.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/adc84ee431bd2af1e77c32048593bfe19afd73dbdb7c0b00b29ad3c32feec3a8.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/b67b66f59e7c42e8ba2c9070094a9c7aedc600fba138ab3ac3c6ad1936a77e64.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/b9a51a6557679e4a338f267ce35b197fd1e53e5e18775c31a0fa1489e66f5fa3.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/badcfb96366c5c392f453331e505103a29df88f13e02a12dcdcbfdd3dd3ef57b.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/bc23a976d32fbe7cbe8183ca0fb56ca28fc1622d0a344ab42c1c7c2f62b154ef.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/bda5fff5402d59127c40549c48b9eba0ef5fe8c312ac590bccd3f258ebcc362c.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/bfb72de31703951046e5fd3a21cb96644e5ffe9baf0f7c17b0c714eff6e7279b.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/c19a01f81b49185eb8f3b59ccb555abe8099a8fa7212d93413eccf202f144251.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/c22ee5e94dc713fe49d24f418e7b7659de7f9cac1b44cf18c5abb6710a848b7e.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/c6a5c455feba4f77a5d8e73687fb686c29e96eb235644e877c02843073cc9ba4.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/c86dc49b39401959ddd4a360e4c0ccf5bc44a2688e474512cf07375cfa439049.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/cde24679e7470f24e8c74fddc67fda27be2c85da86f51bcfa86c4975de4e76a0.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/cff13ba31c830c1d020402df93c8e20bac3265a5b5996239ef09fc8ca9c68426.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/d25ac63c5d3801bb24634a86ea21a93b1462ae2949052a6c28e5bb3959a055fe.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/d34fff24c91740a17113e3ed54a6384972ca7325c7a1cb5eb29f3dfe24647acb.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/d89c7a7e658cab7235f42b50720127877bd0a1031fad491f3268cf0ddf9e5513.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/e1e9ef226211ca9d05eac79ede55dffb496c5ee38ba0b78cfdec771b8b1a7d05.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/e4c7dbde585d4859f25746d89c64960b946347a358f1f7604c4b48443a81716f.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/e87289e87cfb777d1e2aea2596a0a227c017d096a78863d2101909cda2ea956d.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/e8c20f1a5aa83e1380ccde4d7918cd3cec5cad6400aabd70ea8494de1040548e.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/e99a9ba0e50ea190a701b42ae96f8dad4a56203bb915692460e2e7b499f2e0c5.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/ec33d4c302612d199f3dd03f04482afecf61682437fe81e0e7e9f31cdba38b4f.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/ed8af43ddd58f8a4b1fc17aec232e0a6019dc45b66b4bb053b99aa5f166a76dc.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/efece1b7e3a26308b7d47f420a76479e3f8801a91b3fc4dad35e5ae013fed645.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/f0cf6c33810feb709ed807faf13af1d15d2c1552041fef30d86365152660be61.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/f6df4c83d87eef5ef8ee0e8bf3c6b4d893017a9103f1553262d676a12151631d.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/fa3be6c7560840ce2a776487a3e1d8bb327b621ddc35c5b568d8625546a6dbd1.pt\n?? artifacts/bc_v1/cache/g1_v1_final/episodes/fa53dd925c0f278153e55fb5ff05c8a91b07dee11908784f9bfca345a61cb6c0.pt\n?? artifacts/bc_v1/cache/g1_v1_final/manifest.json\n?? artifacts/bc_v1/cache/g1_v1_offline.log\n?? artifacts/bc_v1/cache/g1_v1_optimized.log\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/053afc07aa59a016f176d3403a70db98510c2d97ce56e159811c8a83a3fb3fa4.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/07fe30c199b469af62bddcec36754cfde2dd05602fe0b5f19e46db7cf3672a2b.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/0871bcd9e3b5cb906e6486e983d62a0d7eb4c684ddfdf625f4bb9e2c2bbb9e26.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/0f86dd7b19608b033c0b2c0f3f71943ca1b18553b0f26141df8147264e0d07db.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/10f83521404eea3f336465bc59f8b7c50b6e501c909282aca51795cefc28f397.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/1150bd4b05e730ff27e8af8ee668acf03935189a597b6499e51e96de96f9abf5.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/18926e54e1fdd9cb0c69b291dbf1ba657969d510f06bb8c67f4e54b54c977242.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/1aae2144e66f4ef23a714dbc132333442bbb812751220cdea09429e79d5aeddc.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/23d30aea015372753ac16bad38fb15df36eff6b938b1e949230b70ca5c691e91.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/244fce2e99b378d8c324b8dca5a064dcd787b7036fb885d904eef56330185492.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/32e2d43b967b0e01860998ce4b40c8d9d41437466fff9f836fed879a39fd68bb.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/3bbdbdcce924db30958f4ea1f8ef469a59659f54a277b06e23d2b8dfe8dd5191.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/452d33eaad2a7229787702e74b2bcd3ea3406ba38bfe92dceacd164bb1ea60ac.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/45628b45d54984fdc9d13d69c9fe7de9d8f17f7b3ea6f8faf811f64ab21a3eae.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/490d06af0678db1b073adcd7c0ec51b35aed0d1ea49dfa3fbd0093878c61c4fe.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/4ac888586a1280d1faa5dc43ecdcd751f3474bdc0e6ee7d1944708c57391956f.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/521b21cac25ac2c23708dea204a3f4ab1edbef066a20cb5da0d85ab67df8e08f.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/5b4767e2d2de50560ba84e4430fc1cbc26cb0b855bbc035f161cc45cfac78166.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/5c6c43fc41c1bcc7a766b8c9f84cfe2910d5713f00924b33c8a4a029dd565e1a.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/624dc9eeb62983cc01976f7dd2ca8eedf50e4cdef5aad2acb2daf9a09c746c52.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/63d17ff94d9adce783e13ee1720b17deb2a76ca5ae78de647f3903322f7fe826.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/661b159e80cf0b6e776b0382604a4b0905e6fa828eae6c7dc8baa413e23c4b84.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/66e1c07282c73e4b2a9a8e72c6c6e30e7652a05ef30f3efa92c4ed8645e9fd89.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/68c16682652368a2d7ccbc8a5b94bd511d3853c9ad47c98823f80f0ed5bd5cb1.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/6b5baa0e7b9013f7050a68e8d6d096f7b693c7a62126f157d8cbe46989bd07f8.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/72b7b77d66d9f2373677e953777c458e00b0dd18587674ebd6b64063f0a717c8.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/755870690618c8199872dd8b834599649bc9b0c156245bb76d451f351465d298.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/766621df8c0d66ac1b1f03020f4a9ebbe9caf9f6b2d61e40d5d9e3b26f5b97d0.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/783b527b24b10414be92ccf3feab2a262613a4dc31d710567f15c5b66f5648db.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/789521a77caf34ac5d0572d89f8935fd9d2c66702aa7aed6c7e22a0f2b39a553.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/7f22da73a6ff7b9eccc42b942069685f0ce076dffde6517c300c7f6367cdf5cc.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/7f482f8fdf0fa65c39a9b84235f0dce9d06dc28f4fb17aff333d3e578d59b92f.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/8183db0e8315a024ded298c187828670d5c4540a6bb4eb228ff5ccd2f4cb47ba.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/8517d36f5b4cc161ea8ca201ccd7455af4ab8111f3906d964a9253b73b308722.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/8a43642de0ca371d408ee6cb7949c882161aabf26dacf0241864f59b8e24ffb7.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/8eee0d95ebaddd186ed9644a7e3bcb37d065868a37f99c690dec24653074f46a.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/96982f2df7f4269c603018906f2b92520430903bc5ba09ac751324d2c13581e7.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/97c87a50e3155bb769a7a65936dcba761d9dee6d63990b474c3d94cdb4c8f53f.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/9c7b92e75273dd50669a0455e213822b94264d3e8e6be28cdd061fb7d978908a.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/9e5b8b0ad08a3b17d91b6362ced0ab6cb36b280afda2ef6e1ac090584486efd1.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/a24a831b2df5f627cce289d8cfbede0eb62377a651d6d4c6f341a23f5c7a9bae.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/a62793f23c659d001787366e3dbd0874e0f7d726a3792342e1f4c258a0ef8fdb.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/a76c98d582b24ac9713ac4e13564f14ab15a232a161c920448b55b2c149f6e86.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/a85790f6469df158b0c1f324f9b80dc09cba7bb0b44372b4ac116b3304ec2b22.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/aca69f133d1b9ab76d097fbfe2e0bef9596d5f60ab3b1dc4be33432486bc6bc8.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/adc84ee431bd2af1e77c32048593bfe19afd73dbdb7c0b00b29ad3c32feec3a8.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/b67b66f59e7c42e8ba2c9070094a9c7aedc600fba138ab3ac3c6ad1936a77e64.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/b9a51a6557679e4a338f267ce35b197fd1e53e5e18775c31a0fa1489e66f5fa3.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/badcfb96366c5c392f453331e505103a29df88f13e02a12dcdcbfdd3dd3ef57b.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/bc23a976d32fbe7cbe8183ca0fb56ca28fc1622d0a344ab42c1c7c2f62b154ef.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/bda5fff5402d59127c40549c48b9eba0ef5fe8c312ac590bccd3f258ebcc362c.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/bfb72de31703951046e5fd3a21cb96644e5ffe9baf0f7c17b0c714eff6e7279b.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/c19a01f81b49185eb8f3b59ccb555abe8099a8fa7212d93413eccf202f144251.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/c22ee5e94dc713fe49d24f418e7b7659de7f9cac1b44cf18c5abb6710a848b7e.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/c6a5c455feba4f77a5d8e73687fb686c29e96eb235644e877c02843073cc9ba4.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/c86dc49b39401959ddd4a360e4c0ccf5bc44a2688e474512cf07375cfa439049.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/cde24679e7470f24e8c74fddc67fda27be2c85da86f51bcfa86c4975de4e76a0.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/cff13ba31c830c1d020402df93c8e20bac3265a5b5996239ef09fc8ca9c68426.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/d25ac63c5d3801bb24634a86ea21a93b1462ae2949052a6c28e5bb3959a055fe.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/d34fff24c91740a17113e3ed54a6384972ca7325c7a1cb5eb29f3dfe24647acb.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/d89c7a7e658cab7235f42b50720127877bd0a1031fad491f3268cf0ddf9e5513.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/e1e9ef226211ca9d05eac79ede55dffb496c5ee38ba0b78cfdec771b8b1a7d05.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/e4c7dbde585d4859f25746d89c64960b946347a358f1f7604c4b48443a81716f.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/e87289e87cfb777d1e2aea2596a0a227c017d096a78863d2101909cda2ea956d.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/e8c20f1a5aa83e1380ccde4d7918cd3cec5cad6400aabd70ea8494de1040548e.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/e99a9ba0e50ea190a701b42ae96f8dad4a56203bb915692460e2e7b499f2e0c5.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/ec33d4c302612d199f3dd03f04482afecf61682437fe81e0e7e9f31cdba38b4f.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/ed8af43ddd58f8a4b1fc17aec232e0a6019dc45b66b4bb053b99aa5f166a76dc.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/efece1b7e3a26308b7d47f420a76479e3f8801a91b3fc4dad35e5ae013fed645.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/f0cf6c33810feb709ed807faf13af1d15d2c1552041fef30d86365152660be61.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/f6df4c83d87eef5ef8ee0e8bf3c6b4d893017a9103f1553262d676a12151631d.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/fa3be6c7560840ce2a776487a3e1d8bb327b621ddc35c5b568d8625546a6dbd1.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/episodes/fa53dd925c0f278153e55fb5ff05c8a91b07dee11908784f9bfca345a61cb6c0.pt\n?? artifacts/bc_v1/cache/g1_v1_optimized/manifest.json\n?? artifacts/bc_v1/checkpoints/j_small_overfit_v1/checkpoint.pt\n?? artifacts/bc_v1/checkpoints/j_small_overfit_v1/manifest.json\n?? artifacts/bc_v1/normalization/f2_v1/report.md\n?? artifacts/bc_v1/normalization/f2_v1_optimized/fit_context.json\n?? artifacts/bc_v1/normalization/f2_v1_optimized/normalizers.json\n?? artifacts/bc_v1/sidecar/g2_v1/data.sqlite3\n?? artifacts/bc_v1/sidecar/g2_v1/manifest.json\n?? artifacts/bc_v1/sidecar/g2_v1_pilot/data.sqlite3\n?? artifacts/bc_v1/sidecar/g2_v1_pilot/manifest.json\n?? artifacts/bc_v1/sidecar/g2_v1_pilot_r1/data.sqlite3\n?? artifacts/bc_v1/sidecar/g2_v1_pilot_r1/manifest.json\n?? artifacts/bc_v1/splits/f1_v1/audit.json\n?? artifacts/bc_v1/splits/f1_v1/episodes.json\n?? artifacts/bc_v1/splits/f1_v1/report.md\n?? artifacts/bc_v1/splits/f1_v1/split.json\n?? configs/bc_v1/action_heads_v1.json\n?? configs/bc_v1/causal_topology.json\n?? configs/bc_v1/counts.v1.json\n?? configs/bc_v1/features.json\n?? configs/bc_v1/gnn_v1.json\n?? configs/bc_v1/loss_v1.json\n?? configs/bc_v1/metrics_v1.json\n?? configs/bc_v1/normalization.json\n?? configs/bc_v1/prepare.json\n?? configs/bc_v1/robot_spec.schema.json\n?? configs/bc_v1/sidecar_v1.json\n?? configs/bc_v1/smores_ep.robot.json\n?? configs/bc_v1/source_frames.json\n?? configs/bc_v1/task_context.json\n?? configs/bc_v1/tensor_layout.v1.json\n?? configs/bc_v1/training.json\n?? configs/bc_v1/training_smoke_v1.json\n?? docs/2026-09-17-teleoperation-v1-design.md\n?? docs/bc_v1_align22_manual_audit_20261007.md\n?? docs/bc_v1_context_v1.0.1_20261008.md\n?? docs/bc_v1_joint_structural_audit_20261007.md\n?? docs/bc_v1_mm8_recoverability_audit_20261007.md\n?? docs/superpowers/plans/2026-10-06-bc-v1-implementation-v1.0.0.md\n?? docs/superpowers/plans/2026-10-11-bc-v1-coalesced-supervision-causal-topology-implementation-v1.0.0.md\n?? docs/superpowers/plans/2026-10-12-bc-v1-source-frame-bridges-implementation-v1.0.0.md\n?? docs/superpowers/specs/2026-10-06-bc-v1-architecture-v1.0.0.md\n?? docs/superpowers/specs/2026-10-10-bc-v1-causal-topology-v1.0.0.md\n?? docs/superpowers/specs/2026-10-11-bc-v1-coalesced-supervision-causal-topology-v1.0.0.md\n?? docs/superpowers/specs/2026-10-12-bc-v1-source-frame-bridges-v1.0.0.md\n?? docs/teleop_sei_registrazioni_mancanti.md\n?? drl/IL/bc_v1/__init__.py\n?? drl/IL/bc_v1/__main__.py\n?? drl/IL/bc_v1/action_heads.py\n?? drl/IL/bc_v1/batching.py\n?? drl/IL/bc_v1/bc_v1_contract.py\n?? drl/IL/bc_v1/candidates.py\n?? drl/IL/bc_v1/causal_topology.py\n?? drl/IL/bc_v1/dataset.py\n?? drl/IL/bc_v1/feature_schema.py\n?? drl/IL/bc_v1/features.py\n?? drl/IL/bc_v1/losses.py\n?? drl/IL/bc_v1/metrics.py\n?? drl/IL/bc_v1/model.py\n?? drl/IL/bc_v1/normalization.py\n?? drl/IL/bc_v1/normalization_prepare.py\n?? drl/IL/bc_v1/pipeline_validation.py\n?? drl/IL/bc_v1/policy_inputs.py\n?? drl/IL/bc_v1/requirements.txt\n?? drl/IL/bc_v1/sampling.py\n?? drl/IL/bc_v1/sidecar.py\n?? drl/IL/bc_v1/sidecar_build.py\n?? drl/IL/bc_v1/small_overfit.py\n?? drl/IL/bc_v1/smores_adapter.py\n?? drl/IL/bc_v1/smores_disconnect_evidence.py\n?? drl/IL/bc_v1/smores_source_frames.py\n?? drl/IL/bc_v1/source_frame_bridges.py\n?? drl/IL/bc_v1/split.py\n?? drl/IL/bc_v1/task_context.py\n?? drl/IL/bc_v1/temporal_supervision.py\n?? drl/IL/bc_v1/tensorization.py\n?? drl/IL/bc_v1/training.py\n?? drl/IL/tests/bc_v1/fixtures.py\n?? drl/IL/tests/bc_v1/fixtures/causal_topology.v1.json\n?? drl/IL/tests/bc_v1/g2_fixtures.py\n?? drl/IL/tests/bc_v1/test_action_heads.py\n?? drl/IL/tests/bc_v1/test_batching.py\n?? drl/IL/tests/bc_v1/test_candidates.py\n?? drl/IL/tests/bc_v1/test_causal_topology.py\n?? drl/IL/tests/bc_v1/test_contract.py\n?? drl/IL/tests/bc_v1/test_dataset.py\n?? drl/IL/tests/bc_v1/test_dataset_counts.py\n?? drl/IL/tests/bc_v1/test_e2_integration.py\n?? drl/IL/tests/bc_v1/test_feature_schema.py\n?? drl/IL/tests/bc_v1/test_features.py\n?? drl/IL/tests/bc_v1/test_losses.py\n?? drl/IL/tests/bc_v1/test_metrics.py\n?? drl/IL/tests/bc_v1/test_model.py\n?? drl/IL/tests/bc_v1/test_normalization.py\n?? drl/IL/tests/bc_v1/test_normalization_prepare.py\n?? drl/IL/tests/bc_v1/test_pipeline_validation.py\n?? drl/IL/tests/bc_v1/test_policy_inputs.py\n?? drl/IL/tests/bc_v1/test_robot_spec.py\n?? drl/IL/tests/bc_v1/test_sampling.py\n?? drl/IL/tests/bc_v1/test_sidecar.py\n?? drl/IL/tests/bc_v1/test_sidecar_build.py\n?? drl/IL/tests/bc_v1/test_smores_adapter.py\n?? drl/IL/tests/bc_v1/test_smores_disconnect_evidence.py\n?? drl/IL/tests/bc_v1/test_smores_source_frames.py\n?? drl/IL/tests/bc_v1/test_source_frame_bridges.py\n?? drl/IL/tests/bc_v1/test_split.py\n?? drl/IL/tests/bc_v1/test_task_context.py\n?? drl/IL/tests/bc_v1/test_temporal_supervision.py\n?? drl/IL/tests/bc_v1/test_tensorization.py\n?? drl/IL/tests/bc_v1/test_training.py\n?? mssr_ws/src/mssr_expert/test/test_self_assembly_dataset_event_persistence.py\n?? scripts/dataset_tools/cleanup_teleop_20260926.py\n?? scripts/dataset_tools/test_build_expert_v1_standalone_assembly.py\n?? scripts/smores_ep/tests/test_button_reposition_math.py\n",
+  "diff_stat": " .../execution/parallel_assembly_executor.py        |   81 +-\n .../nodes/smores_parallel_self_assembly_node.py    |   14 +\n .../test/test_parallel_assembly_executor.py        |   41 +\n scripts/dataset_tools/build_expert_v1.py           |    3 +\n scripts/smores_ep/run_button_expert_to_ik.py       | 2013 +++++---------------\n .../src/smores_ep/control/button_ik_math.py        |   55 +\n .../tests/test_button_ik_source_contract.py        |  210 +-\n 7 files changed, 782 insertions(+), 1635 deletions(-)\n",
+  "file_sha256": {
+    "artifacts/bc_v1/audits/j_small_overfit_v1/final_metrics.json": "0abcaef02ad308176f4489e9fea37c33779105aa9f4b8be800f30da23c861244",
+    "artifacts/bc_v1/audits/j_small_overfit_v1/history.jsonl": "f0785dfb3204dfaa994ff536a5b0c92cd052093c2fb9bb20829ace04658b1bab",
+    "artifacts/bc_v1/audits/j_small_overfit_v1/initial_metrics.json": "7c7367f6c8c49a1506521d65a5fa94bd6157317010f4af79c0955fb618d92892",
+    "artifacts/bc_v1/audits/j_small_overfit_v1/selection.json": "8af40237ef29d50e84ad8bae7cccfdbcfd6dc103465082b81f3700c50df2a3d6",
+    "artifacts/bc_v1/audits/j_small_overfit_v1/summary.json": "f8046e38f29934f61c5f0aeb50f6e5912ceb87849a0c3c31f583902bf4098949",
+    "artifacts/bc_v1/audits/post_j_performance_v1/report.md": "dd43be1573323a31485337ea4daebf6cf90ffa338d4589255e06ae44710258aa",
+    "artifacts/bc_v1/audits/post_j_performance_v1/summary.json": "2867d186d7d4faf6f3aa9a112cbe5c356079d39caae62c6226b8301c3c23bde6",
+    "artifacts/bc_v1/audits/post_j_performance_v1/timings.json": "089575e64af92f46bfed98e41182862a1e9c2d4b4815ed19a24bcbaaa569beef",
+    "artifacts/bc_v1/audits/post_j_performance_v1/torch_profiler_top_ops.txt": "acc52bf04f54b2083052ca4774f72e2dca30ba11b9d3a2528e9757d84e91d056",
+    "artifacts/bc_v1/checkpoints/j_small_overfit_v1/checkpoint.pt": "84d88d4332c65bd7f7c57f024668d4eb021647272519884505d1df2768e65e47",
+    "artifacts/bc_v1/checkpoints/j_small_overfit_v1/manifest.json": "14c94f677267477d0d62cf4fa9321634cb59a7e9c7c6b725b8db0a35665bb1da",
+    "configs/bc_v1/action_heads_v1.json": "ccb6707996ba22407df3b7214aa7cfe83a25db056b04adbfd66fc7a642245927",
+    "configs/bc_v1/causal_topology.json": "ecfb73089db4818d4f98cbf607665ce916872be8c441d9ab4d1ac9eddbafddb0",
+    "configs/bc_v1/counts.v1.json": "72464dfe52c80046a212e3697409e5ff7afe5b40f4206cb28150311df226404c",
+    "configs/bc_v1/features.json": "627b9d06a2066d1f17ca98f87eaedbb6a80be0eef35c3260415967189d1d0f1a",
+    "configs/bc_v1/gnn_v1.json": "2ee8bafa6a06da952f3f61bc7a2771e935692271b05bf94e734f69411cfe4dff",
+    "configs/bc_v1/loss_v1.json": "85986a6808dc2295fad5fdefba7389f79eccce628571e9ebeee2b20f45f93d69",
+    "configs/bc_v1/metrics_v1.json": "31b7e02d9bccb3baf5217a29c2ee83a28954ed60c72618363a98478a8e283cac",
+    "configs/bc_v1/normalization.json": "d0dac2789f9d46ea2ed180e2cf0615ce9735e58e67d0901a9c2a793c89feb0ac",
+    "configs/bc_v1/prepare.json": "df1587bc94aca341e0adbd2dc1d2221d6b6da858557f9df1900f1be913591c07",
+    "configs/bc_v1/robot_spec.schema.json": "a793efe8b5f8183f08c035019886bfcaf1adfbd86a99eda557772f89a2274e40",
+    "configs/bc_v1/sidecar_v1.json": "6ec68b021c6189a0640ea1f07670ee449d862455ca8d0f73906060b9bec3fe96",
+    "configs/bc_v1/smores_ep.robot.json": "070e5bab86bd9ebadbd77ef21c25ac34a60ce4f53badbcc7c213cf6c907bd4bb",
+    "configs/bc_v1/source_frames.json": "748f8e00da83f250c8a29308f66af9ebccdaa7907724d7d2b85def1c824165e8",
+    "configs/bc_v1/task_context.json": "565e23b262cfa820bde83222e5bb4f477d211fd1ed025053dcbe420c6c04bfc9",
+    "configs/bc_v1/tensor_layout.v1.json": "736da57202966b65e5f9eda809f620be6abb49030feeecde07570c313b72e40e",
+    "configs/bc_v1/training.json": "730bc5c2b8b2683e6a9b9363a3c35eccf5e0155a3186e53a07502e9471c3aaff",
+    "configs/bc_v1/training_smoke_v1.json": "75674d97d9035cdf0ee0ec35673a8dcd309d468d00138a808666a61d88deb4bf",
+    "docs/2026-09-17-teleoperation-v1-design.md": "59528b38ff623a699c4fc751fdbeddf13388b66be63f08996bcd36d5cc03c2c2",
+    "docs/2026-09-19-t5-full-morphology-matrix-validation.md": "b6a59ce135552a90d4a1a57fba23131c9b0e706796f26ed116a56240e7c3125e",
+    "docs/bc_v1_align22_manual_audit_20261007.md": "3e62320d813fe592b43197138c62decf9afebc67394810351d0af56a32014ddb",
+    "docs/bc_v1_context_v1.0.1_20261008.md": "789416737b34647b75d1f03ff3bbeaf1c5126d1aa7fb2f1b4ddd10d78f1fe745",
+    "docs/bc_v1_joint_structural_audit_20261007.md": "2725453821471e80b59f8b17c7efb5b16da6a335200e300e64db7a59fd46d49d",
+    "docs/bc_v1_mm8_recoverability_audit_20261007.md": "0dffa9bbf2239a07280b73c2a98094b3a9c44d28520dbe232f0941fae9518050",
+    "docs/comandi_expert.md": "2679943d69d8f53ecf2c53734eb16efcd946dcba28c0fd1ead23003f3b46c5e6",
+    "docs/freebot_docking_dynamics_audit.md": "fdee695e4e6964afda00abbf7e248bbfc5b4b2185bda0bcb807ddde49ff940cc",
+    "docs/freebot_mobile_magnetic_docking_spec.md": "31ff1b76710dd4acfeeda850f49b6ffb24825c8e3a35993db1ae59fc3350a5c4",
+    "docs/il_dataset_roadmap.md": "44445665b9f99fd64820efbb07e90026546457f163dd36879de57787156279c8",
+    "docs/smores_expert_roadmap.md": "dc4aecfc178ed450225d7e2d6b47fb586fc65bd92b3797afc1b65bffa0deefdb",
+    "docs/smores_obstacle_course_runbook.md": "fd3c07330eafa86886236d68afacda906a32fa45544ac77e1b9ed2da37e611c3",
+    "docs/smores_reference_morphologies.md": "0cf7cc0bb6a9c31ca5135f28fcded68634242332bda38f5867ba27bb490c1eba",
+    "docs/superpowers/plans/2026-09-16-composite-dataset-acquisition.md": "cab553623234618aaa31864ad351a37859d8faea879a34f393a82ff0c76448ae",
+    "docs/superpowers/plans/2026-09-17-teleoperation-v1-handoff.md": "d843e070686f2b28d0f389448ec0dc5a2f7b0d53d83d1112915309c6da5e9e1d",
+    "docs/superpowers/plans/2026-09-17-teleoperation-v1-structural-estop.md": "3f2d15e6ef2b9462fa56a17d33dfe21ddcc203d9363939d9b2a7662eb15eab1c",
+    "docs/superpowers/plans/2026-09-17-teleoperation-v1.md": "f14d468ea5f15f61cfd225f2d85409fad3f5fb150f190c48b10bb033115cf600",
+    "docs/superpowers/plans/2026-10-06-bc-v1-implementation-v1.0.0.md": "ee6aa4d2f0bebc437895a28955cfab1d427a76e43f6e087a09abedcd679761c8",
+    "docs/superpowers/plans/2026-10-11-bc-v1-coalesced-supervision-causal-topology-implementation-v1.0.0.md": "b1f0b8814200c6fd55aceb8673b77c6e17c9bbe4a9ec6ccc28b625e843e3d607",
+    "docs/superpowers/plans/2026-10-12-bc-v1-source-frame-bridges-implementation-v1.0.0.md": "1a756bc5226dea41eb6bd9cbba34e5f7ae2e5c89a71c001bbdf5cf685cb1d5dd",
+    "docs/superpowers/specs/2026-09-16-composite-dataset-acquisition-design.md": "07cdd7696e7239a5f5947d05cbe1eff75e676858be0e48c8de716846f72cd974",
+    "docs/superpowers/specs/2026-09-17-teleoperation-v1-design.md": "59528b38ff623a699c4fc751fdbeddf13388b66be63f08996bcd36d5cc03c2c2",
+    "docs/superpowers/specs/2026-09-17-teleoperation-v1-structural-estop-amendment.md": "948fbfdb8a3d231f2354d85045bfd352dc7fb4c2f2d4f717855d6a1eec0355b5",
+    "docs/superpowers/specs/2026-09-18-teleoperation-v1-t4-recording-amendment.md": "1543ec573d57867d523fa7e409dabd9c41aa70370a3930107ef16e92cc02d2fa",
+    "docs/superpowers/specs/2026-10-06-bc-v1-architecture-v1.0.0.md": "9bfd5428f163dd3f6688ae5a6b1f8c5cedfdaa9ca72886e3444d6e8c6ac859ff",
+    "docs/superpowers/specs/2026-10-10-bc-v1-causal-topology-v1.0.0.md": "e11acd9cecd206734a67d8c261356e2d383b1377cc644443f4e884698a28e637",
+    "docs/superpowers/specs/2026-10-11-bc-v1-coalesced-supervision-causal-topology-v1.0.0.md": "0efa83076e2b63c7d65f8f58a3e5e7e743955e403097e9df5b1bc23fbc562e55",
+    "docs/superpowers/specs/2026-10-12-bc-v1-source-frame-bridges-v1.0.0.md": "ebec8e05c5ad5353d9c18a312d9f8598d58a8297a475ebd76b20bb732a85a600",
+    "docs/teleop_avvio_t01.md": "81eb2d6f74f4eb73f6814b5e218e6fe8efa95e2eef7d2f9c497460ab30fd2440",
+    "docs/teleop_c05_compaction_audit_20260929.md": "1cc783098dfc5f9cc8a7e42ce2f782352d2605fe56fedab9568c1f5bfa4a626d",
+    "docs/teleop_campaign_audit_20260928.md": "d26898b5cd748d47300bacd83a32b250b439024b6179f5392f5549d60a09058f",
+    "docs/teleop_compaction_audit_20260929.md": "1d29c0c31d89a9abfa9c462a7c74382b70e70379872c6be61db612d44c805165",
+    "docs/teleop_compaction_design_20260928.md": "ffc86c23824a29953941b1722e0e5ef117058cf11a5a88ce6e45d1619680aa8a",
+    "docs/teleop_composite_campaign13.md": "f84d1889bb89f20725cd477ab6aea60aa5fc74cb64ba3de76d649dce6db8b249",
+    "docs/teleop_log_cleanup_20260929.md": "f1beea67594d0614e79aee828a7379e1715c55d146ecf3ca4f6b7a5e9d293d98",
+    "docs/teleop_sei_registrazioni_mancanti.md": "2090103d35d96f802d18a5ed69123ac7b5fdd4f7436f19f892203dfd0c718fe6",
+    "docs/teleop_t01_20260925_audit.md": "3b0d2770bb257f8a2b7dc09ae407060d5ecb7a654fb6e2fdf36c90aa9cbc34de",
+    "docs/teleop_t14_20260927_mm8_rc_diagnosi.md": "e9907ae2cb519d641610f6d795a5b7f449cd9a2abe61d8860b6fe1e7802e2d31",
+    "docs/teleoperation_v1_runbook.md": "ab6aa0142ead87a7d936191d14f88387bca50f01e065f678e62b5186ce8b1fef",
+    "docs/validated_behaviors/snake8_crawl_stairs_arch_wave.md": "294c0559d745602eec55b182008deae72e3b58d60e71d3c990653d41ec559101",
+    "docs/validated_behaviors/snake8_gap_crossing.md": "f19145d08975970e5520b9663fa6d6a2dbaa3c6e5d53705cf8e6578f5f0c4532",
+    "drl/IL/bc_v1/__init__.py": "1a569dfd54219f916740ed501b10e686776fddb9df28985c295a73d99f949f62",
+    "drl/IL/bc_v1/__main__.py": "250f46d2fea53b0b55386b1713483bf6f5f6bfce2a3d0e01a85470b6f7821b41",
+    "drl/IL/bc_v1/action_heads.py": "b352d3975a6192b786cb64daee5ee3576a8bd09d6c4690a492cd9c76fc748444",
+    "drl/IL/bc_v1/batching.py": "c81fc88f01bbd1f91fe47df7db4f127fd9104481b9970eac2f63b50e4138857d",
+    "drl/IL/bc_v1/bc_v1_contract.py": "105868a6e406fcfefc8075c9a4d389c0027080321ee02a4b5ac1cb3a666b7ae5",
+    "drl/IL/bc_v1/candidates.py": "d91d123c79194328613c4d09313a9e71ac43835aa1ac1bbe22cad5a369b75c7f",
+    "drl/IL/bc_v1/causal_topology.py": "aa1f19cad62ae75d03a9890bc357e7db39b42db0d53fc9f85c276fadf5070f14",
+    "drl/IL/bc_v1/dataset.py": "687c906781c2fe9d0391402e15b0a0a3071ae42a6f3359bf8286c8f7bc0c3c65",
+    "drl/IL/bc_v1/feature_schema.py": "a96cbcb8d77b54e4b6bb32f9bf73f46734be6f0c402b6cde03542f99a983c410",
+    "drl/IL/bc_v1/features.py": "4f14b50bf910cada2ab9df5980617df6ddeac70cdf924520579c4f72ac3aaaf8",
+    "drl/IL/bc_v1/losses.py": "e246a7a7c864d4e64a47f1bb89f135c68858926e521c4ff15e6d6dd4d8b0c263",
+    "drl/IL/bc_v1/metrics.py": "34faeea6adfa81142ad12121d900536b63666c74a765d75c4a6c3f808814f6d1",
+    "drl/IL/bc_v1/model.py": "af7a4b921fbdb13689cb7d1f3789c0b1f25fe7e0ce752c94c112893c28eedcaa",
+    "drl/IL/bc_v1/normalization.py": "5baf55d6e31605d8a120234d6ad0717452692724646e5ec19733aa82e28c2e61",
+    "drl/IL/bc_v1/normalization_prepare.py": "c401009feffd0fea70f392b0fa04c1c95770e3589983f38bebf20d41e090e528",
+    "drl/IL/bc_v1/pipeline_validation.py": "677b2754bdedaa6e432bc52847e4b2201a8e5342f8d7a704d742e90a1ab17190",
+    "drl/IL/bc_v1/policy_inputs.py": "8d920ea1e947fc1f369468641bde49612ead1d4836821c001aec2cbc71958e14",
+    "drl/IL/bc_v1/requirements.txt": "978d50d9eb692d753a2833b01e95bb33542488652ac2a078fbe6afa32a58ab0f",
+    "drl/IL/bc_v1/sampling.py": "14e5f56119afb64036429ce4036aaa4e7faba6b41b04a26717fbf9a9ffc189e4",
+    "drl/IL/bc_v1/sidecar.py": "8b201c7f0db8a269fa3bd90f26f5e3b165f728e79df4651f58c58bec1b119e20",
+    "drl/IL/bc_v1/sidecar_build.py": "6c3fd2b866e475fcfb651c2d0bc6572613b24ca8e7f3815ce4536b2acbfd00c9",
+    "drl/IL/bc_v1/small_overfit.py": "92399f94552dc3d1e49b4a18aa0f7fad640696d5c9d621561623c225bfe56876",
+    "drl/IL/bc_v1/smores_adapter.py": "78a6338ee190214b9950948cd40ce9c5701c7a0952907a997c3afd3860e7d197",
+    "drl/IL/bc_v1/smores_disconnect_evidence.py": "20e47b8dc98c7d4769124ea22aa50d830d7b78e622b0731f772fa7a4c65d3112",
+    "drl/IL/bc_v1/smores_source_frames.py": "9aaa194fbf0ccb71ba0d8ec7927ffb8b6ed4ed93c694ea4a3c46c5a921ec3241",
+    "drl/IL/bc_v1/source_frame_bridges.py": "c3a09e4dd0ac775cfaae271eff1d5fb940cdb9c978692de0e41f93aac1345aac",
+    "drl/IL/bc_v1/split.py": "dc301d8fe92aea2e725b59759a6bc43f19043cca49efd2c6d03441975b930faa",
+    "drl/IL/bc_v1/task_context.py": "f7ad6cacd71a988709faefa562f96b9513eb13c6a559ae5fd4d827bc37cd836e",
+    "drl/IL/bc_v1/temporal_supervision.py": "8f396693368816e13b089ae09a32200d2de7e5548cdf5f0a1f9c4e01cbd1b8d2",
+    "drl/IL/bc_v1/tensorization.py": "61e64fb426197b8f1926afad1856067aa3bb07273a05010cde2734dc420f9fda",
+    "drl/IL/bc_v1/training.py": "a028a30a8b3689da3d15397afba52ac2ad6d85d9207589d16b116c1abf9ac581",
+    "drl/IL/tests/bc_v1/fixtures/causal_topology.v1.json": "712e6a82e323cdcbdb513608d68a7e6c52a4c274555730fe978ff5596cf10a0f",
+    "drl/IL/tests/bc_v1/fixtures.py": "43569cefccc7db9605f2b2b4bbedb855ce7dffd6aab6b6bee93108db3bd457aa",
+    "drl/IL/tests/bc_v1/g2_fixtures.py": "c71ace2ae05fd8ad681b3b1254b34c9c47d98c50c2726ca0a8d952ebabdf5eab",
+    "drl/IL/tests/bc_v1/test_action_heads.py": "59d4a33226ba96d464af9b5031ad4398febc704b584f0395752668a898ba27ce",
+    "drl/IL/tests/bc_v1/test_batching.py": "3b0306069e2dd64dbd8dbb253505814d4999c6a99cb9aab38e6e61e5212ba1b5",
+    "drl/IL/tests/bc_v1/test_candidates.py": "98b6bc09c6b307f76160af01b4cf924ce5722b162c59a790c2d281e019646e5c",
+    "drl/IL/tests/bc_v1/test_causal_topology.py": "3d7f1cf5b348a834b241373385e299f6fa693c4dee0c2996d47b9a48c7ac6f49",
+    "drl/IL/tests/bc_v1/test_contract.py": "bff4a04ed4c5cc87bfa141a985edf9a49daf1611d930aedbaa9b33b7ed012ed1",
+    "drl/IL/tests/bc_v1/test_dataset.py": "27c8a9405ac8b9935cdb05c27cf8aa7fb292dd7750a9f246366f688697be74c7",
+    "drl/IL/tests/bc_v1/test_dataset_counts.py": "29bcbaea4efb11a8fbf9cac2ab679a27e847439c48535287a7ff8ef1ec0dd22d",
+    "drl/IL/tests/bc_v1/test_e2_integration.py": "72a2e7fdf673382b5bc5355e8db1090399c46b5b59e93ef607a0a312a5ef638f",
+    "drl/IL/tests/bc_v1/test_feature_schema.py": "4885cc928ac4b7b99cf8595f011c57b60dbb01135a386b6b471a14ac78c1d013",
+    "drl/IL/tests/bc_v1/test_features.py": "12a75d737b364de49e47e5706ae1abcf83e780039ffbde9a810947697cd81b85",
+    "drl/IL/tests/bc_v1/test_losses.py": "bbf8d610134333b0a3cc16251873a6e2c2b0fb33be1f155da61078fffcc05209",
+    "drl/IL/tests/bc_v1/test_metrics.py": "408c8397dedc32b231f436fd3dacb791fc29da6a380992f0a263bc9e3982bc8c",
+    "drl/IL/tests/bc_v1/test_model.py": "815548a472a98615e6745cb1faa0d6cfb2f2c3868038600a055f32b85c5b1351",
+    "drl/IL/tests/bc_v1/test_normalization.py": "444b8a1e0efa864a65f54a41f915ab5272ef14ab3379ebbd7b3233791c65c8c4",
+    "drl/IL/tests/bc_v1/test_normalization_prepare.py": "f82271480d77ed06396203ae45836ee51ce9e847e84c8632f82ac4c4dd2b06c8",
+    "drl/IL/tests/bc_v1/test_pipeline_validation.py": "739663b03adb75d1f3e758e8bc86664f012dfa096b4bd7c0e4f68648703bb97e",
+    "drl/IL/tests/bc_v1/test_policy_inputs.py": "12637e7b7ea524eaddbe48ee87426bf4028df26ed6c153c21375ea57669729d3",
+    "drl/IL/tests/bc_v1/test_robot_spec.py": "e941068d58b42ec344ffafc6f90337c5405eccac5ff861d75fc13678684aa4a3",
+    "drl/IL/tests/bc_v1/test_sampling.py": "cc1a7387da855a53f76c2b95cfa86177d1846df2b441443cf121457781c6aa9a",
+    "drl/IL/tests/bc_v1/test_sidecar.py": "b78cbc379e1353d68f719d756f64b894e8c9580bf9f43935e59d6d6cb2d85256",
+    "drl/IL/tests/bc_v1/test_sidecar_build.py": "993f9eb672bea77803e6b531ec24129c0fdd7d364b790e8344e656cb7f84f246",
+    "drl/IL/tests/bc_v1/test_smores_adapter.py": "d3c805f1eef206ddeaf87f2e66f2c175c9c610788e44999d015264927c17b79b",
+    "drl/IL/tests/bc_v1/test_smores_disconnect_evidence.py": "4eaf3672bd6f1d1cfcec4536dc11eca43c033d46cdda2ea2d344483ee406c79f",
+    "drl/IL/tests/bc_v1/test_smores_source_frames.py": "959e32301672217001fa7c5c17f416cc9f844a152be2d64ad55b2904c9f6d869",
+    "drl/IL/tests/bc_v1/test_source_frame_bridges.py": "9b613bb5aa3aa11d22e71dd6366ac494bc198035d6b9db51a5d6305374c47312",
+    "drl/IL/tests/bc_v1/test_split.py": "a82eb6fe58b6ff3cc9184103dc4a66fcdb4efb9f6d0f20e9418f13b4bdede3a6",
+    "drl/IL/tests/bc_v1/test_task_context.py": "4f8786ff544a921b9702fcd3a33224243615f7db4f04d51d55383766268b115c",
+    "drl/IL/tests/bc_v1/test_temporal_supervision.py": "9dbf3b72aefa304977a12a09d171659004536f8740b6c9b2a95bae77d399b4e9",
+    "drl/IL/tests/bc_v1/test_tensorization.py": "c622721ddfad4fde7e0a6cd5faa2318a265f40d9163c84338d9018c3ec461473",
+    "drl/IL/tests/bc_v1/test_training.py": "b84414adcfec173469ba8aa0cd05cf90531bbcba14ec5f485f16f2b35bb67b31",
+    "mssr_ws/src/mssr_expert/mssr_expert/execution/parallel_assembly_executor.py": "263dcd889879b64363ea0d6e9fb22baf5e9263bd9b80557908cd27281a4221a1",
+    "mssr_ws/src/mssr_expert/mssr_expert/nodes/smores_parallel_self_assembly_node.py": "81249b5240d165cd9f6656a7fae67bbd59b1dd5db388968401bad9bd5459404f",
+    "mssr_ws/src/mssr_expert/test/test_parallel_assembly_executor.py": "b206f9134c51964ed421fcf03a21f86b4223daf96fe4b99540233eaeb574a412",
+    "scripts/dataset_tools/build_expert_v1.py": "a36225d301ba8d7c19b7df4401d0795772092c1af4f13e9de0b98e5d82813084",
+    "scripts/smores_ep/run_button_expert_to_ik.py": "8965b7a2a6df57c39a29effdd374e55e20fb543869b82f930b04873db46dc18d",
+    "scripts/smores_ep/src/smores_ep/control/button_ik_math.py": "8fa49e7124fed460498ca900a53b2b87ffb73a6fd5f85b303b96dc080241ac45",
+    "scripts/smores_ep/tests/test_button_ik_source_contract.py": "555b78ea1c9bcc54721cbbbab9466f2b2859592ebe981165838f3c463aad3860"
+  },
+  "frozen_stats": {
+    "datasets/expert_v1_canonical_v6/manifest.json": {
+      "bytes": 97236,
+      "mtime_ns": 1791383057302253257
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004104.jsonl": {
+      "bytes": 28928409,
+      "mtime_ns": 1791288871527427203
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-beaa63ebe5f347c6abc58baff9d1394a.jsonl": {
+      "bytes": 152530206,
+      "mtime_ns": 1791291491509120896
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003104.jsonl": {
+      "bytes": 46263537,
+      "mtime_ns": 1791289098801266441
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004100.jsonl": {
+      "bytes": 28912854,
+      "mtime_ns": 1791288850397770854
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-004689.jsonl": {
+      "bytes": 54560865,
+      "mtime_ns": 1791289195356665476
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__button__seed-008568.jsonl": {
+      "bytes": 29746233,
+      "mtime_ns": 1791288820948387678
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-fb69637be28d49ccbff572e721cfae24.jsonl": {
+      "bytes": 912365975,
+      "mtime_ns": 1791292513282588321
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__button__seed-006107.jsonl": {
+      "bytes": 29117965,
+      "mtime_ns": 1791288789223275346
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-006004.jsonl": {
+      "bytes": 24556106,
+      "mtime_ns": 1791289047303466199
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-005855.jsonl": {
+      "bytes": 27601381,
+      "mtime_ns": 1791288934264283392
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-5e0c4d97db80492bbb561b16ef132949.jsonl": {
+      "bytes": 627230037,
+      "mtime_ns": 1791290488243235201
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-012398.jsonl": {
+      "bytes": 27870954,
+      "mtime_ns": 1791288963365968877
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-dd6bf8b9926d4a2aab6af7572646d026.jsonl": {
+      "bytes": 137983631,
+      "mtime_ns": 1791291866224653976
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-005998.jsonl": {
+      "bytes": 31248184,
+      "mtime_ns": 1791288941810142108
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-ce8293656bb444ac999f87c0520672fc.jsonl": {
+      "bytes": 818646730,
+      "mtime_ns": 1791291838945538328
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004110.jsonl": {
+      "bytes": 28166820,
+      "mtime_ns": 1791288913853009076
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-adcf33433f954669838220b9f617d952.jsonl": {
+      "bytes": 470294388,
+      "mtime_ns": 1791291434618493506
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-006922.jsonl": {
+      "bytes": 49233465,
+      "mtime_ns": 1791289217030238137
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8.jsonl": {
+      "bytes": 579304031,
+      "mtime_ns": 1791289495317126154
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004103.jsonl": {
+      "bytes": 29816371,
+      "mtime_ns": 1791288864615208503
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-8b55584534d24c86888b350e09c74e7b.jsonl": {
+      "bytes": 154725798,
+      "mtime_ns": 1791290727154482929
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004106.jsonl": {
+      "bytes": 29055072,
+      "mtime_ns": 1791288885939627007
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__button__seed-006103.jsonl": {
+      "bytes": 28658389,
+      "mtime_ns": 1791288778484773943
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003106.jsonl": {
+      "bytes": 43256997,
+      "mtime_ns": 1791289123891842362
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__button__seed-006101.jsonl": {
+      "bytes": 28869090,
+      "mtime_ns": 1791288767957549021
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-004007.jsonl": {
+      "bytes": 12286637,
+      "mtime_ns": 1791289173584120469
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-69b37b8db7e141339518d4eef585e4bd.jsonl": {
+      "bytes": 483722668,
+      "mtime_ns": 1791290696986299990
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__button__seed-008936.jsonl": {
+      "bytes": 30355073,
+      "mtime_ns": 1791288832045484264
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-014544.jsonl": {
+      "bytes": 29134889,
+      "mtime_ns": 1791288970359951084
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf.jsonl": {
+      "bytes": 366447706,
+      "mtime_ns": 1791292010425808190
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-006001.jsonl": {
+      "bytes": 26719871,
+      "mtime_ns": 1791289039744690589
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-952c36750c624fb19de8421019325d13.jsonl": {
+      "bytes": 587970372,
+      "mtime_ns": 1791291028273538282
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-170338d489a64eb397a10cf9910392a1.jsonl": {
+      "bytes": 162904327,
+      "mtime_ns": 1791289527099799270
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004109.jsonl": {
+      "bytes": 29588590,
+      "mtime_ns": 1791288906567024624
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-005106.jsonl": {
+      "bytes": 24765857,
+      "mtime_ns": 1791289023694405677
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004111.jsonl": {
+      "bytes": 28635229,
+      "mtime_ns": 1791288921016012053
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__assembly__seed-006284.jsonl": {
+      "bytes": 107035930,
+      "mtime_ns": 1791382711723388588
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-004047.jsonl": {
+      "bytes": 42601255,
+      "mtime_ns": 1791289180501069995
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-006403.jsonl": {
+      "bytes": 80189902,
+      "mtime_ns": 1791289208470776628
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-005100.jsonl": {
+      "bytes": 30602134,
+      "mtime_ns": 1791288978557578430
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004105.jsonl": {
+      "bytes": 28489229,
+      "mtime_ns": 1791288878863506333
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004102.jsonl": {
+      "bytes": 27894448,
+      "mtime_ns": 1791288857169092600
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-005101.jsonl": {
+      "bytes": 22577842,
+      "mtime_ns": 1791288984915733141
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-1f8b406b56f74377834cd863ebccf696.jsonl": {
+      "bytes": 151334145,
+      "mtime_ns": 1791289760769675941
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003109.jsonl": {
+      "bytes": 42592438,
+      "mtime_ns": 1791289146464157381
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-edbefc66cecf40c180864b452aff8dab.jsonl": {
+      "bytes": 161162137,
+      "mtime_ns": 1791291900716850326
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003108.jsonl": {
+      "bytes": 38850602,
+      "mtime_ns": 1791289138016659719
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003107.jsonl": {
+      "bytes": 46077767,
+      "mtime_ns": 1791289131495590980
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-006056.jsonl": {
+      "bytes": 23751191,
+      "mtime_ns": 1791289069352966384
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-006053.jsonl": {
+      "bytes": 25507700,
+      "mtime_ns": 1791289062192078900
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53.jsonl": {
+      "bytes": 402659261,
+      "mtime_ns": 1791290082765809243
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1.jsonl": {
+      "bytes": 498671899,
+      "mtime_ns": 1791291229412814398
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003102.jsonl": {
+      "bytes": 39506925,
+      "mtime_ns": 1791289091237502652
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-c78e0455357147369ad16bc1bf39a0c2.jsonl": {
+      "bytes": 164651995,
+      "mtime_ns": 1791291523495491300
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003101.jsonl": {
+      "bytes": 48102320,
+      "mtime_ns": 1791289084533483808
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-006017.jsonl": {
+      "bytes": 24530770,
+      "mtime_ns": 1791289054536335755
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__assembly__seed-006217.jsonl": {
+      "bytes": 107895842,
+      "mtime_ns": 1791382697430598800
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-006911.jsonl": {
+      "bytes": 29905913,
+      "mtime_ns": 1791288949453961837
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-006000.jsonl": {
+      "bytes": 26183634,
+      "mtime_ns": 1791289031428135246
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003110.jsonl": {
+      "bytes": 39727427,
+      "mtime_ns": 1791289154063905697
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__button__seed-006251.jsonl": {
+      "bytes": 48234340,
+      "mtime_ns": 1791288809614146664
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-005104.jsonl": {
+      "bytes": 25901077,
+      "mtime_ns": 1791289010971133822
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003292.jsonl": {
+      "bytes": 59976672,
+      "mtime_ns": 1791289171333787512
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-005105.jsonl": {
+      "bytes": 23682573,
+      "mtime_ns": 1791289017280286312
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-007564.jsonl": {
+      "bytes": 29342270,
+      "mtime_ns": 1791288956609911665
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c.jsonl": {
+      "bytes": 563126573,
+      "mtime_ns": 1791289731225237688
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__button__seed-009974.jsonl": {
+      "bytes": 28717804,
+      "mtime_ns": 1791288843161523146
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003105.jsonl": {
+      "bytes": 108899808,
+      "mtime_ns": 1791289116271098139
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004108.jsonl": {
+      "bytes": 28108342,
+      "mtime_ns": 1791288899461973001
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-005102.jsonl": {
+      "bytes": 53442002,
+      "mtime_ns": 1791288998178871569
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__assembly__seed-006307.jsonl": {
+      "bytes": 105735862,
+      "mtime_ns": 1791382728482142837
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__rc_car__seed-005103.jsonl": {
+      "bytes": 22197287,
+      "mtime_ns": 1791289004240102011
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004107.jsonl": {
+      "bytes": 27813990,
+      "mtime_ns": 1791288892717804935
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003111.jsonl": {
+      "bytes": 39533626,
+      "mtime_ns": 1791289161141808272
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-b1456ab292aa4a319c9d4bcc17e7e57f.jsonl": {
+      "bytes": 137018159,
+      "mtime_ns": 1791291461911792959
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-5bb5a4712d924617aab5604b6deb20b4.jsonl": {
+      "bytes": 362704960,
+      "mtime_ns": 1791290197258971491
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-004676.jsonl": {
+      "bytes": 40524461,
+      "mtime_ns": 1791289187177090739
+    },
+    "datasets/expert_v1_canonical_v6/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94.jsonl": {
+      "bytes": 440682716,
+      "mtime_ns": 1791289918033782286
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__gap__seed-004303.jsonl": {
+      "bytes": 26738360,
+      "mtime_ns": 1791288927539181404
+    },
+    "datasets/expert_v1_canonical_v6/episodes/expert__stairs__seed-003100.jsonl": {
+      "bytes": 39382948,
+      "mtime_ns": 1791289076013000434
+    },
+    "artifacts/bc_v1/splits/f1_v1/episodes.json": {
+      "bytes": 211136,
+      "mtime_ns": 1791641372755002096
+    },
+    "artifacts/bc_v1/splits/f1_v1/split.json": {
+      "bytes": 173755,
+      "mtime_ns": 1791641372757002089
+    },
+    "artifacts/bc_v1/splits/f1_v1/report.md": {
+      "bytes": 13918,
+      "mtime_ns": 1791641903806940707
+    },
+    "artifacts/bc_v1/splits/f1_v1/audit.json": {
+      "bytes": 6177,
+      "mtime_ns": 1791641372772002038
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/manifest.json": {
+      "bytes": 131433,
+      "mtime_ns": 1791916807474934187
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/45628b45d54984fdc9d13d69c9fe7de9d8f17f7b3ea6f8faf811f64ab21a3eae.pt": {
+      "bytes": 982439555,
+      "mtime_ns": 1791914621618198282
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/783b527b24b10414be92ccf3feab2a262613a4dc31d710567f15c5b66f5648db.pt": {
+      "bytes": 25981507,
+      "mtime_ns": 1791911131747125118
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/8517d36f5b4cc161ea8ca201ccd7455af4ab8111f3906d964a9253b73b308722.pt": {
+      "bytes": 82898755,
+      "mtime_ns": 1791915479852240029
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/adc84ee431bd2af1e77c32048593bfe19afd73dbdb7c0b00b29ad3c32feec3a8.pt": {
+      "bytes": 50649539,
+      "mtime_ns": 1791911479837922851
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/3bbdbdcce924db30958f4ea1f8ef469a59659f54a277b06e23d2b8dfe8dd5191.pt": {
+      "bytes": 24052163,
+      "mtime_ns": 1791910927388722271
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/e8c20f1a5aa83e1380ccde4d7918cd3cec5cad6400aabd70ea8494de1040548e.pt": {
+      "bytes": 26039811,
+      "mtime_ns": 1791911182409976803
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/c22ee5e94dc713fe49d24f418e7b7659de7f9cac1b44cf18c5abb6710a848b7e.pt": {
+      "bytes": 25816899,
+      "mtime_ns": 1791910838627980946
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/e99a9ba0e50ea190a701b42ae96f8dad4a56203bb915692460e2e7b499f2e0c5.pt": {
+      "bytes": 23826627,
+      "mtime_ns": 1791910914143760902
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/68c16682652368a2d7ccbc8a5b94bd511d3853c9ad47c98823f80f0ed5bd5cb1.pt": {
+      "bytes": 1222261763,
+      "mtime_ns": 1791913843746942810
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/bc23a976d32fbe7cbe8183ca0fb56ca28fc1622d0a344ab42c1c7c2f62b154ef.pt": {
+      "bytes": 4849027,
+      "mtime_ns": 1791910717746332351
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/d34fff24c91740a17113e3ed54a6384972ca7325c7a1cb5eb29f3dfe24647acb.pt": {
+      "bytes": 46673411,
+      "mtime_ns": 1791911281255687184
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/766621df8c0d66ac1b1f03020f4a9ebbe9caf9f6b2d61e40d5d9e3b26f5b97d0.pt": {
+      "bytes": 58121091,
+      "mtime_ns": 1791915453217813888
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/e1e9ef226211ca9d05eac79ede55dffb496c5ee38ba0b78cfdec771b8b1a7d05.pt": {
+      "bytes": 25327299,
+      "mtime_ns": 1791911191704949582
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/0871bcd9e3b5cb906e6486e983d62a0d7eb4c684ddfdf625f4bb9e2c2bbb9e26.pt": {
+      "bytes": 750263427,
+      "mtime_ns": 1791914959138396908
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/9e5b8b0ad08a3b17d91b6362ced0ab6cb36b280afda2ef6e1ac090584486efd1.pt": {
+      "bytes": 24978499,
+      "mtime_ns": 1791910903470792023
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/b67b66f59e7c42e8ba2c9070094a9c7aedc600fba138ab3ac3c6ad1936a77e64.pt": {
+      "bytes": 43171587,
+      "mtime_ns": 1791911236902817176
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/789521a77caf34ac5d0572d89f8935fd9d2c66702aa7aed6c7e22a0f2b39a553.pt": {
+      "bytes": 24309507,
+      "mtime_ns": 1791911105767201137
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/ec33d4c302612d199f3dd03f04482afecf61682437fe81e0e7e9f31cdba38b4f.pt": {
+      "bytes": 35062339,
+      "mtime_ns": 1791911387185868503
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/23d30aea015372753ac16bad38fb15df36eff6b938b1e949230b70ca5c691e91.pt": {
+      "bytes": 38112835,
+      "mtime_ns": 1791911338410968157
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/f6df4c83d87eef5ef8ee0e8bf3c6b4d893017a9103f1553262d676a12151631d.pt": {
+      "bytes": 18597763,
+      "mtime_ns": 1791911434687178270
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/5b4767e2d2de50560ba84e4430fc1cbc26cb0b855bbc035f161cc45cfac78166.pt": {
+      "bytes": 52624451,
+      "mtime_ns": 1791911250327777835
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/a24a831b2df5f627cce289d8cfbede0eb62377a651d6d4c6f341a23f5c7a9bae.pt": {
+      "bytes": 48117379,
+      "mtime_ns": 1791911378115606185
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/10f83521404eea3f336465bc59f8b7c50b6e501c909282aca51795cefc28f397.pt": {
+      "bytes": 24265795,
+      "mtime_ns": 1791911217199874903
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/32e2d43b967b0e01860998ce4b40c8d9d41437466fff9f836fed879a39fd68bb.pt": {
+      "bytes": 106526211,
+      "mtime_ns": 1791912167018553831
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/1aae2144e66f4ef23a714dbc132333442bbb812751220cdea09429e79d5aeddc.pt": {
+      "bytes": 61063747,
+      "mtime_ns": 1791911067502313053
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/d89c7a7e658cab7235f42b50720127877bd0a1031fad491f3268cf0ddf9e5513.pt": {
+      "bytes": 27149507,
+      "mtime_ns": 1791911201575920671
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/cde24679e7470f24e8c74fddc67fda27be2c85da86f51bcfa86c4975de4e76a0.pt": {
+      "bytes": 28371139,
+      "mtime_ns": 1791911153970060072
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/8183db0e8315a024ded298c187828670d5c4540a6bb4eb228ff5ccd2f4cb47ba.pt": {
+      "bytes": 22980483,
+      "mtime_ns": 1791910875208874398
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/fa53dd925c0f278153e55fb5ff05c8a91b07dee11908784f9bfca345a61cb6c0.pt": {
+      "bytes": 35945923,
+      "mtime_ns": 1791911260090749222
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/bfb72de31703951046e5fd3a21cb96644e5ffe9baf0f7c17b0c714eff6e7279b.pt": {
+      "bytes": 86043395,
+      "mtime_ns": 1791912506353427794
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/452d33eaad2a7229787702e74b2bcd3ea3406ba38bfe92dceacd164bb1ea60ac.pt": {
+      "bytes": 830980547,
+      "mtime_ns": 1791913067961432167
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/1150bd4b05e730ff27e8af8ee668acf03935189a597b6499e51e96de96f9abf5.pt": {
+      "bytes": 29756227,
+      "mtime_ns": 1791911116237170505
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/cff13ba31c830c1d020402df93c8e20bac3265a5b5996239ef09fc8ca9c68426.pt": {
+      "bytes": 102849475,
+      "mtime_ns": 1791916019640027638
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/96982f2df7f4269c603018906f2b92520430903bc5ba09ac751324d2c13581e7.pt": {
+      "bytes": 19645699,
+      "mtime_ns": 1791911416507557118
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/053afc07aa59a016f176d3403a70db98510c2d97ce56e159811c8a83a3fb3fa4.pt": {
+      "bytes": 4836931,
+      "mtime_ns": 1791910721505321441
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/9c7b92e75273dd50669a0455e213822b94264d3e8e6be28cdd061fb7d978908a.pt": {
+      "bytes": 1198495043,
+      "mtime_ns": 1791915963942942837
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/aca69f133d1b9ab76d097fbfe2e0bef9596d5f60ab3b1dc4be33432486bc6bc8.pt": {
+      "bytes": 24007747,
+      "mtime_ns": 1791910861497914344
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/490d06af0678db1b073adcd7c0ec51b35aed0d1ea49dfa3fbd0093878c61c4fe.pt": {
+      "bytes": 40937411,
+      "mtime_ns": 1791911428668630279
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/fa3be6c7560840ce2a776487a3e1d8bb327b621ddc35c5b568d8625546a6dbd1.pt": {
+      "bytes": 23618883,
+      "mtime_ns": 1791910989731540313
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/a76c98d582b24ac9713ac4e13564f14ab15a232a161c920448b55b2c149f6e86.pt": {
+      "bytes": 22405123,
+      "mtime_ns": 1791911016795461260
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/4ac888586a1280d1faa5dc43ecdcd751f3474bdc0e6ee7d1944708c57391956f.pt": {
+      "bytes": 28825027,
+      "mtime_ns": 1791911144587087538
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/755870690618c8199872dd8b834599649bc9b0c156245bb76d451f351465d298.pt": {
+      "bytes": 24861955,
+      "mtime_ns": 1791910769787181205
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/624dc9eeb62983cc01976f7dd2ca8eedf50e4cdef5aad2acb2daf9a09c746c52.pt": {
+      "bytes": 23912259,
+      "mtime_ns": 1791910887679838055
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/521b21cac25ac2c23708dea204a3f4ab1edbef066a20cb5da0d85ab67df8e08f.pt": {
+      "bytes": 23875843,
+      "mtime_ns": 1791911024347439194
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/244fce2e99b378d8c324b8dca5a064dcd787b7036fb885d904eef56330185492.pt": {
+      "bytes": 40647043,
+      "mtime_ns": 1791911365868619815
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/72b7b77d66d9f2373677e953777c458e00b0dd18587674ebd6b64063f0a717c8.pt": {
+      "bytes": 161347907,
+      "mtime_ns": 1791911324549194927
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/f0cf6c33810feb709ed807faf13af1d15d2c1552041fef30d86365152660be61.pt": {
+      "bytes": 28773891,
+      "mtime_ns": 1791911170580011443
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/c86dc49b39401959ddd4a360e4c0ccf5bc44a2688e474512cf07375cfa439049.pt": {
+      "bytes": 25484867,
+      "mtime_ns": 1791910759767210323
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/07fe30c199b469af62bddcec36754cfde2dd05602fe0b5f19e46db7cf3672a2b.pt": {
+      "bytes": 869179715,
+      "mtime_ns": 1791914189698002997
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/661b159e80cf0b6e776b0382604a4b0905e6fa828eae6c7dc8baa413e23c4b84.pt": {
+      "bytes": 111201219,
+      "mtime_ns": 1791915511911712679
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/a62793f23c659d001787366e3dbd0874e0f7d726a3792342e1f4c258a0ef8fdb.pt": {
+      "bytes": 796062339,
+      "mtime_ns": 1791913311668725060
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/bda5fff5402d59127c40549c48b9eba0ef5fe8c312ac590bccd3f258ebcc362c.pt": {
+      "bytes": 30547843,
+      "mtime_ns": 1791911444000487377
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/97c87a50e3155bb769a7a65936dcba761d9dee6d63990b474c3d94cdb4c8f53f.pt": {
+      "bytes": 41086083,
+      "mtime_ns": 1791911397838016016
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/efece1b7e3a26308b7d47f420a76479e3f8801a91b3fc4dad35e5ae013fed645.pt": {
+      "bytes": 22614467,
+      "mtime_ns": 1791910974276585440
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/8eee0d95ebaddd186ed9644a7e3bcb37d065868a37f99c690dec24653074f46a.pt": {
+      "bytes": 92605315,
+      "mtime_ns": 1791914238246755533
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/a85790f6469df158b0c1f324f9b80dc09cba7bb0b44372b4ac116b3304ec2b22.pt": {
+      "bytes": 48478659,
+      "mtime_ns": 1791911411716927264
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/c6a5c455feba4f77a5d8e73687fb686c29e96eb235644e877c02843073cc9ba4.pt": {
+      "bytes": 955325251,
+      "mtime_ns": 1791915434481494969
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/66e1c07282c73e4b2a9a8e72c6c6e30e7652a05ef30f3efa92c4ed8645e9fd89.pt": {
+      "bytes": 84885763,
+      "mtime_ns": 1791911466686846983
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/0f86dd7b19608b033c0b2c0f3f71943ca1b18553b0f26141df8147264e0d07db.pt": {
+      "bytes": 24470979,
+      "mtime_ns": 1791910738263272788
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/63d17ff94d9adce783e13ee1720b17deb2a76ca5ae78de647f3903322f7fe826.pt": {
+      "bytes": 37614723,
+      "mtime_ns": 1791911036328404182
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/ed8af43ddd58f8a4b1fc17aec232e0a6019dc45b66b4bb053b99aa5f166a76dc.pt": {
+      "bytes": 25313283,
+      "mtime_ns": 1791910999564511595
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/7f482f8fdf0fa65c39a9b84235f0dce9d06dc28f4fb17aff333d3e578d59b92f.pt": {
+      "bytes": 1535569923,
+      "mtime_ns": 1791916803641953021
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/e4c7dbde585d4859f25746d89c64960b946347a358f1f7604c4b48443a81716f.pt": {
+      "bytes": 23032259,
+      "mtime_ns": 1791910938106691004
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/c19a01f81b49185eb8f3b59ccb555abe8099a8fa7212d93413eccf202f144251.pt": {
+      "bytes": 23110147,
+      "mtime_ns": 1791910749314240692
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/5c6c43fc41c1bcc7a766b8c9f84cfe2910d5713f00924b33c8a4a029dd565e1a.pt": {
+      "bytes": 24680259,
+      "mtime_ns": 1791911044541380178
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/7f22da73a6ff7b9eccc42b942069685f0ce076dffde6517c300c7f6367cdf5cc.pt": {
+      "bytes": 1165583171,
+      "mtime_ns": 1791912113459090967
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/d25ac63c5d3801bb24634a86ea21a93b1462ae2949052a6c28e5bb3959a055fe.pt": {
+      "bytes": 730209987,
+      "mtime_ns": 1791916214991988407
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/8a43642de0ca371d408ee6cb7949c882161aabf26dacf0241864f59b8e24ffb7.pt": {
+      "bytes": 4329475,
+      "mtime_ns": 1791910697731390421
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/6b5baa0e7b9013f7050a68e8d6d096f7b693c7a62126f157d8cbe46989bd07f8.pt": {
+      "bytes": 61392131,
+      "mtime_ns": 1791915988745986664
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/e87289e87cfb777d1e2aea2596a0a227c017d096a78863d2101909cda2ea956d.pt": {
+      "bytes": 862781763,
+      "mtime_ns": 1791912474270102075
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/18926e54e1fdd9cb0c69b291dbf1ba657969d510f06bb8c67f4e54b54c977242.pt": {
+      "bytes": 767592515,
+      "mtime_ns": 1791912765412468588
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/b9a51a6557679e4a338f267ce35b197fd1e53e5e18775c31a0fa1489e66f5fa3.pt": {
+      "bytes": 23912387,
+      "mtime_ns": 1791911009019483977
+    },
+    "artifacts/bc_v1/cache/g1_v1_optimized/episodes/badcfb96366c5c392f453331e505103a29df88f13e02a12dcdcbfdd3dd3ef57b.pt": {
+      "bytes": 49558403,
+      "mtime_ns": 1791911353923628330
+    },
+    "artifacts/bc_v1/normalization/f2_v1_optimized/normalizers.json": {
+      "bytes": 21303,
+      "mtime_ns": 1791970512985044627
+    },
+    "artifacts/bc_v1/normalization/f2_v1_optimized/fit_context.json": {
+      "bytes": 5360,
+      "mtime_ns": 1791970512987044562
+    },
+    "artifacts/bc_v1/sidecar/g2_v1/manifest.json": {
+      "bytes": 13462,
+      "mtime_ns": 1792080305289276507
+    },
+    "artifacts/bc_v1/sidecar/g2_v1/data.sqlite3": {
+      "bytes": 1294589952,
+      "mtime_ns": 1792080305255274880
+    },
+    "artifacts/bc_v1/checkpoints/j_small_overfit_v1/manifest.json": {
+      "bytes": 2743,
+      "mtime_ns": 1792151976923959216
+    },
+    "artifacts/bc_v1/checkpoints/j_small_overfit_v1/checkpoint.pt": {
+      "bytes": 17761735,
+      "mtime_ns": 1792148151780172449
+    }
+  },
+  "post_j_summary": {
+    "schema_version": "mssr.bc_v1.post_j_performance_audit.v1",
+    "status": "recovered_measurements_with_explicit_profiler_gap",
+    "ready_for_review": true,
+    "original_requested_profile_complete": false,
+    "recovered_after_host_interruption": true,
+    "environment": {
+      "torch": "2.14.1+cu130",
+      "cuda": "13.0",
+      "gpu": "NVIDIA GeForce RTX 4070 Laptop GPU",
+      "device": "cuda:0",
+      "dtype": "float32",
+      "amp": false,
+      "deterministic": false,
+      "seed": 20261006,
+      "cpu_threads": 1
+    },
+    "production_changes": false,
+    "full_training_started": false,
+    "new_gpu_work_after_recovery": false,
+    "timings_sha256": "089575e64af92f46bfed98e41182862a1e9c2d4b4815ed19a24bcbaaa569beef",
+    "batch64_production_step": {
+      "n": 9,
+      "mean_ms": 28433.445435893696,
+      "median_ms": 28492.385935998755,
+      "p95_ms": 28811.70681240619,
+      "min_ms": 28081.61178402952,
+      "max_ms": 28823.992454010295
+    },
+    "batch64_components": {
+      "zero_grad": {
+        "n": 9,
+        "mean_ms": 0.4742755554616451,
+        "median_ms": 0.33603099291212857,
+        "p95_ms": 0.9323142003268003,
+        "min_ms": 0.2837670035660267,
+        "max_ms": 0.935667019803077
+      },
+      "h1": {
+        "n": 9,
+        "mean_ms": 38.90896689457198,
+        "median_ms": 39.328643993940204,
+        "p95_ms": 40.379822615068406,
+        "min_ms": 35.16443102853373,
+        "max_ms": 40.47290701419115
+      },
+      "h2": {
+        "n": 9,
+        "mean_ms": 27972.59545222106,
+        "median_ms": 27879.049656970892,
+        "p95_ms": 28552.954832592513,
+        "min_ms": 27449.613381002564,
+        "max_ms": 28574.87350498559
+      },
+      "i1": {
+        "n": 9,
+        "mean_ms": 161.6472473348646,
+        "median_ms": 160.46319002634846,
+        "p95_ms": 172.64768339809962,
+        "min_ms": 155.09729698533192,
+        "max_ms": 178.27171899261884
+      },
+      "backward": {
+        "n": 9,
+        "mean_ms": 399.0417848916776,
+        "median_ms": 398.0823580059223,
+        "p95_ms": 407.1720510022715,
+        "min_ms": 388.71800000197254,
+        "max_ms": 407.618700992316
+      },
+      "clip": {
+        "n": 9,
+        "mean_ms": 2.151055332635426,
+        "median_ms": 2.049290982540697,
+        "p95_ms": 2.5601387955248356,
+        "min_ms": 1.8462599837221205,
+        "max_ms": 2.646506007295102
+      },
+      "optimizer": {
+        "n": 9,
+        "mean_ms": 2.0035646642403058,
+        "median_ms": 1.9008769886568189,
+        "p95_ms": 2.53340519266203,
+        "min_ms": 1.79401901550591,
+        "max_ms": 2.9114659992046654
+      },
+      "diagnostics": {
+        "n": 9,
+        "mean_ms": 0.27519788515443605,
+        "median_ms": 0.26951899053528905,
+        "p95_ms": 0.3182118176482618,
+        "min_ms": 0.25883299531415105,
+        "max_ms": 0.3490910166874528
+      },
+      "full_wall_ms": {
+        "n": 9,
+        "mean_ms": 28578.245166446624,
+        "median_ms": 28483.15602299408,
+        "p95_ms": 29167.267829406774,
+        "min_ms": 28049.137933005113,
+        "max_ms": 29191.034604999004
+      }
+    },
+    "j_wall_decomposition": {
+      "historical_wall_s": 1123.0908395320002,
+      "estimated_train_s": 1099.1524958412629,
+      "estimated_periodic_forward_s": 21.968865478442748,
+      "estimated_periodic_loss_s": 0.058685162004549055,
+      "estimated_periodic_I2_s": 0.46220788002635044,
+      "checkpoint_and_final_verification_inside_historical_timer_s": 0,
+      "unattributed_difference_s": 1.448585170263641
+    },
+    "full_training_estimates": {
+      "production_step_only": {
+        "seconds_per_step": 28.433445435893695,
+        "seconds_per_epoch": 34802.537213533884,
+        "minutes_per_epoch": 580.0422868922313,
+        "hours_per_epoch": 9.667371448203857,
+        "hours_10_epochs": 96.67371448203856,
+        "hours_50_epochs": 483.3685724101928,
+        "hours_100_epochs": 966.7371448203857
+      },
+      "current_with_loader_transfer_and_J_eval_every_50": {
+        "seconds_per_step": 29.847444497425652,
+        "seconds_per_epoch": 36533.272064849,
+        "minutes_per_epoch": 608.8878677474834,
+        "hours_per_epoch": 10.148131129124723,
+        "hours_10_epochs": 101.48131129124722,
+        "hours_50_epochs": 507.4065564562361,
+        "hours_100_epochs": 1014.8131129124722
+      },
+      "excluding_periodic_eval_and_measured_family_diagnostics": {
+        "seconds_per_step": 29.256528369358016,
+        "seconds_per_epoch": 35809.99072409421,
+        "minutes_per_epoch": 596.8331787349035,
+        "hours_per_epoch": 9.947219645581725,
+        "hours_10_epochs": 99.47219645581725,
+        "hours_50_epochs": 497.3609822790863,
+        "hours_100_epochs": 994.7219645581725
+      }
+    },
+    "estimate_assumptions": {
+      "train_samples": 78302,
+      "batch_size": 64,
+      "steps_per_epoch": 1224,
+      "real_sampler_batches": 3,
+      "sampler": {
+        "general": 56,
+        "structural": 8,
+        "seed": 20261006
+      },
+      "loader_overlapped": false,
+      "periodic_eval_scenario_interval": 50,
+      "eval_loss_time_proxy": "split I1; exact combined periodic eval not timed",
+      "heldout_eval_and_checkpoint_cost_included": false
+    },
+    "numerical_checks": {
+      "j8": {
+        "output_tensors": 35,
+        "bitwise_equal_count": 35,
+        "max_output_absolute_difference": 0.0,
+        "shape_matches": true,
+        "dtype_matches": true,
+        "all_finite": true,
+        "assert_close": "PASS",
+        "rtol": 1e-06,
+        "atol": 1e-07
+      },
+      "b64_0": {
+        "output_tensors": 35,
+        "bitwise_equal_count": 35,
+        "max_output_absolute_difference": 0.0,
+        "shape_matches": true,
+        "dtype_matches": true,
+        "all_finite": true,
+        "assert_close": "PASS",
+        "rtol": 1e-06,
+        "atol": 1e-07
+      }
+    },
+    "frozen_checks": {
+      "sources_verified": true,
+      "identity": {
+        "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+        "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+        "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+        "f2_fingerprint": "890eca0b9f6d4deca2cac81d3a41bf535aa3d03ac16e0ff4b81cbc0ca163abf5",
+        "normalizer_sha": "ea8efbd9062acb8625e0618bcc5f86b975f20839bf3132a684a626c744e52003",
+        "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+        "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+        "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+        "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+        "tensorizer_fingerprint": "61e64fb426197b8f1926afad1856067aa3bb07273a05010cde2734dc420f9fda",
+        "storage_fingerprint": "9a5ae40bf224ae53901937883622d2c26935a47def2c93dd5c9c5866e4465bca"
+      },
+      "sidecar_fingerprint": "7bb9f77df7eefe7c3b0246cea10383ec484274093514b59294ea7d752458052a",
+      "sidecar_complete": true,
+      "sidecar_sample_count": 119600,
+      "train_sample_count": 78302,
+      "sidecar_matches_approved": true,
+      "checkpoint_sha256": "84d88d4332c65bd7f7c57f024668d4eb021647272519884505d1df2768e65e47",
+      "checkpoint_matches_approved": true,
+      "j_selection_matches_manifest": true,
+      "checkpoint_upstream_identity_matches": true,
+      "j_config_checks": {
+        "h1": true,
+        "h2": true,
+        "i1": true,
+        "i2": true
+      },
+      "recovery_branch": "wip/t8-c05-human-teleop-20260921",
+      "timings_sha256": "089575e64af92f46bfed98e41182862a1e9c2d4b4815ed19a24bcbaaa569beef"
+    },
+    "limitations": [
+      "Torch profiler operator trace/top-20 did not survive the host interruption and was not rerun. No CUDA kernel busy-time attribution is available.",
+      "Original scratch scripts, pre-profile file hashes and 163-file stat snapshot were lost with /tmp. Identity pins/checkpoint hash were freshly verified; exhaustive pre-interruption byte comparison cannot be reconstructed.",
+      "Root cause of host freeze is unconfirmed; checked current/previous kernel journal had no OOM/kill/Xid/lockup match.",
+      "Three real sampler batches (nine production steps) support estimates, not epoch-wide complexity or statistical confidence bounds. Held-out evaluation/checkpoint costs are not benchmarked."
+    ],
+    "git_audit": {
+      "branch": "wip/t8-c05-human-teleop-20260921",
+      "recovery_files_unchanged": 136,
+      "original_timings_unchanged": true,
+      "diff_check_exit": 0,
+      "new_recovery_status_entries": [
+        "?? artifacts/bc_v1/audits/post_j_performance_v1/report.md",
+        "?? artifacts/bc_v1/audits/post_j_performance_v1/summary.json",
+        "?? artifacts/bc_v1/audits/post_j_performance_v1/torch_profiler_top_ops.txt"
+      ],
+      "removed_status_entries": [],
+      "tracked_diff_stat_unchanged": true,
+      "staged_paths": [],
+      "status_entries": 368,
+      "status_sha256": "75eedb2977d9d6b72b9bd3a2d7a8842e7baac2e87b295f2054122a0b0644e726",
+      "tracked_dirty_files": [
+        "mssr_ws/src/mssr_expert/mssr_expert/execution/parallel_assembly_executor.py",
+        "mssr_ws/src/mssr_expert/mssr_expert/nodes/smores_parallel_self_assembly_node.py",
+        "mssr_ws/src/mssr_expert/test/test_parallel_assembly_executor.py",
+        "scripts/dataset_tools/build_expert_v1.py",
+        "scripts/smores_ep/run_button_expert_to_ik.py",
+        "scripts/smores_ep/src/smores_ep/control/button_ik_math.py",
+        "scripts/smores_ep/tests/test_button_ik_source_contract.py"
+      ],
+      "original_pre_interruption_baseline_available": false,
+      "production_changes_this_task": false
+    }
+  },
+  "interventions": [
+    {
+      "id": "A",
+      "region": "_validate_arguments",
+      "approach": "bulk tensor checks on current input; bounded scalar predicates; no routing cache",
+      "other_H2_regions_changed": false
+    }
+  ],
+  "legacy_action_heads_source": "\"\"\"H2 catalog-driven raw predictions. No targets, normalization fit or decoding.\n\nOnly H1 latents and current G2 tensor routing enter neural computation. Static\ncatalog indices are semantic categories; physical IDs are never accessed.\nRegression outputs live in the already-normalized target ABI, without clamps.\n\nPrediction ABI (float32 scores/values, int64 routing):\n* resource.mode_candidate indexes inputs.resource_candidates; mode_group_ptr\n  has one segment per resource, empty for singleton domains. payload_candidate\n  and payload_ptr route flat numeric values by candidate and ABI component.\n  categorical.candidate/ptr similarly route catalog-ordered category logits.\n* structural.candidate_logits align exactly with inputs.structural bindings;\n  group_ptr retains one decision group per (sample, initiator).\n* arguments.*.argument indexes the G2 structural argument table. numeric uses\n  flat value/ptr (scalar or vector); category uses logits/ptr in ParameterSpec\n  category order. boolean has one logit per argument. reference/reference_set\n  use logits/ptr/domain_index, where domain_index indexes G2's flat\n  argument_domain_index table, not physical entities directly.\n* reference_set required_ptr/required_domain_index retain fixed members without\n  logits. Scope uses binding/ptr/domain_index into G2 scope_members and its own\n  required routing. Fully fixed scopes and bound connector args are unpredicted.\nNo output contains labels. Catalog identities remain available on ActionHeads;\nphysical decoding uses external current G2 routing, never neural ID embeddings.\n\"\"\"\nfrom pathlib import Path\nimport json\n\nimport torch\nfrom torch import nn\nfrom torch.nn import functional as F\n\nfrom .bc_v1_contract import validate_robot_spec\nfrom .model import _owners,_indices,_pointer,_mean\nfrom .tensorization import PARAMETER_KINDS,FAMILIES\n\n\ndef load_action_head_config(path):\n    config=json.loads(Path(path).read_text());_validate_config(config)\n    return config\n\n\ndef _validate_config(config):\n    if (set(config)!={'schema_version','hidden_dim','activation','dropout'}\n            or config['schema_version']!='mssr.bc_v1.action_heads.v1'\n            or type(config['hidden_dim']) is not int or config['hidden_dim']!=128\n            or config['activation']!='silu' or type(config['dropout']) is not float or config['dropout']!=.1):\n        raise ValueError('Unsupported H2 baseline configuration')\n\n\ndef _mlp(source,target,config):\n    # Raw final output: no LayerNorm(1), probability transform or clamping.\n    return nn.Sequential(nn.Linear(source,config['hidden_dim']),nn.SiLU(),\n        nn.Dropout(config['dropout']),nn.Linear(config['hidden_dim'],target))\n\n\ndef _ints(values,like):\n    return torch.tensor(values,dtype=torch.int64,device=like.device)\n\n\nclass ActionHeads(nn.Module):\n    def __init__(self,spec,latent_config,head_config):\n        super().__init__();validate_robot_spec(spec);_validate_config(head_config)\n        self.config=dict(head_config);cfg=self.config;h=cfg['hidden_dim'];self.spec=spec\n        self.mode_catalog=tuple(sorted((t.type_id,r.resource_id,m.mode_id) for t in spec.module_types for r in t.resources for m in r.modes))\n        mode_specs={(t.type_id,r.resource_id,m.mode_id):m for t in spec.module_types for r in t.resources for m in r.modes}\n        self.modes=tuple(mode_specs[k] for k in self.mode_catalog)\n        self.payload_components=tuple((i,j) for i,m in enumerate(self.modes) if m.codec!='categorical' for j in range(m.payload_size))\n        self.component_index={component:i for i,component in enumerate(self.payload_components)}\n        self.resource_projection=nn.Linear(latent_config['hidden_dim'],h)\n        self.module_projection=nn.Linear(latent_config['hidden_dim'],h)\n        self.graph_projection=nn.Linear(latent_config['hidden_dim'],h)\n        self.context_projection=nn.Linear(latent_config['context_latent_dim'],h)\n        self.observation_projection=nn.Linear(latent_config['observation_latent_dim'],h)\n        self.mode_projection=nn.Linear(len(self.modes),h,bias=False) if self.modes else None\n        self.component_projection=nn.Linear(len(self.payload_components),h,bias=False) if self.payload_components else None\n        multimode=any(len(r.modes)>1 for t in spec.module_types for r in t.resources)\n        self.mode_scorer=_mlp(h,1,cfg) if multimode else None\n        self.payload_decoder=_mlp(h,1,cfg) if self.payload_components else None\n        self.resource_categories=tuple((i,j) for i,m in enumerate(self.modes)\n            if m.codec=='categorical' for j in range(len(m.categories)))\n        self.resource_category_index={key:i for i,key in enumerate(self.resource_categories)}\n        self.resource_category_projection=nn.Linear(len(self.resource_categories),h,bias=False) if self.resource_categories else None\n        self.resource_category_scorer=_mlp(h,1,cfg) if self.resource_categories else None\n        self.actions=tuple(sorted(spec.actions,key=lambda a:a.action_id))\n        self.operation_projection=nn.Linear(len(self.actions),h,bias=False) if self.actions else None\n        self.initiator_projection=nn.Linear(latent_config['hidden_dim'],h)\n        self.peer_projection=nn.Linear(latent_config['hidden_dim'],h)\n        self.connector_a_projection=nn.Linear(latent_config['hidden_dim'],h)\n        self.connector_b_projection=nn.Linear(latent_config['hidden_dim'],h)\n        self.scope_projection=nn.Linear(latent_config['hidden_dim'],h)\n        self.pair_projection=nn.Linear(1,h,bias=False)\n        self.structural_scorer=_mlp(h,1,cfg)\n        self.parameter_catalog=tuple((a.action_id,p.name) for a in self.actions for p in sorted(a.parameters,key=lambda p:p.name))\n        self.parameters_catalog=tuple(p for a in self.actions for p in sorted(a.parameters,key=lambda p:p.name))\n        self.action_index={a.action_id:i for i,a in enumerate(self.actions)}\n        self.learnable_parameters=tuple(i for i,p in enumerate(self.parameters_catalog)\n            if p.learnable and self.actions[self.action_index[self.parameter_catalog[i][0]]].scope!='resource')\n        self.learnable_index={i:j for j,i in enumerate(self.learnable_parameters)}\n        self.parameter_projection=nn.Linear(len(self.learnable_parameters),h,bias=False) if self.learnable_parameters else None\n        self.numeric_components=tuple((i,j) for i in self.learnable_parameters\n            if self.parameters_catalog[i].kind in ('scalar','vector') for j in range(self.parameters_catalog[i].size or 1))\n        self.numeric_index={key:i for i,key in enumerate(self.numeric_components)}\n        self.numeric_projection=nn.Linear(len(self.numeric_components),h,bias=False) if self.numeric_components else None\n        self.numeric_decoder=_mlp(h,1,cfg) if self.numeric_components else None\n        self.reference_option_projection=nn.Linear(latent_config['hidden_dim'],h)\n        self.reference_kind_projection=nn.Linear(2,h,bias=False)\n        has_sets=any(self.parameters_catalog[i].kind in ('module_refs','connector_refs') for i in self.learnable_parameters)\n        self.reference_set_scorer=_mlp(h,1,cfg) if has_sets else None\n        # Frozen G2 canonicalizes parameters by name, then binds the first two\n        # connector_ref parameters to the ordered connector endpoints.\n        bound_keys={(a.action_id,p.name) for a in self.actions if a.scope=='connector_pair'\n            for p in tuple(p for p in sorted(a.parameters,key=lambda p:p.name) if p.kind=='connector_ref')[:2]}\n        has_references=any(self.parameters_catalog[i].kind in ('module_ref','connector_ref')\n            and self.parameter_catalog[i] not in bound_keys for i in self.learnable_parameters)\n        self.reference_scorer=_mlp(h,1,cfg) if has_references else None\n        self.boolean_scorer=_mlp(h,1,cfg) if any(self.parameters_catalog[i].kind=='boolean' for i in self.learnable_parameters) else None\n        self.argument_categories=tuple((i,j) for i in self.learnable_parameters\n            if self.parameters_catalog[i].kind=='category' for j in range(len(self.parameters_catalog[i].categories)))\n        self.argument_category_index={key:i for i,key in enumerate(self.argument_categories)}\n        self.argument_category_projection=nn.Linear(len(self.argument_categories),h,bias=False) if self.argument_categories else None\n        self.argument_category_scorer=_mlp(h,1,cfg) if self.argument_categories else None\n        has_scope=any(a.scope=='modules' for a in self.actions)\n        self.scope_option_projection=nn.Linear(latent_config['hidden_dim'],h) if has_scope else None\n        self.scope_scorer=_mlp(h,1,cfg) if has_scope else None\n        for layer in self.modules():\n            if isinstance(layer,nn.Linear):\n                nn.init.xavier_uniform_(layer.weight)\n                if layer.bias is not None:nn.init.zeros_(layer.bias)\n\n    @staticmethod\n    def _validate_input_boundary(inputs):\n        # Same closed G2 input root as H1. The heads use only current routing;\n        # neither a full tensorized batch nor a widened policy boundary is legal.\n        allowed={'graph_ptr','module_batch','connector_to_module','resource_to_module','coordinate_to_resource',\n            'coordinate_slot','connection_connectors','task_one_hot','task_valid','environment','environment_ptr',\n            'object_ptr','relation_to_module','relation_geometry_index','relation_geometry_ptr',\n            'resource_candidates','structural'}\n        allowed.update(f+'_'+suffix for f in FAMILIES for suffix in ('x','validity','ptr'))\n        if set(inputs)-allowed or not {'graph_ptr','resource_candidates','structural'}<=set(inputs):\n            raise ValueError('Pass only G2 causal inputs, without supervision/audit')\n\n    def forward(self,latents,inputs):\n        return {'resource':self.forward_resource(latents,inputs),\n            'structural':self.forward_structural(latents,inputs)}\n\n    def _resource_conditions(self,latents,inputs):\n        module_graph=_owners(inputs['graph_ptr']);parent=inputs['resource_to_module'];graph=module_graph[parent]\n        return (self.resource_projection(latents['resource_h'])+self.module_projection(latents['module_h'][parent])\n            +self.graph_projection(latents['graph_h'][graph])+self.context_projection(latents['context_h'][graph])\n            +self.observation_projection(latents['observation_h'][graph]))\n\n    def forward_resource(self,latents,inputs):\n        \"\"\"One CE domain per multi-mode resource; no CE output for singletons.\n\n        payload_candidate/payload_ptr map numeric mode-conditioned outputs back\n        to existing resource-candidate rows. No expert mode selects a decoder.\n        \"\"\"\n        self._validate_input_boundary(inputs)\n        rows=inputs['resource_candidates'];r=len(inputs['resource_x']);q=len(rows['resource'])\n        _pointer(rows['group_ptr'],q,'resource candidate groups')\n        if len(rows['group_ptr'])!=r+1:raise ValueError('Invalid resource decision groups')\n        _indices(rows['resource'],r,'resource candidate');_indices(rows['mode'],len(self.modes),'resource mode')\n        if rows['mode'].shape!=(q,):raise ValueError('Resource mode shape mismatch')\n        owners=_owners(rows['group_ptr'])\n        if not torch.equal(owners,rows['resource']):raise ValueError('Resource candidate/group mismatch')\n        sizes=[self.modes[i].payload_size for i in rows['mode'].tolist()]\n        expected=[0]\n        for width in sizes:expected.append(expected[-1]+width)\n        if not torch.equal(rows['payload_ptr'],_ints(expected,rows['mode'])):raise ValueError('Catalog payload arity mismatch')\n        base=self._resource_conditions(latents,inputs)\n        conditioned=base[rows['resource']]\n        if q:conditioned=conditioned+self.mode_projection(F.one_hot(rows['mode'],len(self.modes)).float())\n        counts=rows['group_ptr'][1:]-rows['group_ptr'][:-1]\n        multi=counts>1;chosen=torch.nonzero(multi[rows['resource']],as_tuple=False).flatten()\n        mode_ptr=torch.cat((counts.new_zeros(1),torch.cumsum(torch.where(multi,counts,0),0)))\n        if len(chosen) and self.mode_scorer is None:raise ValueError('Catalog does not permit a multi-mode resource')\n        mode_logits=self.mode_scorer(conditioned[chosen]).flatten() if len(chosen) else base.new_empty(0)\n        payload_rows=[i for i,m in enumerate(rows['mode'].tolist()) if self.modes[m].codec!='categorical']\n        query=[];components=[];payload_ptr=[0]\n        for candidate in payload_rows:\n            mode=int(rows['mode'][candidate]);width=self.modes[mode].payload_size\n            query.extend([candidate]*width);components.extend(self.component_index[(mode,j)] for j in range(width))\n            payload_ptr.append(len(query))\n        query=_ints(query,rows['mode']);components=_ints(components,rows['mode'])\n        payload=base.new_empty(0)\n        if len(query):\n            role=self.component_projection(F.one_hot(components,len(self.payload_components)).float())\n            payload=self.payload_decoder(conditioned[query]+role).flatten()\n        category_rows=[i for i,m in enumerate(rows['mode'].tolist()) if self.modes[m].codec=='categorical']\n        queries=[];options=[];category_ptr=[0]\n        for candidate in category_rows:\n            mode=int(rows['mode'][candidate]);width=len(self.modes[mode].categories)\n            queries.extend([candidate]*width);options.extend(self.resource_category_index[(mode,j)] for j in range(width))\n            category_ptr.append(len(queries))\n        category_logits=base.new_empty(0)\n        if queries:\n            role=self.resource_category_projection(F.one_hot(_ints(options,rows['mode']),len(self.resource_categories)).float())\n            category_logits=self.resource_category_scorer(conditioned[_ints(queries,rows['mode'])]+role).flatten()\n        return {'mode_logits':mode_logits,'mode_group_ptr':mode_ptr,'mode_candidate':chosen,\n            'payload':payload,'payload_candidate':_ints(payload_rows,rows['mode']),\n            'payload_ptr':_ints(payload_ptr,rows['mode']),\n            'categorical':{'candidate':_ints(category_rows,rows['mode']),\n                'ptr':_ints(category_ptr,rows['mode']),'logits':category_logits}}\n\n    def _structural_conditions(self,latents,inputs):\n        s=inputs['structural'];q=len(s['initiator']);m=len(inputs['module_x']);c=len(inputs['connector_x'])\n        _pointer(s['group_ptr'],q,'structural groups')\n        if len(s['group_ptr'])!=m+1:raise ValueError('Invalid initiator decision groups')\n        _indices(s['initiator'],m,'initiator');_indices(s['action'],len(self.actions),'operation')\n        for key in ('initiator','action','peer','connector_a','connector_b'):\n            if s[key].shape!=(q,):raise ValueError('Invalid structural binding shape')\n        if not torch.equal(_owners(s['group_ptr']),s['initiator']):raise ValueError('Initiator/group mismatch')\n        paired=s['connector_a']>=0\n        if (not torch.equal(paired,s['connector_b']>=0) or not torch.equal(paired,s['peer']>=0)\n                or (s['connector_a'][~paired]!=-1).any() or (s['connector_b'][~paired]!=-1).any() or (s['peer'][~paired]!=-1).any()):\n            raise ValueError('Inconsistent endpoint applicability')\n        _indices(s['peer'][paired],m,'peer')\n        _indices(s['connector_a'][paired],c,'source connector');_indices(s['connector_b'][paired],c,'peer connector')\n        module_graph=_owners(inputs['graph_ptr']);graph=module_graph[s['initiator']]\n        own=inputs['connector_to_module']\n        if (not torch.equal(own[s['connector_a'][paired]],s['initiator'][paired])\n                or not torch.equal(own[s['connector_b'][paired]],s['peer'][paired])):\n            raise ValueError('Ordered endpoint ownership mismatch')\n        if (graph[paired]!=module_graph[s['peer'][paired]]).any():raise ValueError('Cross-graph peer')\n        _pointer(s['scope_ptr'],len(s['scope_members']),'structural scope')\n        if len(s['scope_ptr'])!=q+1:raise ValueError('Scope/binding mismatch')\n        _indices(s['scope_members'],m,'scope member');scope_owner=_owners(s['scope_ptr'])\n        if (module_graph[s['scope_members']]!=graph[scope_owner]).any():raise ValueError('Cross-graph scope')\n        if s['scope_required'].dtype!=torch.bool or s['scope_required'].shape!=s['scope_members'].shape:\n            raise ValueError('Invalid required scope mask')\n        for i,action_index in enumerate(s['action'].tolist()):\n            action=self.actions[action_index]\n            if bool(paired[i])!=(action.scope=='connector_pair') or action.scope=='resource':\n                raise ValueError('Operation/binding applicability mismatch')\n        scope=_mean(latents['module_h'][s['scope_members']],scope_owner,q)\n        conditions=(self.initiator_projection(latents['module_h'][s['initiator']])+self.scope_projection(scope)\n            +self.graph_projection(latents['graph_h'][graph])+self.context_projection(latents['context_h'][graph])\n            +self.observation_projection(latents['observation_h'][graph])+self.pair_projection(paired[:,None].float()))\n        if q:conditions=conditions+self.operation_projection(F.one_hot(s['action'],len(self.actions)).float())\n        selection=torch.nonzero(paired,as_tuple=False).flatten()\n        # Endpoint-free operations never index -1 or create dummy connectors.\n        pair=(self.peer_projection(latents['module_h'][s['peer'][selection]])\n            +self.connector_a_projection(latents['connector_h'][s['connector_a'][selection]])\n            +self.connector_b_projection(latents['connector_h'][s['connector_b'][selection]]))\n        return conditions.index_add(0,selection,pair)\n\n    def forward_structural(self,latents,inputs):\n        self._validate_input_boundary(inputs)\n        conditions=self._structural_conditions(latents,inputs)\n        return {'candidate_logits':self.structural_scorer(conditions).flatten(),\n            'group_ptr':inputs['structural']['group_ptr'].clone(),\n            'arguments':self._arguments(latents,inputs,conditions),\n            'scope':self._scope(latents,inputs,conditions)}\n\n    def _scope(self,latents,inputs,conditions):\n        \"\"\"Independent participant membership, never an argument-set alias.\n\n        Fully determined scopes need no prediction. Required members for a\n        variable scope are routing only; logits cover its optional members.\n        domain_index indexes the existing flat structural scope_members table.\n        \"\"\"\n        s=inputs['structural'];bindings=[];optional=[];required=[];ptr=[0];required_ptr=[0];scores=[]\n        for binding in range(len(s['initiator'])):\n            start,end=s['scope_ptr'][binding:binding+2].tolist();mask=s['scope_required'][start:end]\n            if mask.all():continue\n            domain=torch.arange(start,end,device=mask.device);chosen=domain[~mask]\n            if self.scope_scorer is None:raise ValueError('Catalog has no variable participant scope')\n            members=s['scope_members'][chosen]\n            scores.append(self.scope_scorer(conditions[binding,None]+\n                self.scope_option_projection(latents['module_h'][members])).flatten())\n            bindings.append(binding);optional.extend(chosen.tolist());required.extend(domain[mask].tolist())\n            ptr.append(len(optional));required_ptr.append(len(required))\n        return {'binding':_ints(bindings,s['initiator']),'logits':torch.cat(scores) if scores else conditions.new_empty(0),\n            'ptr':_ints(ptr,s['initiator']),'domain_index':_ints(optional,s['initiator']),\n            'required_ptr':_ints(required_ptr,s['initiator']),'required_domain_index':_ints(required,s['initiator'])}\n\n    def _validate_arguments(self,inputs):\n        s=inputs['structural'];u=len(s['argument_binding']);q=len(s['initiator'])\n        _indices(s['argument_binding'],q,'argument binding')\n        _indices(s['argument_parameter'],len(self.parameter_catalog),'argument parameter')\n        _pointer(s['argument_domain_ptr'],len(s['argument_domain_index']),'argument domain')\n        if len(s['argument_domain_ptr'])!=u+1:raise ValueError('Argument/domain count mismatch')\n        for key in ('argument_parameter','argument_kind','argument_bound_ref'):\n            if s[key].dtype!=torch.int64 or s[key].shape!=(u,):raise ValueError('Invalid argument routing shape')\n        if s['argument_domain_required'].dtype!=torch.bool or s['argument_domain_required'].shape!=s['argument_domain_index'].shape:\n            raise ValueError('Invalid required argument domain mask')\n        module_graph=_owners(inputs['graph_ptr'])\n        for i,parameter_index in enumerate(s['argument_parameter'].tolist()):\n            p=self.parameters_catalog[parameter_index];binding=int(s['argument_binding'][i])\n            expected_action=self.action_index[self.parameter_catalog[parameter_index][0]]\n            if int(s['action'][binding])!=expected_action or int(s['argument_kind'][i])!=PARAMETER_KINDS.index(p.kind):\n                raise ValueError('Argument/action/type mismatch')\n            start,end=s['argument_domain_ptr'][i:i+2].tolist();refs=s['argument_domain_index'][start:end]\n            if p.kind in ('module_ref','module_refs','connector_ref','connector_refs'):\n                connector=p.kind.startswith('connector');limit=len(inputs['connector_x']) if connector else len(inputs['module_x'])\n                _indices(refs,limit,'argument option')\n                parents=inputs['connector_to_module'][refs] if connector else refs\n                if (module_graph[parents]!=module_graph[s['initiator'][binding]]).any():raise ValueError('Cross-graph argument option')\n                bound=int(s['argument_bound_ref'][i])\n                if bound!=-1 and bound not in refs.tolist():raise ValueError('Argument bound reference absent from domain')\n            elif end!=start or int(s['argument_bound_ref'][i])!=-1:\n                raise ValueError('Nonreference argument has reference domain')\n\n    def _parameter_conditions(self,conditions,s,arguments):\n        arguments=_ints(arguments,s['argument_binding'])\n        params=[self.learnable_index[int(s['argument_parameter'][i])] for i in arguments.tolist()]\n        result=conditions[s['argument_binding'][arguments]]\n        if len(arguments):result=result+self.parameter_projection(F.one_hot(_ints(params,arguments),len(self.learnable_parameters)).float())\n        return arguments,result\n\n    def _reference_logits(self,latents,s,argument,condition,domain_indices,scorer):\n        refs=s['argument_domain_index'][domain_indices];connector=int(s['argument_kind'][argument]) in (5,7)\n        option=latents['connector_h' if connector else 'module_h'][refs]\n        kind=option.new_zeros((len(option),2));kind[:,int(connector)]=1\n        return scorer(condition[None]+self.reference_option_projection(option)+self.reference_kind_projection(kind)).flatten()\n\n    def _arguments(self,latents,inputs,conditions):\n        self._validate_arguments(inputs);s=inputs['structural']\n        selected={key:[] for key in ('numeric','reference_set','reference','boolean','category')}\n        for i,parameter_index in enumerate(s['argument_parameter'].tolist()):\n            p=self.parameters_catalog[parameter_index]\n            if not p.learnable:continue\n            if p.kind in ('scalar','vector'):selected['numeric'].append(i)\n            if p.kind in ('module_refs','connector_refs'):selected['reference_set'].append(i)\n            if p.kind in ('module_ref','connector_ref') and int(s['argument_bound_ref'][i])==-1:selected['reference'].append(i)\n            if p.kind in ('boolean','category'):selected[p.kind].append(i)\n        arguments,base=self._parameter_conditions(conditions,s,selected['numeric'])\n        query=[];components=[];ptr=[0]\n        for row,i in enumerate(arguments.tolist()):\n            parameter=int(s['argument_parameter'][i]);width=self.parameters_catalog[parameter].size or 1\n            query.extend([row]*width);components.extend(self.numeric_index[(parameter,j)] for j in range(width));ptr.append(len(query))\n        value=conditions.new_empty(0)\n        if query:\n            role=self.numeric_projection(F.one_hot(_ints(components,arguments),len(self.numeric_components)).float())\n            value=self.numeric_decoder(base[_ints(query,arguments)]+role).flatten()\n        numeric={'argument':arguments,'value':value,'ptr':_ints(ptr,arguments)}\n        arguments,base=self._parameter_conditions(conditions,s,selected['reference_set'])\n        optional=[];required=[];ptr=[0];required_ptr=[0];scores=[]\n        for row,i in enumerate(arguments.tolist()):\n            start,end=s['argument_domain_ptr'][i:i+2].tolist();domain=torch.arange(start,end,device=arguments.device)\n            mask=s['argument_domain_required'][start:end];chosen=domain[~mask]\n            optional.extend(chosen.tolist());required.extend(domain[mask].tolist());ptr.append(len(optional));required_ptr.append(len(required))\n            scores.append(self._reference_logits(latents,s,i,base[row],chosen,self.reference_set_scorer))\n        members={'argument':arguments,'logits':torch.cat(scores) if scores else conditions.new_empty(0),\n            'ptr':_ints(ptr,arguments),'domain_index':_ints(optional,arguments),\n            'required_ptr':_ints(required_ptr,arguments),'required_domain_index':_ints(required,arguments)}\n        arguments,base=self._parameter_conditions(conditions,s,selected['reference'])\n        domain_indices=[];ptr=[0];scores=[]\n        for row,i in enumerate(arguments.tolist()):\n            start,end=s['argument_domain_ptr'][i:i+2].tolist();domain=torch.arange(start,end,device=arguments.device)\n            domain_indices.extend(domain.tolist());ptr.append(len(domain_indices))\n            if self.reference_scorer is None:raise ValueError('A catalog-bound reference cannot become an unbound prediction')\n            scores.append(self._reference_logits(latents,s,i,base[row],domain,self.reference_scorer))\n        references={'argument':arguments,'logits':torch.cat(scores) if scores else conditions.new_empty(0),\n            'ptr':_ints(ptr,arguments),'domain_index':_ints(domain_indices,arguments)}\n        arguments,base=self._parameter_conditions(conditions,s,selected['boolean'])\n        booleans={'argument':arguments,'logits':self.boolean_scorer(base).flatten() if len(arguments) else conditions.new_empty(0)}\n        arguments,base=self._parameter_conditions(conditions,s,selected['category'])\n        queries=[];options=[];ptr=[0]\n        for row,i in enumerate(arguments.tolist()):\n            parameter=int(s['argument_parameter'][i]);width=len(self.parameters_catalog[parameter].categories)\n            queries.extend([row]*width);options.extend(self.argument_category_index[(parameter,j)] for j in range(width));ptr.append(len(queries))\n        logits=conditions.new_empty(0)\n        if queries:\n            role=self.argument_category_projection(F.one_hot(_ints(options,arguments),len(self.argument_categories)).float())\n            logits=self.argument_category_scorer(base[_ints(queries,arguments)]+role).flatten()\n        categories={'argument':arguments,'ptr':_ints(ptr,arguments),'logits':logits}\n        return {'numeric':numeric,'reference_set':members,'reference':references,'boolean':booleans,'category':categories}\n",
+  "focused_legacy_validator": {
+    "cuda": {
+      "warmup": 1,
+      "seconds": [
+        25.90079034600012,
+        25.94842714000015
+      ]
+    },
+    "cpu": {
+      "warmup": 1,
+      "seconds": [
+        4.2871093910002855,
+        4.203067339999961
+      ]
+    }
+  },
+  "characterization_before": {
+    "passed": 17,
+    "deselected": 1,
+    "duration_s": 2.81,
+    "invalid_cases": 15
+  },
+  "red": {
+    "test": "test_bulk_validator_scalar_reads_are_bounded_not_per_argument_row",
+    "exit_code": 1,
+    "reason": "AssertionError: Missing bulk H2 validator",
+    "duration_s": 1.02
+  },
+  "targeted_step_a": {
+    "passed": 161,
+    "skipped": 0,
+    "failed": 0,
+    "duration_s": 23.91
+  }
+}

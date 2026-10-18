@@ -1,0 +1,19 @@
+{
+  "schema_version": "mssr.bc_v1.gnn.v1",
+  "tensor_layout": "configs/bc_v1/tensor_layout.v1.json",
+  "hidden_dim": 128,
+  "coordinate_latent_dim": 64,
+  "edge_latent_dim": 64,
+  "relation_latent_dim": 64,
+  "environment_latent_dim": 64,
+  "context_latent_dim": 64,
+  "observation_latent_dim": 64,
+  "task_projection_dim": 8,
+  "message_passing_layers": 3,
+  "activation": "silu",
+  "dropout": 0.1,
+  "aggregation": "mean",
+  "graph_pooling": ["mean", "max"],
+  "use_residual": true,
+  "normalization": "layernorm"
+}

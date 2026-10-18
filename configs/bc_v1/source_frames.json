@@ -1,0 +1,74 @@
+{
+  "schema_version": "mssr.bc_v1.source_frames.v1",
+  "missingness_policy": "unresolved",
+  "legacy_rc_map": {
+    "contract_id": "mssr.smores.isaac_nav2.legacy_rc_map.v1",
+    "revision": "1.0.0",
+    "backend_id": "smores_ep",
+    "source_kind": "expert",
+    "canonical": {
+      "manifest": {
+        "path": "datasets/expert_v1_canonical_v6/manifest.json",
+        "sha256": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562"
+      },
+      "dataset_name": "expert_v1_canonical_v6"
+    },
+    "compact": {
+      "manifest": {
+        "path": "datasets/expert_v1_compact/manifest.json",
+        "sha256": "253be8ef240f23f80c6174239e83a9b23e76282bd3ffc204155253b7e4fb7837"
+      },
+      "schema_version": "mssr.expert_compact_dataset.v2"
+    },
+    "launch": {
+      "path": "mssr_ws/src/mssr_expert/launch/smores_nav2.launch.py",
+      "sha256": "521887b3f15897b1116f934543717750328dd2cec1a3910d939280710755e5f2",
+      "odom_pose_frame": "isaac_world",
+      "map_to_odom": "identity"
+    },
+    "evidence_catalog": {
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005100/manifest.json": "b9137cbf81cdd529697167d76e9beff823f416fd272fcb73f4677cf49bcf3ea2",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005100/assembly_manifest.json": "79a6eeeb57b07f7d5a4fd830403478dd56f5b0b20d597459bc081e21b2eb9113",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005100/behavior_manifest.json": "e83b69ffc01bbdf050e909ab53ef2bd078f0f26511d9d49146099027818cb81f",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005100/environment_geometry.json": "360be45bab514717098e04ee627e4b017353b9ca4c0179f6f8199ec4f947e562",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005101/manifest.json": "151743b3f057bfab12653430fc8bca703e01a19e2e6686f9e0a41bd98584dcc2",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005101/assembly_manifest.json": "ae04455735bd312a03761bb3e3036ec35d3aa02f240ab6d3618cf1404dfacecb",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005101/behavior_manifest.json": "392847094e5bb8baac478ea7c3aa054a66bebcdd88632b3eceafeabbf3dd0dd0",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005101/environment_geometry.json": "e588059313c820b82d3edb987b2b4d17e246bb7a9d221787ab424c5edf622509",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005102/manifest.json": "41412427df92fd6478b0b3e683ed8046c72040e98cf1dc20256db0303c8e79a9",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005102/assembly_manifest.json": "37d1fe3f8df3ef353581dbc2843f03a26722bb1111d04b6c3fcf9e03e6e4a9a1",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005102/behavior_manifest.json": "5886aac10aed6aaaa4c1bab06b6a7c8357ba7465bf10944785bcf50aa2585a86",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005102/environment_geometry.json": "4964295dfdb58ec68b2c7589f570fd6a807fc2f7a0a4c506ce5fc50213421ea9",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005103/manifest.json": "d3b3fef759e44f6e8ece497ad285a701fb0588d68b8e98845fcc4f6898d3f994",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005103/assembly_manifest.json": "c124272426c2734365f84175ebb26f59395897abb36d809875455f4461718339",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005103/behavior_manifest.json": "2a95c553a6cedec2fecc1b27388ff2e3daf2b4655df52fbc4ad14cc760d30014",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005103/environment_geometry.json": "5b69f48fe5a73864be82393c235fa32f77a40889f8854c304e054454337da4a8",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005104/manifest.json": "03e60dd8ab4d831891a4ed252c83ab0805bba6b9a5e4d13da333e499199c8956",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005104/assembly_manifest.json": "24f60a36b1be3b29bc343c42faafbfa41f8e2f2bac298f232eb6ed8c43500e4d",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005104/behavior_manifest.json": "0784afdac55c64d31fd88f680c6d4a86f78f3ac17a77acecb673f71dc914f107",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005104/environment_geometry.json": "5cbae09eb88da15aa3fe2916d68b2aeb2a881ce347d56abef76a863fc055f028",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005105/manifest.json": "3047e46bde913bdf66028b28335ced6ece31e2caa702998590e5b61884181864",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005105/assembly_manifest.json": "30411b8414465431dc591cbf55a475107c24c36763445e7292538f6f99e29005",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005105/behavior_manifest.json": "df2455bf80e20e9a4a60a6656f12a982c616ef65215d50663efc8fff8fc41762",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005105/environment_geometry.json": "3c9157d48b754bcd99db8d98b34ee66b2c1580325910fc496454f8adf6926688",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005106/manifest.json": "de215cd6b587408f02524316a5dbba196e917cde7199788c3a0ed311b4e79cb8",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005106/assembly_manifest.json": "6e14d970426ce29acb521cf9e8395278b3fdb184e02d03d3c37cc9478a185aa8",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005106/behavior_manifest.json": "13731a6b7c9b1f00dd3a17996b8a5f41ff17005d12d3b0e2d906a7950341a89f",
+      "datasets/expert_v1_compact/episodes/rc_car/seed-005106/environment_geometry.json": "c85a08057dedccc8dd05efef47c0b76f98271e0562ec5bc2caa4c903237a6554"
+    },
+    "certification_policy": "pinned_source_membership_and_geometry_and_historical_launch"
+  },
+  "current_stage_local": {
+    "contract_id": "mssr.smores.current_task_frame.planar.v1",
+    "revision": "1.0.0",
+    "canonical_manifest": {
+      "path": "datasets/expert_v1_canonical_v6/manifest.json",
+      "sha256": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562"
+    },
+    "source_root": "datasets/expert_v1/teleop",
+    "source_schema": "mssr.expert_transition.v3",
+    "observation_schema": "mssr.module_states.v2",
+    "mission_schema": "mssr.composite_mission.v1",
+    "geometry_convention": "world_z_planar_m_rad"
+  }
+}

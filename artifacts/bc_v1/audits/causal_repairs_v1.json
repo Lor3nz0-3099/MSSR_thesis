@@ -1,0 +1,669 @@
+{
+  "cases": {
+    "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8::7842": {
+      "episode_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+      "run_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t10-20260928-111855.K4mABp/isaac.log",
+        "run_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+        "sha256": "1c135f57e31099513106408b03484d1b804085fe6c534956ec188e3eb507bed9"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8/structural/teleop-self_reconfiguration-1790588462046732906.jsonl",
+          "run_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+          "sha256": "0b459711cd268a8bd9e46618e3f8feb548ccb993dab06cc6a7368daf90f79e58"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8/structural/teleop-self_reconfiguration-1790588462046732906.jsonl",
+          "record": 2265
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8/structural/teleop-self_reconfiguration-1790588462046732906.jsonl",
+          "record": 2266
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8/structural/teleop-self_reconfiguration-1790588462046732906.jsonl",
+          "record": 2267
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8/structural/teleop-self_reconfiguration-1790588462046732906.jsonl",
+          "record": 2268
+        }
+      ],
+      "transition_index": 7842
+    },
+    "teleop-1bea8f28c1c04323a4c3ec7e2829d07c::1239": {
+      "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+      "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t02-20260925-144049.yJK53B/isaac.log",
+        "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+        "sha256": "711ac2831363a5a81552d2667384ab8327717a61b641384c6c06ee9286478bd3"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790340276721552774.jsonl",
+          "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+          "sha256": "2732e508d7b461d806f8d944c242e628df44fa8ff3a6c00094a818dfb2c530ad"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790340276721552774.jsonl",
+          "record": 1330
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790340276721552774.jsonl",
+          "record": 1331
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790340276721552774.jsonl",
+          "record": 1332
+        }
+      ],
+      "transition_index": 1239
+    },
+    "teleop-1bea8f28c1c04323a4c3ec7e2829d07c::3674": {
+      "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+      "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t02-20260925-144049.yJK53B/isaac.log",
+        "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+        "sha256": "711ac2831363a5a81552d2667384ab8327717a61b641384c6c06ee9286478bd3"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790340713024094596.jsonl",
+          "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+          "sha256": "41b4d89c29906103162fcc7afebe95508740d031f064706cf7b1c62a03c32662"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790340713024094596.jsonl",
+          "record": 3
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790340713024094596.jsonl",
+          "record": 4
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790340713024094596.jsonl",
+          "record": 5
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790340713024094596.jsonl",
+          "record": 6
+        }
+      ],
+      "transition_index": 3674
+    },
+    "teleop-1bea8f28c1c04323a4c3ec7e2829d07c::7290": {
+      "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+      "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t02-20260925-144049.yJK53B/isaac.log",
+        "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+        "sha256": "711ac2831363a5a81552d2667384ab8327717a61b641384c6c06ee9286478bd3"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790341290042661895.jsonl",
+          "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+          "sha256": "0cdca7a223d32fb5bc5a8c84ae5e7e7f434731545cfab8fc4d47136342fb7efd"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790341290042661895.jsonl",
+          "record": 241
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790341290042661895.jsonl",
+          "record": 242
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790341290042661895.jsonl",
+          "record": 243
+        }
+      ],
+      "transition_index": 7290
+    },
+    "teleop-1bea8f28c1c04323a4c3ec7e2829d07c::8666": {
+      "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+      "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t02-20260925-144049.yJK53B/isaac.log",
+        "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+        "sha256": "711ac2831363a5a81552d2667384ab8327717a61b641384c6c06ee9286478bd3"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790341487275042032.jsonl",
+          "run_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+          "sha256": "0e7177896fa8669568b36632fbf0be5952c1cf07406cc0dcc291acfe2312b708"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790341487275042032.jsonl",
+          "record": 275
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790341487275042032.jsonl",
+          "record": 276
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c/structural/teleop-self_reconfiguration-1790341487275042032.jsonl",
+          "record": 277
+        }
+      ],
+      "transition_index": 8666
+    },
+    "teleop-39e2f4b4cd684e9ea72734cc21baca94::1189": {
+      "episode_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+      "run_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t15-20260927-170456.qNBeb3/isaac.log",
+        "run_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+        "sha256": "7fd4fbadc5fe27f269e8f0815cd0c561ff875dc44655e9f1f3ec191586519435"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94/structural/teleop-self_reconfiguration-1790522010782194101.jsonl",
+          "run_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+          "sha256": "40c8834d84fddb96e35b0a56c68fca2a18722c5cf77c15609f2448fd43fd8276"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94/structural/teleop-self_reconfiguration-1790522010782194101.jsonl",
+          "record": 228
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94/structural/teleop-self_reconfiguration-1790522010782194101.jsonl",
+          "record": 229
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94/structural/teleop-self_reconfiguration-1790522010782194101.jsonl",
+          "record": 230
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94/structural/teleop-self_reconfiguration-1790522010782194101.jsonl",
+          "record": 231
+        }
+      ],
+      "transition_index": 1189
+    },
+    "teleop-39e2f4b4cd684e9ea72734cc21baca94::2525": {
+      "episode_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+      "run_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t15-20260927-170456.qNBeb3/isaac.log",
+        "run_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+        "sha256": "7fd4fbadc5fe27f269e8f0815cd0c561ff875dc44655e9f1f3ec191586519435"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94/structural/teleop-self_reconfiguration-1790522197121588539.jsonl",
+          "run_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+          "sha256": "eb0a5dec5aa1510fba10efaf02479bddd930c01790338b4b801f4a06fddcf522"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94/structural/teleop-self_reconfiguration-1790522197121588539.jsonl",
+          "record": 239
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94/structural/teleop-self_reconfiguration-1790522197121588539.jsonl",
+          "record": 240
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94/structural/teleop-self_reconfiguration-1790522197121588539.jsonl",
+          "record": 241
+        }
+      ],
+      "transition_index": 2525
+    },
+    "teleop-3aa4f69128774d5eba1f8d851c02cf53::2248": {
+      "episode_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+      "run_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t03-20260925-154622.thMRXr/isaac.log",
+        "run_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+        "sha256": "d8574d1c8461696bbc45f3fac0bf98988fbecc7fabfa8c3571f41cf955c060ef"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53/structural/teleop-self_reconfiguration-1790344450144321607.jsonl",
+          "run_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+          "sha256": "441f66a270bddad6aac2288f8279e50a613262727e5782627c4b9197d94c0475"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53/structural/teleop-self_reconfiguration-1790344450144321607.jsonl",
+          "record": 1223
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53/structural/teleop-self_reconfiguration-1790344450144321607.jsonl",
+          "record": 1224
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53/structural/teleop-self_reconfiguration-1790344450144321607.jsonl",
+          "record": 1225
+        }
+      ],
+      "transition_index": 2248
+    },
+    "teleop-3aa4f69128774d5eba1f8d851c02cf53::4447": {
+      "episode_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+      "run_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t03-20260925-154622.thMRXr/isaac.log",
+        "run_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+        "sha256": "d8574d1c8461696bbc45f3fac0bf98988fbecc7fabfa8c3571f41cf955c060ef"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53/structural/teleop-self_reconfiguration-1790344832043773135.jsonl",
+          "run_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+          "sha256": "c17de294b2c3bf29dcd09f61c21169471b75209d120547a65b09be7b0d6c675d"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53/structural/teleop-self_reconfiguration-1790344832043773135.jsonl",
+          "record": 4
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53/structural/teleop-self_reconfiguration-1790344832043773135.jsonl",
+          "record": 5
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53/structural/teleop-self_reconfiguration-1790344832043773135.jsonl",
+          "record": 6
+        }
+      ],
+      "transition_index": 4447
+    },
+    "teleop-5bb5a4712d924617aab5604b6deb20b4::5004": {
+      "episode_id": "teleop-5bb5a4712d924617aab5604b6deb20b4",
+      "run_id": "teleop-5bb5a4712d924617aab5604b6deb20b4",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t05-20260926-150224.ZCxGOJ/isaac.log",
+        "run_id": "teleop-5bb5a4712d924617aab5604b6deb20b4",
+        "sha256": "919d69acf0c37e651405f98b0f4d00ddf8d586da3fc44ef582b8ef97a6089d3e"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-5bb5a4712d924617aab5604b6deb20b4/structural/teleop-self_reconfiguration-1790428703478581397.jsonl",
+          "run_id": "teleop-5bb5a4712d924617aab5604b6deb20b4",
+          "sha256": "037b1b5326fe873a13a0ef30c5bfd3c2c2b5545944824edc4ec5ab40b3bc498c"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-5bb5a4712d924617aab5604b6deb20b4/structural/teleop-self_reconfiguration-1790428703478581397.jsonl",
+          "record": 236
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-5bb5a4712d924617aab5604b6deb20b4/structural/teleop-self_reconfiguration-1790428703478581397.jsonl",
+          "record": 237
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-5bb5a4712d924617aab5604b6deb20b4/structural/teleop-self_reconfiguration-1790428703478581397.jsonl",
+          "record": 238
+        }
+      ],
+      "transition_index": 5004
+    },
+    "teleop-69b37b8db7e141339518d4eef585e4bd::3137": {
+      "episode_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+      "run_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t01-20260925-114404.OsrpQe/isaac.log",
+        "run_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+        "sha256": "9023af8cedb878d2b438be24f37a7da78a5e24ee11d7e2a4e5facf9b42b74b59"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790330835248152407.jsonl",
+          "run_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+          "sha256": "4f97911fbb4110d94984f1bf52d69888f00f5aa655b1c0aa5bc3ca13e45cc373"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790330835248152407.jsonl",
+          "record": 6
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790330835248152407.jsonl",
+          "record": 7
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790330835248152407.jsonl",
+          "record": 8
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790330835248152407.jsonl",
+          "record": 9
+        }
+      ],
+      "transition_index": 3137
+    },
+    "teleop-69b37b8db7e141339518d4eef585e4bd::7162": {
+      "episode_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+      "run_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t01-20260925-114404.OsrpQe/isaac.log",
+        "run_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+        "sha256": "9023af8cedb878d2b438be24f37a7da78a5e24ee11d7e2a4e5facf9b42b74b59"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790331579965171715.jsonl",
+          "run_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+          "sha256": "43f7302fb9841fe4598fa0336bb8ef9616898d0cc54d206ecfa2b7a8d2ba33ed"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790331579965171715.jsonl",
+          "record": 299
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790331579965171715.jsonl",
+          "record": 300
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790331579965171715.jsonl",
+          "record": 301
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-69b37b8db7e141339518d4eef585e4bd/structural/teleop-self_reconfiguration-1790331579965171715.jsonl",
+          "record": 302
+        }
+      ],
+      "transition_index": 7162
+    },
+    "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1::1161": {
+      "episode_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+      "run_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t06-20260926-161251.6XFOl1/isaac.log",
+        "run_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+        "sha256": "d3b0c02e063f4b93a7f4a795450970f3f7a544784f02da5f8d3d32e92ffc3463"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1/structural/teleop-self_reconfiguration-1790432260992632686.jsonl",
+          "run_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+          "sha256": "4345fd34ddc7ca53d1fc2dcfda4b8315acafaee3081072ded90cc3bf06fd1b11"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1/structural/teleop-self_reconfiguration-1790432260992632686.jsonl",
+          "record": 1232
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1/structural/teleop-self_reconfiguration-1790432260992632686.jsonl",
+          "record": 1233
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1/structural/teleop-self_reconfiguration-1790432260992632686.jsonl",
+          "record": 1234
+        }
+      ],
+      "transition_index": 1161
+    },
+    "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1::6863": {
+      "episode_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+      "run_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t06-20260926-161251.6XFOl1/isaac.log",
+        "run_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+        "sha256": "d3b0c02e063f4b93a7f4a795450970f3f7a544784f02da5f8d3d32e92ffc3463"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1/structural/teleop-self_reconfiguration-1790433134902397672.jsonl",
+          "run_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+          "sha256": "204f8556949bb74d1fca4fcc3a0f46ffe0610432883c2c5c830b3ba0b38fdbfb"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1/structural/teleop-self_reconfiguration-1790433134902397672.jsonl",
+          "record": 216
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1/structural/teleop-self_reconfiguration-1790433134902397672.jsonl",
+          "record": 217
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1/structural/teleop-self_reconfiguration-1790433134902397672.jsonl",
+          "record": 218
+        }
+      ],
+      "transition_index": 6863
+    },
+    "teleop-ce8293656bb444ac999f87c0520672fc::11179": {
+      "episode_id": "teleop-ce8293656bb444ac999f87c0520672fc",
+      "run_id": "teleop-ce8293656bb444ac999f87c0520672fc",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t09-20260928-123435.5Z0MLA/isaac.log",
+        "run_id": "teleop-ce8293656bb444ac999f87c0520672fc",
+        "sha256": "8c5d9aa73753cba85312bf25290ef6a737307f9faf368eec1e5e9bcc29ab0201"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-ce8293656bb444ac999f87c0520672fc/structural/teleop-self_reconfiguration-1790593608950823451.jsonl",
+          "run_id": "teleop-ce8293656bb444ac999f87c0520672fc",
+          "sha256": "c2efe3916d808ba1204c93e62c2e27ec9625ad79512e4a132f3cd790f379174e"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-ce8293656bb444ac999f87c0520672fc/structural/teleop-self_reconfiguration-1790593608950823451.jsonl",
+          "record": 3
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-ce8293656bb444ac999f87c0520672fc/structural/teleop-self_reconfiguration-1790593608950823451.jsonl",
+          "record": 4
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-ce8293656bb444ac999f87c0520672fc/structural/teleop-self_reconfiguration-1790593608950823451.jsonl",
+          "record": 5
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-ce8293656bb444ac999f87c0520672fc/structural/teleop-self_reconfiguration-1790593608950823451.jsonl",
+          "record": 6
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-ce8293656bb444ac999f87c0520672fc/structural/teleop-self_reconfiguration-1790593608950823451.jsonl",
+          "record": 7
+        }
+      ],
+      "transition_index": 11179
+    },
+    "teleop-f8888f12c46249fc80ef0af8c56b4dcf::1908": {
+      "episode_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+      "run_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+      "runtime_log": {
+        "path": "logs/teleop/t8-c05-postreboot-20260922-151449/isaac.log",
+        "run_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+        "sha256": "c11dd4db1fbe4ac0c8c6cc17b0e2fe875990c476bb85dc914e036928f52847bd"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083329256888384.jsonl",
+          "run_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+          "sha256": "23c9b173d0d3509460db4b6f7cb2bdfc106fb722a3fa6796e3673f3db895d902"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083329256888384.jsonl",
+          "record": 5
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083329256888384.jsonl",
+          "record": 6
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083329256888384.jsonl",
+          "record": 7
+        }
+      ],
+      "transition_index": 1908
+    },
+    "teleop-f8888f12c46249fc80ef0af8c56b4dcf::2480": {
+      "episode_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+      "run_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+      "runtime_log": {
+        "path": "logs/teleop/t8-c05-postreboot-20260922-151449/isaac.log",
+        "run_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+        "sha256": "c11dd4db1fbe4ac0c8c6cc17b0e2fe875990c476bb85dc914e036928f52847bd"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083329256888384.jsonl",
+          "run_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+          "sha256": "23c9b173d0d3509460db4b6f7cb2bdfc106fb722a3fa6796e3673f3db895d902"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083329256888384.jsonl",
+          "record": 1653
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083329256888384.jsonl",
+          "record": 1654
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083329256888384.jsonl",
+          "record": 1655
+        }
+      ],
+      "transition_index": 2480
+    },
+    "teleop-f8888f12c46249fc80ef0af8c56b4dcf::5435": {
+      "episode_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+      "run_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+      "runtime_log": {
+        "path": "logs/teleop/t8-c05-postreboot-20260922-151449/isaac.log",
+        "run_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+        "sha256": "c11dd4db1fbe4ac0c8c6cc17b0e2fe875990c476bb85dc914e036928f52847bd"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083816873758636.jsonl",
+          "run_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+          "sha256": "b7ea41b95e194c74a7ad4d55bca71c12795ea936879e9856ba3059ab2d96fb61"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083816873758636.jsonl",
+          "record": 207
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083816873758636.jsonl",
+          "record": 208
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf/structural/teleop-reconfiguration-1790083816873758636.jsonl",
+          "record": 209
+        }
+      ],
+      "transition_index": 5435
+    },
+    "teleop-fb69637be28d49ccbff572e721cfae24::12755": {
+      "episode_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+      "run_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t07-20260928-133103.jQ18MA/isaac.log",
+        "run_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+        "sha256": "8cc0febfa839daab4a971055a0e4817cd7c2c064aeb9544100dc5eeb57d81c22"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597508133369191.jsonl",
+          "run_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+          "sha256": "661babe705135515a6ebb54b327fea7370a99feb375456cbfff06c752b45e609"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597508133369191.jsonl",
+          "record": 315
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597508133369191.jsonl",
+          "record": 316
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597508133369191.jsonl",
+          "record": 317
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597508133369191.jsonl",
+          "record": 318
+        }
+      ],
+      "transition_index": 12755
+    },
+    "teleop-fb69637be28d49ccbff572e721cfae24::14417": {
+      "episode_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+      "run_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+      "runtime_log": {
+        "path": "logs/teleop/runs/teleop-t07-20260928-133103.jQ18MA/isaac.log",
+        "run_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+        "sha256": "8cc0febfa839daab4a971055a0e4817cd7c2c064aeb9544100dc5eeb57d81c22"
+      },
+      "source_files": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597836688321228.jsonl",
+          "run_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+          "sha256": "bc3e60f00dd12a12e49dc1baf778d232ba146a020d97b7350a918b08c63f4c76"
+        }
+      ],
+      "source_records": [
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597836688321228.jsonl",
+          "record": 320
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597836688321228.jsonl",
+          "record": 321
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597836688321228.jsonl",
+          "record": 322
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597836688321228.jsonl",
+          "record": 323
+        },
+        {
+          "path": "datasets/expert_v1/teleop/episodes/teleop-fb69637be28d49ccbff572e721cfae24/structural/teleop-self_reconfiguration-1790597836688321228.jsonl",
+          "record": 324
+        }
+      ],
+      "transition_index": 14417
+    }
+  },
+  "schema_version": "mssr.bc_v1.causal_repairs.v1",
+  "source_identity": {
+    "manifest": "datasets/expert_v1_canonical_v6/manifest.json",
+    "manifest_sha256": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562"
+  }
+}

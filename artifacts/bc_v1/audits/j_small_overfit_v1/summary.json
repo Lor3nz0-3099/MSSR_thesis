@@ -1,0 +1,3923 @@
+{
+  "architecture_changed": false,
+  "checkpoint_file": {
+    "atomic_write_completed": true,
+    "bytes": 17761735,
+    "manifest_published": true,
+    "path": "artifacts/bc_v1/checkpoints/j_small_overfit_v1/checkpoint.pt",
+    "schema": "mssr.bc_v1.training_checkpoint.v1",
+    "sha256": "84d88d4332c65bd7f7c57f024668d4eb021647272519884505d1df2768e65e47",
+    "sha256_after_followup": "84d88d4332c65bd7f7c57f024668d4eb021647272519884505d1df2768e65e47",
+    "sha256_before_followup": "84d88d4332c65bd7f7c57f024668d4eb021647272519884505d1df2768e65e47"
+  },
+  "checkpoint_reload": {
+    "all_finite": true,
+    "assert_close": "PASS",
+    "atol": 1e-07,
+    "bitwise_equal_count": 35,
+    "deterministic_checkpoint_roundtrip": true,
+    "deterministic_setting_restored": true,
+    "device": "cuda:0",
+    "dtype_matches": true,
+    "loss_absolute_difference": 0.0,
+    "loss_after_reload": 0.21724823117256165,
+    "loss_relative_difference": 0.0,
+    "max_output_absolute_difference": 0.0,
+    "model_state_exact": true,
+    "new_reference_instance": true,
+    "new_reload_instance": true,
+    "optimizer_state_exact": true,
+    "output_tensors": 35,
+    "reference_loss": 0.21724823117256165,
+    "reference_metrics": {
+      "arguments": {
+        "boolean_accuracy": {
+          "sum": 0.0,
+          "support": 0,
+          "value": null
+        },
+        "category_accuracy": {
+          "sum": 4.0,
+          "support": 4,
+          "value": 1.0
+        },
+        "numeric": {
+          "argument_support": 0,
+          "by_parameter": {
+            "[\"gravity_settle\",\"duration_s\"]": {
+              "decision_support": 0,
+              "normalized_mae": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "normalized_rmse": {
+                "sum_squared_error": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "physical_by_unit": {
+                "s": {
+                  "mae": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "unit": "s",
+                    "value": null
+                  },
+                  "rmse": {
+                    "sum_squared_error": 0.0,
+                    "support": 0,
+                    "unit": "s",
+                    "value": null
+                  },
+                  "within_tolerance": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "tolerance": 0.1,
+                    "unit": "s",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "normalized_mae": {
+            "sum": 0.0,
+            "support": 0,
+            "value": null
+          },
+          "normalized_rmse": {
+            "sum_squared_error": 0.0,
+            "support": 0,
+            "value": null
+          }
+        },
+        "reference_set": {
+          "exact_match": {
+            "sum": 0.0,
+            "support": 0,
+            "value": null
+          },
+          "jaccard": {
+            "sum": 0.0,
+            "support": 0,
+            "value": null
+          }
+        },
+        "reference_top1": {
+          "sum": 0.0,
+          "support": 0,
+          "value": null
+        }
+      },
+      "breakdowns": {
+        "morphology": {
+          "assembling": {
+            "arguments": {
+              "boolean_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "category_accuracy": {
+                "sum": 4.0,
+                "support": 4,
+                "value": 1.0
+              },
+              "numeric": {
+                "argument_support": 0,
+                "by_parameter": {
+                  "[\"gravity_settle\",\"duration_s\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "s",
+                          "value": null
+                        }
+                      }
+                    }
+                  }
+                },
+                "normalized_mae": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_set": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_top1": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "resource": {
+              "mode": {
+                "accuracy": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "domains": {
+                  "[[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]]": {
+                    "accuracy": {
+                      "support": 0,
+                      "value": null
+                    },
+                    "balanced_accuracy": {
+                      "classes_with_support": 0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "class_support": [
+                      0,
+                      0,
+                      0,
+                      0,
+                      0,
+                      0
+                    ],
+                    "classes": [
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_velocity"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_velocity"
+                      ]
+                    ],
+                    "counts": [
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ]
+                    ],
+                    "macro_f1": {
+                      "classes_with_support": 0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "recall": [
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      }
+                    ]
+                  }
+                }
+              },
+              "payload": {
+                "by_signature": {
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"locomotion\",\"wheel_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  }
+                },
+                "decision_support": 0,
+                "normalized_mae": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "payload_category_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "structural": {
+              "binding_exact_match": {
+                "sum": 4.0,
+                "support": 4,
+                "value": 1.0
+              },
+              "candidate_top1": {
+                "sum": 4.0,
+                "support": 4,
+                "value": 1.0
+              },
+              "connector_a_accuracy": {
+                "sum": 4.0,
+                "support": 4,
+                "value": 1.0
+              },
+              "connector_b_accuracy": {
+                "sum": 4.0,
+                "support": 4,
+                "value": 1.0
+              },
+              "discrete_tuple_exact": {
+                "excluded_incomplete": 0,
+                "sum": 4.0,
+                "support": 4,
+                "value": 1.0
+              },
+              "operation_accuracy": {
+                "sum": 4.0,
+                "support": 4,
+                "value": 1.0
+              },
+              "operation_macro_recall": {
+                "classes_with_support": 2,
+                "support": 4,
+                "value": 1.0
+              },
+              "operation_recall": {
+                "align_faces": {
+                  "sum": 3.0,
+                  "support": 3,
+                  "value": 1.0
+                },
+                "dock": {
+                  "sum": 1.0,
+                  "support": 1,
+                  "value": 1.0
+                },
+                "gravity_settle": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "undock": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "ordered_connector_pair_accuracy": {
+                "sum": 4.0,
+                "support": 4,
+                "value": 1.0
+              },
+              "peer_accuracy": {
+                "sum": 4.0,
+                "support": 4,
+                "value": 1.0
+              },
+              "scope": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              }
+            }
+          },
+          "snake8": {
+            "arguments": {
+              "boolean_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "category_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "numeric": {
+                "argument_support": 0,
+                "by_parameter": {
+                  "[\"gravity_settle\",\"duration_s\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "s",
+                          "value": null
+                        }
+                      }
+                    }
+                  }
+                },
+                "normalized_mae": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_set": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_top1": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "resource": {
+              "mode": {
+                "accuracy": {
+                  "sum": 16.0,
+                  "support": 16,
+                  "value": 1.0
+                },
+                "domains": {
+                  "[[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]]": {
+                    "accuracy": {
+                      "support": 16,
+                      "value": 1.0
+                    },
+                    "balanced_accuracy": {
+                      "classes_with_support": 1,
+                      "support": 16,
+                      "value": 1.0
+                    },
+                    "class_support": [
+                      0,
+                      0,
+                      0,
+                      0,
+                      16,
+                      0
+                    ],
+                    "classes": [
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_velocity"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_velocity"
+                      ]
+                    ],
+                    "counts": [
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        16,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ]
+                    ],
+                    "macro_f1": {
+                      "classes_with_support": 1,
+                      "support": 16,
+                      "value": 1.0
+                    },
+                    "recall": [
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 16,
+                        "support": 16,
+                        "value": 1.0
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      }
+                    ]
+                  }
+                }
+              },
+              "payload": {
+                "by_signature": {
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"]": {
+                    "decision_support": 16,
+                    "normalized_mae": {
+                      "sum": 0.5687023252248764,
+                      "support": 16,
+                      "value": 0.035543895326554775
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.042925856292144404,
+                      "support": 16,
+                      "value": 0.05179639001184373
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.37496596809486543,
+                          "support": 16,
+                          "unit": "rad",
+                          "value": 0.02343537300592909
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.018660903427070736,
+                          "support": 16,
+                          "unit": "rad",
+                          "value": 0.034151229321825606
+                        },
+                        "within_tolerance": {
+                          "sum": 15.0,
+                          "support": 16,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": 0.9375
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"locomotion\",\"wheel_velocity\"]": {
+                    "decision_support": 8,
+                    "normalized_mae": {
+                      "sum": 1.199100250378251,
+                      "support": 16,
+                      "value": 0.07494376564864069
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.09502594629110858,
+                      "support": 16,
+                      "value": 0.07706569692927123
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.9599617672599152,
+                          "support": 16,
+                          "unit": "rad/s",
+                          "value": 0.0599976104537447
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.06090305651755985,
+                          "support": 16,
+                          "unit": "rad/s",
+                          "value": 0.06169636158111344
+                        },
+                        "within_tolerance": {
+                          "sum": 16.0,
+                          "support": 16,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": 1.0
+                        }
+                      }
+                    }
+                  }
+                },
+                "decision_support": 24,
+                "normalized_mae": {
+                  "sum": 1.7678025756031275,
+                  "support": 32,
+                  "value": 0.055243830487597734
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.13795180258325299,
+                  "support": 32,
+                  "value": 0.0656581589044854
+                }
+              },
+              "payload_category_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "structural": {
+              "binding_exact_match": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "candidate_top1": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "connector_a_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "connector_b_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "discrete_tuple_exact": {
+                "excluded_incomplete": 0,
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "operation_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "operation_macro_recall": {
+                "classes_with_support": 0,
+                "support": 0,
+                "value": null
+              },
+              "operation_recall": {
+                "align_faces": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "dock": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "gravity_settle": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "undock": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "ordered_connector_pair_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "peer_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "scope": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              }
+            }
+          }
+        },
+        "task": {
+          "button": {
+            "arguments": {
+              "boolean_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "category_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "numeric": {
+                "argument_support": 0,
+                "by_parameter": {
+                  "[\"gravity_settle\",\"duration_s\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "s",
+                          "value": null
+                        }
+                      }
+                    }
+                  }
+                },
+                "normalized_mae": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_set": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_top1": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "resource": {
+              "mode": {
+                "accuracy": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "domains": {
+                  "[[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]]": {
+                    "accuracy": {
+                      "support": 0,
+                      "value": null
+                    },
+                    "balanced_accuracy": {
+                      "classes_with_support": 0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "class_support": [
+                      0,
+                      0,
+                      0,
+                      0,
+                      0,
+                      0
+                    ],
+                    "classes": [
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_velocity"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_velocity"
+                      ]
+                    ],
+                    "counts": [
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ]
+                    ],
+                    "macro_f1": {
+                      "classes_with_support": 0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "recall": [
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      }
+                    ]
+                  }
+                }
+              },
+              "payload": {
+                "by_signature": {
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"locomotion\",\"wheel_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  }
+                },
+                "decision_support": 0,
+                "normalized_mae": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "payload_category_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "structural": {
+              "binding_exact_match": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "candidate_top1": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "connector_a_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "connector_b_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "discrete_tuple_exact": {
+                "excluded_incomplete": 0,
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "operation_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "operation_macro_recall": {
+                "classes_with_support": 2,
+                "support": 2,
+                "value": 1.0
+              },
+              "operation_recall": {
+                "align_faces": {
+                  "sum": 1.0,
+                  "support": 1,
+                  "value": 1.0
+                },
+                "dock": {
+                  "sum": 1.0,
+                  "support": 1,
+                  "value": 1.0
+                },
+                "gravity_settle": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "undock": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "ordered_connector_pair_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "peer_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "scope": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              }
+            }
+          },
+          "gap": {
+            "arguments": {
+              "boolean_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "category_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "numeric": {
+                "argument_support": 0,
+                "by_parameter": {
+                  "[\"gravity_settle\",\"duration_s\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "s",
+                          "value": null
+                        }
+                      }
+                    }
+                  }
+                },
+                "normalized_mae": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_set": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_top1": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "resource": {
+              "mode": {
+                "accuracy": {
+                  "sum": 16.0,
+                  "support": 16,
+                  "value": 1.0
+                },
+                "domains": {
+                  "[[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]]": {
+                    "accuracy": {
+                      "support": 16,
+                      "value": 1.0
+                    },
+                    "balanced_accuracy": {
+                      "classes_with_support": 1,
+                      "support": 16,
+                      "value": 1.0
+                    },
+                    "class_support": [
+                      0,
+                      0,
+                      0,
+                      0,
+                      16,
+                      0
+                    ],
+                    "classes": [
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_velocity"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_velocity"
+                      ]
+                    ],
+                    "counts": [
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        16,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ]
+                    ],
+                    "macro_f1": {
+                      "classes_with_support": 1,
+                      "support": 16,
+                      "value": 1.0
+                    },
+                    "recall": [
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 16,
+                        "support": 16,
+                        "value": 1.0
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      }
+                    ]
+                  }
+                }
+              },
+              "payload": {
+                "by_signature": {
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"]": {
+                    "decision_support": 16,
+                    "normalized_mae": {
+                      "sum": 0.5687023252248764,
+                      "support": 16,
+                      "value": 0.035543895326554775
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.042925856292144404,
+                      "support": 16,
+                      "value": 0.05179639001184373
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.37496596809486543,
+                          "support": 16,
+                          "unit": "rad",
+                          "value": 0.02343537300592909
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.018660903427070736,
+                          "support": 16,
+                          "unit": "rad",
+                          "value": 0.034151229321825606
+                        },
+                        "within_tolerance": {
+                          "sum": 15.0,
+                          "support": 16,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": 0.9375
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"locomotion\",\"wheel_velocity\"]": {
+                    "decision_support": 8,
+                    "normalized_mae": {
+                      "sum": 1.199100250378251,
+                      "support": 16,
+                      "value": 0.07494376564864069
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.09502594629110858,
+                      "support": 16,
+                      "value": 0.07706569692927123
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.9599617672599152,
+                          "support": 16,
+                          "unit": "rad/s",
+                          "value": 0.0599976104537447
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.06090305651755985,
+                          "support": 16,
+                          "unit": "rad/s",
+                          "value": 0.06169636158111344
+                        },
+                        "within_tolerance": {
+                          "sum": 16.0,
+                          "support": 16,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": 1.0
+                        }
+                      }
+                    }
+                  }
+                },
+                "decision_support": 24,
+                "normalized_mae": {
+                  "sum": 1.7678025756031275,
+                  "support": 32,
+                  "value": 0.055243830487597734
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.13795180258325299,
+                  "support": 32,
+                  "value": 0.0656581589044854
+                }
+              },
+              "payload_category_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "structural": {
+              "binding_exact_match": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "candidate_top1": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "connector_a_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "connector_b_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "discrete_tuple_exact": {
+                "excluded_incomplete": 0,
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "operation_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "operation_macro_recall": {
+                "classes_with_support": 0,
+                "support": 0,
+                "value": null
+              },
+              "operation_recall": {
+                "align_faces": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "dock": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "gravity_settle": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "undock": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "ordered_connector_pair_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "peer_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "scope": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              }
+            }
+          },
+          "navigation": {
+            "arguments": {
+              "boolean_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "category_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "numeric": {
+                "argument_support": 0,
+                "by_parameter": {
+                  "[\"gravity_settle\",\"duration_s\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "s",
+                          "value": null
+                        }
+                      }
+                    }
+                  }
+                },
+                "normalized_mae": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_set": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "reference_top1": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "resource": {
+              "mode": {
+                "accuracy": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "domains": {
+                  "[[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]]": {
+                    "accuracy": {
+                      "support": 0,
+                      "value": null
+                    },
+                    "balanced_accuracy": {
+                      "classes_with_support": 0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "class_support": [
+                      0,
+                      0,
+                      0,
+                      0,
+                      0,
+                      0
+                    ],
+                    "classes": [
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "pan_velocity"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_delta"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_target"
+                      ],
+                      [
+                        "smores_ep_enhanced",
+                        "internal_motion",
+                        "tilt_velocity"
+                      ]
+                    ],
+                    "counts": [
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ],
+                      [
+                        0,
+                        0,
+                        0,
+                        0,
+                        0,
+                        0
+                      ]
+                    ],
+                    "macro_f1": {
+                      "classes_with_support": 0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "recall": [
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      },
+                      {
+                        "sum": 0,
+                        "support": 0,
+                        "value": null
+                      }
+                    ]
+                  }
+                }
+              },
+              "payload": {
+                "by_signature": {
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.05,
+                          "unit": "rad",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  },
+                  "[\"smores_ep_enhanced\",\"locomotion\",\"wheel_velocity\"]": {
+                    "decision_support": 0,
+                    "normalized_mae": {
+                      "sum": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "normalized_rmse": {
+                      "sum_squared_error": 0.0,
+                      "support": 0,
+                      "value": null
+                    },
+                    "physical_by_unit": {
+                      "rad/s": {
+                        "mae": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "rmse": {
+                          "sum_squared_error": 0.0,
+                          "support": 0,
+                          "unit": "rad/s",
+                          "value": null
+                        },
+                        "within_tolerance": {
+                          "sum": 0.0,
+                          "support": 0,
+                          "tolerance": 0.1,
+                          "unit": "rad/s",
+                          "value": null
+                        }
+                      }
+                    }
+                  }
+                },
+                "decision_support": 0,
+                "normalized_mae": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "normalized_rmse": {
+                  "sum_squared_error": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "payload_category_accuracy": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              }
+            },
+            "structural": {
+              "binding_exact_match": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "candidate_top1": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "connector_a_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "connector_b_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "discrete_tuple_exact": {
+                "excluded_incomplete": 0,
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "operation_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "operation_macro_recall": {
+                "classes_with_support": 1,
+                "support": 2,
+                "value": 1.0
+              },
+              "operation_recall": {
+                "align_faces": {
+                  "sum": 2.0,
+                  "support": 2,
+                  "value": 1.0
+                },
+                "dock": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "gravity_settle": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "undock": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              },
+              "ordered_connector_pair_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "peer_accuracy": {
+                "sum": 2.0,
+                "support": 2,
+                "value": 1.0
+              },
+              "scope": {
+                "exact_match": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                },
+                "jaccard": {
+                  "sum": 0.0,
+                  "support": 0,
+                  "value": null
+                }
+              }
+            }
+          }
+        }
+      },
+      "resource": {
+        "mode": {
+          "accuracy": {
+            "sum": 16.0,
+            "support": 16,
+            "value": 1.0
+          },
+          "domains": {
+            "[[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"],[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]]": {
+              "accuracy": {
+                "support": 16,
+                "value": 1.0
+              },
+              "balanced_accuracy": {
+                "classes_with_support": 1,
+                "support": 16,
+                "value": 1.0
+              },
+              "class_support": [
+                0,
+                0,
+                0,
+                0,
+                16,
+                0
+              ],
+              "classes": [
+                [
+                  "smores_ep_enhanced",
+                  "internal_motion",
+                  "pan_delta"
+                ],
+                [
+                  "smores_ep_enhanced",
+                  "internal_motion",
+                  "pan_target"
+                ],
+                [
+                  "smores_ep_enhanced",
+                  "internal_motion",
+                  "pan_velocity"
+                ],
+                [
+                  "smores_ep_enhanced",
+                  "internal_motion",
+                  "tilt_delta"
+                ],
+                [
+                  "smores_ep_enhanced",
+                  "internal_motion",
+                  "tilt_target"
+                ],
+                [
+                  "smores_ep_enhanced",
+                  "internal_motion",
+                  "tilt_velocity"
+                ]
+              ],
+              "counts": [
+                [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  0,
+                  0,
+                  16,
+                  0
+                ],
+                [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ]
+              ],
+              "macro_f1": {
+                "classes_with_support": 1,
+                "support": 16,
+                "value": 1.0
+              },
+              "recall": [
+                {
+                  "sum": 0,
+                  "support": 0,
+                  "value": null
+                },
+                {
+                  "sum": 0,
+                  "support": 0,
+                  "value": null
+                },
+                {
+                  "sum": 0,
+                  "support": 0,
+                  "value": null
+                },
+                {
+                  "sum": 0,
+                  "support": 0,
+                  "value": null
+                },
+                {
+                  "sum": 16,
+                  "support": 16,
+                  "value": 1.0
+                },
+                {
+                  "sum": 0,
+                  "support": 0,
+                  "value": null
+                }
+              ]
+            }
+          }
+        },
+        "payload": {
+          "by_signature": {
+            "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_delta\"]": {
+              "decision_support": 0,
+              "normalized_mae": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "normalized_rmse": {
+                "sum_squared_error": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "physical_by_unit": {
+                "rad": {
+                  "mae": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "unit": "rad",
+                    "value": null
+                  },
+                  "rmse": {
+                    "sum_squared_error": 0.0,
+                    "support": 0,
+                    "unit": "rad",
+                    "value": null
+                  },
+                  "within_tolerance": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "tolerance": 0.05,
+                    "unit": "rad",
+                    "value": null
+                  }
+                }
+              }
+            },
+            "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_target\"]": {
+              "decision_support": 0,
+              "normalized_mae": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "normalized_rmse": {
+                "sum_squared_error": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "physical_by_unit": {
+                "rad": {
+                  "mae": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "unit": "rad",
+                    "value": null
+                  },
+                  "rmse": {
+                    "sum_squared_error": 0.0,
+                    "support": 0,
+                    "unit": "rad",
+                    "value": null
+                  },
+                  "within_tolerance": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "tolerance": 0.05,
+                    "unit": "rad",
+                    "value": null
+                  }
+                }
+              }
+            },
+            "[\"smores_ep_enhanced\",\"internal_motion\",\"pan_velocity\"]": {
+              "decision_support": 0,
+              "normalized_mae": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "normalized_rmse": {
+                "sum_squared_error": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "physical_by_unit": {
+                "rad/s": {
+                  "mae": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "unit": "rad/s",
+                    "value": null
+                  },
+                  "rmse": {
+                    "sum_squared_error": 0.0,
+                    "support": 0,
+                    "unit": "rad/s",
+                    "value": null
+                  },
+                  "within_tolerance": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "tolerance": 0.1,
+                    "unit": "rad/s",
+                    "value": null
+                  }
+                }
+              }
+            },
+            "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_delta\"]": {
+              "decision_support": 0,
+              "normalized_mae": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "normalized_rmse": {
+                "sum_squared_error": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "physical_by_unit": {
+                "rad": {
+                  "mae": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "unit": "rad",
+                    "value": null
+                  },
+                  "rmse": {
+                    "sum_squared_error": 0.0,
+                    "support": 0,
+                    "unit": "rad",
+                    "value": null
+                  },
+                  "within_tolerance": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "tolerance": 0.05,
+                    "unit": "rad",
+                    "value": null
+                  }
+                }
+              }
+            },
+            "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_target\"]": {
+              "decision_support": 16,
+              "normalized_mae": {
+                "sum": 0.5687023252248764,
+                "support": 16,
+                "value": 0.035543895326554775
+              },
+              "normalized_rmse": {
+                "sum_squared_error": 0.042925856292144404,
+                "support": 16,
+                "value": 0.05179639001184373
+              },
+              "physical_by_unit": {
+                "rad": {
+                  "mae": {
+                    "sum": 0.37496596809486543,
+                    "support": 16,
+                    "unit": "rad",
+                    "value": 0.02343537300592909
+                  },
+                  "rmse": {
+                    "sum_squared_error": 0.018660903427070736,
+                    "support": 16,
+                    "unit": "rad",
+                    "value": 0.034151229321825606
+                  },
+                  "within_tolerance": {
+                    "sum": 15.0,
+                    "support": 16,
+                    "tolerance": 0.05,
+                    "unit": "rad",
+                    "value": 0.9375
+                  }
+                }
+              }
+            },
+            "[\"smores_ep_enhanced\",\"internal_motion\",\"tilt_velocity\"]": {
+              "decision_support": 0,
+              "normalized_mae": {
+                "sum": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "normalized_rmse": {
+                "sum_squared_error": 0.0,
+                "support": 0,
+                "value": null
+              },
+              "physical_by_unit": {
+                "rad/s": {
+                  "mae": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "unit": "rad/s",
+                    "value": null
+                  },
+                  "rmse": {
+                    "sum_squared_error": 0.0,
+                    "support": 0,
+                    "unit": "rad/s",
+                    "value": null
+                  },
+                  "within_tolerance": {
+                    "sum": 0.0,
+                    "support": 0,
+                    "tolerance": 0.1,
+                    "unit": "rad/s",
+                    "value": null
+                  }
+                }
+              }
+            },
+            "[\"smores_ep_enhanced\",\"locomotion\",\"wheel_velocity\"]": {
+              "decision_support": 8,
+              "normalized_mae": {
+                "sum": 1.199100250378251,
+                "support": 16,
+                "value": 0.07494376564864069
+              },
+              "normalized_rmse": {
+                "sum_squared_error": 0.09502594629110858,
+                "support": 16,
+                "value": 0.07706569692927123
+              },
+              "physical_by_unit": {
+                "rad/s": {
+                  "mae": {
+                    "sum": 0.9599617672599152,
+                    "support": 16,
+                    "unit": "rad/s",
+                    "value": 0.0599976104537447
+                  },
+                  "rmse": {
+                    "sum_squared_error": 0.06090305651755985,
+                    "support": 16,
+                    "unit": "rad/s",
+                    "value": 0.06169636158111344
+                  },
+                  "within_tolerance": {
+                    "sum": 16.0,
+                    "support": 16,
+                    "tolerance": 0.1,
+                    "unit": "rad/s",
+                    "value": 1.0
+                  }
+                }
+              }
+            }
+          },
+          "decision_support": 24,
+          "normalized_mae": {
+            "sum": 1.7678025756031275,
+            "support": 32,
+            "value": 0.055243830487597734
+          },
+          "normalized_rmse": {
+            "sum_squared_error": 0.13795180258325299,
+            "support": 32,
+            "value": 0.0656581589044854
+          }
+        },
+        "payload_category_accuracy": {
+          "sum": 0.0,
+          "support": 0,
+          "value": null
+        }
+      },
+      "structural": {
+        "binding_exact_match": {
+          "sum": 4.0,
+          "support": 4,
+          "value": 1.0
+        },
+        "candidate_top1": {
+          "sum": 4.0,
+          "support": 4,
+          "value": 1.0
+        },
+        "connector_a_accuracy": {
+          "sum": 4.0,
+          "support": 4,
+          "value": 1.0
+        },
+        "connector_b_accuracy": {
+          "sum": 4.0,
+          "support": 4,
+          "value": 1.0
+        },
+        "discrete_tuple_exact": {
+          "excluded_incomplete": 0,
+          "sum": 4.0,
+          "support": 4,
+          "value": 1.0
+        },
+        "operation_accuracy": {
+          "sum": 4.0,
+          "support": 4,
+          "value": 1.0
+        },
+        "operation_macro_recall": {
+          "classes_with_support": 2,
+          "support": 4,
+          "value": 1.0
+        },
+        "operation_recall": {
+          "align_faces": {
+            "sum": 3.0,
+            "support": 3,
+            "value": 1.0
+          },
+          "dock": {
+            "sum": 1.0,
+            "support": 1,
+            "value": 1.0
+          },
+          "gravity_settle": {
+            "sum": 0.0,
+            "support": 0,
+            "value": null
+          },
+          "undock": {
+            "sum": 0.0,
+            "support": 0,
+            "value": null
+          }
+        },
+        "ordered_connector_pair_accuracy": {
+          "sum": 4.0,
+          "support": 4,
+          "value": 1.0
+        },
+        "peer_accuracy": {
+          "sum": 4.0,
+          "support": 4,
+          "value": 1.0
+        },
+        "scope": {
+          "exact_match": {
+            "sum": 0.0,
+            "support": 0,
+            "value": null
+          },
+          "jaccard": {
+            "sum": 0.0,
+            "support": 0,
+            "value": null
+          }
+        }
+      }
+    },
+    "rtol": 1e-06,
+    "shape_matches": true
+  },
+  "closure_status": "J_complete_ready_for_review",
+  "config": {
+    "amp": false,
+    "audit_dir": "artifacts/bc_v1/audits/j_small_overfit_v1",
+    "batch_size": 8,
+    "checkpoint_dir": "artifacts/bc_v1/checkpoints/j_small_overfit_v1",
+    "cpu_threads": 1,
+    "device": "cuda:0",
+    "dtype": "float32",
+    "eval_interval": 50,
+    "gradient_clip": 1.0,
+    "learning_rate": 0.0003,
+    "max_steps": 1500,
+    "optimizer": "AdamW",
+    "required_keys": [
+      [
+        "expert:rc_car:seed-005100",
+        0
+      ],
+      [
+        "expert:gap:seed-004303",
+        299
+      ],
+      [
+        "expert:assembly:seed-006307",
+        0
+      ],
+      [
+        "expert:assembly:seed-006307",
+        444
+      ]
+    ],
+    "scheduler": null,
+    "schema_version": "mssr.bc_v1.training_smoke.v1",
+    "seed": 20261006,
+    "weight_decay": 0.0001,
+    "workers": 0
+  },
+  "deterministic_flag_changed_for_diagnostic_only": true,
+  "deterministic_same_instance_check": {
+    "all_finite": true,
+    "assert_close": "PASS",
+    "atol": 1e-07,
+    "bitwise_equal_count": 35,
+    "deterministic_checkpoint_roundtrip": true,
+    "dtype_matches": true,
+    "loss_absolute_difference": 0.0,
+    "loss_after_reload": 0.21724823117256165,
+    "loss_relative_difference": 0.0,
+    "max_output_absolute_difference": 0.0,
+    "output_tensors": 35,
+    "reference_loss": 0.21724823117256165,
+    "rtol": 1e-06,
+    "shape_matches": true
+  },
+  "environment": {
+    "cuda_runtime": "13.0",
+    "cudnn_benchmark": false,
+    "cudnn_deterministic": false,
+    "deterministic_algorithms": false,
+    "device": "cuda:0",
+    "float32_matmul_precision": "highest",
+    "gpu": "NVIDIA GeForce RTX 4070 Laptop GPU",
+    "initial_vram_bytes": 23835136,
+    "torch": "2.14.1+cu130"
+  },
+  "final_loss": 0.21724820137023926,
+  "first_step": {
+    "clip_threshold": 1.0,
+    "families": {
+      "arg_boolean": {
+        "mean": 0.0,
+        "sum": 0.0,
+        "support": 0,
+        "weighted": 0.0
+      },
+      "arg_category": {
+        "mean": 1.3115041255950928,
+        "sum": 5.246016502380371,
+        "support": 4,
+        "weighted": 1.3115041255950928
+      },
+      "arg_numeric": {
+        "mean": 0.0,
+        "sum": 0.0,
+        "support": 0,
+        "weighted": 0.0
+      },
+      "arg_reference": {
+        "mean": 0.0,
+        "sum": 0.0,
+        "support": 0,
+        "weighted": 0.0
+      },
+      "arg_reference_set": {
+        "mean": 0.0,
+        "sum": 0.0,
+        "support": 0,
+        "weighted": 0.0
+      },
+      "resource_mode": {
+        "mean": 2.1461384296417236,
+        "sum": 34.33821487426758,
+        "support": 16,
+        "weighted": 2.1461384296417236
+      },
+      "resource_payload": {
+        "mean": 0.3787984549999237,
+        "sum": 9.09116268157959,
+        "support": 24,
+        "weighted": 0.3787984549999237
+      },
+      "scope": {
+        "mean": 0.0,
+        "sum": 0.0,
+        "support": 0,
+        "weighted": 0.0
+      },
+      "structural_choice": {
+        "mean": 6.53867244720459,
+        "sum": 26.15468978881836,
+        "support": 4,
+        "weighted": 6.53867244720459
+      }
+    },
+    "grad_norm_before_clip": 38.21466064453125,
+    "gradients": {
+      "arg_category": {
+        "finite": true,
+        "nonzero": true,
+        "norm": 3.4300715923309326,
+        "parameter": "action_heads.argument_category_scorer.0.weight"
+      },
+      "h1": {
+        "finite": true,
+        "nonzero": true,
+        "norm": 10.408380508422852,
+        "parameter": "message_blocks.1.update.0.weight"
+      },
+      "resource_mode": {
+        "finite": true,
+        "nonzero": true,
+        "norm": 2.2606821060180664,
+        "parameter": "action_heads.mode_scorer.0.weight"
+      },
+      "resource_payload": {
+        "finite": true,
+        "nonzero": true,
+        "norm": 4.048211097717285,
+        "parameter": "action_heads.payload_decoder.0.weight"
+      },
+      "structural_choice": {
+        "finite": true,
+        "nonzero": true,
+        "norm": 8.728401184082031,
+        "parameter": "action_heads.structural_scorer.0.weight"
+      }
+    },
+    "optimizer_step_completed": true,
+    "parameter_delta": {
+      "h1": {
+        "parameter": "encoders.module.4.weight",
+        "value": 0.0003000497817993164
+      },
+      "h2": {
+        "parameter": "action_heads.resource_projection.weight",
+        "value": 0.0003000199794769287
+      },
+      "largest": {
+        "parameter": "encoders.module.4.weight",
+        "value": 0.0003000497817993164
+      }
+    },
+    "total_loss": 10.375113487243652
+  },
+  "followup": {
+    "checkpoint_unchanged": true,
+    "deterministic_settings_restored": true,
+    "tolerances_relaxed": false,
+    "training_behavior_changed": false,
+    "training_steps_executed": 0,
+    "verification_only_determinism": true
+  },
+  "frozen_verification": {
+    "complete": true,
+    "samples": 119600,
+    "sidecar": "7bb9f77df7eefe7c3b0246cea10383ec484274093514b59294ea7d752458052a",
+    "sources": {
+      "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+      "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+      "f2_fingerprint": "890eca0b9f6d4deca2cac81d3a41bf535aa3d03ac16e0ff4b81cbc0ca163abf5",
+      "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+      "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+      "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+      "normalizer_sha": "ea8efbd9062acb8625e0618bcc5f86b975f20839bf3132a684a626c744e52003",
+      "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+      "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+      "storage_fingerprint": "9a5ae40bf224ae53901937883622d2c26935a47def2c93dd5c9c5866e4465bca",
+      "tensorizer_fingerprint": "61e64fb426197b8f1926afad1856067aa3bb07273a05010cde2734dc420f9fda"
+    },
+    "unchanged": true
+  },
+  "gates": {
+    "continuous": true,
+    "loss": true,
+    "passed": true,
+    "resource_mode": true,
+    "structural_top1": true
+  },
+  "identity": {
+    "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+    "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+    "f2_fingerprint": "890eca0b9f6d4deca2cac81d3a41bf535aa3d03ac16e0ff4b81cbc0ca163abf5",
+    "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+    "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+    "h1_config_fingerprint": "81154912d4eed35d00bf97433e8964c10b6fc0b261abe34e2124d15695d490bf",
+    "h2_config_fingerprint": "e26cda59784b8c0a9ab5081b928d29b09b6f64ddf635d12c5a80ebefa6a7d2d0",
+    "i1_config_fingerprint": "39076e1dcea87b2c3b5ea620a9fe57640ac6041acc3d2d08b0271b1199887f41",
+    "i2_config_fingerprint": "f30bb55bc4f0342697a640175f00f474cbd919af582d181eec4691700f44bfa6",
+    "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+    "normalizer_sha": "ea8efbd9062acb8625e0618bcc5f86b975f20839bf3132a684a626c744e52003",
+    "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "sidecar_manifest_fingerprint": "7bb9f77df7eefe7c3b0246cea10383ec484274093514b59294ea7d752458052a",
+    "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+    "storage_fingerprint": "9a5ae40bf224ae53901937883622d2c26935a47def2c93dd5c9c5866e4465bca",
+    "tensorizer_fingerprint": "61e64fb426197b8f1926afad1856067aa3bb07273a05010cde2734dc420f9fda",
+    "training_config_fingerprint": "f9331664715b1d51033f968ee40c5d00ea771a471536fda70d19ad086630b1a0"
+  },
+  "initial_loss": 9.093772888183594,
+  "max_grad_norm_before_clip": 51.22664260864258,
+  "optimizer_groups": [
+    {
+      "parameters": 1442600,
+      "tensors": 100,
+      "weight_decay": 0.0001
+    },
+    {
+      "parameters": 16911,
+      "tensors": 164,
+      "weight_decay": 0.0
+    }
+  ],
+  "performance": {
+    "mean_step_s": 5.615454197660001,
+    "peak_rss_KiB": 1743304,
+    "peak_vram_bytes": 208826368,
+    "training_wall_s": 1123.0908395320002
+  },
+  "previous_checkpoint_reload_failure": {
+    "assert_close": "FAIL",
+    "atol": 1e-07,
+    "loss_after_reload_diagnostic": 0.2172483503818512,
+    "loss_assert_close_diagnostic": "PASS",
+    "loss_before_save": 0.21724820137023926,
+    "model_state_exact": true,
+    "new_instance": true,
+    "optimizer_state_exact": true,
+    "original_failure_reported_max_abs_difference": 2.9802322387695312e-06,
+    "rtol": 1e-06
+  },
+  "ready": true,
+  "reload_diagnosis": {
+    "default_deterministic_algorithms": false,
+    "default_repeat_same_instance": {
+      "all_shapes_and_finite": true,
+      "loss_a": 0.2172483503818512,
+      "loss_b": 0.21724826097488403,
+      "max_absolute_difference": 1.1444091796875e-05,
+      "mismatching_outputs": [
+        {
+          "error": "Tensor-likes are not close!\n\nMismatched elements: 32 / 384 (8.3%)\nGreatest absolute difference: 3.337860107421875e-06 at index (298,) (up to 1e-07 allowed)\nGreatest relative difference: 6.159291842777748e-06 at index (101,) (up to 1e-06 allowed)",
+          "max_abs_difference": 3.814697265625e-06,
+          "output": "resource.mode_logits",
+          "shape": [
+            384
+          ],
+          "strict_pass": false
+        },
+        {
+          "error": "Tensor-likes are not close!\n\nMismatched elements: 49 / 512 (9.6%)\nGreatest absolute difference: 8.344650268554688e-07 at index (15,) (up to 1e-07 allowed)\nGreatest relative difference: 0.00010857996676350012 at index (494,) (up to 1e-06 allowed)",
+          "max_abs_difference": 8.344650268554688e-07,
+          "output": "resource.payload",
+          "shape": [
+            512
+          ],
+          "strict_pass": false
+        },
+        {
+          "error": "Tensor-likes are not close!\n\nMismatched elements: 28 / 8330 (0.3%)\nGreatest absolute difference: 1.9073486328125e-06 at index (6704,) (up to 1e-07 allowed)\nGreatest relative difference: 0.0002802792005240917 at index (8018,) (up to 1e-06 allowed)",
+          "max_abs_difference": 1.1444091796875e-05,
+          "output": "structural.candidate_logits",
+          "shape": [
+            8330
+          ],
+          "strict_pass": false
+        },
+        {
+          "error": "Tensor-likes are not close!\n\nMismatched elements: 5 / 64 (7.8%)\nGreatest absolute difference: 1.6093254089355469e-06 at index (16,) (up to 1e-07 allowed)\nGreatest relative difference: 1.143999816122232e-05 at index (7,) (up to 1e-06 allowed)",
+          "max_abs_difference": 1.6093254089355469e-06,
+          "output": "structural.arguments.numeric.value",
+          "shape": [
+            64
+          ],
+          "strict_pass": false
+        },
+        {
+          "error": "Tensor-likes are not close!\n\nMismatched elements: 6 / 512 (1.2%)\nGreatest absolute difference: 1.6689300537109375e-06 at index (121,) (up to 1e-07 allowed)\nGreatest relative difference: 1.211231051456707e-06 at index (374,) (up to 1e-06 allowed)",
+          "max_abs_difference": 1.6689300537109375e-06,
+          "output": "structural.arguments.reference_set.logits",
+          "shape": [
+            512
+          ],
+          "strict_pass": false
+        },
+        {
+          "error": "Tensor-likes are not close!\n\nMismatched elements: 6227 / 33064 (18.8%)\nGreatest absolute difference: 7.152557373046875e-06 at index (2578,) (up to 1e-07 allowed)\nGreatest relative difference: 0.015457520261406898 at index (24753,) (up to 1e-06 allowed)",
+          "max_abs_difference": 7.152557373046875e-06,
+          "output": "structural.arguments.category.logits",
+          "shape": [
+            33064
+          ],
+          "strict_pass": false
+        },
+        {
+          "error": "Tensor-likes are not close!\n\nMismatched elements: 13 / 448 (2.9%)\nGreatest absolute difference: 2.1457672119140625e-06 at index (208,) (up to 1e-07 allowed)\nGreatest relative difference: 1.3343445971258916e-05 at index (117,) (up to 1e-06 allowed)",
+          "max_abs_difference": 2.1457672119140625e-06,
+          "output": "structural.scope.logits",
+          "shape": [
+            448
+          ],
+          "strict_pass": false
+        }
+      ],
+      "output_tensors": 35,
+      "strict_pass": false
+    },
+    "deterministic_diagnostic_only": {
+      "all_shapes_and_finite": true,
+      "loss_a": 0.21724823117256165,
+      "loss_b": 0.21724823117256165,
+      "max_absolute_difference": 0.0,
+      "mismatching_outputs": [],
+      "output_tensors": 35,
+      "strict_pass": true
+    },
+    "device": "cuda:0",
+    "model_state_exact": true,
+    "optimizer_state_exact": true
+  },
+  "stale_checkpoint_test": {
+    "invalid_layout": "OLD-invalid-layout",
+    "result": "REJECTED before any model/optimizer loading"
+  },
+  "steps": 200,
+  "stop_reason": null,
+  "tests": {
+    "full_bc_v1": {
+      "duration_s": 145.84,
+      "fail": 0,
+      "pass": 1596,
+      "run": true,
+      "skip": 1
+    },
+    "targeted": {
+      "duration_s": 14.66,
+      "fail": 0,
+      "pass": 235,
+      "skip": 0
+    }
+  },
+  "tolerances_relaxed": false,
+  "training_restarted": false
+}

@@ -1,0 +1,209 @@
+{
+  "config": {
+    "amp": false,
+    "audit_dir": "artifacts/bc_v1/audits/j_small_overfit_v1",
+    "batch_size": 8,
+    "checkpoint_dir": "artifacts/bc_v1/checkpoints/j_small_overfit_v1",
+    "cpu_threads": 1,
+    "device": "cuda:0",
+    "dtype": "float32",
+    "eval_interval": 50,
+    "gradient_clip": 1.0,
+    "learning_rate": 0.0003,
+    "max_steps": 1500,
+    "optimizer": "AdamW",
+    "required_keys": [
+      [
+        "expert:rc_car:seed-005100",
+        0
+      ],
+      [
+        "expert:gap:seed-004303",
+        299
+      ],
+      [
+        "expert:assembly:seed-006307",
+        0
+      ],
+      [
+        "expert:assembly:seed-006307",
+        444
+      ]
+    ],
+    "scheduler": null,
+    "schema_version": "mssr.bc_v1.training_smoke.v1",
+    "seed": 20261006,
+    "weight_decay": 0.0001,
+    "workers": 0
+  },
+  "identity": {
+    "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+    "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+    "f2_fingerprint": "890eca0b9f6d4deca2cac81d3a41bf535aa3d03ac16e0ff4b81cbc0ca163abf5",
+    "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+    "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+    "h1_config_fingerprint": "81154912d4eed35d00bf97433e8964c10b6fc0b261abe34e2124d15695d490bf",
+    "h2_config_fingerprint": "e26cda59784b8c0a9ab5081b928d29b09b6f64ddf635d12c5a80ebefa6a7d2d0",
+    "i1_config_fingerprint": "39076e1dcea87b2c3b5ea620a9fe57640ac6041acc3d2d08b0271b1199887f41",
+    "i2_config_fingerprint": "f30bb55bc4f0342697a640175f00f474cbd919af582d181eec4691700f44bfa6",
+    "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+    "normalizer_sha": "ea8efbd9062acb8625e0618bcc5f86b975f20839bf3132a684a626c744e52003",
+    "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "sidecar_manifest_fingerprint": "7bb9f77df7eefe7c3b0246cea10383ec484274093514b59294ea7d752458052a",
+    "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+    "storage_fingerprint": "9a5ae40bf224ae53901937883622d2c26935a47def2c93dd5c9c5866e4465bca",
+    "tensorizer_fingerprint": "61e64fb426197b8f1926afad1856067aa3bb07273a05010cde2734dc420f9fda",
+    "training_config_fingerprint": "f9331664715b1d51033f968ee40c5d00ea771a471536fda70d19ad086630b1a0"
+  },
+  "samples": [
+    {
+      "canonical_transition_index": 0,
+      "logical_episode_id": "expert:rc_car:seed-005100",
+      "morphology": "assembling",
+      "provenance": "expert",
+      "resource_modes": [],
+      "split": "train",
+      "structural_operations": [
+        "align_faces",
+        "align_faces"
+      ],
+      "supported_loss_families": {
+        "arg_category": 2,
+        "structural_choice": 2
+      },
+      "task": "navigation"
+    },
+    {
+      "canonical_transition_index": 299,
+      "logical_episode_id": "expert:gap:seed-004303",
+      "morphology": "snake8",
+      "provenance": "expert",
+      "resource_modes": [
+        "wheel_velocity",
+        "wheel_velocity",
+        "tilt_target",
+        "wheel_velocity",
+        "wheel_velocity",
+        "wheel_velocity",
+        "wheel_velocity",
+        "wheel_velocity",
+        "wheel_velocity"
+      ],
+      "split": "train",
+      "structural_operations": [],
+      "supported_loss_families": {
+        "resource_mode": 1,
+        "resource_payload": 9
+      },
+      "task": "gap"
+    },
+    {
+      "canonical_transition_index": 0,
+      "logical_episode_id": "expert:assembly:seed-006307",
+      "morphology": "assembling",
+      "provenance": "expert",
+      "resource_modes": [],
+      "split": "train",
+      "structural_operations": [
+        "align_faces"
+      ],
+      "supported_loss_families": {
+        "arg_category": 1,
+        "structural_choice": 1
+      },
+      "task": "button"
+    },
+    {
+      "canonical_transition_index": 444,
+      "logical_episode_id": "expert:assembly:seed-006307",
+      "morphology": "assembling",
+      "provenance": "expert",
+      "resource_modes": [],
+      "split": "train",
+      "structural_operations": [
+        "dock"
+      ],
+      "supported_loss_families": {
+        "arg_category": 1,
+        "structural_choice": 1
+      },
+      "task": "button"
+    },
+    {
+      "canonical_transition_index": 274,
+      "logical_episode_id": "expert:gap:seed-004100",
+      "morphology": "snake8",
+      "provenance": "expert",
+      "resource_modes": [
+        "tilt_target",
+        "tilt_target",
+        "tilt_target",
+        "tilt_target",
+        "tilt_target"
+      ],
+      "split": "train",
+      "structural_operations": [],
+      "supported_loss_families": {
+        "resource_mode": 5,
+        "resource_payload": 5
+      },
+      "task": "gap"
+    },
+    {
+      "canonical_transition_index": 274,
+      "logical_episode_id": "expert:gap:seed-004102",
+      "morphology": "snake8",
+      "provenance": "expert",
+      "resource_modes": [
+        "tilt_target",
+        "tilt_target",
+        "tilt_target",
+        "tilt_target",
+        "tilt_target"
+      ],
+      "split": "train",
+      "structural_operations": [],
+      "supported_loss_families": {
+        "resource_mode": 5,
+        "resource_payload": 5
+      },
+      "task": "gap"
+    },
+    {
+      "canonical_transition_index": 270,
+      "logical_episode_id": "expert:gap:seed-004103",
+      "morphology": "snake8",
+      "provenance": "expert",
+      "resource_modes": [
+        "tilt_target",
+        "tilt_target",
+        "tilt_target",
+        "tilt_target"
+      ],
+      "split": "train",
+      "structural_operations": [],
+      "supported_loss_families": {
+        "resource_mode": 4,
+        "resource_payload": 4
+      },
+      "task": "gap"
+    },
+    {
+      "canonical_transition_index": 271,
+      "logical_episode_id": "expert:gap:seed-004105",
+      "morphology": "snake8",
+      "provenance": "expert",
+      "resource_modes": [
+        "tilt_target"
+      ],
+      "split": "train",
+      "structural_operations": [],
+      "supported_loss_families": {
+        "resource_mode": 1,
+        "resource_payload": 1
+      },
+      "task": "gap"
+    }
+  ],
+  "selection_policy": "known TRAIN keys; then first resource-only row per additional TRAIN episode in stable logical order"
+}

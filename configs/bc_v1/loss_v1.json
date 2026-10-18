@@ -1,0 +1,15 @@
+{
+  "schema_version": "mssr.bc_v1.loss.v1",
+  "huber_delta": 1.0,
+  "weights": {
+    "resource_mode": 1.0,
+    "resource_payload": 1.0,
+    "structural_choice": 1.0,
+    "arg_category": 1.0,
+    "arg_numeric": 1.0,
+    "arg_reference": 1.0,
+    "arg_reference_set": 1.0,
+    "arg_boolean": 1.0,
+    "scope": 1.0
+  }
+}

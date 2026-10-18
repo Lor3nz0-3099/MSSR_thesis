@@ -1,0 +1,367 @@
+{
+  "forward": {
+    "j8": {
+      "output_tensors": 35,
+      "bitwise_equal_count": 35,
+      "max_output_absolute_difference": 0.0,
+      "shape_matches": true,
+      "dtype_matches": true,
+      "all_finite": true,
+      "assert_close": "PASS",
+      "rtol": 1e-06,
+      "atol": 1e-07,
+      "candidate_count_same": true,
+      "candidate_order_same": true,
+      "cardinality": {
+        "module": 64,
+        "connector": 256,
+        "resource": 128,
+        "coordinate": 256,
+        "connection": 35,
+        "relation": 168,
+        "structural_candidates": 8330,
+        "argument_rows": 86880,
+        "reference_domain_members": 562320,
+        "scope_members": 17044
+      }
+    },
+    "b64_0": {
+      "output_tensors": 35,
+      "bitwise_equal_count": 35,
+      "max_output_absolute_difference": 0.0,
+      "shape_matches": true,
+      "dtype_matches": true,
+      "all_finite": true,
+      "assert_close": "PASS",
+      "rtol": 1e-06,
+      "atol": 1e-07,
+      "candidate_count_same": true,
+      "candidate_order_same": true,
+      "cardinality": {
+        "module": 512,
+        "connector": 2048,
+        "resource": 1024,
+        "coordinate": 2048,
+        "connection": 411,
+        "relation": 1896,
+        "structural_candidates": 43270,
+        "argument_rows": 449262,
+        "reference_domain_members": 2908352,
+        "scope_members": 89612
+      }
+    },
+    "b64_1": {
+      "output_tensors": 35,
+      "bitwise_equal_count": 35,
+      "max_output_absolute_difference": 0.0,
+      "shape_matches": true,
+      "dtype_matches": true,
+      "all_finite": true,
+      "assert_close": "PASS",
+      "rtol": 1e-06,
+      "atol": 1e-07,
+      "candidate_count_same": true,
+      "candidate_order_same": true,
+      "cardinality": {
+        "module": 512,
+        "connector": 2048,
+        "resource": 1024,
+        "coordinate": 2048,
+        "connection": 417,
+        "relation": 1944,
+        "structural_candidates": 42274,
+        "argument_rows": 438786,
+        "reference_domain_members": 2840576,
+        "scope_members": 87620
+      }
+    },
+    "b64_2": {
+      "output_tensors": 35,
+      "bitwise_equal_count": 35,
+      "max_output_absolute_difference": 0.0,
+      "shape_matches": true,
+      "dtype_matches": true,
+      "all_finite": true,
+      "assert_close": "PASS",
+      "rtol": 1e-06,
+      "atol": 1e-07,
+      "candidate_count_same": true,
+      "candidate_order_same": true,
+      "cardinality": {
+        "module": 512,
+        "connector": 2048,
+        "resource": 1024,
+        "coordinate": 2048,
+        "connection": 417,
+        "relation": 1864,
+        "structural_candidates": 42014,
+        "argument_rows": 436056,
+        "reference_domain_members": 2822896,
+        "scope_members": 87100
+      }
+    },
+    "structural_heavy": {
+      "output_tensors": 35,
+      "bitwise_equal_count": 35,
+      "max_output_absolute_difference": 0.0,
+      "shape_matches": true,
+      "dtype_matches": true,
+      "all_finite": true,
+      "assert_close": "PASS",
+      "rtol": 1e-06,
+      "atol": 1e-07,
+      "candidate_count_same": true,
+      "candidate_order_same": true,
+      "cardinality": {
+        "module": 64,
+        "connector": 256,
+        "resource": 128,
+        "coordinate": 256,
+        "connection": 10,
+        "relation": 256,
+        "structural_candidates": 12340,
+        "argument_rows": 129060,
+        "reference_domain_members": 835200,
+        "scope_members": 25064
+      }
+    },
+    "resource_only": {
+      "output_tensors": 35,
+      "bitwise_equal_count": 35,
+      "max_output_absolute_difference": 0.0,
+      "shape_matches": true,
+      "dtype_matches": true,
+      "all_finite": true,
+      "assert_close": "PASS",
+      "rtol": 1e-06,
+      "atol": 1e-07,
+      "candidate_count_same": true,
+      "candidate_order_same": true,
+      "cardinality": {
+        "module": 64,
+        "connector": 256,
+        "resource": 128,
+        "coordinate": 256,
+        "connection": 56,
+        "relation": 248,
+        "structural_candidates": 4680,
+        "argument_rows": 48492,
+        "reference_domain_members": 313952,
+        "scope_members": 9744
+      }
+    }
+  },
+  "gradients": {
+    "j8": {
+      "all_present_gradients_equivalent": true,
+      "all_present_gradients_bitwise": true,
+      "representatives": {
+        "encoders.module.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        },
+        "module_fusion.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        },
+        "action_heads.structural_scorer.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        },
+        "action_heads.payload_decoder.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        },
+        "action_heads.argument_category_scorer.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        }
+      },
+      "loss_old": 9.093771934509277,
+      "loss_new": 9.093771934509277,
+      "family_losses": {
+        "resource_mode": {
+          "support": 16,
+          "old_mean": 1.9021779298782349,
+          "new_mean": 1.9021779298782349,
+          "equivalent": true
+        },
+        "resource_payload": {
+          "support": 24,
+          "old_mean": 0.1703411191701889,
+          "new_mean": 0.1703411191701889,
+          "equivalent": true
+        },
+        "structural_choice": {
+          "support": 4,
+          "old_mean": 5.649473190307617,
+          "new_mean": 5.649473190307617,
+          "equivalent": true
+        },
+        "arg_category": {
+          "support": 4,
+          "old_mean": 1.371779441833496,
+          "new_mean": 1.371779441833496,
+          "equivalent": true
+        },
+        "arg_numeric": {
+          "support": 0,
+          "old_mean": 0.0,
+          "new_mean": 0.0,
+          "equivalent": true
+        },
+        "arg_reference": {
+          "support": 0,
+          "old_mean": 0.0,
+          "new_mean": 0.0,
+          "equivalent": true
+        },
+        "arg_reference_set": {
+          "support": 0,
+          "old_mean": 0.0,
+          "new_mean": 0.0,
+          "equivalent": true
+        },
+        "arg_boolean": {
+          "support": 0,
+          "old_mean": 0.0,
+          "new_mean": 0.0,
+          "equivalent": true
+        },
+        "scope": {
+          "support": 0,
+          "old_mean": 0.0,
+          "new_mean": 0.0,
+          "equivalent": true
+        }
+      }
+    },
+    "b64_0": {
+      "all_present_gradients_equivalent": true,
+      "all_present_gradients_bitwise": true,
+      "representatives": {
+        "encoders.module.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        },
+        "module_fusion.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        },
+        "action_heads.structural_scorer.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        },
+        "action_heads.payload_decoder.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        },
+        "action_heads.argument_category_scorer.0.weight": {
+          "nonzero": true,
+          "finite": true,
+          "bitwise_equal": true,
+          "max_abs_diff": 0.0
+        }
+      },
+      "loss_old": 13.25829029083252,
+      "loss_new": 13.25829029083252,
+      "family_losses": {
+        "resource_mode": {
+          "support": 130,
+          "old_mean": 1.8073756694793701,
+          "new_mean": 1.8073756694793701,
+          "equivalent": true
+        },
+        "resource_payload": {
+          "support": 402,
+          "old_mean": 0.7470247745513916,
+          "new_mean": 0.7470247745513916,
+          "equivalent": true
+        },
+        "structural_choice": {
+          "support": 14,
+          "old_mean": 5.578116416931152,
+          "new_mean": 5.578116416931152,
+          "equivalent": true
+        },
+        "arg_category": {
+          "support": 13,
+          "old_mean": 1.4320024251937866,
+          "new_mean": 1.4320024251937866,
+          "equivalent": true
+        },
+        "arg_numeric": {
+          "support": 1,
+          "old_mean": 1.8836579322814941,
+          "new_mean": 1.8836579322814941,
+          "equivalent": true
+        },
+        "arg_reference": {
+          "support": 0,
+          "old_mean": 0.0,
+          "new_mean": 0.0,
+          "equivalent": true
+        },
+        "arg_reference_set": {
+          "support": 1,
+          "old_mean": 0.05215383693575859,
+          "new_mean": 0.05215383693575859,
+          "equivalent": true
+        },
+        "arg_boolean": {
+          "support": 0,
+          "old_mean": 0.0,
+          "new_mean": 0.0,
+          "equivalent": true
+        },
+        "scope": {
+          "support": 1,
+          "old_mean": 1.7579594850540161,
+          "new_mean": 1.7579594850540161,
+          "equivalent": true
+        }
+      }
+    }
+  },
+  "train_step": {
+    "j8": {
+      "loss_old": 9.429155349731445,
+      "loss_new": 9.429155349731445,
+      "parameter_deltas": {
+        "tensors": 264,
+        "bitwise_equal": 264,
+        "max_abs_diff": 0.0,
+        "assert_close": "PASS"
+      },
+      "optimizer_state": {
+        "tensors": 774,
+        "bitwise_equal": 774,
+        "max_abs_diff": 0.0,
+        "assert_close": "PASS"
+      },
+      "initial_optimizer_nonempty": true,
+      "seed": 20261007,
+      "dropout": 0.1
+    }
+  },
+  "all_forward_equivalent": true,
+  "gradient_and_train_equivalence": true
+}
