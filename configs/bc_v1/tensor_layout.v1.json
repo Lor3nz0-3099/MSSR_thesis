@@ -1,0 +1,9 @@
+{
+  "schema_version": "mssr.bc_v1.tensor_layout.v1",
+  "policy_input_contract": "mssr.bc_v1.policy_inputs.v1",
+  "task_ontology": "configs/bc_v1/task_context.json",
+  "semantic_geometry": "approved_d2_fields_with_object_ordinals_removed",
+  "packing": "all_values_then_matching_validity",
+  "dtypes": {"features": "float32", "indices": "int64", "masks": "bool"},
+  "sampler": {"batch_size": 64, "ordinary_quota": 56, "structural_quota": 8, "seed": 20261006}
+}

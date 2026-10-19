@@ -1,0 +1,900 @@
+{
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "mssr.bc_v1.robot_spec.v1"
+    },
+    "robot_id": {
+      "$ref": "#/$defs/Identifier"
+    },
+    "module_types": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ModuleTypeSpec"
+      },
+      "minItems": 1
+    },
+    "actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ActionSpec"
+      },
+      "default": []
+    }
+  },
+  "required": [
+    "schema_version",
+    "robot_id",
+    "module_types"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:mssr:bc_v1:robot_spec:v1",
+  "title": "BC-v1 robot type and capability catalog",
+  "$comment": "Python validate_robot_spec is authoritative for scoped ID uniqueness, type/resource/connector/capability references, bound-resource unit compatibility, finite numeric values, lower <= upper, unit quaternion/axis and payload_size == len(units). No runtime module inventory, label support or feasibility is represented. Catalog arrays normalize by ID/name; categories and numeric payload components preserve order. Missing/null argument codec derives from kind. vector is the A1 numeric resource-mode codec; continuous is also supported. Surface geometry/domain interpretation belongs to adapters.",
+  "description": "Frozen A1 dataclass JSON shape. Additional fields are rejected. Geometry features are named numeric vectors; a surface requires at least one. Units are nonempty strings; 1 denotes dimensionless. Reference arguments optionally constrain a module type and a resource/connector in that type. module_refs/connector_refs define reference_set element types; size optionally fixes cardinality. Numeric arguments have homogeneous units and optional common limits; heterogeneous resource payload units remain ordered. Boolean arguments use categorical codec with intrinsic false/true values and no explicit categories. enabled defaults to true, independent of label frequency. JSON integral numeric dimensions such as 3.0 normalize to integers.",
+  "$defs": {
+    "Identifier": {
+      "type": "string",
+      "minLength": 1,
+      "not": {
+        "pattern": "\\s"
+      }
+    },
+    "Limits": {
+      "anyOf": [
+        {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "NumericFeature": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1
+        },
+        "valid": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": [
+        "name",
+        "values"
+      ],
+      "additionalProperties": false
+    },
+    "CoordinateSpec": {
+      "type": "object",
+      "properties": {
+        "coordinate_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "units": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "periodic": {
+          "type": "boolean",
+          "default": false
+        },
+        "axis": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "number"
+              },
+              "minItems": 3,
+              "maxItems": 3
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "coordinate_id",
+        "units"
+      ],
+      "additionalProperties": false
+    },
+    "ResourceModeSpec": {
+      "type": "object",
+      "properties": {
+        "mode_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "payload_size": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "units": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "minItems": 1
+        },
+        "kind": {
+          "enum": [
+            "continuous",
+            "discrete"
+          ],
+          "default": "continuous"
+        },
+        "codec": {
+          "enum": [
+            "vector",
+            "continuous",
+            "categorical"
+          ],
+          "default": "vector"
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "required": [
+        "mode_id",
+        "payload_size",
+        "units"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "codec": {
+                "const": "categorical"
+              }
+            },
+            "required": [
+              "codec"
+            ]
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "const": "discrete"
+              },
+              "payload_size": {
+                "const": 1
+              },
+              "units": {
+                "const": [
+                  "1"
+                ]
+              },
+              "categories": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "kind",
+              "categories"
+            ]
+          },
+          "else": {
+            "properties": {
+              "categories": {
+                "maxItems": 0
+              }
+            }
+          }
+        }
+      ]
+    },
+    "ResourceSpec": {
+      "type": "object",
+      "properties": {
+        "resource_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "coordinates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CoordinateSpec"
+          },
+          "default": []
+        },
+        "modes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceModeSpec"
+          },
+          "default": []
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "required": [
+        "resource_id"
+      ],
+      "additionalProperties": false
+    },
+    "ConnectorSpec": {
+      "type": "object",
+      "properties": {
+        "connector_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "kind": {
+          "enum": [
+            "fixed_port",
+            "surface"
+          ]
+        },
+        "local_position": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 3,
+          "maxItems": 3,
+          "default": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "local_orientation_xyzw": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 4,
+          "maxItems": 4,
+          "default": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ]
+        },
+        "geometry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NumericFeature"
+          },
+          "default": []
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "required": [
+        "connector_id",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "surface"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "geometry": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "geometry"
+            ]
+          }
+        }
+      ]
+    },
+    "ModuleTypeSpec": {
+      "type": "object",
+      "properties": {
+        "type_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "connectors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConnectorSpec"
+          },
+          "default": []
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResourceSpec"
+          },
+          "default": []
+        },
+        "geometry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NumericFeature"
+          },
+          "default": []
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true,
+          "default": []
+        }
+      },
+      "required": [
+        "type_id"
+      ],
+      "additionalProperties": false
+    },
+    "ParameterSpec": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "kind": {
+          "enum": [
+            "scalar",
+            "vector",
+            "boolean",
+            "category",
+            "module_ref",
+            "connector_ref",
+            "module_refs",
+            "connector_refs"
+          ]
+        },
+        "units": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "default": null
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "limits": {
+          "$ref": "#/$defs/Limits"
+        },
+        "learnable": {
+          "type": "boolean",
+          "default": true
+        },
+        "codec": {
+          "enum": [
+            null,
+            "continuous",
+            "categorical",
+            "module_ref",
+            "connector_ref",
+            "reference_set"
+          ],
+          "default": null
+        },
+        "module_type_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "resource_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "connector_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Identifier"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "name",
+        "kind"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "scalar"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "codec": {
+                "enum": [
+                  null,
+                  "continuous"
+                ]
+              },
+              "size": {
+                "enum": [
+                  null,
+                  1
+                ]
+              },
+              "categories": {
+                "maxItems": 0
+              },
+              "connector_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "vector"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "codec": {
+                "enum": [
+                  null,
+                  "continuous"
+                ]
+              },
+              "size": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "categories": {
+                "maxItems": 0
+              },
+              "connector_id": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "size"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "boolean"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "codec": {
+                "enum": [
+                  null,
+                  "categorical"
+                ]
+              },
+              "size": {
+                "enum": [
+                  null,
+                  1
+                ]
+              },
+              "units": {
+                "type": "null"
+              },
+              "limits": {
+                "type": "null"
+              },
+              "categories": {
+                "maxItems": 0
+              },
+              "resource_id": {
+                "type": "null"
+              },
+              "connector_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "category"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "codec": {
+                "enum": [
+                  null,
+                  "categorical"
+                ]
+              },
+              "size": {
+                "enum": [
+                  null,
+                  1
+                ]
+              },
+              "units": {
+                "type": "null"
+              },
+              "limits": {
+                "type": "null"
+              },
+              "categories": {
+                "minItems": 1
+              },
+              "connector_id": {
+                "type": "null"
+              }
+            },
+            "required": [
+              "categories"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "module_ref"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "codec": {
+                "enum": [
+                  null,
+                  "module_ref"
+                ]
+              },
+              "size": {
+                "enum": [
+                  null,
+                  1
+                ]
+              },
+              "units": {
+                "type": "null"
+              },
+              "limits": {
+                "type": "null"
+              },
+              "categories": {
+                "maxItems": 0
+              },
+              "resource_id": {
+                "type": "null"
+              },
+              "connector_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "connector_ref"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "codec": {
+                "enum": [
+                  null,
+                  "connector_ref"
+                ]
+              },
+              "size": {
+                "enum": [
+                  null,
+                  1
+                ]
+              },
+              "units": {
+                "type": "null"
+              },
+              "limits": {
+                "type": "null"
+              },
+              "categories": {
+                "maxItems": 0
+              },
+              "resource_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "module_refs"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "codec": {
+                "enum": [
+                  null,
+                  "reference_set"
+                ]
+              },
+              "units": {
+                "type": "null"
+              },
+              "limits": {
+                "type": "null"
+              },
+              "categories": {
+                "maxItems": 0
+              },
+              "resource_id": {
+                "type": "null"
+              },
+              "connector_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "connector_refs"
+              }
+            },
+            "required": [
+              "kind"
+            ]
+          },
+          "then": {
+            "properties": {
+              "codec": {
+                "enum": [
+                  null,
+                  "reference_set"
+                ]
+              },
+              "units": {
+                "type": "null"
+              },
+              "limits": {
+                "type": "null"
+              },
+              "categories": {
+                "maxItems": 0
+              },
+              "resource_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "resource_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "resource_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "module_type_id": {
+                "$ref": "#/$defs/Identifier"
+              }
+            },
+            "required": [
+              "module_type_id"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "connector_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "connector_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "module_type_id": {
+                "$ref": "#/$defs/Identifier"
+              }
+            },
+            "required": [
+              "module_type_id"
+            ]
+          }
+        },
+        {
+          "not": {
+            "properties": {
+              "resource_id": {
+                "type": "string"
+              },
+              "connector_id": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "resource_id",
+              "connector_id"
+            ]
+          }
+        }
+      ]
+    },
+    "ActionSpec": {
+      "type": "object",
+      "properties": {
+        "action_id": {
+          "$ref": "#/$defs/Identifier"
+        },
+        "kind": {
+          "enum": [
+            "continuous",
+            "discrete",
+            "prepare_connection",
+            "connect",
+            "disconnect",
+            "skill"
+          ]
+        },
+        "scope": {
+          "enum": [
+            "resource",
+            "module",
+            "modules",
+            "connector_pair"
+          ]
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ParameterSpec"
+          },
+          "default": []
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Identifier"
+          },
+          "uniqueItems": true,
+          "default": []
+        },
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": [
+        "action_id",
+        "kind",
+        "scope"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

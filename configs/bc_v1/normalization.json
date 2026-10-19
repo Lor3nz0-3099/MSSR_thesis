@@ -1,0 +1,34 @@
+{
+  "schema_version": "mssr.bc_v1.normalization_policy.v1",
+  "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+  "fields": {
+    "module": {"relative_position": "train", "orientation_r6": "preserve", "linear_velocity": "train", "angular_velocity": "train"},
+    "connector": {"position_body_m": "train", "normal_body": "preserve", "tangent_body": "preserve", "kind": "preserve", "status": "preserve", "capabilities": "preserve"},
+    "resource": {"capabilities": "preserve"},
+    "actuator_coordinate": {"position": "coordinate_bounds", "velocity": "train", "limits": "preserve", "periodic": "preserve"},
+    "connection": {"relative_position": "train", "relative_orientation_r6": "preserve", "clocking": "preserve", "allowed_relative_dofs": "preserve", "relation": "preserve"},
+    "environment": {"geometry": "geometry", "object_type": "preserve"},
+    "module_environment_relation": {"delta_xyz": "train", "distance": "train", "direction": "preserve"},
+    "structural_candidate_metadata": {}
+  },
+  "geometry": {
+    "point3": ["train", "train", "train"],
+    "vector3": ["preserve", "preserve", "preserve"],
+    "line": ["train", "train", "train", "preserve", "preserve", "preserve"],
+    "plane": ["preserve", "preserve", "preserve", "train"],
+    "heading": ["preserve", "preserve", "preserve"],
+    "planar_pose": ["train", "train", "train", "preserve", "preserve", "preserve", "preserve", "preserve", "preserve"],
+    "angle_constraint": ["train", "preserve", "preserve", "preserve", "preserve", "preserve", "preserve", "preserve", "preserve", "preserve"],
+    "intrinsic_scalar": "train",
+    "intrinsic_vector": "train"
+  },
+  "resource_payloads": [
+    {"module_type_id": "smores_ep_enhanced", "resource_id": "locomotion", "mode_id": "wheel_velocity", "components": [{"parameter": "left_rad_s", "component": 0}, {"parameter": "right_rad_s", "component": 0}]},
+    {"module_type_id": "smores_ep_enhanced", "resource_id": "internal_motion", "mode_id": "pan_velocity", "components": [{"parameter": "value", "component": 0}]},
+    {"module_type_id": "smores_ep_enhanced", "resource_id": "internal_motion", "mode_id": "tilt_velocity", "components": [{"parameter": "value", "component": 0}]},
+    {"module_type_id": "smores_ep_enhanced", "resource_id": "internal_motion", "mode_id": "pan_target", "components": [{"parameter": "value", "component": 0}]},
+    {"module_type_id": "smores_ep_enhanced", "resource_id": "internal_motion", "mode_id": "tilt_target", "components": [{"parameter": "value", "component": 0}]},
+    {"module_type_id": "smores_ep_enhanced", "resource_id": "internal_motion", "mode_id": "pan_delta", "components": [{"parameter": "value", "component": 0}]},
+    {"module_type_id": "smores_ep_enhanced", "resource_id": "internal_motion", "mode_id": "tilt_delta", "components": [{"parameter": "value", "component": 0}]}
+  ]
+}

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from smores_ep.config.simulation import SelfAssemblySimulationConfig
+from smores_ep.primitives.bc_runtime import attach_bc_runtime
 from smores_ep.control.teleop import SmoresCommand
 from smores_ep.isaac.command_router import IsaacMultiModuleCommandRouter
 from smores_ep.isaac.docking import IsaacDockingManager
@@ -1007,6 +1008,10 @@ def run_parallel_self_assembly_scenario(
         invalidate_command_sources
     )
     primitive_executor.reset_free_modules_callback = reset_free_modules
+    bc_runtime = attach_bc_runtime(
+        config.primitive_status_file.parent, action_channel, primitive_executor,
+        tuple(module_roots),
+    )
 
     previous_connection_count = 0
     previous_behavior_commands: dict[str, SmoresCommand] = {}
@@ -1096,6 +1101,8 @@ def run_parallel_self_assembly_scenario(
                 dynamic_obstacle_path,
                 now_s,
             )
+        if bc_runtime is not None:
+            bc_runtime.service(now_s)
         admission_statuses: list[Any] = []
         try:
             primitive_goal = primitive_channel.poll_goal()
@@ -1157,6 +1164,8 @@ def run_parallel_self_assembly_scenario(
             )
         except (TypeError, ValueError) as error:
             print(f"[behavior] REJECTED malformed action payload: {error}")
+        if bc_runtime is not None:
+            behavior_baseline = bc_runtime.filter_commands(behavior_baseline)
         diagnostics = action_channel.diagnostics
 
         behavior_source_seen = prepare_initial_manual_teleop_handoff(
@@ -1212,6 +1221,8 @@ def run_parallel_self_assembly_scenario(
             held_primitive_commands,
         )
         routed_rates = command_router.apply(routed_commands)
+        if bc_runtime is not None:
+            bc_runtime.record_applied(behavior_baseline, routed_commands, now_s)
         if behavior_baseline != previous_behavior_commands:
             if behavior_baseline:
                 behavior_started_step = physics_step
@@ -1305,6 +1316,8 @@ def run_parallel_self_assembly_scenario(
                     "deterministic_parallel_self_assembly"
                 ),
             )
+            if bc_runtime is not None:
+                bc_runtime.publish_status(SimulationManager.get_simulation_time())
 
         connection_count = len(docking.connections)
         if connection_count != previous_connection_count:

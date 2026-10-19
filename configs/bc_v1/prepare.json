@@ -1,0 +1,20 @@
+{
+  "schema_version": "mssr.bc_v1.prepare.v1",
+  "adapter": "smores_ep",
+  "robot_spec": "configs/bc_v1/smores_ep.robot.json",
+  "feature_schema": "configs/bc_v1/features.json",
+  "task_context": "configs/bc_v1/task_context.json",
+  "topology": {
+    "policy": "configs/bc_v1/causal_topology.json",
+    "source_catalog": "artifacts/bc_v1/audits/causal_repairs_v1.json"
+  },
+  "source_frames": {
+    "policy": "configs/bc_v1/source_frames.json"
+  },
+  "normalization_policy": "configs/bc_v1/normalization.json",
+  "expected_fingerprints": {
+    "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+    "normalization_policy_fingerprint": "366b9b0dfe838208462e0b99c634f0cf844c8ba15959f1bcf62b3a363261fd91"
+  }
+}

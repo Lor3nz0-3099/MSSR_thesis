@@ -1,0 +1,22 @@
+{
+  "schema_version": "mssr.bc_v1.sidecar_build_config.v1",
+  "paths": {
+    "canonical_manifest": "datasets/expert_v1_canonical_v6/manifest.json",
+    "split": "artifacts/bc_v1/splits/f1_v1/split.json",
+    "g1": "artifacts/bc_v1/cache/g1_v1_optimized",
+    "normalizers": "artifacts/bc_v1/normalization/f2_v1_optimized/normalizers.json",
+    "robot_spec": "configs/bc_v1/smores_ep.robot.json",
+    "feature_schema": "configs/bc_v1/features.json",
+    "normalization_policy": "configs/bc_v1/normalization.json",
+    "tensor_layout": "configs/bc_v1/tensor_layout.v1.json",
+    "output": "artifacts/bc_v1/sidecar/g2_v1"
+  },
+  "pins": {
+    "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+    "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+    "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+    "f2_fingerprint": "890eca0b9f6d4deca2cac81d3a41bf535aa3d03ac16e0ff4b81cbc0ca163abf5",
+    "normalizer_sha": "ea8efbd9062acb8625e0618bcc5f86b975f20839bf3132a684a626c744e52003",
+    "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49"
+  }
+}
