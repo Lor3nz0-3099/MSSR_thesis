@@ -1,0 +1,16 @@
+{
+  "counts": {
+    "passed": 0,
+    "failed": 0,
+    "skipped": 0,
+    "deselected": 0,
+    "error": 2
+  },
+  "exit_code": 2,
+  "TEST_payload_access": 0,
+  "denied_attempts": [],
+  "failures": [
+    "ImportError while importing test module '/home/lorenzo/MSSR_thesis/scripts/smores_ep/tests/test_bc_runtime.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/lib/python3.10/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\nscripts/smores_ep/tests/test_bc_runtime.py:9: in <module>\n    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor\nE   ModuleNotFoundError: No module named 'smores_ep'",
+    "ImportError while importing test module '/home/lorenzo/MSSR_thesis/scripts/smores_ep/tests/test_command_router.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\n/usr/lib/python3.10/importlib/__init__.py:126: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\nscripts/smores_ep/tests/test_command_router.py:3: in <module>\n    from smores_ep.control.teleop import InternalMotionMode, SmoresCommand\nE   ModuleNotFoundError: No module named 'smores_ep'"
+  ]
+}

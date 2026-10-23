@@ -100,7 +100,7 @@ def test_evaluation_modes_no_grad_global_aggregation_and_no_updates(monkeypatch)
     class Toy(torch.nn.Module):
         def __init__(self): super().__init__(); self.weight = torch.nn.Parameter(torch.tensor(2.)); self.modes = []
         def forward(self, inputs):
-            self.modes.append((self.training, torch.is_grad_enabled()))
+            self.modes.append((self.training, torch.is_grad_enabled(), torch.is_inference_mode_enabled()))
             return inputs['x'] * self.weight
     class Metrics:
         def reset(self): self.n = 0
@@ -117,11 +117,101 @@ def test_evaluation_modes_no_grad_global_aggregation_and_no_updates(monkeypatch)
                                    device='cpu', batch_size=2, collate=collate)
     assert result['total_loss'] == 4. and result['samples'] == 3 and result['batches'] == 2
     assert result['metrics']['toy']['support'] == 3
-    assert model.modes == [(False, False), (False, False)]
+    assert model.modes == [(False, False, True), (False, False, True)]
     assert model.training and torch.equal(model.weight, before) and model.weight.grad is None
     data = Data([1]); data.split = 'test'
     with pytest.raises(ValueError, match='TEST|validation'):
         m.evaluate_validation(model, data, {}, Metrics(), device='cpu')
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason='CUDA postprocessing boundary')
+def test_validation_host_postprocessing_matches_cuda_loss_and_metrics(monkeypatch):
+    from drl.IL.tests.bc_v1.test_no_structural import sample, v2_model
+    from drl.IL.bc_v1.structural_decisions import add_no_structural_supervision
+    from drl.IL.bc_v1.batching import collate_policy_samples
+    from drl.IL.bc_v1.metrics import BCMetrics
+    from drl.IL.bc_v1.training import move_batch_to_device, deterministic_verification, family_statistics
+    from drl.IL.bc_v1.losses import load_loss_config, compute_bc_loss
+    from pathlib import Path
+    m = api()
+    row, kw = sample(positive=(2, 6))
+    row = add_no_structural_supervision(row)
+    class Data(list): split = 'validation'
+    data = Data([row, row, row])
+    config = load_loss_config(Path(__file__).resolve().parents[4]/'configs/bc_v1/loss_v1.json')
+    model = v2_model(kw).cuda().eval()
+    metric_config = {'schema_version': 'mssr.bc_v1.metrics.v1', 'tolerances': {},
+                     'breakdowns': ['task', 'morphology', 'provenance', 'task_stratum']}
+    expected_metrics = BCMetrics(kw['spec'], kw['normalizers'], metric_config)
+    accumulator = m.FamilyAccumulator(config['weights'])
+    with deterministic_verification(), torch.no_grad():
+        for rows in (data[:2], data[2:]):
+            b = move_batch_to_device(collate_policy_samples(rows), 'cuda:0')
+            prediction = model(b['inputs'])
+            _, families = compute_bc_loss(prediction, b, config)
+            accumulator.add(family_statistics(families)); expected_metrics.update(prediction, b)
+        def host_loss(prediction, batch, config):
+            def check(tree):
+                for value in tree.values():
+                    if isinstance(value, dict): check(value)
+                    else: assert value.device.type == 'cpu'
+            check(prediction); check(batch['supervision'])
+            return compute_bc_loss(prediction, batch, config)
+        monkeypatch.setattr(m, 'compute_bc_loss', host_loss)
+        actual = m.evaluate_validation(model, data, config,
+            BCMetrics(kw['spec'], kw['normalizers'], metric_config),
+            device='cuda:0', batch_size=2)
+    expected = accumulator.compute()
+    assert actual['total_loss'] == pytest.approx(expected['total_loss'], rel=1e-6, abs=1e-7)
+    for family in expected['families']:
+        assert actual['families'][family]['support'] == expected['families'][family]['support']
+    assert actual['metrics'] == expected_metrics.compute()
+    assert not model.training and all(p.grad is None for p in model.parameters())
+
+
+def test_validation_reports_first_periodic_and_final_progress_without_changing_results(monkeypatch, capsys):
+    m = api()
+    class Model(torch.nn.Module):
+        def forward(self, inputs): return inputs['x']
+    class Data(list): split = 'validation'
+    class Metrics:
+        def reset(self): self.count = 0
+        def update(self, prediction, batch): self.count += len(prediction)
+        def compute(self): return {'count': self.count}
+    def collate(rows): return {'inputs': {'x': torch.tensor(rows, dtype=torch.float32)}, 'supervision': {}}
+    def loss(prediction, batch, config):
+        s = prediction.sum(); n = torch.tensor(len(prediction))
+        return s/n, {'a': {'sum': s, 'support': n, 'mean': s/n, 'weighted': s/n}}
+    monkeypatch.setattr(m, 'compute_bc_loss', loss)
+    events = []
+    result = m.evaluate_validation(Model(), Data([1, 2, 3, 4, 5]), {'weights': {'a': 1.}},
+        Metrics(), device='cpu', batch_size=1, collate=collate, epoch=0,
+        log_interval=3, progress=events.append)
+    assert result['total_loss'] == 3. and result['metrics'] == {'count': 5}
+    assert [e['batch'] for e in events] == [1, 3, 5]
+    assert events[-1]['samples'] == 5 and events[-1]['eta_seconds'] == 0.
+    assert all(e['samples_per_second'] > 0 and e['epoch'] == 0 for e in events)
+    output = capsys.readouterr().out
+    assert 'VAL epoch 0 batch 1/5' in output and 'VAL epoch 0 batch 5/5' in output
+    assert 'samples/s' in output and 'ETA' in output
+
+
+@pytest.mark.parametrize('training', [False, True])
+def test_validation_restores_mode_and_grad_context_on_failure(monkeypatch, training):
+    m = api()
+    class Data(list): split = 'validation'
+    class Metrics:
+        def reset(self): pass
+    model = torch.nn.Linear(1, 1).train(training)
+    model.weight.grad = torch.ones_like(model.weight)
+    before = model.weight.grad.clone()
+    def fail(*args): raise ValueError('expected failure')
+    monkeypatch.setattr(m, 'compute_bc_loss', fail)
+    with pytest.raises(ValueError, match='expected failure'):
+        m.evaluate_validation(model, Data([1]), {'weights': {}}, Metrics(), device='cpu',
+            collate=lambda rows: {'inputs': torch.ones(1, 1), 'supervision': {}})
+    assert model.training == training and torch.is_grad_enabled()
+    assert torch.equal(model.weight.grad, before)
 
 
 def runner():
@@ -237,7 +327,7 @@ def test_runtime_status_is_atomic_machine_readable_and_failure_visible(tmp_path)
         status.update('RESTARTING')
 
 
-def test_training_reports_actual_optimization_mean_separately_from_global_families(monkeypatch):
+def test_training_reports_actual_optimization_mean_separately_from_global_families(monkeypatch, capsys):
     m = api()
     class Data(list): split = 'train'
     class Sampler:
@@ -257,6 +347,9 @@ def test_training_reports_actual_optimization_mean_separately_from_global_famili
     assert result['total_loss'] == 1.  # Actual objective averaged across two updates.
     assert result['global_support_total_loss'] == .2
     assert result['families']['a']['support'] == 10
+    output = capsys.readouterr().out
+    assert 'epoch 1 step 1/2' in output and 'epoch 1 step 2/2' in output
+    assert 'samples/s' in output and 'ETA' in output
 
 
 def test_runner_exception_marks_failed_and_never_restarts(tmp_path, monkeypatch):

@@ -1,0 +1,14 @@
+{
+  "NO_PRODUCTION_CODE_MODIFIED": true,
+  "PASS": true,
+  "all_original_hashes_equal": true,
+  "checkpoint_bytes_unchanged": true,
+  "diff_check_exit_code": 0,
+  "index_empty": true,
+  "index_unchanged": true,
+  "no_reset_restore_clean_stash_checkout_add_commit_push": true,
+  "original_git_status_preserved": true,
+  "source_config_run_files_hashed": 137,
+  "tracked_diff_unchanged": true,
+  "writes": "Only this new audit directory"
+}

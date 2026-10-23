@@ -40,8 +40,9 @@ def load_action_head_config(path):
 
 
 def _validate_config(config):
-    if (set(config)!={'schema_version','hidden_dim','activation','dropout'}
-            or config['schema_version'] not in ('mssr.bc_v1.action_heads.v1','mssr.bc_v1.action_heads.v2')
+    extra={'resource_contract'} if config.get('schema_version')=='mssr.bc_v1.action_heads.v3' else set()
+    if (set(config)!={'schema_version','hidden_dim','activation','dropout'}|extra
+            or config['schema_version'] not in ('mssr.bc_v1.action_heads.v1','mssr.bc_v1.action_heads.v2','mssr.bc_v1.action_heads.v3')
             or type(config['hidden_dim']) is not int or config['hidden_dim']!=128
             or config['activation']!='silu' or type(config['dropout']) is not float or config['dropout']!=.1):
         raise ValueError('Unsupported H2 baseline configuration')
@@ -55,6 +56,23 @@ def _mlp(source,target,config):
 
 def _ints(values,like):
     return torch.tensor(values,dtype=torch.int64,device=like.device)
+
+
+def _segmented_score(scorer,values,ptr):
+    """Batch deterministic linear work, preserve per-domain dropout calls.
+
+    In training the legacy ordered domain calls consume RNG independently.
+    Keeping their dropout shapes/order preserves that contract while removing
+    repeated linear/activation autograd graphs. Evaluation is fully bulk.
+    """
+    hidden=scorer[1](scorer[0](values))
+    dropout=scorer[2]
+    if dropout.training and dropout.p:
+        sizes=(ptr[1:]-ptr[:-1]).tolist()  # one routing transfer per family
+        hidden=torch.cat([dropout(part) for part in hidden.split(sizes)],0)
+    else:
+        hidden=dropout(hidden)
+    return scorer[3](hidden)
 
 
 class ActionHeads(nn.Module):
@@ -74,7 +92,12 @@ class ActionHeads(nn.Module):
         self.mode_projection=nn.Linear(len(self.modes),h,bias=False) if self.modes else None
         self.component_projection=nn.Linear(len(self.payload_components),h,bias=False) if self.payload_components else None
         multimode=any(len(r.modes)>1 for t in spec.module_types for r in t.resources)
-        self.mode_scorer=_mlp(h,1,cfg) if multimode else None
+        self.resource_contract=None
+        if cfg['schema_version']=='mssr.bc_v1.action_heads.v3':
+            from .resource_decisions import ResourceDecisionContract
+            self.resource_contract=ResourceDecisionContract.from_dict(cfg['resource_contract'],spec)
+        self.outcome_projection=(nn.Linear(len(self.resource_contract.outcomes),h,bias=False) if self.resource_contract else None)
+        self.mode_scorer=_mlp(h,1,cfg) if multimode or self.resource_contract else None
         self.payload_decoder=_mlp(h,1,cfg) if self.payload_components else None
         self.resource_categories=tuple((i,j) for i,m in enumerate(self.modes)
             if m.codec=='categorical' for j in range(len(m.categories)))
@@ -91,7 +114,7 @@ class ActionHeads(nn.Module):
         self.pair_projection=nn.Linear(1,h,bias=False)
         self.structural_scorer=_mlp(h,1,cfg)
         self.no_structural_scorer=(_mlp(h,1,cfg)
-            if cfg['schema_version']=='mssr.bc_v1.action_heads.v2' else None)
+            if cfg['schema_version'] in ('mssr.bc_v1.action_heads.v2','mssr.bc_v1.action_heads.v3') else None)
         self.parameter_catalog=tuple((a.action_id,p.name) for a in self.actions for p in sorted(a.parameters,key=lambda p:p.name))
         self.parameters_catalog=tuple(p for a in self.actions for p in sorted(a.parameters,key=lambda p:p.name))
         self.action_index={a.action_id:i for i,a in enumerate(self.actions)}
@@ -124,6 +147,27 @@ class ActionHeads(nn.Module):
         has_scope=any(a.scope=='modules' for a in self.actions)
         self.scope_option_projection=nn.Linear(latent_config['hidden_dim'],h) if has_scope else None
         self.scope_scorer=_mlp(h,1,cfg) if has_scope else None
+        # Catalog-only, nonlearned routing tables. Nonpersistent buffers keep
+        # legacy checkpoint keys unchanged and follow the actor's device.
+        tables={
+            'mode_width':[m.payload_size for m in self.modes],
+            'mode_numeric':[m.codec!='categorical' for m in self.modes],
+            'mode_component_start':[self.component_index.get((i,0),0) for i in range(len(self.modes))],
+            'mode_categories':[len(m.categories) for m in self.modes],
+            'mode_category_start':[self.resource_category_index.get((i,0),0) for i in range(len(self.modes))],
+            'action_pair':[a.scope=='connector_pair' for a in self.actions],
+            'action_resource':[a.scope=='resource' for a in self.actions],
+            'parameter_kind':[PARAMETER_KINDS.index(p.kind) for p in self.parameters_catalog],
+            'parameter_action':[self.action_index[a] for a,_ in self.parameter_catalog],
+            'parameter_learnable':[p.learnable for p in self.parameters_catalog],
+            'parameter_learnable_index':[self.learnable_index.get(i,-1) for i in range(len(self.parameter_catalog))],
+            'parameter_width':[p.size or 1 for p in self.parameters_catalog],
+            'parameter_numeric_start':[self.numeric_index.get((i,0),0) for i in range(len(self.parameter_catalog))],
+            'parameter_categories':[len(p.categories) for p in self.parameters_catalog],
+            'parameter_category_start':[self.argument_category_index.get((i,0),0) for i in range(len(self.parameter_catalog))],
+        }
+        for name,values in tables.items():
+            self.register_buffer('_catalog_'+name,torch.tensor(values,dtype=torch.int64),persistent=False)
         for layer in self.modules():
             if isinstance(layer,nn.Linear):
                 nn.init.xavier_uniform_(layer.weight)
@@ -165,10 +209,9 @@ class ActionHeads(nn.Module):
         if rows['mode'].shape!=(q,):raise ValueError('Resource mode shape mismatch')
         owners=_owners(rows['group_ptr'])
         if not torch.equal(owners,rows['resource']):raise ValueError('Resource candidate/group mismatch')
-        sizes=[self.modes[i].payload_size for i in rows['mode'].tolist()]
-        expected=[0]
-        for width in sizes:expected.append(expected[-1]+width)
-        if not torch.equal(rows['payload_ptr'],_ints(expected,rows['mode'])):raise ValueError('Catalog payload arity mismatch')
+        sizes=self._catalog_mode_width[rows['mode']]
+        expected=torch.cat((sizes.new_zeros(1),sizes.cumsum(0)))
+        if not torch.equal(rows['payload_ptr'],expected):raise ValueError('Catalog payload arity mismatch')
         base=self._resource_conditions(latents,inputs)
         conditioned=base[rows['resource']]
         if q:conditioned=conditioned+self.mode_projection(F.one_hot(rows['mode'],len(self.modes)).float())
@@ -177,32 +220,38 @@ class ActionHeads(nn.Module):
         mode_ptr=torch.cat((counts.new_zeros(1),torch.cumsum(torch.where(multi,counts,0),0)))
         if len(chosen) and self.mode_scorer is None:raise ValueError('Catalog does not permit a multi-mode resource')
         mode_logits=self.mode_scorer(conditioned[chosen]).flatten() if len(chosen) else base.new_empty(0)
-        payload_rows=[i for i,m in enumerate(rows['mode'].tolist()) if self.modes[m].codec!='categorical']
-        query=[];components=[];payload_ptr=[0]
-        for candidate in payload_rows:
-            mode=int(rows['mode'][candidate]);width=self.modes[mode].payload_size
-            query.extend([candidate]*width);components.extend(self.component_index[(mode,j)] for j in range(width))
-            payload_ptr.append(len(query))
-        query=_ints(query,rows['mode']);components=_ints(components,rows['mode'])
+        numeric=self._catalog_mode_numeric[rows['mode']].bool()
+        payload_rows=torch.nonzero(numeric,as_tuple=False).flatten()
+        payload_ptr=torch.cat((sizes.new_zeros(1),sizes[payload_rows].cumsum(0)))
+        owner=_owners(payload_ptr);query=payload_rows[owner]
+        components=(self._catalog_mode_component_start[rows['mode'][query]]
+            +torch.arange(len(query),device=query.device)-payload_ptr[owner])
         payload=base.new_empty(0)
         if len(query):
             role=self.component_projection(F.one_hot(components,len(self.payload_components)).float())
             payload=self.payload_decoder(conditioned[query]+role).flatten()
-        category_rows=[i for i,m in enumerate(rows['mode'].tolist()) if self.modes[m].codec=='categorical']
-        queries=[];options=[];category_ptr=[0]
-        for candidate in category_rows:
-            mode=int(rows['mode'][candidate]);width=len(self.modes[mode].categories)
-            queries.extend([candidate]*width);options.extend(self.resource_category_index[(mode,j)] for j in range(width))
-            category_ptr.append(len(queries))
+        category_rows=torch.nonzero(~numeric,as_tuple=False).flatten()
+        widths=self._catalog_mode_categories[rows['mode'][category_rows]]
+        category_ptr=torch.cat((widths.new_zeros(1),widths.cumsum(0)))
+        owner=_owners(category_ptr);queries=category_rows[owner]
+        options=(self._catalog_mode_category_start[rows['mode'][queries]]
+            +torch.arange(len(queries),device=queries.device)-category_ptr[owner])
         category_logits=base.new_empty(0)
-        if queries:
-            role=self.resource_category_projection(F.one_hot(_ints(options,rows['mode']),len(self.resource_categories)).float())
-            category_logits=self.resource_category_scorer(conditioned[_ints(queries,rows['mode'])]+role).flatten()
-        return {'mode_logits':mode_logits,'mode_group_ptr':mode_ptr,'mode_candidate':chosen,
-            'payload':payload,'payload_candidate':_ints(payload_rows,rows['mode']),
-            'payload_ptr':_ints(payload_ptr,rows['mode']),
-            'categorical':{'candidate':_ints(category_rows,rows['mode']),
-                'ptr':_ints(category_ptr,rows['mode']),'logits':category_logits}}
+        if len(queries):
+            role=self.resource_category_projection(F.one_hot(options,len(self.resource_categories)).float())
+            category_logits=self.resource_category_scorer(conditioned[queries]+role).flatten()
+        result={'mode_logits':mode_logits,'mode_group_ptr':mode_ptr,'mode_candidate':chosen,
+            'payload':payload,'payload_candidate':payload_rows,
+            'payload_ptr':payload_ptr,
+            'categorical':{'candidate':category_rows,
+                'ptr':category_ptr,'logits':category_logits}}
+        if self.resource_contract is not None:
+            from .resource_decisions import validate_outcome_inputs
+            validate_outcome_inputs(rows,self.resource_contract,r)
+            roles=self.outcome_projection(F.one_hot(rows['outcome_catalog'],len(self.resource_contract.outcomes)).float())
+            result['outcome_logits']=self.mode_scorer(base[rows['outcome_resource']]+roles).flatten()
+        elif 'outcome_ptr' in rows:raise ValueError('Resource v3 inputs require v3 heads')
+        return result
 
     def _structural_conditions(self,latents,inputs):
         s=inputs['structural'];q=len(s['initiator']);m=len(inputs['module_x']);c=len(inputs['connector_x'])
@@ -230,10 +279,9 @@ class ActionHeads(nn.Module):
         if (module_graph[s['scope_members']]!=graph[scope_owner]).any():raise ValueError('Cross-graph scope')
         if s['scope_required'].dtype!=torch.bool or s['scope_required'].shape!=s['scope_members'].shape:
             raise ValueError('Invalid required scope mask')
-        for i,action_index in enumerate(s['action'].tolist()):
-            action=self.actions[action_index]
-            if bool(paired[i])!=(action.scope=='connector_pair') or action.scope=='resource':
-                raise ValueError('Operation/binding applicability mismatch')
+        if ((paired!=self._catalog_action_pair[s['action']].bool())
+                |self._catalog_action_resource[s['action']].bool()).any():
+            raise ValueError('Operation/binding applicability mismatch')
         scope=_mean(latents['module_h'][s['scope_members']],scope_owner,q)
         conditions=(self.initiator_projection(latents['module_h'][s['initiator']])+self.scope_projection(scope)
             +self.graph_projection(latents['graph_h'][graph])+self.context_projection(latents['context_h'][graph])
@@ -284,13 +332,13 @@ class ActionHeads(nn.Module):
         required_ptr=torch.cat((counts.new_zeros(1),required_counts.cumsum(0)))
         if len(bindings) and self.scope_scorer is None:
             raise ValueError('Catalog has no variable participant scope')
-        scores=[]
-        for binding,start,end in zip(bindings.tolist(),ptr[:-1].tolist(),ptr[1:].tolist()):
-            chosen=optional[start:end]
-            members=s['scope_members'][chosen]
-            scores.append(self.scope_scorer(conditions[binding,None]+
-                self.scope_option_projection(latents['module_h'][members])).flatten())
-        return {'binding':bindings,'logits':torch.cat(scores) if scores else conditions.new_empty(0),
+        logits=conditions.new_empty(0)
+        if len(bindings):
+            option_owner=_owners(ptr)
+            values=(conditions[bindings[option_owner]]+
+                self.scope_option_projection(latents['module_h'][s['scope_members'][optional]]))
+            logits=_segmented_score(self.scope_scorer,values,ptr).flatten()
+        return {'binding':bindings,'logits':logits,
             'ptr':ptr,'domain_index':optional,'required_ptr':required_ptr,'required_domain_index':required}
 
     def _validate_arguments(self,inputs):
@@ -315,8 +363,8 @@ class ActionHeads(nn.Module):
         if refs.dtype!=torch.int64 or refs.ndim!=1:raise ValueError('Invalid argument domain indices')
         if s['argument_domain_required'].dtype!=torch.bool or s['argument_domain_required'].shape!=s['argument_domain_index'].shape:
             raise ValueError('Invalid required argument domain mask')
-        kinds=_ints([PARAMETER_KINDS.index(p.kind) for p in self.parameters_catalog],s['argument_kind'])
-        actions=_ints([self.action_index[a] for a,_ in self.parameter_catalog],s['argument_parameter'])
+        kinds=self._catalog_parameter_kind
+        actions=self._catalog_parameter_action
         parameter=s['argument_parameter'];binding=s['argument_binding'];kind=s['argument_kind'];bound=s['argument_bound_ref']
         if ((s['action'][binding]!=actions[parameter])|(kind!=kinds[parameter])).any():
             raise ValueError('Argument/action/type mismatch')
@@ -342,7 +390,7 @@ class ActionHeads(nn.Module):
         if not isinstance(arguments,torch.Tensor):arguments=_ints(arguments,s['argument_binding'])
         # Catalog lookup only; binding/parameter rows always come from the
         # current, validated batch. No per-argument CUDA -> Python conversion.
-        lookup=_ints([self.learnable_index.get(i,-1) for i in range(len(self.parameter_catalog))],arguments)
+        lookup=self._catalog_parameter_learnable_index
         params=lookup[s['argument_parameter'][arguments]]
         result=conditions[s['argument_binding'][arguments]]
         if len(arguments):result=result+self.parameter_projection(F.one_hot(params,len(self.learnable_parameters)).float())
@@ -354,7 +402,7 @@ class ActionHeads(nn.Module):
         Called after full dynamic argument validation, including fixed fields.
         Bound single references remain routing-only, without new predictions.
         """
-        learnable=_ints([p.learnable for p in self.parameters_catalog],s['argument_parameter']).bool()
+        learnable=self._catalog_parameter_learnable.bool()
         learnable=learnable[s['argument_parameter']];kind=s['argument_kind']
         masks={'numeric':(kind==0)|(kind==1),'reference_set':(kind==6)|(kind==7),
             'reference':((kind==4)|(kind==5))&(s['argument_bound_ref']==-1),
@@ -364,11 +412,10 @@ class ActionHeads(nn.Module):
     def _category_routes(self,s,arguments):
         """Expand catalog categories in legacy row/category order in bulk."""
         parameter=s['argument_parameter'][arguments]
-        widths=_ints([len(p.categories) for p in self.parameters_catalog],arguments)[parameter]
+        widths=self._catalog_parameter_categories[parameter]
         ptr=torch.cat((arguments.new_zeros(1),widths.cumsum(0)))
         query=_owners(ptr)
-        first=_ints([self.argument_category_index.get((i,0),0)
-            for i in range(len(self.parameter_catalog))],arguments)
+        first=self._catalog_parameter_category_start
         options=first[parameter[query]]+torch.arange(len(query),device=query.device)-ptr[query]
         return query,options,ptr
 
@@ -378,38 +425,58 @@ class ActionHeads(nn.Module):
         kind=option.new_zeros((len(option),2));kind[:,int(connector)]=1
         return scorer(condition[None]+self.reference_option_projection(option)+self.reference_kind_projection(kind)).flatten()
 
+    def _reference_scores(self,latents,s,arguments,base,domain_indices,ptr,scorer):
+        if not len(arguments):return base.new_empty(0)
+        query=_owners(ptr);refs=s['argument_domain_index'][domain_indices]
+        kind=s['argument_kind'][arguments[query]]
+        connector=(kind==5)|(kind==7)
+        options=latents['module_h'].new_empty((len(query),latents['module_h'].shape[1]))
+        options[~connector]=latents['module_h'][refs[~connector]]
+        options[connector]=latents['connector_h'][refs[connector]]
+        values=(base[query]+self.reference_option_projection(options)
+            +self.reference_kind_projection(F.one_hot(connector.long(),2).float()))
+        return _segmented_score(scorer,values,ptr).flatten()
+
     def _arguments(self,latents,inputs,conditions):
         self._validate_arguments(inputs);s=inputs['structural']
         selected=self._select_argument_rows(s)
         arguments,base=self._parameter_conditions(conditions,s,selected['numeric'])
-        query=[];components=[];ptr=[0]
-        for row,i in enumerate(arguments.tolist()):
-            parameter=int(s['argument_parameter'][i]);width=self.parameters_catalog[parameter].size or 1
-            query.extend([row]*width);components.extend(self.numeric_index[(parameter,j)] for j in range(width));ptr.append(len(query))
+        parameter=s['argument_parameter'][arguments]
+        widths=self._catalog_parameter_width[parameter]
+        ptr=torch.cat((widths.new_zeros(1),widths.cumsum(0)))
+        query=_owners(ptr)
+        components=(self._catalog_parameter_numeric_start[parameter[query]]
+            +torch.arange(len(query),device=query.device)-ptr[query])
         value=conditions.new_empty(0)
-        if query:
-            role=self.numeric_projection(F.one_hot(_ints(components,arguments),len(self.numeric_components)).float())
-            value=self.numeric_decoder(base[_ints(query,arguments)]+role).flatten()
-        numeric={'argument':arguments,'value':value,'ptr':_ints(ptr,arguments)}
+        if len(query):
+            role=self.numeric_projection(F.one_hot(components,len(self.numeric_components)).float())
+            value=self.numeric_decoder(base[query]+role).flatten()
+        numeric={'argument':arguments,'value':value,'ptr':ptr}
         arguments,base=self._parameter_conditions(conditions,s,selected['reference_set'])
-        optional=[];required=[];ptr=[0];required_ptr=[0];scores=[]
-        for row,i in enumerate(arguments.tolist()):
-            start,end=s['argument_domain_ptr'][i:i+2].tolist();domain=torch.arange(start,end,device=arguments.device)
-            mask=s['argument_domain_required'][start:end];chosen=domain[~mask]
-            optional.extend(chosen.tolist());required.extend(domain[mask].tolist());ptr.append(len(optional));required_ptr.append(len(required))
-            scores.append(self._reference_logits(latents,s,i,base[row],chosen,self.reference_set_scorer))
-        members={'argument':arguments,'logits':torch.cat(scores) if scores else conditions.new_empty(0),
-            'ptr':_ints(ptr,arguments),'domain_index':_ints(optional,arguments),
-            'required_ptr':_ints(required_ptr,arguments),'required_domain_index':_ints(required,arguments)}
+        # Flat current-domain ownership; required members remain routing-only.
+        domain_owner=_owners(s['argument_domain_ptr'])
+        lookup=arguments.new_full((len(s['argument_binding']),),-1)
+        lookup[arguments]=torch.arange(len(arguments),device=arguments.device)
+        owner=lookup[domain_owner];chosen=owner>=0
+        optional=torch.nonzero(chosen&~s['argument_domain_required'],as_tuple=False).flatten()
+        required=torch.nonzero(chosen&s['argument_domain_required'],as_tuple=False).flatten()
+        counts=arguments.new_zeros(len(arguments)).scatter_add_(0,owner[optional],torch.ones_like(optional))
+        required_counts=arguments.new_zeros(len(arguments)).scatter_add_(0,owner[required],torch.ones_like(required))
+        ptr=torch.cat((counts.new_zeros(1),counts.cumsum(0)))
+        required_ptr=torch.cat((counts.new_zeros(1),required_counts.cumsum(0)))
+        members={'argument':arguments,'logits':self._reference_scores(latents,s,arguments,base,optional,ptr,self.reference_set_scorer),
+            'ptr':ptr,'domain_index':optional,
+            'required_ptr':required_ptr,'required_domain_index':required}
         arguments,base=self._parameter_conditions(conditions,s,selected['reference'])
-        domain_indices=[];ptr=[0];scores=[]
-        for row,i in enumerate(arguments.tolist()):
-            start,end=s['argument_domain_ptr'][i:i+2].tolist();domain=torch.arange(start,end,device=arguments.device)
-            domain_indices.extend(domain.tolist());ptr.append(len(domain_indices))
-            if self.reference_scorer is None:raise ValueError('A catalog-bound reference cannot become an unbound prediction')
-            scores.append(self._reference_logits(latents,s,i,base[row],domain,self.reference_scorer))
-        references={'argument':arguments,'logits':torch.cat(scores) if scores else conditions.new_empty(0),
-            'ptr':_ints(ptr,arguments),'domain_index':_ints(domain_indices,arguments)}
+        lookup=arguments.new_full((len(s['argument_binding']),),-1)
+        lookup[arguments]=torch.arange(len(arguments),device=arguments.device)
+        owner=lookup[domain_owner]
+        domain_indices=torch.nonzero(owner>=0,as_tuple=False).flatten()
+        widths=s['argument_domain_ptr'][arguments+1]-s['argument_domain_ptr'][arguments]
+        ptr=torch.cat((widths.new_zeros(1),widths.cumsum(0)))
+        if len(arguments) and self.reference_scorer is None:raise ValueError('A catalog-bound reference cannot become an unbound prediction')
+        references={'argument':arguments,'logits':self._reference_scores(latents,s,arguments,base,domain_indices,ptr,self.reference_scorer),
+            'ptr':ptr,'domain_index':domain_indices}
         arguments,base=self._parameter_conditions(conditions,s,selected['boolean'])
         booleans={'argument':arguments,'logits':self.boolean_scorer(base).flatten() if len(arguments) else conditions.new_empty(0)}
         arguments,base=self._parameter_conditions(conditions,s,selected['category'])

@@ -1,0 +1,10 @@
+[
+  "scripts/smores_ep/tests/test_bc_live_smoke.py",
+  "scripts/smores_ep/tests/test_bc_runtime.py",
+  "scripts/smores_ep/tests/test_command_router.py",
+  "-q",
+  "-p",
+  "no:cacheprovider",
+  "--basetemp",
+  "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/audits/20261023T103641_695403Z_pre_marl_git_checkpoint/runtime_gate_recovery_work"
+]

@@ -1,0 +1,12 @@
+{
+  "checkpoint_metadata_evidence": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/audits/20261023T073725_980736Z_bc_v4_official_one_shot_test_evaluation/checkpoint_identity.json",
+  "epoch": 5,
+  "format": "ordinary Git binary, no LFS",
+  "global_step": 6120,
+  "no_checkpoint_deserialization_this_task": true,
+  "path": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/runs/20261022T232532_854802073Z_207309_bc_v4_actor_visible_r1m_scratch_final/best.pt",
+  "sha256": "d90a73e9b5ba2ecb579e4fc8733066b1c55d9e60dafeb1d71c029c49a7c21c6d",
+  "size": 17536215,
+  "size_MiB": 16.723837852478027,
+  "validation_objective": 0.06868529843473761
+}

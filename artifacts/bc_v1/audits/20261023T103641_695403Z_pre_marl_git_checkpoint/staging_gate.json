@@ -1,0 +1,13 @@
+{
+  "PASS": true,
+  "TEST_payload_access_this_task": 0,
+  "all_staged_blobs_match_worktree": true,
+  "best_sha256": "d90a73e9b5ba2ecb579e4fc8733066b1c55d9e60dafeb1d71c029c49a7c21c6d",
+  "last_staged": false,
+  "last_tracked": false,
+  "only_binary": [
+    "artifacts/bc_v1/runs/20261022T232532_854802073Z_207309_bc_v4_actor_visible_r1m_scratch_final/best.pt"
+  ],
+  "paths": 198,
+  "pre_existing_unrelated_files_staged": false
+}

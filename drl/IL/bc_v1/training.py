@@ -18,6 +18,7 @@ HEADS = {
     'arg_numeric': 'numeric_decoder', 'arg_reference': 'reference_scorer',
     'arg_reference_set': 'reference_set_scorer', 'arg_boolean': 'boolean_scorer',
     'scope': 'scope_scorer',
+    'no_structural': 'no_structural_scorer',
 }
 
 
@@ -63,16 +64,58 @@ def family_statistics(families):
 
 
 def _gradient_summary(named):
+    named = list(named)
     values = [(name, p.grad) for name, p in named if p.grad is not None]
     finite = all(bool(torch.isfinite(g).all()) for _, g in values)
     norms = [(name, float(g.detach().norm())) for name, g in values]
     name, norm = max(norms, key=lambda x: x[1], default=(None, 0.))
-    return {'finite': finite, 'nonzero': norm > 0., 'parameter': name, 'norm': norm}
+    return {'finite': finite, 'nonzero': norm > 0., 'parameter': name, 'norm': norm,
+            'grad_none': len(named)-len(values),
+            'grad_exact_zero': sum(not bool(torch.count_nonzero(g)) for _, g in values)}
+
+
+def _head_parameters(named, family):
+    prefix = 'action_heads.'+HEADS[family]+'.'
+    return [(n, p) for n, p in named if n.startswith(prefix) and p.requires_grad]
+
+
+def _head_outputs(prediction, family):
+    resource, structural = prediction['resource'], prediction['structural']
+    if family == 'resource_mode': return [resource.get('outcome_logits',resource['mode_logits'])]
+    if family == 'resource_payload': return [resource['payload']]
+    if family == 'structural_choice': return [structural['candidate_logits']]
+    if family == 'no_structural': return [structural['no_structural_logits']]
+    if family == 'scope': return [structural['scope']['logits']]
+    kind = {'arg_category': 'category', 'arg_numeric': 'numeric', 'arg_reference': 'reference',
+            'arg_reference_set': 'reference_set', 'arg_boolean': 'boolean'}[family]
+    return [structural['arguments'][kind]['value' if kind == 'numeric' else 'logits']]
+
+
+def _connected_stationary_head(loss, outputs, named):
+    """Certify exact stationarity at raw outputs AND a real path to this head.
+
+    In float32 BCE, sigmoid(z)-1 can be exactly zero for an already-correct
+    positive while the softplus loss is still positive. Singleton CE and exact
+    regression optima also have zero derivatives. No epsilon or loss rewrite:
+    a nonzero output derivative or an absent head path still fails the audit.
+    """
+    outputs = [v for v in outputs if v.requires_grad]
+    parameters = [p for _, p in named]
+    if not loss.requires_grad or not outputs or not parameters:
+        return False
+    derivatives = torch.autograd.grad(loss, outputs, retain_graph=True, allow_unused=True)
+    present = [g for g in derivatives if g is not None]
+    if not present or any(not bool(torch.isfinite(g).all()) or bool(torch.count_nonzero(g)) for g in present):
+        return False
+    paths = torch.autograd.grad(loss, parameters, retain_graph=True, allow_unused=True)
+    return any(g is not None for g in paths) and all(g is None or bool(torch.isfinite(g).all()) for g in paths)
 
 
 def _step_failure(stage, error, model, result, prediction=None, batch=None):
+    global_gradients = _gradient_summary(model.named_parameters())
     diagnostics = {**result, 'stage': stage, 'error': repr(error),
-        'gradients': _gradient_summary(model.named_parameters()),
+        'gradients': result.get('gradients', global_gradients),
+        'global_gradients': global_gradients,
         'nonfinite_gradient_parameters': [n for n, p in model.named_parameters()
             if p.grad is not None and not bool(torch.isfinite(p.grad).all())]}
     if stage == 'loss' and prediction is not None:
@@ -86,7 +129,8 @@ def _step_failure(stage, error, model, result, prediction=None, batch=None):
     return TrainingStepError(str(error), diagnostics)
 
 
-def train_step(model, batch, optimizer, loss_config, *, max_grad_norm=1., audit=False):
+def train_step(model, batch, optimizer, loss_config, *, max_grad_norm=1., audit=False,
+               loss_fn=None):
     model.train()
     optimizer.zero_grad(set_to_none=True)
     try:
@@ -94,7 +138,7 @@ def train_step(model, batch, optimizer, loss_config, *, max_grad_norm=1., audit=
     except (ValueError, RuntimeError) as exc:
         raise _step_failure('forward', exc, model, {}) from exc
     try:
-        total, families = compute_bc_loss(prediction, batch, loss_config)
+        total, families = (loss_fn or compute_bc_loss)(prediction, batch, loss_config)
     except (ValueError, RuntimeError) as exc:
         raise _step_failure('loss', exc, model, {}, prediction, batch) from exc
     result = {'total_loss': float(total.detach()), 'families': family_statistics(families),
@@ -102,18 +146,24 @@ def train_step(model, batch, optimizer, loss_config, *, max_grad_norm=1., audit=
     if not bool(torch.isfinite(total)):
         raise _step_failure('loss', ValueError('Nonfinite loss'), model, result, prediction, batch)
     try:
-        total.backward()
+        total.backward(retain_graph=audit)
     except (ValueError, RuntimeError) as exc:
         raise _step_failure('backward', exc, model, result) from exc
     if audit:
         named = list(model.named_parameters())
         gradients = {'h1': _gradient_summary([(n, p) for n, p in named if not n.startswith('action_heads.')])}
-        for family, stats in result['families'].items():
-            if stats['support']:
-                prefix = 'action_heads.'+HEADS[family]+'.'
-                gradients[family] = _gradient_summary([(n, p) for n, p in named if n.startswith(prefix)])
+        audited = [(f, f) for f, stats in result['families'].items() if stats['support']]
+        if 'no_structural_logits' in prediction['structural'] and result['families']['structural_choice']['support']:
+            audited.append(('no_structural', 'structural_choice'))
+        for head, family in audited:
+            parameters = _head_parameters(named, head)
+            summary = _gradient_summary(parameters)
+            if summary['finite'] and not summary['nonzero']:
+                if _connected_stationary_head(families[family]['weighted'], _head_outputs(prediction, head), parameters):
+                    summary['zero_gradient_reason'] = 'connected_zero_output_derivative'
+            gradients[head] = summary
         result['gradients'] = gradients
-        if not all(s['finite'] and s['nonzero'] for s in gradients.values()):
+        if not all(s['finite'] and (s['nonzero'] or 'zero_gradient_reason' in s) for s in gradients.values()):
             raise _step_failure('gradient', ValueError('Nonfinite or zero supported gradients'), model, result)
     try:
         norm = torch.nn.utils.clip_grad_norm_(model.parameters(), max_grad_norm, error_if_nonfinite=True)

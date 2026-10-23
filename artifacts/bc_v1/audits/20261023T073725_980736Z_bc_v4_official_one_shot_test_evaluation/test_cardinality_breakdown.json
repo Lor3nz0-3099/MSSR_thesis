@@ -1,0 +1,137 @@
+{
+  "1": {
+    "exact": 5,
+    "exact_set_rate": 0.005219206680584551,
+    "fn": 20,
+    "fp": 12923,
+    "mean_FN": 0.020876826722338204,
+    "mean_FP": 13.48956158663883,
+    "samples": 958
+  },
+  "10": {
+    "exact": 362,
+    "exact_set_rate": 0.5944170771756979,
+    "fn": 39,
+    "fp": 483,
+    "mean_FN": 0.06403940886699508,
+    "mean_FP": 0.7931034482758621,
+    "samples": 609
+  },
+  "11": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 0,
+    "fp": 81,
+    "mean_FN": 0.0,
+    "mean_FP": 5.4,
+    "samples": 15
+  },
+  "12": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 0,
+    "fp": 65,
+    "mean_FN": 0.0,
+    "mean_FP": 4.333333333333333,
+    "samples": 15
+  },
+  "13": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 0,
+    "fp": 27,
+    "mean_FN": 0.0,
+    "mean_FP": 3.0,
+    "samples": 9
+  },
+  "14": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 0,
+    "fp": 26,
+    "mean_FN": 0.0,
+    "mean_FP": 2.0,
+    "samples": 13
+  },
+  "15": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 0,
+    "fp": 21,
+    "mean_FN": 0.0,
+    "mean_FP": 1.0,
+    "samples": 21
+  },
+  "2": {
+    "exact": 252,
+    "exact_set_rate": 0.1694687289845326,
+    "fn": 19,
+    "fp": 14611,
+    "mean_FN": 0.012777404169468728,
+    "mean_FP": 9.825823806321452,
+    "samples": 1487
+  },
+  "3": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 3,
+    "fp": 130,
+    "mean_FN": 0.17647058823529413,
+    "mean_FP": 7.647058823529412,
+    "samples": 17
+  },
+  "4": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 0,
+    "fp": 36,
+    "mean_FN": 0.0,
+    "mean_FP": 7.2,
+    "samples": 5
+  },
+  "5": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 0,
+    "fp": 41,
+    "mean_FN": 0.0,
+    "mean_FP": 5.857142857142857,
+    "samples": 7
+  },
+  "6": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 0,
+    "fp": 87,
+    "mean_FN": 0.0,
+    "mean_FP": 5.117647058823529,
+    "samples": 17
+  },
+  "7": {
+    "exact": 0,
+    "exact_set_rate": 0.0,
+    "fn": 4,
+    "fp": 177,
+    "mean_FN": 0.08,
+    "mean_FP": 3.54,
+    "samples": 50
+  },
+  "8": {
+    "exact": 8311,
+    "exact_set_rate": 0.560985487681404,
+    "fn": 28,
+    "fp": 27141,
+    "mean_FN": 0.0018899763752953087,
+    "mean_FP": 1.8319946000674991,
+    "samples": 14815
+  },
+  "9": {
+    "exact": 9,
+    "exact_set_rate": 0.018072289156626505,
+    "fn": 38,
+    "fp": 1805,
+    "mean_FN": 0.07630522088353414,
+    "mean_FP": 3.6244979919678717,
+    "samples": 498
+  }
+}

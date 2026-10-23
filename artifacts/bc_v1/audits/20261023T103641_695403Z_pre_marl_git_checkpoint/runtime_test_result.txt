@@ -1,0 +1,25 @@
+
+==================================== ERRORS ====================================
+__________________ ERROR collecting tests/test_bc_runtime.py ___________________
+ImportError while importing test module '/home/lorenzo/MSSR_thesis/scripts/smores_ep/tests/test_bc_runtime.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+scripts/smores_ep/tests/test_bc_runtime.py:9: in <module>
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+E   ModuleNotFoundError: No module named 'smores_ep'
+________________ ERROR collecting tests/test_command_router.py _________________
+ImportError while importing test module '/home/lorenzo/MSSR_thesis/scripts/smores_ep/tests/test_command_router.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+/usr/lib/python3.10/importlib/__init__.py:126: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+scripts/smores_ep/tests/test_command_router.py:3: in <module>
+    from smores_ep.control.teleop import InternalMotionMode, SmoresCommand
+E   ModuleNotFoundError: No module named 'smores_ep'
+=========================== short test summary info ============================
+ERROR scripts/smores_ep/tests/test_bc_runtime.py
+ERROR scripts/smores_ep/tests/test_command_router.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!!
+2 errors in 1.39s

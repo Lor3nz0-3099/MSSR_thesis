@@ -178,7 +178,11 @@ def _target_tensors(resource_targets, structural_targets, indices, routing, inpu
     refs, ref_ptr, member_domain, member_value, member_valid = [],[0],[],[],[]
     scope_index, scope_value, scope_valid, scope_ptr = [], [], [], [0]
     st = inputs['structural']
-    arg_lookup = {(int(b),routing['argument_domains'][i].parameter.name):i for i,b in enumerate(st['argument_binding'])}
+    # Resource-only targets need the empty structural ABI, not its domain lookup.
+    # Read bindings in bulk to avoid creating a scalar Tensor view for every key.
+    arg_lookup = ({(int(b),routing['argument_domains'][i].parameter.name):i
+                   for i,b in enumerate(st['argument_binding'].tolist())}
+                  if structural_targets else {})
     for target in structural_targets:
         matches = [i for i,(a,b) in enumerate(routing['structural_bindings']) if a.action_id==target.operation_id
             and b.initiator==target.initiator and b.connectors==target.connectors]

@@ -1,0 +1,241 @@
+{
+  "INITIAL_RANDOM_VAL_REFERENCE": {
+    "families": {
+      "arg_boolean": {
+        "mean": 0.0,
+        "sum": 0.0,
+        "support": 0,
+        "weighted": 0.0
+      },
+      "arg_category": {
+        "mean": 1.382069921352454,
+        "sum": 233.56981670856476,
+        "support": 169,
+        "weighted": 1.382069921352454
+      },
+      "arg_numeric": {
+        "mean": 0.6096289426398774,
+        "sum": 3.6577736558392644,
+        "support": 6,
+        "weighted": 0.6096289426398774
+      },
+      "arg_reference": {
+        "mean": 0.0,
+        "sum": 0.0,
+        "support": 0,
+        "weighted": 0.0
+      },
+      "arg_reference_set": {
+        "mean": 2.618930220603943,
+        "sum": 15.713581323623657,
+        "support": 6,
+        "weighted": 2.618930220603943
+      },
+      "presence": {
+        "mean": 0.733897145231666,
+        "sum": 16704.966819763184,
+        "support": 22762,
+        "weighted": 0.733897145231666
+      },
+      "resource_payload": {
+        "mean": 0.691664617333736,
+        "sum": 110983.1211681366,
+        "support": 160458,
+        "weighted": 0.691664617333736
+      },
+      "scope": {
+        "mean": 0.32529524341225624,
+        "sum": 1.9517714604735374,
+        "support": 6,
+        "weighted": 0.32529524341225624
+      }
+    },
+    "metrics": {
+      "cardinality_absolute_error": 142.9534311571918,
+      "exact_match": 0.0,
+      "f1": 0.0897718182377588,
+      "false_negative": 180,
+      "false_negative_actions": 180,
+      "false_positive": 3254086,
+      "false_positive_actions": 3254086,
+      "jaccard": 0.08318352063136066,
+      "normalized_numeric": {
+        "arguments": {
+          "1": {
+            "mae": 1.0369565188884735,
+            "rmse": 1.1455297623309744,
+            "support": 6,
+            "tolerance": null,
+            "unit": "1",
+            "within_tolerance": null
+          }
+        },
+        "payload": {
+          "1": {
+            "mae": 1.0072276832983227,
+            "rmse": 1.3216379026083673,
+            "support": 266398,
+            "tolerance": null,
+            "unit": "1",
+            "within_tolerance": null
+          }
+        }
+      },
+      "normalized_payload_rmse": 1.3216379026083673,
+      "numeric": {},
+      "per_action": {
+        "align_faces": {
+          "f1": 7.927762230555182e-06,
+          "fn": 82,
+          "fp": 1009022,
+          "precision": 3.964218959670018e-06,
+          "recall": 0.046511627906976744,
+          "support": 86,
+          "tp": 4
+        },
+        "dock": {
+          "f1": 1.0894836501188627e-05,
+          "fn": 78,
+          "fp": 917778,
+          "precision": 5.4479108896111605e-06,
+          "recall": 0.060240963855421686,
+          "support": 83,
+          "tp": 5
+        },
+        "gravity_settle": {
+          "f1": 6.813110696016034e-05,
+          "fn": 0,
+          "fp": 176119,
+          "precision": 3.40667139815472e-05,
+          "recall": 1.0,
+          "support": 6,
+          "tp": 6
+        },
+        "pan_delta": {
+          "f1": 0.0,
+          "fn": 0,
+          "fp": 182096,
+          "precision": 0.0,
+          "recall": 0.0,
+          "support": 0,
+          "tp": 0
+        },
+        "pan_target": {
+          "f1": 0.0005161715446708033,
+          "fn": 0,
+          "fp": 182016,
+          "precision": 0.0002581523977963672,
+          "recall": 1.0,
+          "support": 47,
+          "tp": 47
+        },
+        "pan_velocity": {
+          "f1": 0.35064582163366603,
+          "fn": 0,
+          "fp": 143380,
+          "precision": 0.21259583067899743,
+          "recall": 1.0,
+          "support": 38712,
+          "tp": 38712
+        },
+        "tilt_delta": {
+          "f1": 0.0,
+          "fn": 0,
+          "fp": 182086,
+          "precision": 0.0,
+          "recall": 0.0,
+          "support": 0,
+          "tp": 0
+        },
+        "tilt_target": {
+          "f1": 0.15929847615678147,
+          "fn": 0,
+          "fp": 166337,
+          "precision": 0.08654226342149196,
+          "recall": 1.0,
+          "support": 15759,
+          "tp": 15759
+        },
+        "tilt_velocity": {
+          "f1": 0.0,
+          "fn": 0,
+          "fp": 182096,
+          "precision": 0.0,
+          "recall": 0.0,
+          "support": 0,
+          "tp": 0
+        },
+        "undock": {
+          "f1": 0.00021594191162577266,
+          "fn": 20,
+          "fp": 37019,
+          "precision": 0.00010804094751910974,
+          "recall": 0.16666666666666666,
+          "support": 24,
+          "tp": 4
+        },
+        "wheel_velocity": {
+          "f1": 0.7356510205994785,
+          "fn": 0,
+          "fp": 76137,
+          "precision": 0.5818417482713357,
+          "recall": 1.0,
+          "support": 105940,
+          "tp": 105940
+        }
+      },
+      "precision": 0.04699781494733001,
+      "predicted_cardinality": 150.0115543449609,
+      "predicted_cardinality_max": 1090,
+      "predicted_cardinality_mean": 150.0115543449609,
+      "predicted_cardinality_min": 51,
+      "recall": 0.9988796006398726,
+      "samples": 22762,
+      "set_exact_match": 0.0,
+      "set_f1": 0.0897718182377588,
+      "set_jaccard": 0.08318352063136066,
+      "set_precision": 0.04699781494733001,
+      "set_recall": 0.9988796006398726,
+      "target_cardinality": 7.058123187769088,
+      "target_cardinality_max": 15,
+      "target_cardinality_mean": 7.058123187769088,
+      "target_cardinality_min": 1,
+      "true_positive": 160477
+    },
+    "total_loss": 6.3614860905739326
+  },
+  "checkpoint_epoch": 5,
+  "metrics": {
+    "exact_match": {
+      "TEST": 0.48225075528700906,
+      "TEST_minus_VAL": -0.033213615154955634,
+      "VAL_best": 0.5154643704419647
+    },
+    "f1": {
+      "TEST": 0.8230016687845431,
+      "TEST_minus_VAL": 0.011869311645835712,
+      "VAL_best": 0.8111323571387073
+    },
+    "precision": {
+      "TEST": 0.6997875486867593,
+      "TEST_minus_VAL": 0.01723315603943787,
+      "VAL_best": 0.6825543926473214
+    },
+    "predicted_cardinality": {
+      "TEST": 10.360595597755719,
+      "TEST_minus_VAL": 0.02609072120708511,
+      "VAL_best": 10.334504876548634
+    },
+    "recall": {
+      "TEST": 0.9988776655443322,
+      "TEST_minus_VAL": -0.0005185636893768608,
+      "VAL_best": 0.9993962292337091
+    },
+    "total_loss": {
+      "TEST": 0.07753449015633553,
+      "TEST_minus_VAL": 0.008849191721597913,
+      "VAL_best": 0.06868529843473761
+    }
+  },
+  "not_a_random_TEST_baseline": true
+}

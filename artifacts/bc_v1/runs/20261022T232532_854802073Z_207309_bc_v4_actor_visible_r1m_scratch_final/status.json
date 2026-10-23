@@ -1,0 +1,14 @@
+{
+  "TEST_payload_access": 0,
+  "global_step": 15912,
+  "phase": "COMPLETE",
+  "selection": {
+    "best_epoch": 5,
+    "best_val": 0.06868529843473761,
+    "counter": 8,
+    "initial_val": 6.3614860905739326,
+    "last_epoch": 13,
+    "min_delta": 0.002,
+    "patience": 8
+  }
+}

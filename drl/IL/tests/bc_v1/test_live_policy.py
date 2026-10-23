@@ -73,7 +73,7 @@ def test_missing_physical_goal_cannot_use_nominal_waypoint_as_fallback():
 def test_frozen_loader_rejects_wrong_checkpoint_before_deserializing(tmp_path):
     a=api();bad=tmp_path/'bad.pt';bad.write_bytes(b'not the frozen checkpoint')
     with pytest.raises(ValueError,match='checkpoint SHA'):
-        a.load_frozen_policy(ROOT,bad,builder(),device='cpu')
+        a.load_frozen_policy(ROOT,bad,builder(),device='cpu',expected_checkpoint_sha256='0'*64)
 
 
 def test_runtime_pair_serialization_preserves_ordered_connectors_and_scope_members():

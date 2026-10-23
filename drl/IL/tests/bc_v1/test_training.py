@@ -106,7 +106,8 @@ def test_only_inputs_enter_forward_and_device_move_preserves_routing():
     assert moved['inputs']['structural']['initiator'].dtype == torch.int64
 
 
-def test_nonfinite_gradients_fail_before_optimizer_update():
+@pytest.mark.parametrize('audit', [False, True])
+def test_nonfinite_gradients_fail_before_optimizer_update(audit):
     mod = api()
     model, batch, _ = case()
     before = copy.deepcopy(model.state_dict())
@@ -114,11 +115,141 @@ def test_nonfinite_gradients_fail_before_optimizer_update():
     hook = next(model.parameters()).register_hook(lambda grad: grad*float('inf'))
     try:
         with pytest.raises((ValueError, RuntimeError), match='finite'):
-            mod.train_step(model, batch, optimizer, loss_config())
+            mod.train_step(model, batch, optimizer, loss_config(), audit=audit)
     finally:
         hook.remove()
     equal_trees(before, model.state_dict())
     assert not optimizer.state
+
+
+def test_step_failure_preserves_per_family_gradient_evidence():
+    mod = api()
+    model = torch.nn.Linear(1, 1)
+    model(torch.ones(1, 1)).sum().backward()
+    families = {'h1': {'finite': True, 'nonzero': True, 'norm': 1.},
+                'scope': {'finite': True, 'nonzero': False, 'norm': 0.}}
+    result = {'gradients': families, 'optimizer_step_completed': False}
+    failure = mod._step_failure('gradient', ValueError('zero scope'), model, result)
+    assert failure.diagnostics['gradients'] == families
+    assert failure.diagnostics['global_gradients']['finite']
+    assert failure.diagnostics['global_gradients']['nonzero']
+    assert result['gradients'] == families
+
+
+def saturated_membership_case():
+    from dataclasses import replace
+    sample, kw = fixture(3, 0)
+    sample = with_structural(sample, skill=True)
+    members = tuple(m.ref for m in sample.inputs.policy.graph.modules)
+    targets = tuple(replace(t, participants=members, parameters=tuple(
+        replace(a, value=members) if a.name == 'members' else a for a in t.parameters))
+        for t in sample.supervision.structural_targets)
+    sample = replace(sample, supervision=replace(sample.supervision, structural_targets=targets))
+    model = complete_model(kw)
+    with torch.no_grad():
+        for scorer in (model.action_heads.reference_set_scorer, model.action_heads.scope_scorer):
+            scorer[-1].weight.zero_()
+            scorer[-1].bias.fill_(21.)
+    return model, tensorize(sample, kw)
+
+
+def test_audit_accepts_connected_exact_zero_output_derivatives():
+    mod = api()
+    model, batch = saturated_membership_case()
+    result = mod.train_step(model, batch, mod.build_optimizer(model), loss_config(), audit=True)
+    assert result['optimizer_step_completed'] and result['grad_norm_before_clip'] > 0
+    for family in ('arg_reference_set', 'scope', 'structural_choice'):
+        assert result['families'][family]['support'] > 0
+        evidence = result['gradients'][family]
+        assert evidence['finite'] and not evidence['nonzero']
+        assert evidence['zero_gradient_reason'] == 'connected_zero_output_derivative'
+
+
+@pytest.mark.parametrize('saturated', [False, True])
+def test_audit_rejects_detached_supported_head_even_when_saturated(saturated):
+    mod = api()
+    model, batch = saturated_membership_case() if saturated else case()[:2]
+    scorer = model.action_heads.reference_set_scorer if saturated else model.action_heads.argument_category_scorer
+    # Bulk scoring invokes the constituent layers directly to preserve the
+    # legacy dropout calls. Detach the actual final projection in both paths.
+    hook = scorer[-1].register_forward_hook(lambda module, args, output: output.detach().requires_grad_(True))
+    optimizer = mod.build_optimizer(model)
+    try:
+        with pytest.raises(mod.TrainingStepError, match='gradient'):
+            mod.train_step(model, batch, optimizer, loss_config(), audit=True)
+    finally:
+        hook.remove()
+    assert not optimizer.state
+
+
+def test_audit_rejects_zero_informative_head_and_disconnected_h1():
+    mod = api()
+    for part in ('head', 'h1'):
+        model, batch, _ = case()
+        parameters = (model.action_heads.argument_category_scorer.parameters() if part == 'head' else
+                      (p for n, p in model.named_parameters() if not n.startswith('action_heads.')))
+        hooks = [p.register_hook(torch.zeros_like) for p in parameters]
+        optimizer = mod.build_optimizer(model)
+        try:
+            with pytest.raises(mod.TrainingStepError, match='gradient'):
+                mod.train_step(model, batch, optimizer, loss_config(), audit=True)
+        finally:
+            for hook in hooks:
+                hook.remove()
+        assert not optimizer.state
+
+
+@pytest.mark.parametrize('head', ['no_structural_scorer', 'structural_scorer'])
+def test_joint_structural_heads_cannot_hide_each_others_disconnect(head):
+    from drl.IL.tests.bc_v1.test_no_structural import sample, v2_model
+    from drl.IL.bc_v1.structural_decisions import add_no_structural_supervision
+    mod = api()
+    batch, kw = sample(positive=(2,))
+    batch = add_no_structural_supervision(batch)
+    model = v2_model(kw)
+    hook = getattr(model.action_heads, head).register_forward_hook(
+        lambda module, args, output: output.detach().requires_grad_(True))
+    optimizer = mod.build_optimizer(model)
+    try:
+        with pytest.raises(mod.TrainingStepError, match='gradient'):
+            mod.train_step(model, batch, optimizer, loss_config(), audit=True)
+    finally:
+        hook.remove()
+    assert not optimizer.state
+
+
+def test_zero_global_gradient_is_always_fatal():
+    mod = api()
+    model, batch, _ = case()
+    config = loss_config()
+    config['weights'] = dict.fromkeys(config['weights'], 0.)
+    optimizer = mod.build_optimizer(model)
+    with pytest.raises(mod.TrainingStepError, match='zero global gradient'):
+        mod.train_step(model, batch, optimizer, config)
+    assert not optimizer.state
+
+
+@pytest.mark.skipif(__import__('os').environ.get('MSSR_K2_REAL_TRAIN_SMOKE') != '1',
+                    reason='Explicit opt-in for one real TRAIN batch; TEST stays sealed')
+def test_k2_real_first_batch_completes_optimizer_step():
+    from drl.IL.bc_v1.k2_no_structural import components, load_config
+    from drl.IL.bc_v1.trainer import open_dataset
+    from drl.IL.bc_v1.sampling import JointActionBatchSampler
+    from drl.IL.bc_v1.batching import collate_policy_samples
+    cfg = load_config()
+    model, optimizer, loss, _, _, cache, doc, initialized, _ = components(cfg)
+    with open_dataset(cache, 'train', doc['identity']) as data:
+        indices = next(iter(JointActionBatchSampler(data.train_index(), batch_size=64,
+            ordinary_quota=48, structural_quota=16, seed=cfg['seed'])))
+        assert indices[:8] == [64854, 10658, 37563, 37839, 66823, 25839, 73274, 30565]
+        batch = api().move_batch_to_device(collate_policy_samples([data[i] for i in indices]), cfg['device'])
+        result = api().train_step(model, batch, optimizer, loss, audit=True)
+    assert initialized['reused_tensors'] == 264
+    assert len(initialized['new_parameters']) == 4
+    assert all('no_structural_scorer' in key for key in initialized['new_parameters'])
+    assert result['optimizer_step_completed'] and optimizer.state
+    for family in ('scope', 'arg_reference_set'):
+        assert result['gradients'][family]['zero_gradient_reason'] == 'connected_zero_output_derivative'
 
 
 def checkpoint_case(tmp_path, device='cpu'):

@@ -8,8 +8,22 @@ import torch
 from drl.IL.bc_v1.training import move_batch_to_device
 from drl.IL.tests.bc_v1.test_action_heads_bulk import example, ScalarReads
 from drl.IL.tests.bc_v1.test_action_heads import reroute_structural
-from drl.IL.tests.bc_v1.test_model import model_for, equal_trees
+from drl.IL.tests.bc_v1.test_model import model_for
 from drl.IL.tests.bc_v1.h2_scope_routing_reference import PreP1bRouting
+
+
+def equal_trees(first, second):
+    """Bulk GEMM changes FP32 reduction order; routing remains bit-exact.
+
+    This is the same explicit tolerance as the real-batch forward/gradient
+    oracle, not a weakening of integer domains, masks or shapes.
+    """
+    if isinstance(first,dict):
+        assert first.keys()==second.keys()
+        for key in first:equal_trees(first[key],second[key])
+    elif first.is_floating_point():
+        torch.testing.assert_close(first,second,rtol=2e-5,atol=2e-6)
+    else:assert torch.equal(first,second)
 
 
 @pytest.fixture(autouse=True, scope='module')

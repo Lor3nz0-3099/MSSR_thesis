@@ -1,0 +1,2 @@
+action	path	reason
+IGNORE_POLICY	artifacts/bc_v1/	Generated and historical files local-only; exact release exceptions force-added

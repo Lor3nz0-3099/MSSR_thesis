@@ -124,9 +124,17 @@ def ensure_finite_parameters(model):
             raise ValueError('Nonfinite model parameters')
 
 
-@torch.no_grad()
+def _detached_cpu(value):
+    """One bulk transfer of raw predictions for scalar-heavy offline consumers."""
+    if isinstance(value, torch.Tensor):
+        return value.detach().cpu()
+    return {k: _detached_cpu(v) for k, v in value.items()}
+
+
+@torch.inference_mode()
 def evaluate_validation(model, data, loss_config, metrics, *, device, batch_size=64,
-                        collate=collate_policy_samples, max_batches=None):
+                        collate=collate_policy_samples, max_batches=None,
+                        epoch=None, log_interval=50, progress=None, loss_fn=None):
     if data.split != 'validation':
         raise ValueError('K1 evaluation requires validation; TEST forbidden')
     previous = model.training
@@ -134,20 +142,43 @@ def evaluate_validation(model, data, loss_config, metrics, *, device, batch_size
     metrics.reset()
     start = time.perf_counter()
     samples = batches = 0
+    total_batches = math.ceil(len(data)/batch_size)
+    if max_batches is not None:
+        total_batches = min(total_batches, max_batches)
     try:
         model.eval()
         for indices in validation_batches(len(data), batch_size):
             if max_batches is not None and batches >= max_batches:
                 break  # Isolated smoke only. Official runner never supplies this.
-            batch = move_batch_to_device(collate([data[i] for i in indices]), device)
+            reader = getattr(data, 'get_for_collate', data.__getitem__)
+            host_batch = collate([reader(i) for i in indices])
+            batch = move_batch_to_device(host_batch, device)
             prediction = model(batch['inputs'])
-            total, families = compute_bc_loss(prediction, batch, loss_config)
+            # I1/I2 use many small routed decisions and Python scalar checks.
+            # On CUDA those checks serialize thousands of transfers per batch.
+            # Keep the GPU forward unchanged; consume its float32 outputs once
+            # on CPU with the original CPU targets and identical I1/I2 functions.
+            if torch.device(device).type != 'cpu':
+                prediction = _detached_cpu(prediction)
+                batch = host_batch
+            total, families = (loss_fn or compute_bc_loss)(prediction, batch, loss_config)
             if not bool(torch.isfinite(total)):
                 raise ValueError('Nonfinite VAL loss')
             accumulator.add(family_statistics(families))
             metrics.update(prediction, batch)
             samples += len(indices)
             batches += 1
+            if (epoch is not None or progress is not None) and (batches == 1 or batches % log_interval == 0 or batches == total_batches):
+                elapsed = time.perf_counter()-start
+                rate = samples/elapsed
+                event = {'epoch': epoch, 'batch': batches, 'total_batches': total_batches,
+                    'samples': samples, 'loss': accumulator.compute()['total_loss'],
+                    'samples_per_second': rate,
+                    'eta_seconds': max(0, total_batches-batches)*elapsed/batches}
+                if progress is not None:
+                    progress(event)
+                print(f'VAL epoch {epoch} batch {batches}/{total_batches} loss {event["loss"]:.6f} '
+                      f'samples/s {rate:.2f} ETA {event["eta_seconds"]/60:.1f} min', flush=True)
         return {**accumulator.compute(), 'metrics': metrics.compute(), 'samples': samples,
                 'batches': batches, 'wall_seconds': time.perf_counter()-start}
     finally:
@@ -155,7 +186,8 @@ def evaluate_validation(model, data, loss_config, metrics, *, device, batch_size
 
 
 def train_epoch(model, data, sampler, optimizer, loss_config, *, device, epoch,
-                global_step=0, gradient_clip=1., log_interval=50, max_steps=None, progress=None):
+                global_step=0, gradient_clip=1., log_interval=50, max_steps=None, progress=None,
+                loss_fn=None, collate=None):
     if data.split != 'train':
         raise ValueError('K1 optimizer steps require TRAIN')
     accumulator = FamilyAccumulator(loss_config['weights'])
@@ -165,11 +197,12 @@ def train_epoch(model, data, sampler, optimizer, loss_config, *, device, epoch,
     model.train()
     for step, indices in enumerate(sampler, 1):
         t = time.perf_counter()
-        batch = move_batch_to_device(collate_policy_samples([data[i] for i in indices]), device)
+        reader = getattr(data, 'get_for_collate', data.__getitem__)
+        batch = move_batch_to_device((collate or collate_policy_samples)([reader(i) for i in indices]), device)
         loader_times.append(time.perf_counter()-t)
         t = time.perf_counter()
         result = train_step(model, batch, optimizer, loss_config, max_grad_norm=gradient_clip,
-                            audit=global_step == 0 and step == 1)
+                            audit=global_step == 0 and step == 1, loss_fn=loss_fn)
         ensure_finite_parameters(model)
         if not result['optimizer_step_completed']:
             raise ValueError('Optimizer step incomplete')
@@ -185,7 +218,7 @@ def train_epoch(model, data, sampler, optimizer, loss_config, *, device, epoch,
             first_audit = result
         if progress and (step == 1 or step % log_interval == 0 or step == len(sampler)):
             progress(global_step+step, result['total_loss'])
-        if step % log_interval == 0:
+        if step == 1 or step % log_interval == 0 or step == len(sampler):
             elapsed = time.perf_counter()-start
             print(f'epoch {epoch} step {step}/{len(sampler)} loss {result["total_loss"]:.6f} '
                   f'grad_norm {norms[-1]:.4f} lr {optimizer.param_groups[0]["lr"]:g} '

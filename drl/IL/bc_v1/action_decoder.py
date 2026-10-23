@@ -237,12 +237,15 @@ def decode_actions(prediction, inputs, routing, *, spec, normalizers,
                    availability: tuple[DispatchAvailability, ...],
                    execution_semantics: Mapping[str, ExecutionSemantics],
                    configured_arguments: Mapping[tuple[str, str], object],
-                   claim_resolver: Callable[[ActionChoice], tuple[Claim, ...]]):
+                   claim_resolver: Callable[[ActionChoice], tuple[Claim, ...]],
+                   resource_contract=None,inactive_sink=None,decode_policy=None):
     """Decode proposals only. Does not query policy, dispatch, or update leases.
 
     Availability has one entry per sample, in G2 order. Its two masks have
     lengths equal to that sample's resource candidates and structural bindings.
     claim_resolver is a backend/runtime contract; missing claims fail closed.
+    decode_policy is an optional, separately identified v3 compatibility policy;
+    omission replays archived contract rules. It never replaces routing identity.
     It must resolve ALL resources affected (including helpers and connectors),
     and may validate the backend-specific ActionChoice. No generic claim
     inference from PAN/TILT names or fixed connector/module counts occurs.
@@ -315,6 +318,12 @@ def decode_actions(prediction, inputs, routing, *, spec, normalizers,
         if len(none_scores)!=len(sp)-1:raise ValueError('Invalid NO_STRUCTURAL groups')
     args = _Arguments(prediction['structural'], structural, flat['module_refs'], flat['connector_refs'], flat['argument_domains'], normalizers)
     bindings = {(b.module_type_id, b.resource_id, b.mode_id): b for b in normalizers.resource_bindings}
+    selection=None
+    if 'outcome_logits' in p:
+        if resource_contract is None:raise ValueError('Resource v3 requires explicit contract')
+        from .resource_decoder import resolve_resource_outcomes
+        selection,_=resolve_resource_outcomes(prediction,inputs,routing,contract=resource_contract,normalizers=normalizers,availability=availability,claim_resolver=claim_resolver,decode_policy=decode_policy)
+    elif resource_contract is not None or decode_policy is not None or 'outcome_ptr' in res:raise ValueError('Resource head/schema mismatch')
     out = []; resource_offset = structural_offset = module_offset = candidate_offset = connector_offset = 0
     for sample_index, (route, av) in enumerate(zip(samples, availability)):
         if len(av.resource_mask) != len(route['resource_candidates']) or len(av.structural_mask) != len(route['structural_bindings']):
@@ -336,7 +345,17 @@ def decode_actions(prediction, inputs, routing, *, spec, normalizers,
         for local, ref in enumerate(route['resource_refs']):
             lo, hi = rp[resource_offset+local:resource_offset+local+2]
             options = [i for i in range(lo, hi) if av.resource_mask[i-candidate_offset]]
-            if not av.free((ref,)) or not options: continue
+            if not av.free((ref,)) or (not options and selection is None): continue
+            if selection is not None:
+                result=selection.get(resource_offset+local)
+                if result is None:continue
+                outcome,selected,payload=result
+                if int(res['outcome_kind'][outcome])==0:
+                    if inactive_sink is not None:inactive_sink(sample_index,ref)
+                    continue
+                row=rrows[selected];mode=row.mode
+                append(ActionChoice(row.action.action_id,ref.module,resource=ref,payload=payload),selected)
+                continue
             selected = options[_choose(options, [score_map.get(i, 0.) for i in options])]
             row = rrows[selected]; mode = row.mode
             if mode.codec == 'categorical':

@@ -202,3 +202,41 @@ def test_disjoint_native_resource_proposal_runs_in_parallel_without_replacing_ol
     request(b,goals=[target('m1','bc:session:1')]);old=executor.active_goals[0].goal_id
     request(b,goals=[target('m2','bc:session:2')])
     assert len(executor.active_goals)==2 and old in [g.goal_id for g in executor.active_goals]
+
+
+@pytest.mark.parametrize('pan_rate',[2.,0.])
+def test_owner_accepts_pan_and_wheel_bc_leases_on_same_module(tmp_path,pan_rate):
+    from smores_ep.control.teleop import InternalMotionMode
+    b,t,c,e=armed(tmp_path)
+    pan=row();pan['payload']['parameters']['rate_rad_s']=pan_rate
+    wheel=dict(key=['m1','locomotion'],generation='bc:session:2',source_stamp=1.,
+        payload={'command':'wheel_velocity','module_ids':['m1'],
+                 'parameters':{'left_rad_s':2.,'right_rad_s':2.}})
+    request(b,rows=[pan,wheel])
+    assert b.armed and b.failure is None
+    commands=b.filter_commands(c.commands(t.now))
+    command=commands['m1']
+    assert command.linear_x_m_s==pytest.approx(.063)
+    assert command.pan_velocity_rad_s==pan_rate
+    assert command.internal_motion is (InternalMotionMode.PAN_VELOCITY if pan_rate else InternalMotionMode.HOLD)
+    assert set(b._held)=={('m1','internal_motion'),('m1','locomotion')}
+    assert not e.active_goals and not b.rejections
+
+
+def test_native_pan_then_tilt_still_rejected_as_resource_busy(tmp_path):
+    b,t,c,e=armed(tmp_path)
+    def goal(name):
+        return PrimitiveGoal.from_dict(dict(goal_id=name,primitive=name,module_ids=['m1'],parameters={'angle_rad':.2}))
+    assert e.submit(goal('set_pan'),1.).state is PrimitiveState.ACCEPTED
+    rejected=e.submit(goal('set_tilt'),1.)
+    assert rejected.code=='RESOURCE_BUSY' and len(e.active_goals)==1
+
+
+def test_native_locomotion_still_blocks_new_pan_bc(tmp_path):
+    b,t,c,e=armed(tmp_path)
+    goal=PrimitiveGoal.from_dict(dict(goal_id='drive-owner',primitive='drive_to_pose',module_ids=['m1'],
+        parameters={'x_m':1.,'y_m':0.,'yaw_rad':0.}))
+    assert e.submit(goal,1.).state is PrimitiveState.ACCEPTED
+    request(b,rows=[row()])
+    assert b.armed and b.rejections and not c.commands(t.now)
+    assert len(e.active_goals)==1 and e.active_goals[0].goal_id=='drive-owner'

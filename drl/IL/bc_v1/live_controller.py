@@ -45,6 +45,26 @@ class RuntimeCommand:
 
 
 @dataclass(frozen=True)
+class RuntimeDecision:
+    """BC-only withdrawal keys, separate from physical/native commands."""
+    commands: tuple[RuntimeCommand,...]
+    withdrawals: tuple[tuple[str,str],...] = ()
+
+    def __iter__(self):
+        # Existing proposal safety wrappers inspect physical commands; returning
+        # this object unchanged retains explicit withdrawals for the controller.
+        return iter(self.commands)
+
+    def __post_init__(self):
+        if (not isinstance(self.commands,tuple) or any(not isinstance(c,RuntimeCommand) for c in self.commands)
+                or not isinstance(self.withdrawals,tuple) or any(not isinstance(k,tuple) or len(k)!=2
+                    or any(not isinstance(v,str) or not v for v in k) for k in self.withdrawals)
+                or len(set(self.withdrawals))!=len(self.withdrawals)
+                or set(self.withdrawals).intersection(c.key for c in self.commands)):
+            raise ValueError('Invalid/conflicting resource withdrawal')
+
+
+@dataclass(frozen=True)
 class HeldCommand:
     command: RuntimeCommand
     generation: str
@@ -128,6 +148,13 @@ class LiveController:
                 if now-started >= 1. or source.epoch != self.epoch:
                     self.fail('stale inference result'); return
                 goals = []; busy = set(feedback.get('busy', ()))
+                if isinstance(commands,RuntimeDecision):
+                    for key in commands.withdrawals:
+                        old=self.held.get(key)
+                        if old is not None and old.command.continuous and not busy.intersection(old.command.claims):
+                            self.held.pop(key);dirty=True
+                            self._event('bc_resource_withdrawn',key=key,generation=old.generation)
+                    commands=commands.commands
                 for command in commands:
                     if not isinstance(command, RuntimeCommand): raise ValueError('Invalid runtime proposal')
                     require_finite(command.payload)

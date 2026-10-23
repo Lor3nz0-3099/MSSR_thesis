@@ -1,0 +1,509 @@
+{
+  "TEST_payload_access": 0,
+  "candidates_preserved": true,
+  "fingerprint": "e6b819c2e23e1713f70649d83b547d7701d78ef8c0ec7a21668c803c7c8f6234",
+  "goal_provider_identity": "411ad902fcb13c6c7866b3b4382dd57f863d1c6ca2dc617208c3149a3141b6a0",
+  "manifest_fingerprint": "d80b0774ed1793dedfa101cbaa82e45b7cb460384bfdd36a4291a592e9d97a3f",
+  "normalizer_context": {
+    "TEST_payload_access": 0,
+    "TRAIN_only": true,
+    "actor_input_schema": "mssr.bc_v1.actor_inputs.v1",
+    "actor_visibility": {
+      "attribute_rules": [
+        {
+          "names": [
+            "gap.width_m",
+            "gap.bank_width_m",
+            "gap.bank_thickness_m",
+            "gap.crossing_direction_world_xy"
+          ],
+          "object_refs": [],
+          "object_types": [
+            "gap_boundary"
+          ]
+        },
+        {
+          "names": [
+            "gap.landing_length_m"
+          ],
+          "object_refs": [
+            "gap.far_edge"
+          ],
+          "object_types": []
+        },
+        {
+          "names": [
+            "stairs.rise_m",
+            "stairs.riser_depth_m",
+            "stairs.tread_depth_m",
+            "stairs.width_m",
+            "stairs.ascent_direction_world_xy"
+          ],
+          "object_refs": [],
+          "object_types": [
+            "stair_riser"
+          ]
+        },
+        {
+          "names": [
+            "cones.cone_radius_m",
+            "cones.cone_height_m"
+          ],
+          "object_refs": [],
+          "object_types": [
+            "cone"
+          ]
+        }
+      ],
+      "critic_only": [
+        "task_frame.origin_xyz_m",
+        "task_frame.yaw_rad",
+        "environment.floor_height_m",
+        "environment.upper_deck_height_m",
+        "environment.platform_bounds_xy_m",
+        "environment.clear_landing_length_m",
+        "stairs.step_count",
+        "button.plunger_depth_m",
+        "button.plunger_stroke_m",
+        "cones.corridor_width_m"
+      ],
+      "empirical_reference_mean_m": 0.47550612841561374,
+      "goal_policy": "certified_current_assigned_physical_goal_exempt",
+      "local_compound_parts": [
+        "stairs.top_heights_m",
+        "stairs.top_heights_world_m"
+      ],
+      "prefer_dynamic_object_types": [
+        "button"
+      ],
+      "radius_m": 1.0,
+      "radius_selection": "user design decision: approximately 0.8 m robot span; not the empirical mean",
+      "revision": "r1m-team-union-1",
+      "schema_version": "mssr.bc_v1.actor_visibility.v1",
+      "scope": "team_union_wireless",
+      "threshold": "<="
+    },
+    "actor_visibility_fingerprint": "e6b819c2e23e1713f70649d83b547d7701d78ef8c0ec7a21668c803c7c8f6234",
+    "expected_metadata": {
+      "actor_input_schema": "mssr.bc_v1.actor_inputs.v1",
+      "actor_visibility_fingerprint": "e6b819c2e23e1713f70649d83b547d7701d78ef8c0ec7a21668c803c7c8f6234",
+      "complete_train_coverage": true,
+      "dataset_identity_fingerprint": "b09313e4c5a930cf1608a6a4bbd1425700f7e459c10b37141eeacce56ef08bde",
+      "dataset_manifest_sha256": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+      "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+      "goal_provider_identity": "411ad902fcb13c6c7866b3b4382dd57f863d1c6ca2dc617208c3149a3141b6a0",
+      "moments": "exact_streaming_population_ddof_0",
+      "policy_fingerprint": "366b9b0dfe838208462e0b99c634f0cf844c8ba15959f1bcf62b3a363261fd91",
+      "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+      "sample_counts": [
+        [
+          "expert:assembly:seed-006307",
+          19
+        ],
+        [
+          "expert:gap:seed-004100",
+          254
+        ],
+        [
+          "expert:gap:seed-004102",
+          244
+        ],
+        [
+          "expert:gap:seed-004103",
+          272
+        ],
+        [
+          "expert:gap:seed-004105",
+          270
+        ],
+        [
+          "expert:gap:seed-004106",
+          258
+        ],
+        [
+          "expert:gap:seed-004108",
+          251
+        ],
+        [
+          "expert:gap:seed-004111",
+          255
+        ],
+        [
+          "expert:gap:seed-004303",
+          237
+        ],
+        [
+          "expert:gap:seed-005998",
+          244
+        ],
+        [
+          "expert:gap:seed-006911",
+          264
+        ],
+        [
+          "expert:gap:seed-007564",
+          252
+        ],
+        [
+          "expert:gap:seed-012398",
+          239
+        ],
+        [
+          "expert:rc_car:seed-005100",
+          381
+        ],
+        [
+          "expert:rc_car:seed-005101",
+          237
+        ],
+        [
+          "expert:rc_car:seed-005102",
+          617
+        ],
+        [
+          "expert:rc_car:seed-005103",
+          231
+        ],
+        [
+          "expert:rc_car:seed-005104",
+          294
+        ],
+        [
+          "expert:rc_car:seed-006001",
+          311
+        ],
+        [
+          "expert:rc_car:seed-006017",
+          269
+        ],
+        [
+          "expert:rc_car:seed-006053",
+          289
+        ],
+        [
+          "expert:rc_car:seed-006056",
+          255
+        ],
+        [
+          "expert:stairs:seed-003102",
+          326
+        ],
+        [
+          "expert:stairs:seed-003104",
+          425
+        ],
+        [
+          "expert:stairs:seed-003105",
+          1489
+        ],
+        [
+          "expert:stairs:seed-003107",
+          453
+        ],
+        [
+          "expert:stairs:seed-003108",
+          373
+        ],
+        [
+          "expert:stairs:seed-003109",
+          441
+        ],
+        [
+          "expert:stairs:seed-003110",
+          317
+        ],
+        [
+          "expert:stairs:seed-003292",
+          439
+        ],
+        [
+          "expert:stairs:seed-004007",
+          188
+        ],
+        [
+          "expert:stairs:seed-004047",
+          378
+        ],
+        [
+          "expert:stairs:seed-006403",
+          736
+        ],
+        [
+          "expert:stairs:seed-006922",
+          449
+        ],
+        [
+          "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+          7770
+        ],
+        [
+          "teleop-1f8b406b56f74377834cd863ebccf696",
+          823
+        ],
+        [
+          "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+          5745
+        ],
+        [
+          "teleop-5bb5a4712d924617aab5604b6deb20b4",
+          5504
+        ],
+        [
+          "teleop-5e0c4d97db80492bbb561b16ef132949",
+          9725
+        ],
+        [
+          "teleop-69b37b8db7e141339518d4eef585e4bd",
+          6789
+        ],
+        [
+          "teleop-8b55584534d24c86888b350e09c74e7b",
+          887
+        ],
+        [
+          "teleop-952c36750c624fb19de8421019325d13",
+          7751
+        ],
+        [
+          "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+          5797
+        ],
+        [
+          "teleop-adcf33433f954669838220b9f617d952",
+          7018
+        ],
+        [
+          "teleop-beaa63ebe5f347c6abc58baff9d1394a",
+          792
+        ],
+        [
+          "teleop-c78e0455357147369ad16bc1bf39a0c2",
+          1060
+        ],
+        [
+          "teleop-dd6bf8b9926d4a2aab6af7572646d026",
+          575
+        ],
+        [
+          "teleop-edbefc66cecf40c180864b452aff8dab",
+          984
+        ],
+        [
+          "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+          5125
+        ]
+      ],
+      "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+      "train_episode_count": 49,
+      "train_episode_ids": [
+        "expert:assembly:seed-006307",
+        "expert:gap:seed-004100",
+        "expert:gap:seed-004102",
+        "expert:gap:seed-004103",
+        "expert:gap:seed-004105",
+        "expert:gap:seed-004106",
+        "expert:gap:seed-004108",
+        "expert:gap:seed-004111",
+        "expert:gap:seed-004303",
+        "expert:gap:seed-005998",
+        "expert:gap:seed-006911",
+        "expert:gap:seed-007564",
+        "expert:gap:seed-012398",
+        "expert:rc_car:seed-005100",
+        "expert:rc_car:seed-005101",
+        "expert:rc_car:seed-005102",
+        "expert:rc_car:seed-005103",
+        "expert:rc_car:seed-005104",
+        "expert:rc_car:seed-006001",
+        "expert:rc_car:seed-006017",
+        "expert:rc_car:seed-006053",
+        "expert:rc_car:seed-006056",
+        "expert:stairs:seed-003102",
+        "expert:stairs:seed-003104",
+        "expert:stairs:seed-003105",
+        "expert:stairs:seed-003107",
+        "expert:stairs:seed-003108",
+        "expert:stairs:seed-003109",
+        "expert:stairs:seed-003110",
+        "expert:stairs:seed-003292",
+        "expert:stairs:seed-004007",
+        "expert:stairs:seed-004047",
+        "expert:stairs:seed-006403",
+        "expert:stairs:seed-006922",
+        "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+        "teleop-1f8b406b56f74377834cd863ebccf696",
+        "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+        "teleop-5bb5a4712d924617aab5604b6deb20b4",
+        "teleop-5e0c4d97db80492bbb561b16ef132949",
+        "teleop-69b37b8db7e141339518d4eef585e4bd",
+        "teleop-8b55584534d24c86888b350e09c74e7b",
+        "teleop-952c36750c624fb19de8421019325d13",
+        "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+        "teleop-adcf33433f954669838220b9f617d952",
+        "teleop-beaa63ebe5f347c6abc58baff9d1394a",
+        "teleop-c78e0455357147369ad16bc1bf39a0c2",
+        "teleop-dd6bf8b9926d4a2aab6af7572646d026",
+        "teleop-edbefc66cecf40c180864b452aff8dab",
+        "teleop-f8888f12c46249fc80ef0af8c56b4dcf"
+      ],
+      "train_membership_fingerprint": "db6f5d65f60d74decbe64d85be506aa8266b2612d1dff8687befd631faf1ee85",
+      "train_source_fingerprint": "22ea82eb08d9d545782ef2dab0c7afa703df141eee08c695a92188dd712586b3",
+      "unseen_train_component_policy": "identity_with_no_train_support"
+    },
+    "normalizer_fingerprint": "bdb5304cd620faa7461c448794044af4757b85e77e672ca7022a1083da9f37cd",
+    "normalizer_sha256": "2b2348763b5bf8ce9e87a8fa294250184124fea6efbc480b7c2b976dffb1b0c7",
+    "schema_version": "mssr.bc_v1.actor_normalization_fit.v1"
+  },
+  "physical_labels_preserved": true,
+  "policy": {
+    "attribute_rules": [
+      {
+        "names": [
+          "gap.width_m",
+          "gap.bank_width_m",
+          "gap.bank_thickness_m",
+          "gap.crossing_direction_world_xy"
+        ],
+        "object_refs": [],
+        "object_types": [
+          "gap_boundary"
+        ]
+      },
+      {
+        "names": [
+          "gap.landing_length_m"
+        ],
+        "object_refs": [
+          "gap.far_edge"
+        ],
+        "object_types": []
+      },
+      {
+        "names": [
+          "stairs.rise_m",
+          "stairs.riser_depth_m",
+          "stairs.tread_depth_m",
+          "stairs.width_m",
+          "stairs.ascent_direction_world_xy"
+        ],
+        "object_refs": [],
+        "object_types": [
+          "stair_riser"
+        ]
+      },
+      {
+        "names": [
+          "cones.cone_radius_m",
+          "cones.cone_height_m"
+        ],
+        "object_refs": [],
+        "object_types": [
+          "cone"
+        ]
+      }
+    ],
+    "critic_only": [
+      "task_frame.origin_xyz_m",
+      "task_frame.yaw_rad",
+      "environment.floor_height_m",
+      "environment.upper_deck_height_m",
+      "environment.platform_bounds_xy_m",
+      "environment.clear_landing_length_m",
+      "stairs.step_count",
+      "button.plunger_depth_m",
+      "button.plunger_stroke_m",
+      "cones.corridor_width_m"
+    ],
+    "empirical_reference_mean_m": 0.47550612841561374,
+    "goal_policy": "certified_current_assigned_physical_goal_exempt",
+    "local_compound_parts": [
+      "stairs.top_heights_m",
+      "stairs.top_heights_world_m"
+    ],
+    "prefer_dynamic_object_types": [
+      "button"
+    ],
+    "radius_m": 1.0,
+    "radius_selection": "user design decision: approximately 0.8 m robot span; not the empirical mean",
+    "revision": "r1m-team-union-1",
+    "schema_version": "mssr.bc_v1.actor_visibility.v1",
+    "scope": "team_union_wireless",
+    "threshold": "<="
+  },
+  "resource_and_structural_decisions_preserved": true,
+  "sample_counts": {
+    "train": 78302,
+    "validation": 22762
+  },
+  "schema_version": "mssr.bc_v1.actor_inputs.v1",
+  "source_manifest_fingerprint": "4874065f8c7adc7894224d07692d21b289def12562543706cab0f420366bf3be",
+  "support": {
+    "train": {
+      "FIXED": 154071,
+      "INACTIVE": 22536,
+      "PARAMETERIZED": 399918,
+      "smores_ep_enhanced/internal_motion/INACTIVE": 11268,
+      "smores_ep_enhanced/internal_motion/PAN_HOLD_FIXED": 8567,
+      "smores_ep_enhanced/internal_motion/pan_target": 527,
+      "smores_ep_enhanced/internal_motion/pan_velocity": 112449,
+      "smores_ep_enhanced/internal_motion/tilt_target": 58324,
+      "smores_ep_enhanced/locomotion/INACTIVE": 11268,
+      "smores_ep_enhanced/locomotion/WHEEL_STOP_FIXED": 145504,
+      "smores_ep_enhanced/locomotion/wheel_velocity": 228618,
+      "unsupervised": 676307
+    },
+    "validation": {
+      "FIXED": 52725,
+      "INACTIVE": 4152,
+      "PARAMETERIZED": 107733,
+      "smores_ep_enhanced/internal_motion/INACTIVE": 2076,
+      "smores_ep_enhanced/internal_motion/PAN_HOLD_FIXED": 4287,
+      "smores_ep_enhanced/internal_motion/pan_target": 47,
+      "smores_ep_enhanced/internal_motion/pan_velocity": 34425,
+      "smores_ep_enhanced/internal_motion/tilt_target": 15759,
+      "smores_ep_enhanced/locomotion/INACTIVE": 2076,
+      "smores_ep_enhanced/locomotion/WHEEL_STOP_FIXED": 48438,
+      "smores_ep_enhanced/locomotion/wheel_velocity": 57502,
+      "unsupervised": 199582
+    }
+  },
+  "verification": {
+    "TEST_payload_access": 0,
+    "integrity": "PASS",
+    "manifest_fingerprint": "d80b0774ed1793dedfa101cbaa82e45b7cb460384bfdd36a4291a592e9d97a3f",
+    "sample_counts": {
+      "train": 78302,
+      "validation": 22762
+    },
+    "support": {
+      "train": {
+        "FIXED": 154071,
+        "INACTIVE": 22536,
+        "PARAMETERIZED": 399918,
+        "smores_ep_enhanced/internal_motion/INACTIVE": 11268,
+        "smores_ep_enhanced/internal_motion/PAN_HOLD_FIXED": 8567,
+        "smores_ep_enhanced/internal_motion/pan_target": 527,
+        "smores_ep_enhanced/internal_motion/pan_velocity": 112449,
+        "smores_ep_enhanced/internal_motion/tilt_target": 58324,
+        "smores_ep_enhanced/locomotion/INACTIVE": 11268,
+        "smores_ep_enhanced/locomotion/WHEEL_STOP_FIXED": 145504,
+        "smores_ep_enhanced/locomotion/wheel_velocity": 228618,
+        "unsupervised": 676307
+      },
+      "validation": {
+        "FIXED": 52725,
+        "INACTIVE": 4152,
+        "PARAMETERIZED": 107733,
+        "smores_ep_enhanced/internal_motion/INACTIVE": 2076,
+        "smores_ep_enhanced/internal_motion/PAN_HOLD_FIXED": 4287,
+        "smores_ep_enhanced/internal_motion/pan_target": 47,
+        "smores_ep_enhanced/internal_motion/pan_velocity": 34425,
+        "smores_ep_enhanced/internal_motion/tilt_target": 15759,
+        "smores_ep_enhanced/locomotion/INACTIVE": 2076,
+        "smores_ep_enhanced/locomotion/WHEEL_STOP_FIXED": 48438,
+        "smores_ep_enhanced/locomotion/wheel_velocity": 57502,
+        "unsupervised": 199582
+      }
+    }
+  }
+}

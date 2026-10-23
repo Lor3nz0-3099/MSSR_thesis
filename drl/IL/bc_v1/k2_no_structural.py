@@ -160,7 +160,8 @@ def train(cfg,*,overfit_report):
                         gradient_clip=cfg['gradient_clip'],log_interval=cfg['logging_cadence'])
                     if tr['steps']!=cfg['steps_per_epoch']:raise ValueError('Incomplete full TRAIN epoch')
                     global_step=tr['global_step']
-                val=evaluate_validation(model,val_data,loss,metrics,device=cfg['device'],batch_size=64)
+                val=evaluate_validation(model,val_data,loss,metrics,device=cfg['device'],batch_size=64,
+                    epoch=epoch,log_interval=cfg['logging_cadence'])
                 if val['samples']!=22762:raise ValueError('Incomplete full VAL')
                 decisions=val['metrics']['structural']['decisions'];invalid=collapsed(decisions)
                 # Ineligible epochs consume patience without becoming the

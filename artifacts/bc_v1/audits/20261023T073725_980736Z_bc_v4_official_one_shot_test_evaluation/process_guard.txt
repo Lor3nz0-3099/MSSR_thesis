@@ -1,0 +1,3 @@
+pgrep -af 'drl\.IL\.bc_v1\.train_action_set.*g2_v4_actor_visible_r1m'
+exit=1
+stdout empty; no matching training active; no process modified.

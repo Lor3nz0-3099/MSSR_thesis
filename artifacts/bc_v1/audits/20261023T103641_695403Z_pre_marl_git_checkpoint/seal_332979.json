@@ -1,0 +1,30 @@
+{
+  "TEST_payload_access": 0,
+  "denied_attempts": [],
+  "real_episode_opens": {
+    "train": 54,
+    "validation": 56
+  },
+  "sidecar_split_opens": [
+    {
+      "root": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/sidecar/g2_v3_resource_contract",
+      "split": "train",
+      "phase": "integrity_mapping"
+    },
+    {
+      "root": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/sidecar/g2_v3_resource_contract",
+      "split": "train",
+      "phase": "integrity_mapping"
+    },
+    {
+      "root": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/sidecar/g2_v3_resource_contract",
+      "split": "train",
+      "phase": "integrity_mapping"
+    },
+    {
+      "root": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/sidecar/g2_v3_resource_contract",
+      "split": "train",
+      "phase": "integrity_mapping"
+    }
+  ]
+}

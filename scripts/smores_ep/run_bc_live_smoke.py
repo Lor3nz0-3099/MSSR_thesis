@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""One bounded frozen-K1 RC8/navigation smoke; deterministic setup ends first.
+"""One bounded frozen BC-v1 RC8/navigation smoke; deterministic setup ends first.
 
 Standalone Isaac runtime + existing pure assembly planner/executor; no ROS,
 Nav2, teleop, dataset recorder, training, or alternative learned preprocessing.
@@ -103,9 +103,9 @@ def pose(raw):
         module_poses={m['module_id']:m['pose'] for m in modules})
 
 
-def run(output,checkpoint,cleanup_manifest):
+def run(output,checkpoint,cleanup_manifest,*,expected_checkpoint_sha256=None):
     from drl.IL.bc_v1.live_controller import LiveController,PhysicalSnapshot
-    from drl.IL.bc_v1.live_policy import load_frozen_policy,K1_SHA
+    from drl.IL.bc_v1.live_policy import load_frozen_policy
     import torch
     cleanup=read_json(cleanup_manifest)
     if not cleanup or not cleanup.get('passed') or time.monotonic()-cleanup['wall_monotonic']>120.:
@@ -113,15 +113,21 @@ def run(output,checkpoint,cleanup_manifest):
     output=Path(output);output.mkdir(parents=True,exist_ok=False)
     runtime_dir=output/'runtime';runtime_dir.mkdir()
     session=uuid4().hex
-    config=dict(morphology='rc_car8',task='navigation',seed=5100,policy_max_hz=10.,state_hz_sim=30,
-        physics_hz_sim=240,state_stale_s=1.,holder_period_s=.1,sim_bound_s=5.,wall_bound_s=120.,
-        checkpoint=str(checkpoint),checkpoint_sha256=K1_SHA,session=session,structural_safety='terminate before dispatch',
-        recorders_enabled=False,nav2_enabled=False,teleop_enabled=False,setup='existing deterministic planner/executor, pre-evaluation only')
-    write_json(output/'run_config.json',config)
     torch.set_num_threads(1)
     events_file=(output/'controller_events.jsonl').open('w',buffering=1)
     def event(row):events_file.write(json.dumps(row,allow_nan=False)+'\n')
-    policy=load_frozen_policy(ROOT,checkpoint,GraphBuilder(),event_sink=event)
+    try:
+        policy=load_frozen_policy(ROOT,checkpoint,GraphBuilder(),event_sink=event,
+            expected_checkpoint_sha256=expected_checkpoint_sha256)
+    except Exception:
+        events_file.close()
+        raise
+    config=dict(morphology='rc_car8',task='navigation',seed=5100,policy_max_hz=10.,state_hz_sim=30,
+        physics_hz_sim=240,state_stale_s=1.,holder_period_s=.1,sim_bound_s=5.,wall_bound_s=120.,
+        checkpoint=str(checkpoint),session=session,structural_safety='terminate before dispatch',
+        recorders_enabled=False,nav2_enabled=False,teleop_enabled=False,setup='existing deterministic planner/executor, pre-evaluation only',
+        **policy.checkpoint_provenance)
+    write_json(output/'run_config.json',config)
     process=None;controller=None;transport=None;initial=None;final=None;armed_wall=None;armed_stamp=None
     failure=None;runtime_status=None;setup_states=[]
     try:
@@ -241,7 +247,8 @@ def run(output,checkpoint,cleanup_manifest):
             backlog_count=0,forward_count=policy.forward_count,timings=policy.timings,
             candidate_domain=policy.last_candidate_domain,owner_status=serializable_owner_status(runtime_status),
             physical_observation=observation,setup_states=setup_states,expert_leakage=False,
-            TEST_access=0,TRAIN_access=0,VAL_access=0,training=0,optimizer=0,backward=0)
+            TEST_access=0,TRAIN_access=0,VAL_access=0,training=0,optimizer=0,backward=0,
+            **policy.checkpoint_provenance)
         write_json(output/'decision_summary.json',summary)
         write_json(output/'progress.json',dict(phase='FINISHED',success=integration,failure=failure))
         (output/'smoke_report.md').write_text('# One bounded RC8 seed5100 smoke\n\n'+
@@ -255,8 +262,10 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--checkpoint',type=Path,default=Path('/home/lorenzo/MSSR_thesis/artifacts/bc_v1/checkpoints/k1_baseline_v1/best_checkpoint.pt'))
+    parser.add_argument('--expected-checkpoint-sha256',help='Optional integrity pin checked before runtime launch')
     parser.add_argument('--cleanup-manifest',type=Path,required=True)
-    args=parser.parse_args();summary=run(args.output,args.checkpoint,args.cleanup_manifest)
+    args=parser.parse_args();summary=run(args.output,args.checkpoint,args.cleanup_manifest,
+        expected_checkpoint_sha256=args.expected_checkpoint_sha256)
     print(json.dumps({k:summary[k] for k in ('runtime_integration_success','policy_behavior','failure','decision_count')},indent=2))
     return 0 if summary['runtime_integration_success'] else 1
 

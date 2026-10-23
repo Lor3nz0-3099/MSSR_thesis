@@ -1,0 +1,13 @@
+{
+  "batch_size": 64,
+  "initialization": "scratch",
+  "lr": 0.0003,
+  "max_epochs": 30,
+  "min_delta": 0.002,
+  "model_contract": "action_set_v1",
+  "patience": 8,
+  "schema_version": "mssr.bc_v1.training_action_set.v1",
+  "seed": 20261021,
+  "threshold_logit": 0.0,
+  "weight_decay": 0.0001
+}

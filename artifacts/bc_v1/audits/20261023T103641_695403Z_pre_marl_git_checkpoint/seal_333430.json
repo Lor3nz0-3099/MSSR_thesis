@@ -1,0 +1,9 @@
+{
+  "TEST_payload_access": 0,
+  "denied_attempts": [],
+  "real_episode_opens": {
+    "train": 0,
+    "validation": 0
+  },
+  "sidecar_split_opens": []
+}

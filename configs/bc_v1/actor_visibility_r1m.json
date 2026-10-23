@@ -1,0 +1,25 @@
+{
+  "schema_version": "mssr.bc_v1.actor_visibility.v1",
+  "revision": "r1m-team-union-1",
+  "radius_m": 1.0,
+  "threshold": "<=",
+  "scope": "team_union_wireless",
+  "empirical_reference_mean_m": 0.47550612841561374,
+  "radius_selection": "user design decision: approximately 0.8 m robot span; not the empirical mean",
+  "goal_policy": "certified_current_assigned_physical_goal_exempt",
+  "prefer_dynamic_object_types": ["button"],
+  "critic_only": [
+    "task_frame.origin_xyz_m", "task_frame.yaw_rad",
+    "environment.floor_height_m", "environment.upper_deck_height_m",
+    "environment.platform_bounds_xy_m", "environment.clear_landing_length_m",
+    "stairs.step_count", "button.plunger_depth_m", "button.plunger_stroke_m",
+    "cones.corridor_width_m"
+  ],
+  "local_compound_parts": ["stairs.top_heights_m", "stairs.top_heights_world_m"],
+  "attribute_rules": [
+    {"names": ["gap.width_m", "gap.bank_width_m", "gap.bank_thickness_m", "gap.crossing_direction_world_xy"], "object_types": ["gap_boundary"], "object_refs": []},
+    {"names": ["gap.landing_length_m"], "object_types": [], "object_refs": ["gap.far_edge"]},
+    {"names": ["stairs.rise_m", "stairs.riser_depth_m", "stairs.tread_depth_m", "stairs.width_m", "stairs.ascent_direction_world_xy"], "object_types": ["stair_riser"], "object_refs": []},
+    {"names": ["cones.cone_radius_m", "cones.cone_height_m"], "object_types": ["cone"], "object_refs": []}
+  ]
+}

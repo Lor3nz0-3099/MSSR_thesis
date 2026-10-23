@@ -28,7 +28,7 @@ IDENTITIES=('canonical_sha','f1_sha','g1_fingerprint','f2_fingerprint','normaliz
     'tensorizer_fingerprint','storage_fingerprint','split_fingerprint')
 SPLITS=('train','validation','test')
 _DYNAMIC_ROUTING=frozenset(('audit','resource_targets','structural_targets','physical_supervision',
-    'environment_refs','environment_layouts','object_refs'))
+    'environment_refs','environment_layouts','object_refs','resource_label_authority'))
 _STATIC_INPUTS=frozenset(('structural','resource_candidates'))
 
 
@@ -92,7 +92,7 @@ def _catalog(inventory):
 
 
 def _identity(identity):
-    if set(identity)!=set(IDENTITIES) or any(type(v) is not str or not v for v in identity.values()):
+    if set(identity) not in (set(IDENTITIES),set(IDENTITIES)|{'resource_contract_fingerprint'}) or any(type(v) is not str or not v for v in identity.values()):
         raise ValueError('Independent complete sidecar identities required')
     return dict(identity)
 
@@ -204,6 +204,7 @@ class SidecarWriter:
         eid,local=_locate(self.inventory,split,index);audit=sample['routing']['audit']
         for route,identity in [('layout_fingerprint','layout_fingerprint'),('normalizer_fingerprint','f2_fingerprint')]:
             if sample['routing'][route]!=self.identity[identity]:raise ValueError('Sample upstream fingerprint/identity mismatch')
+        if self.identity.get('resource_contract_fingerprint') is not None and sample['routing'].get('resource_contract_fingerprint')!=self.identity['resource_contract_fingerprint']:raise ValueError('Sample resource contract identity mismatch')
         if audit.episode_id!=eid or type(audit.transition_index) is not int or audit.transition_index<0:
             raise ValueError(f'Wrong logical sample identity at {split}/{index}')
         template,dynamic=_parts(sample);tb=encode(template);tid=_sha(tb)
@@ -314,7 +315,26 @@ class SidecarDataset:
         if getattr(self,'db',None) is not None:self.db.close();self.db=None
         self.templates.clear()
 
-    def __getitem__(self,index):
+    def _read_template(self,tid):
+        if tid in self.templates:
+            template=self.templates[tid];self.templates.move_to_end(tid)
+            return template
+        record=self.db.execute('SELECT payload FROM templates WHERE id=?',(tid,)).fetchone()
+        if record is None or _sha(record[0])!=tid:raise ValueError('Missing/corrupt template')
+        template=decode(record[0])
+        if self.limit:
+            self.templates[tid]=template
+            if len(self.templates)>self.limit:self.templates.popitem(last=False)
+        return template
+
+    def read_parts(self,index,*,template_reader=None):
+        """Authenticate one record without cloning large static tensors.
+
+        Internal read-only API: parts may borrow private template storage.
+        An optional private cache provider receives (template_id, load_verified)
+        and must return the same previously authenticated immutable template.
+        Public indexing below still returns owned numerical inputs.
+        """
         if type(index) is not int:raise TypeError('Integer sidecar index required')
         if index<0:index+=len(self)
         eid,local=_locate(self.manifest['inventory'],self.split,index)
@@ -324,21 +344,19 @@ class SidecarDataset:
             episode,transition,ordinal,tid,checksum,blob=row
             if (episode,ordinal)!=(eid,local):raise ValueError('Invalid split/index mapping')
             if _sha(blob)!=checksum:raise ValueError('Sample checksum mismatch')
-            if tid in self.templates:
-                template=self.templates[tid];self.templates.move_to_end(tid)
-            else:
-                record=self.db.execute('SELECT payload FROM templates WHERE id=?',(tid,)).fetchone()
-                if record is None or _sha(record[0])!=tid:raise ValueError('Missing/corrupt template')
-                template=decode(record[0])
-                if self.limit:
-                    self.templates[tid]=template
-                    if len(self.templates)>self.limit:self.templates.popitem(last=False)
-            result=_join(template,decode(blob));audit=result['routing']['audit']
+            template=(self._read_template(tid) if template_reader is None else
+                template_reader(tid,lambda:self._read_template(tid)))
+            dynamic=decode(blob)
+            routing={**template['routing'],**dynamic['routing']};audit=routing['audit']
             if (audit.episode_id,audit.transition_index)!=(episode,transition):raise ValueError('Record routing identity mismatch')
             for route,identity in [('layout_fingerprint','layout_fingerprint'),('normalizer_fingerprint','f2_fingerprint')]:
-                if result['routing'][route]!=self.manifest['identity'][identity]:raise ValueError('Record upstream identity mismatch')
-            return result
+                if routing[route]!=self.manifest['identity'][identity]:raise ValueError('Record upstream identity mismatch')
+            return tid,template,dynamic
         except Exception as exc:raise ValueError(f'Cannot read sidecar sample {self.split}/{index} ({eid}, local {local}): {exc}') from exc
+
+    def __getitem__(self,index):
+        _,template,dynamic=self.read_parts(index)
+        return _join(template,dynamic)
 
     def get(self,episode_id,transition_index):
         row=self.db.execute('SELECT idx FROM samples WHERE split=? AND episode=? AND transition_idx=?',

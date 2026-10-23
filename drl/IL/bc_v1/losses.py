@@ -67,6 +67,10 @@ def _ce(logits,target):
 
 
 def resource_mode_loss(prediction,batch):
+    if 'outcome_logits' in prediction['resource']:
+        from .resource_decisions import supervised_decisions
+        return _statistics([_ce(logits,target) for _,logits,target in supervised_decisions(prediction,batch)],_anchor(prediction))
+    if 'decision_group' in batch['supervision']['resource']:raise ValueError('Resource v3 targets require v3 heads')
     p=prediction['resource'];x=batch['inputs']['resource_candidates'];y=batch['supervision']['resource']
     routes=_routes(p['mode_candidate']);items=[];seen=set()
     for row,valid in enumerate(y['supervised'].tolist()):
@@ -94,6 +98,9 @@ def _numeric(predicted,target,valid):
 
 
 def resource_payload_loss(prediction,batch):
+    if 'outcome_logits' in prediction['resource']:
+        from .resource_decisions import validate_decision_targets
+        validate_decision_targets(batch)
     p=prediction['resource'];y=batch['supervision']['resource'];x=batch['inputs']['resource_candidates']
     numeric=_routes(p['payload_candidate']);categorical=_routes(p['categorical']['candidate']);items=[];seen=set()
     for row,valid in enumerate(y['supervised'].tolist()):

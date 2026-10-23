@@ -25,17 +25,19 @@ def collate_policy_samples(samples):
     """Collate already tensorized samples; preserve whole joint supervision."""
     if not samples: raise ValueError('Cannot collate an empty batch')
     for sample in samples:
+        if sample['routing'].get('resource_contract_fingerprint')!=samples[0]['routing'].get('resource_contract_fingerprint'):raise ValueError('Incompatible resource contracts')
         for key in ('layout_fingerprint','normalizer_fingerprint'):
             if sample['routing'][key] != samples[0]['routing'][key]:
                 raise ValueError('incompatible tensor samples')
     xs=[s['inputs'] for s in samples]
     result={}
-    offsets=[]; current={k:0 for k in ('module','connector','resource','coordinate','connection','relation','environment','object','resource_candidate','structural','argument','domain','scope')}
+    offsets=[]; current={k:0 for k in ('module','connector','resource','coordinate','connection','relation','environment','object','resource_candidate','resource_outcome','structural','argument','domain','scope')}
     for x in xs:
         offsets.append(dict(current))
         for family in FAMILIES: current[family]+=len(x[family+'_x'])
         current['environment']+=int(x['environment_ptr'][-1]);current['object']+=int(x['object_ptr'][-1])
         current['resource_candidate']+=len(x['resource_candidates']['resource'])
+        current['resource_outcome']+=len(x['resource_candidates'].get('outcome_resource',()))
         current['structural']+=len(x['structural']['initiator'])
         current['argument']+=len(x['structural']['argument_binding'])
         current['domain']+=len(x['structural']['argument_domain_index'])
@@ -63,10 +65,11 @@ def collate_policy_samples(samples):
         environment[key]['graph_index']=_cat([torch.full((len(row['x']),),i,dtype=torch.int64) for i,row,_ in records])
     result['environment']=environment
     resources={}
+    if any(set(x['resource_candidates'])!=set(xs[0]['resource_candidates']) for x in xs):raise ValueError('Mixed resource action schemas')
     for key in xs[0]['resource_candidates']:
         values=[x['resource_candidates'][key] for x in xs]
         resources[key]=_ptr(values) if key.endswith('_ptr') else _cat([
-            _shift(v,o['resource']) if key=='resource' else v for v,o in zip(values,offsets)])
+            _shift(v,o[{'resource':'resource','outcome_resource':'resource','outcome_candidate':'resource_candidate'}[key]]) if key in ('resource','outcome_resource','outcome_candidate') else v for v,o in zip(values,offsets)])
     result['resource_candidates']=resources
     structural={}
     for key in xs[0]['structural']:
@@ -94,7 +97,7 @@ def collate_policy_samples(samples):
             if key.endswith('_ptr'): out[key]=_ptr(values);continue
             shifted=[]
             for v,s,o in zip(values,samples,offsets):
-                target=({'resource':'resource','candidate':'resource_candidate'} if family=='resource' else {
+                target=({'resource':'resource','candidate':'resource_candidate','decision_group':'resource','decision_candidate':'resource_outcome'} if family=='resource' else {
                     'candidate':'structural','group':'module','decision_candidate':'structural','decision_group':'module','argument_domain':'argument','membership_domain':'domain',
                     'scope_membership_index':'scope'}).get(key)
                 if target:v=_shift(v,o[target])

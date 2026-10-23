@@ -639,6 +639,25 @@ class ArticulationStateReader:
             dof_indices=[pan_index],
         )
 
+    def configure_pan_velocity_drive_with_powered_wheels(
+        self,
+        docked_face_names: set[str] | frozenset[str],
+    ) -> None:
+        """Coactuate wheel/PAN velocities without wheel position brakes.
+
+        TILT retains the controlled profile. PAN-only reaction supports keep
+        using configure_pan_velocity_drive_with_braked_wheels unchanged.
+        """
+        self.configure_controlled_docking_mode(docked_face_names)
+        self._articulation.set_dof_gains(
+            stiffnesses=[0.0],
+            dampings=[self._drive.pan_damping_nm_s_per_rad],
+            dof_indices=[self._indices["pan"]],
+        )
+        self._articulation.set_dof_velocity_targets(
+            [0.0], dof_indices=[self._indices["pan"]],
+        )
+
     def _set_wheel_contact_mode(self, material_name: str) -> None:
         """Switch operational supports between tire grip and passive skid."""
 

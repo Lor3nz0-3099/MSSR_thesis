@@ -1,0 +1,20 @@
+{
+  "TEST_payload_access_this_task": 0,
+  "baseline_planned_files": 187,
+  "binary_checkpoints": 1,
+  "counts": {
+    "configs": 8,
+    "docs_and_packaging_audit": 64,
+    "final_helper": 3,
+    "housekeeping": 1,
+    "identity_and_normalizer_metadata": 9,
+    "official_TEST": 35,
+    "official_training": 7,
+    "production": 36,
+    "tests": 35
+  },
+  "phase": "final staged release; commit only after gates, actual commit SHA in local-only post_commit_integrity.json",
+  "selection_change_reason": "Recovery evidence, command log, audit-local formatting policy and final staging gate; no new production/test/config files",
+  "staged_files_expected": 198,
+  "temporary_deleted": 0
+}

@@ -1,0 +1,13 @@
+{
+  "PASS": true,
+  "credential_signature_findings": [],
+  "large_text_files": "Intentional snapshot/classification and frozen scientific evidence; no dataset payload dumps",
+  "new_config_machine_absolute_data_paths": [],
+  "scope": "Exact final selected paths; high-confidence private-key/token signature scan; absolute paths in frozen evidence preserved",
+  "selected_binary_files": [
+    {
+      "path": "artifacts/bc_v1/runs/20261022T232532_854802073Z_207309_bc_v4_actor_visible_r1m_scratch_final/best.pt",
+      "size": 17536215
+    }
+  ]
+}

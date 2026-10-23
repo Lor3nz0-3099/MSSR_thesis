@@ -1,0 +1,381 @@
+{
+  "classification": "A \u2014 OFFICIAL TEST EVALUATION COMPLETE; BC-v4 SUITABLE FOR MAPPO WARM START",
+  "integrity": "PASS",
+  "preservation": "PASS",
+  "source_config_run_files_checked": 137,
+  "global": {
+    "cardinality_absolute_error": 3.106009926629262,
+    "exact_match": 0.48225075528700906,
+    "f1": 0.8230016687845431,
+    "false_negative": 151,
+    "false_negative_actions": 151,
+    "false_positive": 57654,
+    "false_positive_actions": 57654,
+    "jaccard": 0.7755218967145973,
+    "mean_FN_per_sample": 0.008146309883470005,
+    "mean_FP_per_sample": 3.1103798014674147,
+    "membership_semantics": "Same raw candidate identity/logit>=0 VAL contract; values/feasibility excluded from exact-set",
+    "normalized_numeric": {
+      "arguments": {
+        "1": {
+          "mae": 0.0071437744578967495,
+          "rmse": 0.007591174044198279,
+          "support": 3,
+          "tolerance": null,
+          "unit": "1",
+          "within_tolerance": null
+        }
+      },
+      "payload": {
+        "1": {
+          "mae": 0.15438749410106245,
+          "rmse": 0.30669723404705834,
+          "support": 231101,
+          "tolerance": null,
+          "unit": "1",
+          "within_tolerance": null
+        }
+      }
+    },
+    "normalized_payload_rmse": 0.30669723404705834,
+    "numeric": {},
+    "parameter_hash_after": "80cdf41cadd12d4b6e9af825e2619c2e5bba32f26fd0b81ac08005b440d59ad3",
+    "parameter_hash_before": "80cdf41cadd12d4b6e9af825e2619c2e5bba32f26fd0b81ac08005b440d59ad3",
+    "parameter_hash_equal": true,
+    "per_action": {
+      "align_faces": {
+        "f1": 0.3008130081300813,
+        "fn": 11,
+        "fp": 333,
+        "precision": 0.18181818181818182,
+        "recall": 0.8705882352941177,
+        "support": 85,
+        "tp": 74
+      },
+      "dock": {
+        "f1": 0.477124183006536,
+        "fn": 8,
+        "fp": 152,
+        "precision": 0.3244444444444444,
+        "recall": 0.9012345679012346,
+        "support": 81,
+        "tp": 73
+      },
+      "gravity_settle": {
+        "f1": 0.02553191489361702,
+        "fn": 0,
+        "fp": 229,
+        "precision": 0.01293103448275862,
+        "recall": 1.0,
+        "support": 3,
+        "tp": 3
+      },
+      "pan_delta": {
+        "f1": 0.0,
+        "fn": 0,
+        "fp": 15,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0,
+        "tp": 0
+      },
+      "pan_target": {
+        "f1": 0.028469750889679714,
+        "fn": 29,
+        "fp": 517,
+        "precision": 0.015238095238095238,
+        "recall": 0.21621621621621623,
+        "support": 37,
+        "tp": 8
+      },
+      "pan_velocity": {
+        "f1": 0.997260171845004,
+        "fn": 3,
+        "fp": 144,
+        "precision": 0.9946462430754359,
+        "recall": 0.9998878756166841,
+        "support": 26756,
+        "tp": 26753
+      },
+      "tilt_delta": {
+        "f1": 0.0,
+        "fn": 0,
+        "fp": 14,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0,
+        "tp": 0
+      },
+      "tilt_target": {
+        "f1": 0.34393166834464617,
+        "fn": 87,
+        "fp": 40315,
+        "precision": 0.20803457420685592,
+        "recall": 0.9918516437201461,
+        "support": 10677,
+        "tp": 10590
+      },
+      "tilt_velocity": {
+        "f1": 0.0,
+        "fn": 0,
+        "fp": 15,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0,
+        "tp": 0
+      },
+      "undock": {
+        "f1": 0.04185351270553064,
+        "fn": 8,
+        "fp": 633,
+        "precision": 0.021638330757341576,
+        "recall": 0.6363636363636364,
+        "support": 22,
+        "tp": 14
+      },
+      "wheel_velocity": {
+        "f1": 0.9268472364405239,
+        "fn": 5,
+        "fp": 15287,
+        "precision": 0.863706068008773,
+        "recall": 0.9999483897605285,
+        "support": 96880,
+        "tp": 96875
+      }
+    },
+    "precision": 0.6997875486867593,
+    "predicted_cardinality": 10.360595597755719,
+    "predicted_cardinality_max": 21,
+    "predicted_cardinality_mean": 10.360595597755719,
+    "predicted_cardinality_min": 1,
+    "recall": 0.9988776655443322,
+    "samples": 18536,
+    "samples_per_s": 12.768945390896704,
+    "set_exact_match": 0.48225075528700906,
+    "set_f1": 0.8230016687845431,
+    "set_jaccard": 0.7755218967145973,
+    "set_precision": 0.6997875486867593,
+    "set_recall": 0.9988776655443322,
+    "target_cardinality": 7.258362106171774,
+    "target_cardinality_max": 15,
+    "target_cardinality_mean": 7.258362106171774,
+    "target_cardinality_min": 1,
+    "total_loss": 0.07753449015633553,
+    "true_positive": 134390,
+    "wall_time_s": 1451.6469005509862
+  },
+  "families": {
+    "families": {
+      "arg_boolean": {
+        "mean": 0.0,
+        "sum": 0.0,
+        "support": 0,
+        "weighted": 0.0
+      },
+      "arg_category": {
+        "mean": 3.605003816535674e-07,
+        "sum": 5.984306335449219e-05,
+        "support": 166,
+        "weighted": 3.605003816535674e-07
+      },
+      "arg_numeric": {
+        "mean": 2.8812961621345796e-05,
+        "sum": 8.643888486403739e-05,
+        "support": 3,
+        "weighted": 2.8812961621345796e-05
+      },
+      "arg_reference": {
+        "mean": 0.0,
+        "sum": 0.0,
+        "support": 0,
+        "weighted": 0.0
+      },
+      "arg_reference_set": {
+        "mean": 1.0462413528126528e-09,
+        "sum": 3.1387240584379583e-09,
+        "support": 3,
+        "weighted": 1.0462413528126528e-09
+      },
+      "presence": {
+        "mean": 0.037835234925853785,
+        "sum": 701.3139145856258,
+        "support": 18536,
+        "weighted": 0.037835234925853785
+      },
+      "resource_payload": {
+        "mean": 0.03967008028014424,
+        "sum": 5329.675285637379,
+        "support": 134350,
+        "weighted": 0.03967008028014424
+      },
+      "scope": {
+        "mean": 4.420931491259476e-10,
+        "sum": 1.3262794473778428e-09,
+        "support": 3,
+        "weighted": 4.420931491259476e-10
+      }
+    },
+    "total_loss": 0.07753449015633553
+  },
+  "errors": {
+    "0": {
+      "count": 8939,
+      "fraction": 0.48225075528700906
+    },
+    "1": {
+      "count": 1901,
+      "fraction": 0.10255718601640051
+    },
+    "2": {
+      "count": 1292,
+      "fraction": 0.0697022011221407
+    },
+    "3": {
+      "count": 764,
+      "fraction": 0.04121709106603366
+    },
+    "4+": {
+      "count": 5640,
+      "fraction": 0.30427276650841606
+    }
+  },
+  "patterns": {
+    "FN_only": {
+      "count": 24,
+      "fraction": 0.001294777729823047
+    },
+    "FP_only": {
+      "count": 9469,
+      "fraction": 0.510843763487268
+    },
+    "both": {
+      "count": 104,
+      "fraction": 0.0056107034958998705
+    },
+    "exact": {
+      "count": 8939,
+      "fraction": 0.48225075528700906
+    }
+  },
+  "top5": {
+    "wheel_velocity": {
+      "f1": 0.9268472364405239,
+      "fn": 5,
+      "fp": 15287,
+      "precision": 0.863706068008773,
+      "recall": 0.9999483897605285,
+      "support": 96880,
+      "tp": 96875
+    },
+    "pan_velocity": {
+      "f1": 0.997260171845004,
+      "fn": 3,
+      "fp": 144,
+      "precision": 0.9946462430754359,
+      "recall": 0.9998878756166841,
+      "support": 26756,
+      "tp": 26753
+    },
+    "tilt_target": {
+      "f1": 0.34393166834464617,
+      "fn": 87,
+      "fp": 40315,
+      "precision": 0.20803457420685592,
+      "recall": 0.9918516437201461,
+      "support": 10677,
+      "tp": 10590
+    },
+    "align_faces": {
+      "f1": 0.3008130081300813,
+      "fn": 11,
+      "fp": 333,
+      "precision": 0.18181818181818182,
+      "recall": 0.8705882352941177,
+      "support": 85,
+      "tp": 74
+    },
+    "dock": {
+      "f1": 0.477124183006536,
+      "fn": 8,
+      "fp": 152,
+      "precision": 0.3244444444444444,
+      "recall": 0.9012345679012346,
+      "support": 81,
+      "tp": 73
+    }
+  },
+  "rare": {
+    "align_faces": {
+      "f1": 0.3008130081300813,
+      "fn": 11,
+      "fp": 333,
+      "precision": 0.18181818181818182,
+      "recall": 0.8705882352941177,
+      "support": 85,
+      "tp": 74
+    },
+    "dock": {
+      "f1": 0.477124183006536,
+      "fn": 8,
+      "fp": 152,
+      "precision": 0.3244444444444444,
+      "recall": 0.9012345679012346,
+      "support": 81,
+      "tp": 73
+    },
+    "undock": {
+      "f1": 0.04185351270553064,
+      "fn": 8,
+      "fp": 633,
+      "precision": 0.021638330757341576,
+      "recall": 0.6363636363636364,
+      "support": 22,
+      "tp": 14
+    },
+    "gravity_settle": {
+      "f1": 0.02553191489361702,
+      "fn": 0,
+      "fp": 229,
+      "precision": 0.01293103448275862,
+      "recall": 1.0,
+      "support": 3,
+      "tp": 3
+    }
+  },
+  "worst_task": "stairs",
+  "best_task": "navigation",
+  "worst_episode": "expert:assembly:seed-006284",
+  "best_episode": "expert:rc_car:seed-006004",
+  "comparison": {
+    "exact_match": {
+      "TEST": 0.48225075528700906,
+      "TEST_minus_VAL": -0.033213615154955634,
+      "VAL_best": 0.5154643704419647
+    },
+    "f1": {
+      "TEST": 0.8230016687845431,
+      "TEST_minus_VAL": 0.011869311645835712,
+      "VAL_best": 0.8111323571387073
+    },
+    "precision": {
+      "TEST": 0.6997875486867593,
+      "TEST_minus_VAL": 0.01723315603943787,
+      "VAL_best": 0.6825543926473214
+    },
+    "predicted_cardinality": {
+      "TEST": 10.360595597755719,
+      "TEST_minus_VAL": 0.02609072120708511,
+      "VAL_best": 10.334504876548634
+    },
+    "recall": {
+      "TEST": 0.9988776655443322,
+      "TEST_minus_VAL": -0.0005185636893768608,
+      "VAL_best": 0.9993962292337091
+    },
+    "total_loss": {
+      "TEST": 0.07753449015633553,
+      "TEST_minus_VAL": 0.008849191721597913,
+      "VAL_best": 0.06868529843473761
+    }
+  }
+}

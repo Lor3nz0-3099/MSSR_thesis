@@ -1,0 +1,3 @@
+PYTHONDONTWRITEBYTECODE=1 PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 MSSR_BC_V1_SKIP_REAL_CENSUS=1 MSSR_K2_REAL_TRAIN_SMOKE=0 CUDA_VISIBLE_DEVICES='' OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 OPENBLAS_NUM_THREADS=1 /home/lorenzo/.local/share/mssr-bc-v1/venv/bin/python -B -u /home/lorenzo/MSSR_thesis/artifacts/bc_v1/audits/20261023T103641_695403Z_pre_marl_git_checkpoint/run_cpu_suite.py
+
+Inner pytest selection: same as the last certified reader audit, only --basetemp moves into this audit. See test_command.json. No tests or exclusions added/changed.

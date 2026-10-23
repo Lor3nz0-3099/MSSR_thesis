@@ -164,6 +164,8 @@ class _Store:
     def __init__(self,owner):
         from .structural_decisions import StructuralDecisionMetrics
         self.decisions=StructuralDecisionMetrics(tuple(a.action_id for a in owner.actions if a.scope!='resource'))
+        from .resource_decisions import ResourceDecisionMetrics
+        self.resource_outcomes=ResourceDecisionMetrics();self.has_resource_outcomes=False
         self.has_decisions=False
         self.resource_error=ErrorAccumulator();self.resource_decisions=0
         self.payloads={_key(k):ContinuousAccumulator(owner.normalizers,owner.resource_bindings[k].keys,
@@ -196,7 +198,7 @@ class _Store:
         arguments['reference_set']={'exact_match':self.arguments['reference_set_exact'].compute(),'jaccard':self.arguments['reference_set_jaccard'].compute()}
         arguments['numeric']={'normalized_mae':numeric['mae'],'normalized_rmse':numeric['rmse'],
             'argument_support':self.numeric_decisions,'by_parameter':{k:v.compute() for k,v in sorted(self.numeric.items())}}
-        return {'resource':{'payload':{'normalized_mae':error['mae'],'normalized_rmse':error['rmse'],
+        return {'resource':{**({'decisions':self.resource_outcomes.compute()} if self.has_resource_outcomes else {}),'payload':{'normalized_mae':error['mae'],'normalized_rmse':error['rmse'],
             'decision_support':self.resource_decisions,'by_signature':{k:v.compute() for k,v in sorted(self.payloads.items())}},
             'mode':{'accuracy':self.mode_accuracy.compute(),'domains':{k:v.compute() for k,v in sorted(self.mode_domains.items())}},
             'payload_category_accuracy':self.payload_category.compute()},
@@ -214,6 +216,7 @@ class BCMetrics:
         validate_robot_spec(spec);_validate_config(config)
         if normalizers.metadata.get('robot_spec_fingerprint')!=robot_spec_fingerprint(spec):
             raise ValueError('Metric normalizers/RobotSpec mismatch')
+        self.spec=spec
         self.normalizers=normalizers;self.tolerances=dict(config['tolerances']);self.dimensions=tuple(config['breakdowns'])
         self.normalizer_fingerprint=normalizer_fingerprint(normalizers)
         mode_specs={(t.type_id,r.resource_id,m.mode_id):m for t in spec.module_types for r in t.resources for m in r.modes}
@@ -322,6 +325,25 @@ class BCMetrics:
     @torch.no_grad()
     def update_resource_mode(self,prediction,batch):
         p=prediction['resource'];y=batch['supervision']['resource'];x=batch['inputs']['resource_candidates'];seen=set()
+        if 'outcome_logits' in p:
+            from .resource_decisions import supervised_decisions,INACTIVE,ResourceDecisionContract
+            from .resource_decoder import resolve_resource_outcomes
+            samples=batch['routing'].get('samples',(batch['routing'],))
+            contract=ResourceDecisionContract.from_dict(samples[0]['resource_contract'],self.spec)
+            selected,compat=resolve_resource_outcomes(prediction,batch['inputs'],batch['routing'],contract=contract,normalizers=self.normalizers)
+            self._base.has_resource_outcomes=True
+            self._base.resource_outcomes.pre+=compat['pre_violations'];self._base.resource_outcomes.post+=compat['post_violations']
+            self._base.resource_outcomes.joint_support+=compat['support']
+            for r,logits,target in supervised_decisions(prediction,batch):
+                lo=int(x['outcome_ptr'][r]);chosen=int(_maxima(logits)[0]);q=lo+target;pred=lo+chosen
+                graph=self._graph(batch,int(batch['inputs']['resource_to_module'][r]))
+                for store in self._stores(graph):
+                    store.has_resource_outcomes=True
+                    kind=int(x['outcome_kind'][q]);catalog=int(x['outcome_catalog'][q])
+                    semantic=contract.outcomes[catalog]
+                    store.resource_outcomes.add(_key((semantic.module_type_id,semantic.resource_id)),
+                        None if kind==INACTIVE else catalog, None if int(x['outcome_kind'][pred])==INACTIVE else int(x['outcome_catalog'][pred]),kind,contract.outcomes[catalog].outcome_id)
+            return
         routes=_routes(p['mode_candidate'])
         for row,valid in enumerate(y['supervised'].tolist()):
             if not valid:continue
@@ -508,7 +530,7 @@ class BCMetrics:
         """
         if batch.get('routing',{}).get('normalizer_fingerprint')!=self.normalizer_fingerprint:
             raise ValueError('Metric batch/normalizer identity mismatch')
-        view={'inputs':batch['inputs'],'supervision':{family:{k:v.detach() for k,v in values.items()}
+        view={'inputs':batch['inputs'],'routing':batch.get('routing',{}),'supervision':{family:{k:v.detach() for k,v in values.items()}
             for family,values in batch['supervision'].items()}}
         _validate_supervision(view)
         with self.audit_context(batch,audit):

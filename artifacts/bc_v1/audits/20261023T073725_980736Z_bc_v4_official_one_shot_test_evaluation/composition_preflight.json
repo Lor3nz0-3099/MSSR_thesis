@@ -1,0 +1,14 @@
+{
+  "CUDA_initialized": false,
+  "PASS": true,
+  "TEST_payload_access": 0,
+  "TRAIN_episode": "expert:assembly:seed-006307",
+  "TRAIN_probe_samples": 1,
+  "checks": [
+    "strict best epoch5 CPU checkpoint",
+    "all expected fingerprints/counts via metadata",
+    "frozen actor-visible tensorization exact input/supervision/candidate routing equality with G2 on one TRAIN sample"
+  ],
+  "model_predictions": 0,
+  "parameter_hash": "80cdf41cadd12d4b6e9af825e2619c2e5bba32f26fd0b81ac08005b440d59ad3"
+}

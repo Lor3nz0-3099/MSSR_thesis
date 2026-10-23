@@ -60,9 +60,6 @@ class BcRuntimeBridge:
                 entry['vx']=geometry.wheel_radius_m*(left+right)/2
                 entry['yaw_rate']=geometry.wheel_radius_m*(right-left)/geometry.track_width_m
             else:raise ValueError('Unsupported BC continuous actuator')
-        for entry in commands.values():
-            if abs(entry['pan_rate_rad_s'])>1e-12 and (abs(entry['vx'])>1e-12 or abs(entry['yaw_rate'])>1e-12):
-                raise ValueError('Incompatible PAN traction and wheel propulsion on same module')
         packet={'schema_version':'mssr.actions.v2','source':'bc','locomotion':commands,
             'expert':{'pan_traction_module_ids':traction,'debug':{'command_id':self._packet_id}}}
         PrimitiveFileChannel._write_atomic(self.action_file,json.dumps(packet,allow_nan=False))

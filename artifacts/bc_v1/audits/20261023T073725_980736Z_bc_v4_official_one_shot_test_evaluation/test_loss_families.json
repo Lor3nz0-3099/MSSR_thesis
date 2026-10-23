@@ -1,0 +1,53 @@
+{
+  "families": {
+    "arg_boolean": {
+      "mean": 0.0,
+      "sum": 0.0,
+      "support": 0,
+      "weighted": 0.0
+    },
+    "arg_category": {
+      "mean": 3.605003816535674e-07,
+      "sum": 5.984306335449219e-05,
+      "support": 166,
+      "weighted": 3.605003816535674e-07
+    },
+    "arg_numeric": {
+      "mean": 2.8812961621345796e-05,
+      "sum": 8.643888486403739e-05,
+      "support": 3,
+      "weighted": 2.8812961621345796e-05
+    },
+    "arg_reference": {
+      "mean": 0.0,
+      "sum": 0.0,
+      "support": 0,
+      "weighted": 0.0
+    },
+    "arg_reference_set": {
+      "mean": 1.0462413528126528e-09,
+      "sum": 3.1387240584379583e-09,
+      "support": 3,
+      "weighted": 1.0462413528126528e-09
+    },
+    "presence": {
+      "mean": 0.037835234925853785,
+      "sum": 701.3139145856258,
+      "support": 18536,
+      "weighted": 0.037835234925853785
+    },
+    "resource_payload": {
+      "mean": 0.03967008028014424,
+      "sum": 5329.675285637379,
+      "support": 134350,
+      "weighted": 0.03967008028014424
+    },
+    "scope": {
+      "mean": 4.420931491259476e-10,
+      "sum": 1.3262794473778428e-09,
+      "support": 3,
+      "weighted": 4.420931491259476e-10
+    }
+  },
+  "total_loss": 0.07753449015633553
+}

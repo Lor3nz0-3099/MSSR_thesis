@@ -1,0 +1,170 @@
+{
+  "AMP": false,
+  "F2": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/normalization/f2_actor_visible_r1m_v1",
+  "F2_fingerprint": "bdb5304cd620faa7461c448794044af4757b85e77e672ca7022a1083da9f37cd",
+  "FP32_eager": true,
+  "G1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+  "G1_source": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/cache/g1_v1_optimized",
+  "TF32": false,
+  "actor_visibility": {
+    "attribute_rules": [
+      {
+        "names": [
+          "gap.width_m",
+          "gap.bank_width_m",
+          "gap.bank_thickness_m",
+          "gap.crossing_direction_world_xy"
+        ],
+        "object_refs": [],
+        "object_types": [
+          "gap_boundary"
+        ]
+      },
+      {
+        "names": [
+          "gap.landing_length_m"
+        ],
+        "object_refs": [
+          "gap.far_edge"
+        ],
+        "object_types": []
+      },
+      {
+        "names": [
+          "stairs.rise_m",
+          "stairs.riser_depth_m",
+          "stairs.tread_depth_m",
+          "stairs.width_m",
+          "stairs.ascent_direction_world_xy"
+        ],
+        "object_refs": [],
+        "object_types": [
+          "stair_riser"
+        ]
+      },
+      {
+        "names": [
+          "cones.cone_radius_m",
+          "cones.cone_height_m"
+        ],
+        "object_refs": [],
+        "object_types": [
+          "cone"
+        ]
+      }
+    ],
+    "critic_only": [
+      "task_frame.origin_xyz_m",
+      "task_frame.yaw_rad",
+      "environment.floor_height_m",
+      "environment.upper_deck_height_m",
+      "environment.platform_bounds_xy_m",
+      "environment.clear_landing_length_m",
+      "stairs.step_count",
+      "button.plunger_depth_m",
+      "button.plunger_stroke_m",
+      "cones.corridor_width_m"
+    ],
+    "empirical_reference_mean_m": 0.47550612841561374,
+    "goal_policy": "certified_current_assigned_physical_goal_exempt",
+    "local_compound_parts": [
+      "stairs.top_heights_m",
+      "stairs.top_heights_world_m"
+    ],
+    "prefer_dynamic_object_types": [
+      "button"
+    ],
+    "radius_m": 1.0,
+    "radius_selection": "user design decision: approximately 0.8 m robot span; not the empirical mean",
+    "revision": "r1m-team-union-1",
+    "schema_version": "mssr.bc_v1.actor_visibility.v1",
+    "scope": "team_union_wireless",
+    "threshold": "<="
+  },
+  "actor_visibility_fingerprint": "e6b819c2e23e1713f70649d83b547d7701d78ef8c0ec7a21668c803c7c8f6234",
+  "backward": false,
+  "batch_size": 64,
+  "candidate_policy": "Unchanged current G1 candidate tables and production tensorization/order; no label filtering or feasibility pruning",
+  "checkpoint": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/runs/20261022T232532_854802073Z_207309_bc_v4_actor_visible_r1m_scratch_final/best.pt",
+  "checkpoint_sha256": "d90a73e9b5ba2ecb579e4fc8733066b1c55d9e60dafeb1d71c029c49a7c21c6d",
+  "compile": false,
+  "created_UTC": "2026-10-23T07:39:56.993240+00:00",
+  "epoch": 5,
+  "expected_batches": 290,
+  "expected_episodes": 12,
+  "expected_samples": 18536,
+  "frozen_before_TEST": true,
+  "h1_config": {
+    "activation": "silu",
+    "aggregation": "mean",
+    "context_latent_dim": 64,
+    "coordinate_latent_dim": 64,
+    "dropout": 0.1,
+    "edge_latent_dim": 64,
+    "environment_latent_dim": 64,
+    "graph_pooling": [
+      "mean",
+      "max"
+    ],
+    "hidden_dim": 128,
+    "message_passing_layers": 3,
+    "normalization": "layernorm",
+    "observation_latent_dim": 64,
+    "relation_latent_dim": 64,
+    "schema_version": "mssr.bc_v1.gnn.v1",
+    "task_projection_dim": 8,
+    "tensor_layout": "configs/bc_v1/tensor_layout.v1.json",
+    "use_residual": true
+  },
+  "h2_config": {
+    "activation": "silu",
+    "dropout": 0.1,
+    "hidden_dim": 128,
+    "schema_version": "mssr.bc_v1.action_set_head.v1"
+  },
+  "identity": {
+    "action_set_fingerprint": "9d4825f23380cce49ba5fd620334ecb3fc167e1963fe66a11cc4a538e644a4df",
+    "action_set_version": "mssr.bc_v1.action_set.v1",
+    "catalog_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "decode_config": {
+      "configured_arguments": {},
+      "threshold_logit": 0.0
+    },
+    "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+    "h1_config_fingerprint": "81154912d4eed35d00bf97433e8964c10b6fc0b261abe34e2124d15695d490bf",
+    "head_config": {
+      "activation": "silu",
+      "dropout": 0.1,
+      "hidden_dim": 128,
+      "schema_version": "mssr.bc_v1.action_set_head.v1"
+    },
+    "head_config_fingerprint": "3e3e5c930388f20283c0c6bb9c360ae0cb3a118279757035f74e90d37282d778",
+    "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+    "model_contract": "action_set_v1",
+    "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "source_identity": {
+      "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+      "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+      "f2_fingerprint": "bdb5304cd620faa7461c448794044af4757b85e77e672ca7022a1083da9f37cd",
+      "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+      "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+      "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+      "normalizer_sha": "2b2348763b5bf8ce9e87a8fa294250184124fea6efbc480b7c2b976dffb1b0c7",
+      "resource_contract_fingerprint": "7a77f9118c81a7ca7a9b80f8f1df78011c92492be9c53a17d3fc00188268d194",
+      "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+      "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+      "storage_fingerprint": "5e6f4f093c58df71f9c23a3e5bb94086e9a615690309b52cec75a93abf920499",
+      "tensorizer_fingerprint": "2b04372e98e29f3a5759799e971b7e33147b91ce1f248e50e0914fab9c663192"
+    },
+    "source_manifest_fingerprint": "d80b0774ed1793dedfa101cbaa82e45b7cb460384bfdd36a4291a592e9d97a3f",
+    "source_schema_version": "mssr.bc_v1.g2_sidecar.v1",
+    "training_config_fingerprint": "495d9dfc7478fa5c1f61d13cbae0b01647413875f7197abbafd1ae8787f4c044"
+  },
+  "metrics_semantics": "Exact production train_action_set.measure_batch raw membership logit>=0; physical feasibility not applied, same as VAL",
+  "model_eval": true,
+  "optimizer": null,
+  "parameterized_payload": "Same matched numeric contract/validity as official VAL, additionally grouped by action_id using existing ActionSetMetrics.update_numeric",
+  "task_routing": "Current sample.inputs.policy.context.task_id; audit only, no taxonomy inference",
+  "test_materialization": "Streaming in-memory tensorization only, no persistent G2 TEST or source modification",
+  "threshold_logit": 0.0
+}

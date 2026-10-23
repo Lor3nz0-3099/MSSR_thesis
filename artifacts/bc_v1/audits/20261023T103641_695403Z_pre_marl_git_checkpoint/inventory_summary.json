@@ -1,0 +1,15 @@
+{
+  "categories": {
+    "OFFICIAL_COMMIT": 287,
+    "KEEP_LOCAL_IGNORE": 12623,
+    "UNRELATED_DO_NOT_TOUCH": 31,
+    "AMBIGUOUS_DO_NOT_TOUCH": 2
+  },
+  "selected_paths": 198,
+  "historical_untracked_from_git": 0,
+  "temporary_deleted": 0,
+  "old_run_directories": 7,
+  "historical_pt_files_including_caches_and_synthetic_fixtures": 1067,
+  "old_checkpoint_files": 19,
+  "old_audit_directories": 36
+}

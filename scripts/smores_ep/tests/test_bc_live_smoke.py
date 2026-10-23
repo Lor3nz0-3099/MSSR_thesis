@@ -94,3 +94,53 @@ def test_summary_serializes_owner_busy_set_explicitly_and_deterministically(tmp_
     assert result['busy']==['internal_motion:m1','locomotion:m2']
     assert isinstance(status['busy'],set)
     a.write_json(tmp_path/'summary.json',{'owner_status':result})
+
+
+def test_runner_records_loaded_checkpoint_provenance_without_starting_runtime(tmp_path, monkeypatch):
+    import json
+    import time
+    from types import SimpleNamespace
+    from drl.IL.bc_v1 import live_policy
+    a=api()
+    provenance=dict(checkpoint_path='/synthetic/epoch13.pt',checkpoint_sha256='a'*64,
+        checkpoint_epoch=13,checkpoint_global_step=15912,checkpoint_profile='bc_v1.no_structural_v2',
+        checkpoint_schema='mssr.bc_v1.training_checkpoint.v1',action_heads_schema='mssr.bc_v1.action_heads.v2')
+    policy=SimpleNamespace(checkpoint_provenance=provenance,forward_count=0,timings=[],last_candidate_domain={})
+    monkeypatch.setattr(live_policy,'load_frozen_policy',lambda *args,**kwargs:policy)
+    launches=[]
+    def no_launch(*args,**kwargs):
+        launches.append('blocked');raise RuntimeError('Simulation disabled by CPU-only unit test')
+    monkeypatch.setattr(a.subprocess,'Popen',no_launch)
+    cleanup=tmp_path/'cleanup.json';cleanup.write_text(json.dumps(dict(passed=True,wall_monotonic=time.monotonic())))
+    output=tmp_path/'output';result=a.run(output,Path(provenance['checkpoint_path']),cleanup)
+    saved=json.loads((output/'run_config.json').read_text())
+    for key,value in provenance.items():
+        assert saved[key]==value
+        assert result[key]==value
+    assert launches==['blocked']
+
+
+def test_cli_expected_checkpoint_sha_is_forwarded_without_running_simulation(tmp_path,monkeypatch):
+    a=api();captured=[]
+    def fake_run(*args,**kwargs):
+        captured.append((args,kwargs))
+        return dict(runtime_integration_success=True,policy_behavior='fixture',failure=None,decision_count=0)
+    monkeypatch.setattr(a,'run',fake_run)
+    monkeypatch.setattr(sys,'argv',['run_bc_live_smoke.py','--output',str(tmp_path/'output'),
+        '--checkpoint','/synthetic/model.pt','--cleanup-manifest',str(tmp_path/'cleanup.json'),
+        '--expected-checkpoint-sha256','b'*64])
+    assert a.main()==0
+    assert captured[0][1]['expected_checkpoint_sha256']=='b'*64
+
+
+def test_runner_sha_failure_occurs_before_any_process_launch(tmp_path,monkeypatch):
+    import json
+    import time
+    from drl.IL.bc_v1 import live_policy
+    a=api()
+    def reject(*args,**kwargs):raise ValueError('Frozen checkpoint SHA mismatch')
+    monkeypatch.setattr(live_policy,'load_frozen_policy',reject)
+    monkeypatch.setattr(a.subprocess,'Popen',lambda *a,**kw:pytest.fail('No process may start'))
+    cleanup=tmp_path/'cleanup.json';cleanup.write_text(json.dumps(dict(passed=True,wall_monotonic=time.monotonic())))
+    with pytest.raises(ValueError,match='checkpoint SHA'):
+        a.run(tmp_path/'output',tmp_path/'model.pt',cleanup,expected_checkpoint_sha256='0'*64)
