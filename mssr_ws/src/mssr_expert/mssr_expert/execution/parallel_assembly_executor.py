@@ -158,6 +158,64 @@ class AssemblyExecutionDecision:
 class ParallelAssemblyExecutor:
     """Execute assembly waves through alignment, contact, and docking."""
 
+    @classmethod
+    def from_alignment_commands(cls, commands, *, execution_id: str, **options):
+        """Execute only the face pairs selected by a policy, with shared barriers.
+
+        This constructs one selected batch; it does not plan a morphology or
+        choose later waves. Internal recovery uses the existing executor. After
+        APPROACH succeeds, control returns to the policy for a separate DOCK.
+        Call step() and publish its goals through the existing primitive channel.
+        """
+        actions = []
+        parameters_by_module = {}
+        occupied_faces = set()
+        mobile_ids = set()
+        parent_ids = set()
+        for index, command in enumerate(commands):
+            if command.get('command') != 'align_faces':
+                raise ParallelAssemblyExecutionError('An alignment batch accepts only align_faces.')
+            modules = tuple(command.get('module_ids', ()))
+            parameters = dict(command.get('parameters', {}))
+            parameters.pop('execution_phase', None)
+            validated = PrimitiveGoalRequest(
+                goal_id=f'{execution_id}-selected-{index}', primitive='align_faces',
+                module_ids=modules, parameters=parameters)
+            parameters = dict(validated.parameters)
+            mobile, parent = modules
+            for face in ((mobile, parameters['face_a']), (parent, parameters['face_b'])):
+                if face in occupied_faces:
+                    raise ParallelAssemblyExecutionError('Alignment commands compete for the same face.')
+                occupied_faces.add(face)
+            if mobile in mobile_ids:
+                raise ParallelAssemblyExecutionError('A moving module has multiple alignment commands.')
+            mobile_ids.add(mobile)
+            parent_ids.add(parent)
+            parameters_by_module[mobile] = parameters
+            actions.append(AssemblyAction(
+                mobile_module_id=mobile, mobile_face=parameters['face_a'],
+                parent_module_id=parent, parent_face=parameters['face_b'],
+                mobile_target_vertex=mobile, parent_target_vertex=parent,
+                depth=1, clocking_quarter_turns=parameters.get('clocking_quarter_turns', 0),
+                requires_helper=False))
+        if not actions:
+            raise ParallelAssemblyExecutionError('An alignment batch cannot be empty.')
+        if mobile_ids & parent_ids:
+            raise ParallelAssemblyExecutionError('A moving module cannot simultaneously be a fixed reference.')
+        plan = ParallelAssemblyPlan(
+            root_target_vertex=actions[0].parent_module_id,
+            root_module_id=actions[0].parent_module_id,
+            waves=(AssemblyWave(0, 1, 'POLICY_SELECTED', tuple(actions)),))
+        known_ids = mobile_ids | parent_ids | set(options.pop('additional_known_module_ids', ()))
+        assembled_ids = parent_ids | set(options.pop('initially_assembled_module_ids', ()))
+        if options.pop('alignment_only', True) is not True:
+            raise ParallelAssemblyExecutionError('A policy alignment batch must stop before docking.')
+        executor = cls(plan, execution_id=execution_id, alignment_only=True,
+                       initially_assembled_module_ids=tuple(sorted(assembled_ids)),
+                       additional_known_module_ids=tuple(sorted(known_ids)), **options)
+        executor._selected_alignment_parameters = parameters_by_module
+        return executor
+
     def __init__(
         self,
         plan: ParallelAssemblyPlan,
@@ -217,6 +275,7 @@ class ParallelAssemblyExecutor:
         ) = None,
         additional_known_module_ids: tuple[str, ...] = (),
         initially_assembled_module_ids: tuple[str, ...] = (),
+        alignment_only: bool = False,
     ) -> None:
         if not execution_id.strip():
             raise ParallelAssemblyExecutionError(
@@ -277,6 +336,8 @@ class ParallelAssemblyExecutor:
                 "helper_joint_timeout_s must be positive."
             )
         self.plan = plan
+        self.alignment_only = bool(alignment_only)
+        self._selected_alignment_parameters: dict[str, dict[str, Any]] = {}
         self.execution_id = execution_id
         self.align_timeout_s = align_timeout_s
         self.dock_timeout_s = dock_timeout_s
@@ -1529,6 +1590,12 @@ class ParallelAssemblyExecutor:
             "CLOCKING": "APPROACH",
             "APPROACH": "DOCK",
         }.get(self._phase)
+        if next_phase == "DOCK" and self.alignment_only:
+            self._completed_action_count += len(current_wave.actions)
+            self._reset_wave_tracking()
+            self._state = "SUCCEEDED"
+            self._phase = "COMPLETE"
+            return
         if next_phase is None:
             raise ParallelAssemblyExecutionError(
                 f"Unknown execution phase {self._phase!r}."
@@ -1635,7 +1702,7 @@ class ParallelAssemblyExecutor:
         )
 
         if self._phase in {"REACH", "ALIGN", "CLOCKING", "RETREAT", "APPROACH"}:
-            return make_align_faces_goal(
+            goal = make_align_faces_goal(
                 goal_id=goal_id,
                 mobile_module_id=(
                     action.mobile_module_id
@@ -1688,6 +1755,18 @@ class ParallelAssemblyExecutor:
                     else None
                 ),
             )
+            selected = self._selected_alignment_parameters.get(action.mobile_module_id)
+            if selected is not None:
+                parameters = dict(goal.parameters)
+                parameters.update(selected)
+                parameters['execution_phase'] = self._phase.lower()
+                fallback = self._staging_path_fallback_by_action.get(action_index)
+                if fallback is not None:
+                    parameters['staging_path_fallback_level'] = fallback
+                goal = PrimitiveGoalRequest(
+                    goal_id=goal.goal_id, primitive=goal.primitive, module_ids=goal.module_ids,
+                    parameters=parameters, timeout_s=goal.timeout_s)
+            return goal
 
         if self._phase == "DOCK":
             return make_dock_goal(

@@ -17,7 +17,7 @@ def bridge_module():
     return module
 
 
-def bridge(tmp_path, monkeypatch):
+def bridge(tmp_path, monkeypatch, **options):
     module = bridge_module()
     assert hasattr(module.MssrFileBridge, "_on_runtime_request"), "missing runtime channel in file bridge"
     publishers, subscriptions, timers = {}, {}, []
@@ -42,7 +42,8 @@ def bridge(tmp_path, monkeypatch):
     monkeypatch.setattr(module.Node, "create_timer", timer)
     node = module.MssrFileBridge(tmp_path / "state", tmp_path / "actions.json",
         tmp_path / "goal.json", tmp_path / "cancel.json", tmp_path / "primitive_status.json", 0.02,
-        runtime_request_file=tmp_path / "runtime_request.json", runtime_status_file=tmp_path / "runtime_status.json")
+        runtime_request_file=tmp_path / "runtime_request.json", runtime_status_file=tmp_path / "runtime_status.json",
+        **options)
     return node, publishers, subscriptions, timers
 
 
@@ -66,3 +67,17 @@ def test_runtime_status_has_its_own_topic(tmp_path, monkeypatch):
 def test_file_bridge_polling_is_independent_of_frozen_sim_time(tmp_path, monkeypatch):
     _, _, _, timers = bridge(tmp_path, monkeypatch)
     assert timers[0]["clock"].clock_type == ClockType.STEADY_TIME
+
+
+@pytest.mark.parametrize("explicit_path", [False, True])
+def test_expert_state_is_mirrored_without_writing_commands(tmp_path, monkeypatch, explicit_path):
+    destination = tmp_path / "expert" / "assembly.json" if explicit_path else tmp_path / "self_assembly_state.json"
+    options = {"expert_state_file": destination} if explicit_path else {}
+    _, _, subscriptions, _ = bridge(tmp_path, monkeypatch, **options)
+    payload = '{"schema_version":"mssr.self_assembly_state.v1","state":"SUCCEEDED"}'
+
+    subscriptions["/mssr/expert/self_assembly/state"](SimpleNamespace(data=payload))
+
+    assert destination.read_text() == payload
+    assert not destination.with_suffix(destination.suffix + ".tmp").exists()
+    assert not any((tmp_path / name).exists() for name in ("actions.json", "goal.json", "cancel.json"))

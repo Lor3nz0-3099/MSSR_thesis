@@ -30,6 +30,7 @@ class MssrFileBridge(Node):
         publish_period: float,
         runtime_request_file: Path | None = None,
         runtime_status_file: Path | None = None,
+        expert_state_file: Path | None = None,
     ) -> None:
         """Create publishers, subscriber, and periodic file polling."""
         super().__init__("mssr_file_bridge")
@@ -38,6 +39,7 @@ class MssrFileBridge(Node):
         self._primitive_goal_file = primitive_goal_file
         self._primitive_cancel_file = primitive_cancel_file
         self._primitive_status_file = primitive_status_file
+        self._expert_state_file = expert_state_file or primitive_status_file.with_name("self_assembly_state.json")
         self._runtime_request_file = runtime_request_file or action_file.with_name("smores_teleop_runtime_request.json")
         self._runtime_status_file = runtime_status_file or primitive_status_file.with_name("smores_teleop_runtime_status.json")
 
@@ -66,6 +68,12 @@ class MssrFileBridge(Node):
             String,
             "/mssr/primitives/cancel",
             self._on_primitive_cancel,
+            10,
+        )
+        self._expert_state_sub = self.create_subscription(
+            String,
+            "/mssr/expert/self_assembly/state",
+            self._on_expert_state,
             10,
         )
         self._runtime_status_pub = self.create_publisher(String, "/mssr/teleop/runtime_status", 10)
@@ -120,6 +128,13 @@ class MssrFileBridge(Node):
         """Forward a primitive cancellation request to Isaac."""
         self._write_atomic(self._primitive_cancel_file, message.data)
 
+    def _on_expert_state(self, message: String) -> None:
+        """Mirror the self-assembly Expert state into the runtime directory."""
+        self._write_atomic(
+            self._expert_state_file,
+            message.data,
+        )
+
     def _on_runtime_request(self, message: String) -> None:
         """Forward timeline/camera intent without touching robot-action files."""
         self._write_atomic(self._runtime_request_file, message.data)
@@ -166,6 +181,14 @@ def parse_args() -> argparse.Namespace:
         default="logs/bridge/smores_primitive_status.json",
         help="Status file produced by Isaac and published to ROS 2.",
     )
+    parser.add_argument(
+        "--expert-state-file",
+        default="logs/bridge/self_assembly_state.json",
+        help=(
+            "File receiving /mssr/expert/self_assembly/state "
+            "for ROS-free runtime consumers."
+        ),
+    )
     parser.add_argument("--runtime-request-file", default=None,
                         help="Separate teleop timeline/camera request file; defaults beside action file.")
     parser.add_argument("--runtime-status-file", default=None,
@@ -183,6 +206,7 @@ def main() -> None:
         primitive_goal_file=Path(args.primitive_goal_file),
         primitive_cancel_file=Path(args.primitive_cancel_file),
         primitive_status_file=Path(args.primitive_status_file),
+        expert_state_file=Path(args.expert_state_file),
         publish_period=args.publish_period,
         runtime_request_file=Path(args.runtime_request_file) if args.runtime_request_file else None,
         runtime_status_file=Path(args.runtime_status_file) if args.runtime_status_file else None,

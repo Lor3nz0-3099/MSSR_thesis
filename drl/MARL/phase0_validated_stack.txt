@@ -1,0 +1,24 @@
+MSSR MARL - Phase 0 validated stack
+validated_date=2026-10-25
+
+=== ISAAC LAB ===
+path=/home/lorenzo/IsaacLab
+perf-2026-06-24
+28a37cecdd433c22d9eabd6a5954add9f13a8951
+
+=== PYTHON ===
+Python 3.12.15
+
+=== TORCH / CUDA ===
+torch=2.10.0+cu128
+torch_cuda=12.8
+cuda_available=True
+gpu=NVIDIA GeForce RTX 4070 Laptop GPU
+isaacsim=6.0.0.1
+isaaclab=6.1.11
+torchvision=0.25.0+cu128
+warp-lang=1.13.0
+
+=== BC-V4 ===
+checkpoint=artifacts/bc_v1/runs/20261022T232532_854802073Z_207309_bc_v4_actor_visible_r1m_scratch_final/best.pt
+d90a73e9b5ba2ecb579e4fc8733066b1c55d9e60dafeb1d71c029c49a7c21c6d  artifacts/bc_v1/runs/20261022T232532_854802073Z_207309_bc_v4_actor_visible_r1m_scratch_final/best.pt

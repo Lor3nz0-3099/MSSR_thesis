@@ -121,6 +121,47 @@ def _succeed_parallel_phase(
     return goals, decision
 
 
+def test_policy_selected_alignments_keep_barriers_and_do_not_dock() -> None:
+    commands = [
+        {'command': 'align_faces', 'module_ids': ['m1', 'm0'],
+         'parameters': {'face_a': 'BOTTOM', 'face_b': 'TOP', 'clocking_quarter_turns': 0}},
+        {'command': 'align_faces', 'module_ids': ['m2', 'm0'],
+         'parameters': {'face_a': 'TOP', 'face_b': 'BOTTOM', 'clocking_quarter_turns': 2}},
+    ]
+    executor = ParallelAssemblyExecutor.from_alignment_commands(commands, execution_id='policy')
+    decision = executor.step()
+    observed = []
+    for phase in ('REACH', 'ALIGN', 'CLOCKING', 'APPROACH'):
+        assert decision.phase == phase
+        goals, decision = _succeed_parallel_phase(executor, decision, 2)
+        assert all(goal.primitive == 'align_faces' for goal in goals)
+        assert all(goal.parameters['execution_phase'] == phase.lower() for goal in goals)
+        assert [goal.parameters['clocking_quarter_turns'] for goal in goals] == [0, 2]
+        observed.extend(goals)
+    assert decision.done and decision.success
+    assert decision.primitive_goal is None
+    assert all(goal.primitive != 'dock' for goal in observed)
+
+
+def test_policy_alignment_batch_rejects_conflicting_faces() -> None:
+    commands = [
+        {'command': 'align_faces', 'module_ids': [mobile, 'm0'],
+         'parameters': {'face_a': 'BOTTOM', 'face_b': 'TOP'}}
+        for mobile in ('m1', 'm2')
+    ]
+    with pytest.raises(ValueError, match='face'):
+        ParallelAssemblyExecutor.from_alignment_commands(commands, execution_id='policy')
+
+
+def test_policy_alignment_batch_accepts_existing_module_registry() -> None:
+    command = {'command': 'align_faces', 'module_ids': ['m1', 'm0'],
+               'parameters': {'face_a': 'BOTTOM', 'face_b': 'TOP'}}
+    executor = ParallelAssemblyExecutor.from_alignment_commands(
+        [command], execution_id='policy', additional_known_module_ids=('m2',),
+        initially_assembled_module_ids=('m2',))
+    assert executor.step().primitive_goal.module_ids == ('m1', 'm0')
+
+
 def test_single_action_executes_paper_docking_barriers() -> None:
     executor = ParallelAssemblyExecutor(
         _plan((_action(),)),

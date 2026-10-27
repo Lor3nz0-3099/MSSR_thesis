@@ -1,0 +1,18 @@
+{
+  "schema_version": "mssr.bc_v1.runtime_inference.v1",
+  "actor": "bc_v4_actor_visible_r1m",
+  "deterministic_presence_threshold_logit": 4.5,
+  "selection": {
+    "split": "validation",
+    "metric": "set_exact_match",
+    "set_exact_match": 0.78569546,
+    "set_f1": 0.93636693,
+    "set_jaccard": 0.86985367,
+    "set_precision": 0.92372076,
+    "set_recall": 0.94936417,
+    "predicted_cardinality_mean": 7.254064,
+    "target_cardinality_mean": 7.05812319
+  },
+  "TEST_payload_access": 0,
+  "notes": "Inference-only deterministic BC-v4 threshold. Must not be used for stochastic MAPPO/APPO sampling."
+}
