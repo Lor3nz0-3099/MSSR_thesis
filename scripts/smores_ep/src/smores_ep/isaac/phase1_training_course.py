@@ -616,3 +616,131 @@ def phase1_rc_car_training_course(
 
         forward_only=True,
     )
+
+
+def _install_phase1_static_cones(
+    stage,
+    root_path: str,
+    cones: tuple[Phase1Cone, ...],
+) -> None:
+    """Materialize rigid static Phase-1 navigation cones in USD.
+
+    No RigidBodyAPI is applied: each cone is therefore a static collider.
+    """
+
+    from pxr import (
+        Gf,
+        UsdGeom,
+        UsdPhysics,
+    )
+
+    UsdGeom.Xform.Define(
+        stage,
+        root_path,
+    )
+
+    for index, specification in enumerate(
+        cones,
+        start=1,
+    ):
+        path = (
+            f"{root_path}/"
+            f"Cone{index:02d}"
+        )
+
+        cone = UsdGeom.Cone.Define(
+            stage,
+            path,
+        )
+
+        cone.CreateHeightAttr(
+            float(
+                specification.height_m
+            )
+        )
+
+        cone.CreateRadiusAttr(
+            float(
+                specification.radius_m
+            )
+        )
+
+        cone.CreateDisplayColorAttr(
+            [
+                Gf.Vec3f(
+                    0.90,
+                    0.32,
+                    0.08,
+                )
+            ]
+        )
+
+        x_m, y_m = (
+            specification.center_xy_m
+        )
+
+        UsdGeom.XformCommonAPI(
+            cone
+        ).SetTranslate(
+            Gf.Vec3d(
+                float(x_m),
+                float(y_m),
+                0.5
+                * float(
+                    specification.height_m
+                ),
+            )
+        )
+
+        # Collision only. Absence of RigidBodyAPI keeps it static.
+        UsdPhysics.CollisionAPI.Apply(
+            cone.GetPrim()
+        )
+
+
+def install_phase1_training_course(
+    stage,
+    *,
+    seed: int,
+    box_installer=None,
+    cone_installer=None,
+) -> Phase1TrainingCourse:
+    """Build and materialize one seeded Phase-1 RC-Car8 course.
+
+    The pure generator remains the single source of truth for geometry,
+    reward and the public course observation.
+    """
+
+    course = (
+        phase1_rc_car_training_course(
+            int(seed)
+        )
+    )
+
+    if box_installer is None:
+        from .obstacle_course import (
+            _install_course_boxes,
+        )
+
+        box_installer = (
+            _install_course_boxes
+        )
+
+    if cone_installer is None:
+        cone_installer = (
+            _install_phase1_static_cones
+        )
+
+    box_installer(
+        stage,
+        "/World/Phase1TrainingCourse/Supports",
+        course.support_boxes,
+    )
+
+    cone_installer(
+        stage,
+        "/World/Phase1TrainingCourse/NavigationCones",
+        course.cones,
+    )
+
+    return course

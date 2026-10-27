@@ -185,6 +185,45 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "Nav2 route stage"
         ),
     )
+    course_group.add_argument(
+        "--phase1-training-course",
+        action="store_true",
+        help=(
+            "Install the seeded RC-Car8 Phase-1 MARL road, target "
+            "platform and static cone course"
+        ),
+    )
+    course_group.add_argument(
+        "--phase1-marl-course",
+        action="store_true",
+        help=(
+            "Install a structurally-unseen RC-Car8 "
+            "MARL curriculum stage"
+        ),
+    )
+    parser.add_argument(
+        "--phase1-marl-split",
+        choices=(
+            "train",
+            "validation",
+            "test",
+            "challenge",
+        ),
+        default="train",
+        help="Phase-1 MARL curriculum split",
+    )
+    parser.add_argument(
+        "--phase1-marl-seed",
+        type=int,
+        default=7000,
+        help="Seed selecting the unseen MARL curriculum stage",
+    )
+    parser.add_argument(
+        "--phase1-seed",
+        type=int,
+        default=5100,
+        help="Seed selecting the Phase-1 RC-Car8 MARL course",
+    )
     parser.add_argument(
         "--rc-car-seed",
         type=int,
@@ -370,6 +409,11 @@ def main() -> None:
                 gap_test_course=args.gap_test_course,
                 rc_car_planar_test_course=args.rc_car_planar_test_course,
                 rc_car_seed=args.rc_car_seed,
+                phase1_training_course=args.phase1_training_course,
+                phase1_seed=args.phase1_seed,
+                phase1_marl_course=args.phase1_marl_course,
+                phase1_marl_split=args.phase1_marl_split,
+                phase1_marl_seed=args.phase1_marl_seed,
                 stair_rise_m=stair_spec.rise_m,
                 stair_depth_m=stair_spec.tread_depth_m,
                 stair_count=stair_spec.step_count,

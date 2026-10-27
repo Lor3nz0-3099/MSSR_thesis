@@ -354,6 +354,11 @@ class SelfAssemblySimulationConfig:
     gap_test_course: bool = False
     rc_car_planar_test_course: bool = False
     rc_car_seed: int | None = None
+    phase1_training_course: bool = False
+    phase1_seed: int = 5100
+    phase1_marl_course: bool = False
+    phase1_marl_split: str = "train"
+    phase1_marl_seed: int = 7000
     stair_rise_m: float = 0.065
     stair_depth_m: float = 0.280
     stair_count: int = 3
@@ -382,10 +387,32 @@ class SelfAssemblySimulationConfig:
                 self.button_test_course,
                 self.gap_test_course,
                 self.rc_car_planar_test_course,
+                self.phase1_training_course,
+                self.phase1_marl_course,
             )
         ) > 1:
             raise ValueError(
                 "Physical obstacle and isolated test courses are exclusive"
+            )
+        if self.phase1_marl_split not in {
+            "train",
+            "validation",
+            "test",
+            "challenge",
+        }:
+            raise ValueError(
+                "Unknown Phase-1 MARL split: "
+                f"{self.phase1_marl_split!r}"
+            )
+
+        if type(self.phase1_marl_seed) is not int:
+            raise TypeError(
+                "Phase-1 MARL seed must be an integer"
+            )
+
+        if type(self.phase1_seed) is not int:
+            raise TypeError(
+                "Phase-1 training seed must be an integer"
             )
         if self.steps < 0:
             raise ValueError("Step count cannot be negative")

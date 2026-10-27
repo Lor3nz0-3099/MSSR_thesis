@@ -714,6 +714,27 @@ def run_parallel_self_assembly_scenario(
                 seed=config.gap_seed,
             ),
         )
+    elif config.phase1_marl_course:
+        from smores_ep.isaac.phase1_marl_curriculum import (
+            install_phase1_marl_curriculum_course,
+        )
+
+        obstacle_course = install_phase1_marl_curriculum_course(
+            stage,
+            seed=config.phase1_marl_seed,
+            split=config.phase1_marl_split,
+        )
+
+    elif config.phase1_training_course:
+        from smores_ep.isaac.phase1_training_course import (
+            install_phase1_training_course,
+        )
+
+        obstacle_course = install_phase1_training_course(
+            stage,
+            seed=config.phase1_seed,
+        )
+
     elif config.rc_car_planar_test_course:
         from smores_ep.isaac.obstacle_course import (
             install_rc_car_planar_test_course,
