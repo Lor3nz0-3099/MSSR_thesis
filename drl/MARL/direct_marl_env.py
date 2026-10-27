@@ -1,12 +1,27 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
+from copy import deepcopy
+from dataclasses import dataclass
 from typing import Any
 
 from drl.MARL.runtime_handoff import (
     DirectMARLHandoff,
     RuntimePhase,
 )
+
+
+@dataclass(frozen=True)
+class DirectMARLTransition:
+    """One authority-safe physical transition for one vector environment."""
+
+    env_index: int
+    previous_state: Any
+    actuation_result: Any
+    physics_result: Any
+    next_state: Any
+    evaluation: Any
+    episode_step: int
 
 
 class DirectMARLEnv:
@@ -45,6 +60,18 @@ class DirectMARLEnv:
         ],
         actuation_bridge: Any,
         target_morphology: str = "rc_car8",
+        state_reader: Callable[
+            [int],
+            Any,
+        ] | None = None,
+        physics_step: Callable[
+            [],
+            Any,
+        ] | None = None,
+        transition_evaluator: Callable[
+            ...,
+            Any,
+        ] | None = None,
     ) -> None:
         self._handoffs = tuple(
             handoffs
@@ -91,6 +118,50 @@ class DirectMARLEnv:
                     f"{label} must be callable"
                 )
 
+        transition_callbacks = {
+            "state_reader":
+                state_reader,
+            "physics_step":
+                physics_step,
+            "transition_evaluator":
+                transition_evaluator,
+        }
+
+        transition_configured = tuple(
+            callback is not None
+            for callback
+            in transition_callbacks.values()
+        )
+
+        if (
+            any(
+                transition_configured
+            )
+            and not all(
+                transition_configured
+            )
+        ):
+            raise ValueError(
+                "state_reader, physics_step and "
+                "transition_evaluator must be configured together"
+            )
+
+        if all(
+            transition_configured
+        ):
+            for (
+                label,
+                callback,
+            ) in (
+                transition_callbacks.items()
+            ):
+                if not callable(
+                    callback
+                ):
+                    raise TypeError(
+                        f"{label} must be callable"
+                    )
+
         step = getattr(
             actuation_bridge,
             "step",
@@ -130,6 +201,24 @@ class DirectMARLEnv:
         self._actuation_bridge = (
             actuation_bridge
         )
+
+        self._state_reader = (
+            state_reader
+        )
+
+        self._physics_step = (
+            physics_step
+        )
+
+        self._transition_evaluator = (
+            transition_evaluator
+        )
+
+        self._episode_steps = [
+            0
+            for _
+            in self._handoffs
+        ]
 
         self.target_morphology = (
             target_morphology
@@ -249,6 +338,10 @@ class DirectMARLEnv:
             # Revoke MARL/Expert authority from the previous episode
             # before starting a new external process.
             handoff.reset()
+
+            self._episode_steps[
+                env_index
+            ] = 0
 
             launched = (
                 self._expert_launcher(
@@ -460,4 +553,197 @@ class DirectMARLEnv:
             in range(
                 self.num_envs
             )
+        )
+
+    @property
+    def episode_steps(
+        self,
+    ) -> tuple[int, ...]:
+        return tuple(
+            self._episode_steps
+        )
+
+    def _require_transition_runtime(
+        self,
+    ) -> None:
+        if (
+            self._state_reader
+            is None
+            or self._physics_step
+            is None
+            or self._transition_evaluator
+            is None
+        ):
+            raise RuntimeError(
+                "DirectMARLEnv physical transition runtime "
+                "is not configured"
+            )
+
+    def step_marl_transitions(
+        self,
+    ) -> tuple[
+        DirectMARLTransition | None,
+        ...,
+    ]:
+        """Advance exactly one physical MARL transition for the vector batch.
+
+        Ordering:
+
+            capture s_t for every MARL-owned environment
+            -> apply native actuation for every MARL-owned environment
+            -> advance physics exactly once for the vector batch
+            -> capture s_t+1
+            -> evaluate reward/termination from the true pre/post pair
+
+        Environments without MARL authority are not read, actuated,
+        advanced independently, or evaluated here.
+        """
+        active_env_ids = tuple(
+            env_index
+            for (
+                env_index,
+                handoff,
+            )
+            in enumerate(
+                self._handoffs
+            )
+            if handoff.marl_active
+        )
+
+        if not active_env_ids:
+            return tuple(
+                None
+                for _
+                in self._handoffs
+            )
+
+        self._require_transition_runtime()
+
+        assert (
+            self._state_reader
+            is not None
+        )
+
+        assert (
+            self._physics_step
+            is not None
+        )
+
+        assert (
+            self._transition_evaluator
+            is not None
+        )
+
+        previous_states = {
+            env_index:
+                deepcopy(
+                    self._state_reader(
+                        env_index
+                    )
+                )
+            for env_index
+            in active_env_ids
+        }
+
+        actuation_results = {
+            env_index:
+                self.step_marl_actuation(
+                    env_index
+                )
+            for env_index
+            in active_env_ids
+        }
+
+        # Una sola avanzata fisica per l'intero vector batch.
+        physics_result = (
+            self._physics_step()
+        )
+
+        next_states = {
+            env_index:
+                deepcopy(
+                    self._state_reader(
+                        env_index
+                    )
+                )
+            for env_index
+            in active_env_ids
+        }
+
+        results: list[
+            DirectMARLTransition | None
+        ] = [
+            None
+            for _
+            in self._handoffs
+        ]
+
+        for env_index in active_env_ids:
+            self._episode_steps[
+                env_index
+            ] += 1
+
+            episode_step = (
+                self._episode_steps[
+                    env_index
+                ]
+            )
+
+            evaluation = (
+                self._transition_evaluator(
+                    env_index=env_index,
+                    previous_state=(
+                        previous_states[
+                            env_index
+                        ]
+                    ),
+                    next_state=(
+                        next_states[
+                            env_index
+                        ]
+                    ),
+                    actuation_result=(
+                        actuation_results[
+                            env_index
+                        ]
+                    ),
+                    physics_result=(
+                        physics_result
+                    ),
+                    episode_step=(
+                        episode_step
+                    ),
+                )
+            )
+
+            results[
+                env_index
+            ] = DirectMARLTransition(
+                env_index=env_index,
+                previous_state=(
+                    previous_states[
+                        env_index
+                    ]
+                ),
+                actuation_result=(
+                    actuation_results[
+                        env_index
+                    ]
+                ),
+                physics_result=(
+                    physics_result
+                ),
+                next_state=(
+                    next_states[
+                        env_index
+                    ]
+                ),
+                evaluation=evaluation,
+                episode_step=(
+                    episode_step
+                ),
+            )
+
+        return tuple(
+            results
         )

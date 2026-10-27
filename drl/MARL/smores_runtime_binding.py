@@ -41,6 +41,37 @@ class DecodedSMORESAction:
     command: Mapping[str, object]
 
 
+@dataclass(frozen=True)
+class SMORESMARLProposalOutcome:
+    """Runtime admission result for one complete MARL proposal."""
+
+    accepted: bool
+    code: str
+    message: str
+    owner_ids: tuple[str, ...] = ()
+    statuses: tuple[object, ...] = ()
+
+
+class SMORESMARLActionRejected(RuntimeError):
+    """Expected policy-level rejection kept observable by RL."""
+
+    def __init__(
+        self,
+        outcome: SMORESMARLProposalOutcome,
+    ) -> None:
+        if outcome.accepted:
+            raise ValueError(
+                "Rejected MARL action outcome cannot be accepted"
+            )
+
+        self.outcome = outcome
+
+        super().__init__(
+            "MARL primitive admission rejected: "
+            f"{outcome.code}: {outcome.message}"
+        )
+
+
 class SMORESMARLRuntimeBinding:
     """Translate executable ActionSets through the existing SMORES adapter."""
 
@@ -1932,10 +1963,31 @@ class SMORESMARLDecisionBridge:
         """Revoke stale continuous actuation when a proposal is rejected."""
         try:
             return self._stage_decision(decision, env_index, context)
+
+        except SMORESMARLActionRejected:
+            # RESOURCE_BUSY / INVALID_GOAL are policy outcomes.
+            # The dispatcher already rejected/rolled back the proposal
+            # fail-closed, but the trainer must still reach env.step()
+            # so reward attribution can observe the event.
+            return self.placeholder_action(
+                env_index,
+                context,
+            )
+
         except Exception:
-            clear = getattr(self.dispatcher, "clear", None)
-            if callable(clear):
-                clear(env_index)
+            clear = getattr(
+                self.dispatcher,
+                "clear",
+                None,
+            )
+
+            if callable(
+                clear
+            ):
+                clear(
+                    env_index
+                )
+
             raise
 
     def _stage_decision(
@@ -2060,6 +2112,13 @@ class SMORESNativeDispatcher:
         {
             "wheel_velocity",
             "pan_velocity",
+        }
+    )
+
+    _EXPECTED_POLICY_REJECTION_CODES = frozenset(
+        {
+            "RESOURCE_BUSY",
+            "INVALID_GOAL",
         }
     )
 
@@ -2215,6 +2274,7 @@ class SMORESNativeDispatcher:
 
         self._continuous_by_env = {}
         self._sequence_by_env = {}
+        self._last_outcome_by_env = {}
 
     @staticmethod
     def _finite_number(
@@ -2625,15 +2685,30 @@ class SMORESNativeDispatcher:
             )
         )
 
+    def proposal_outcome(
+        self,
+        env_index,
+    ):
+        """Last admission outcome for the current policy proposal."""
+        return self._last_outcome_by_env.get(
+            env_index
+        )
+
     def clear(
         self,
         env_index=None,
     ):
         if env_index is None:
             self._continuous_by_env.clear()
+            self._last_outcome_by_env.clear()
             return
 
         self._continuous_by_env.pop(
+            env_index,
+            None,
+        )
+
+        self._last_outcome_by_env.pop(
             env_index,
             None,
         )
@@ -2650,6 +2725,12 @@ class SMORESNativeDispatcher:
 
         decoded_actions = tuple(
             decoded_actions
+        )
+
+        # Una policy proposal possiede un solo admission outcome.
+        self._last_outcome_by_env.pop(
+            env_index,
+            None,
         )
 
         executor = (
@@ -2746,6 +2827,35 @@ class SMORESNativeDispatcher:
                         "",
                     )
 
+                    code = str(
+                        code
+                    )
+
+                    message = str(
+                        message
+                    )
+
+                    if (
+                        code
+                        in self._EXPECTED_POLICY_REJECTION_CODES
+                    ):
+                        raise SMORESMARLActionRejected(
+                            SMORESMARLProposalOutcome(
+                                accepted=False,
+                                code=code,
+                                message=message,
+                                owner_ids=tuple(
+                                    module_ids
+                                ),
+                                statuses=tuple(
+                                    [
+                                        *statuses,
+                                        status,
+                                    ]
+                                ),
+                            )
+                        )
+
                     raise RuntimeError(
                         "MARL primitive admission rejected: "
                         f"{code}: {message}"
@@ -2765,16 +2875,61 @@ class SMORESNativeDispatcher:
                 env_index
             ] = pending_continuous
 
+            owner_ids = set(
+                specs
+            )
+
+            for (
+                _,
+                module_ids,
+                _,
+            ) in primitive_rows:
+                owner_ids.update(
+                    module_ids
+                )
+
+            self._last_outcome_by_env[
+                env_index
+            ] = SMORESMARLProposalOutcome(
+                accepted=True,
+                code="ACCEPTED",
+                message="proposal admitted",
+                owner_ids=tuple(
+                    sorted(
+                        owner_ids
+                    )
+                ),
+                statuses=tuple(
+                    statuses
+                ),
+            )
+
             return tuple(
                 statuses
             )
 
-        except Exception:
-            # Presence=0 or rejected proposals must never leave stale drive
-            # commands from the preceding policy decision.
-            self.clear(
-                env_index
+        except Exception as error:
+            expected_outcome = (
+                error.outcome
+                if isinstance(
+                    error,
+                    SMORESMARLActionRejected,
+                )
+                else None
             )
+
+            # Qualunque proposal respinta resta fisicamente fail-closed.
+            # Per le rejection previste dalla policy conserviamo però
+            # l'attribuzione strutturata per il reward.
+            if expected_outcome is None:
+                self.clear(
+                    env_index
+                )
+            else:
+                self._continuous_by_env.pop(
+                    env_index,
+                    None,
+                )
 
             rollback_errors = []
 
@@ -2787,20 +2942,24 @@ class SMORESNativeDispatcher:
                         now_s,
                     )
 
-                except Exception as error:
+                except Exception as rollback_error:
                     rollback_errors.append(
                         (
                             goal.goal_id,
-                            error,
+                            rollback_error,
                         )
                     )
 
             if rollback_errors:
+                self.clear(
+                    env_index
+                )
+
                 details = "; ".join(
-                    f"{goal_id}: {error}"
+                    f"{goal_id}: {rollback_error}"
                     for (
                         goal_id,
-                        error,
+                        rollback_error,
                     )
                     in rollback_errors
                 )
@@ -2808,7 +2967,12 @@ class SMORESNativeDispatcher:
                 raise RuntimeError(
                     "MARL primitive proposal failed and rollback "
                     f"also failed: {details}"
-                )
+                ) from error
+
+            if expected_outcome is not None:
+                self._last_outcome_by_env[
+                    env_index
+                ] = expected_outcome
 
             raise
 
@@ -2829,6 +2993,11 @@ class SMORESNativeActuationStep:
         str,
         tuple[float, float],
     ]
+
+    proposal_outcome: (
+        SMORESMARLProposalOutcome
+        | None
+    ) = None
 
 
 class SMORESNativeActuationBridge:
@@ -3017,6 +3186,23 @@ class SMORESNativeActuationBridge:
             )
         )
 
+        proposal_outcome = None
+
+        outcome_reader = getattr(
+            self.dispatcher,
+            "proposal_outcome",
+            None,
+        )
+
+        if callable(
+            outcome_reader
+        ):
+            proposal_outcome = (
+                outcome_reader(
+                    env_index
+                )
+            )
+
         return SMORESNativeActuationStep(
             baseline_commands=baseline,
             primitive_commands=(
@@ -3027,4 +3213,7 @@ class SMORESNativeActuationBridge:
                 primitive_statuses
             ),
             wheel_rates=wheel_rates,
+            proposal_outcome=(
+                proposal_outcome
+            ),
         )
