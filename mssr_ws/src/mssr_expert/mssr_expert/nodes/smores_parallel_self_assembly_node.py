@@ -490,6 +490,20 @@ class SmoresParallelSelfAssemblyNode(Node):
             decision
         )
 
+        # A new structural dispatch is a new supervision event even when
+        # Isaac has not published a newer physical graph yet.  Preserve the
+        # previous event before storing the new primitive goal.  Polling ticks
+        # with no new primitive continue to share the existing pending record.
+        pending = self._pending_transition
+        if (
+            pending is not None
+            and current_graph.stamp == pending.graph.stamp
+            and expert_output.primitive_goal is not None
+        ):
+            self._flush_pending_transition(
+                next_graph=current_graph
+            )
+
         # Normally there is one pending IL transition per distinct
         # physical graph stamp.  Repeated 20 Hz control ticks over the
         # same cached graph must not create duplicate dataset records.

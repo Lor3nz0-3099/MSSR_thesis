@@ -31,6 +31,7 @@ from typing import Any, Iterable
 
 
 PHASES_BY_TASK = {
+    "assembly": ("assembly",),
     "stairs": ("assembly", "behavior"),
     "gap": ("assembly", "behavior"),
     "rc_car": ("assembly", "behavior"),
@@ -43,6 +44,7 @@ PHASES_BY_TASK = {
 # Keep assembly as a supported phase when a complete run records it, but do
 # not reject a successful stairs episode that contains behavior only.
 REQUIRED_PHASES_BY_TASK = {
+    "assembly": ("assembly",),
     "stairs": ("behavior",),
     "gap": ("assembly", "behavior"),
     "rc_car": ("assembly", "behavior"),
@@ -50,6 +52,7 @@ REQUIRED_PHASES_BY_TASK = {
 }
 
 RESULT_SCHEMA_TO_TASK = {
+    "mssr.self_assembly_episode.v1": "assembly",
     "mssr.stair_headless_episode.v1": "stairs",
     "mssr.gap_headless_episode.v1": "gap",
     "mssr.rc_car_nav2_episode.v1": "rc_car",
