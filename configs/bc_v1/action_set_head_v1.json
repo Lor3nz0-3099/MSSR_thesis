@@ -1,0 +1,6 @@
+{
+  "schema_version": "mssr.bc_v1.action_set_head.v1",
+  "hidden_dim": 128,
+  "activation": "silu",
+  "dropout": 0.1
+}

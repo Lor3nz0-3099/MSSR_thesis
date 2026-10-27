@@ -22,9 +22,20 @@ def component(name):
 def session():
     mapping = yaml.safe_load((CONFIG_DIR / "smores_dualsense.yaml").read_text())
     # Isolate synthetic bindings from the approved physical toggle mapping.
-    mapping["commands"].update(select_rc="cross", select_snake="triangle",
-                               select_mm8="circle", home="square",
-                               estop="ps", resume="share", estop_toggle=None)
+    mapping["commands"].update(
+        select_rc="cross",
+        select_snake="triangle",
+        select_mm8="circle",
+        home="square",
+        estop="ps",
+        resume="share",
+        estop_toggle=None,
+        # Legacy synthetic tests deliberately reuse Cross/Square for
+        # morphology/Home. Disable the new production Snake macros here so
+        # the synthetic mapping remains one-command-per-button.
+        snake_gap=None,
+        snake_stairs=None,
+    )
     return component("session").TeleopSession(InputConfig.from_mapping(mapping))
 
 
@@ -305,3 +316,284 @@ def test_session_propagates_available_controller_morphologies():
     assert payload["detected_morphology"] == "rc_car8"
     assert payload["active_controller"] == "rc_car8"
     assert payload["authority"] == "TELEOP"
+
+
+def test_cross_plus_dpad_requests_initial_snake_self_assembly():
+    """T8: X modifies a morphology selection into initial self-assembly."""
+
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+
+    core = component("session").TeleopSession(
+        InputConfig.from_mapping(mapping)
+    )
+
+    # First neutral packet establishes the real DualSense state.
+    send(core, at=20.0)
+
+    # Physical shipped mapping:
+    #   cross = 0
+    #   dpad_up = 11
+    #
+    # No supported morphology is detected, but initial assembly is
+    # allowed only after the live graph explicitly proves all 8 modules
+    # are physically disconnected.
+    assert core.state.detected_morphology is None
+    core.state.observe_initial_assembly_ready(True)
+
+    send(core, [0, 11], 20.10)
+    payload = core.tick(20.11)
+
+    assert payload["requested_morphology"] == "snake8"
+    assert payload["structural_macro_request"] == "snake8"
+
+    # New T8 contract: X + morphology selection means INITIAL ASSEMBLY,
+    # not self-reconfiguration from a morphology that does not yet exist.
+    assert payload["structural_macro_kind"] == "self_assembly"
+
+
+def test_loose_dpad_without_cross_does_not_start_structural_macro():
+    """T8: loose modules require X + D-pad for initial assembly."""
+
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+
+    core = component("session").TeleopSession(
+        InputConfig.from_mapping(mapping)
+    )
+
+    # Establish controller connection with no detected morphology.
+    send(core, at=21.0)
+    assert core.state.detected_morphology is None
+
+    # Physical shipped mapping:
+    #   dpad_up = 11 -> Snake8
+    # but X/cross is NOT pressed.
+    send(core, [11], 21.10)
+    payload = core.tick(21.11)
+
+    assert payload["requested_morphology"] is None
+    assert payload["structural_macro_request"] is None
+    assert payload["structural_macro_kind"] is None
+    assert payload["rejected_commands"] == [
+        "initial_assembly_requires_cross"
+    ]
+
+
+
+def test_cross_plus_dpad_rejects_unknown_topology_for_initial_assembly():
+    """None morphology is not sufficient evidence that modules are loose."""
+
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+
+    core = component("session").TeleopSession(
+        InputConfig.from_mapping(mapping)
+    )
+
+    send(core, at=22.0)
+
+    # No graph-derived proof of a loose 8-module structure exists.
+    assert core.state.detected_morphology is None
+
+    # Physical mapping: cross + dpad_up -> requested Snake8.
+    send(core, [0, 11], 22.10)
+    payload = core.tick(22.11)
+
+    assert payload["requested_morphology"] is None
+    assert payload["structural_macro_request"] is None
+    assert payload["structural_macro_kind"] is None
+    assert payload["rejected_commands"] == [
+        "initial_assembly_topology_unavailable"
+    ]
+
+
+def test_t8_real_dualsense_maps_cross_to_gap_and_square_to_stairs():
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+
+    assert mapping["buttons"]["cross"] == 0
+    assert mapping["buttons"]["square"] == 2
+
+    assert mapping["commands"]["snake_gap"] == "cross"
+    assert mapping["commands"]["snake_stairs"] == "square"
+
+
+def test_snake_cross_tap_requests_gap_once_on_release():
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+    core = component("session").TeleopSession(
+        InputConfig.from_mapping(mapping)
+    )
+
+    cross = mapping["buttons"]["cross"]
+
+    # Neutral packet establishes the controller without generating an edge.
+    send(core, at=30.0)
+    core.state.observe_topology("snake8")
+
+    baseline = core.tick(30.01)
+    assert baseline["authority"] == "TELEOP"
+    assert baseline["active_controller"] == "snake8"
+
+    # Press alone only ARMS the candidate.  It must not launch immediately,
+    # otherwise X followed one packet later by D-pad could leak into gap.
+    send(core, [cross], 30.10)
+    pressed = core.tick(30.11)
+
+    assert pressed["structural_macro_request"] is None
+    assert pressed["structural_macro_kind"] is None
+
+    # A clean release with no morphology chord means "X alone".
+    send(core, [], 30.20)
+    released = core.tick(30.21)
+
+    assert released["structural_macro_request"] == "snake8"
+    assert released["structural_macro_kind"] == "snake_gap"
+
+    # Event semantics: never repeat while idle after that release.
+    following = core.tick(30.22)
+
+    assert following["structural_macro_request"] is None
+    assert following["structural_macro_kind"] is None
+
+
+def test_cross_then_dpad_chord_never_leaks_into_gap_macro():
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+    core = component("session").TeleopSession(
+        InputConfig.from_mapping(mapping)
+    )
+
+    cross = mapping["buttons"]["cross"]
+    select_snake_button = mapping["commands"]["select_snake"]
+    dpad_up = mapping["buttons"][select_snake_button]
+
+    send(core, at=31.0)
+
+    # Live graph proves eight loose modules.
+    core.state.observe_initial_assembly_ready(True)
+
+    # Human naturally presses X slightly before the D-pad.
+    send(core, [cross], 31.10)
+    first = core.tick(31.11)
+
+    assert first["structural_macro_request"] is None
+    assert first["structural_macro_kind"] is None
+
+    # Direction arrives one Joy packet later while X remains held.
+    send(core, [cross, dpad_up], 31.20)
+    chord = core.tick(31.21)
+
+    assert chord["requested_morphology"] == "snake8"
+    assert chord["structural_macro_request"] == "snake8"
+    assert chord["structural_macro_kind"] == "self_assembly"
+
+    # Releasing the chord must NOT release a stale pending snake_gap.
+    send(core, [], 31.30)
+    released = core.tick(31.31)
+
+    assert released["structural_macro_request"] is None
+    assert released["structural_macro_kind"] is None
+
+
+def test_cross_tap_on_loose_modules_does_not_request_gap():
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+    core = component("session").TeleopSession(
+        InputConfig.from_mapping(mapping)
+    )
+
+    cross = mapping["buttons"]["cross"]
+
+    send(core, at=32.0)
+    core.state.observe_initial_assembly_ready(True)
+
+    assert core.state.detected_morphology is None
+
+    send(core, [cross], 32.10)
+    pressed = core.tick(32.11)
+
+    assert pressed["structural_macro_request"] is None
+    assert pressed["structural_macro_kind"] is None
+
+    send(core, [], 32.20)
+    released = core.tick(32.21)
+
+    assert released["structural_macro_request"] is None
+    assert released["structural_macro_kind"] is None
+
+
+def test_snake_square_requests_stairs_macro_once():
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+    core = component("session").TeleopSession(
+        InputConfig.from_mapping(mapping)
+    )
+
+    square = mapping["buttons"]["square"]
+
+    send(core, at=33.0)
+    core.state.observe_topology("snake8")
+
+    baseline = core.tick(33.01)
+    assert baseline["authority"] == "TELEOP"
+
+    send(core, [square], 33.10)
+    requested = core.tick(33.11)
+
+    assert requested["structural_macro_request"] == "snake8"
+    assert requested["structural_macro_kind"] == "snake_stairs"
+
+    # Held button generates no second rising edge.
+    send(core, [square], 33.20)
+    held = core.tick(33.21)
+
+    assert held["structural_macro_request"] is None
+    assert held["structural_macro_kind"] is None
+
+
+def test_snake_behavior_buttons_do_not_launch_outside_live_snake8():
+    mapping = yaml.safe_load(
+        (CONFIG_DIR / "smores_dualsense.yaml").read_text()
+    )
+
+    cross = mapping["buttons"]["cross"]
+    square = mapping["buttons"]["square"]
+
+    # RC-Car: neither Snake behavior macro is legal.
+    core = component("session").TeleopSession(
+        InputConfig.from_mapping(mapping)
+    )
+    send(core, at=34.0)
+    core.state.observe_topology("rc_car8")
+    core.tick(34.01)
+
+    send(core, [square], 34.10)
+    square_payload = core.tick(34.11)
+
+    assert square_payload["structural_macro_request"] is None
+    assert square_payload["structural_macro_kind"] is None
+
+    send(core, [], 34.20)
+    core.tick(34.21)
+
+    send(core, [cross], 34.30)
+    cross_pressed = core.tick(34.31)
+
+    assert cross_pressed["structural_macro_request"] is None
+    assert cross_pressed["structural_macro_kind"] is None
+
+    send(core, [], 34.40)
+    cross_released = core.tick(34.41)
+
+    assert cross_released["structural_macro_request"] is None
+    assert cross_released["structural_macro_kind"] is None

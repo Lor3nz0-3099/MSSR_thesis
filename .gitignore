@@ -72,3 +72,10 @@ datasets/**
 
 # Generated analysis / visualization outputs
 figures/
+
+
+# BC generated data and historical/diagnostic results remain local.
+# Official BC-v4 release files are added by exact path with git add -f;
+# their inventory and exceptions are documented in docs/bc_v4_actor_visible_release.md.
+# This includes local-only last.pt, older checkpoints, logs and profiling outputs.
+artifacts/bc_v1/

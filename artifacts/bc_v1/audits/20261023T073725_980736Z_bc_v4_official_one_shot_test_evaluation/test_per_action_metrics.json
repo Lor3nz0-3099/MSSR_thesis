@@ -1,0 +1,147 @@
+{
+  "actions": {
+    "align_faces": {
+      "f1": 0.3008130081300813,
+      "fn": 11,
+      "fp": 333,
+      "precision": 0.18181818181818182,
+      "recall": 0.8705882352941177,
+      "support": 85,
+      "tp": 74
+    },
+    "dock": {
+      "f1": 0.477124183006536,
+      "fn": 8,
+      "fp": 152,
+      "precision": 0.3244444444444444,
+      "recall": 0.9012345679012346,
+      "support": 81,
+      "tp": 73
+    },
+    "gravity_settle": {
+      "f1": 0.02553191489361702,
+      "fn": 0,
+      "fp": 229,
+      "precision": 0.01293103448275862,
+      "recall": 1.0,
+      "support": 3,
+      "tp": 3
+    },
+    "pan_delta": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 15,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    },
+    "pan_target": {
+      "f1": 0.028469750889679714,
+      "fn": 29,
+      "fp": 517,
+      "precision": 0.015238095238095238,
+      "recall": 0.21621621621621623,
+      "support": 37,
+      "tp": 8
+    },
+    "pan_velocity": {
+      "f1": 0.997260171845004,
+      "fn": 3,
+      "fp": 144,
+      "precision": 0.9946462430754359,
+      "recall": 0.9998878756166841,
+      "support": 26756,
+      "tp": 26753
+    },
+    "tilt_delta": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 14,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    },
+    "tilt_target": {
+      "f1": 0.34393166834464617,
+      "fn": 87,
+      "fp": 40315,
+      "precision": 0.20803457420685592,
+      "recall": 0.9918516437201461,
+      "support": 10677,
+      "tp": 10590
+    },
+    "tilt_velocity": {
+      "f1": 0.0,
+      "fn": 0,
+      "fp": 15,
+      "precision": 0.0,
+      "recall": 0.0,
+      "support": 0,
+      "tp": 0
+    },
+    "undock": {
+      "f1": 0.04185351270553064,
+      "fn": 8,
+      "fp": 633,
+      "precision": 0.021638330757341576,
+      "recall": 0.6363636363636364,
+      "support": 22,
+      "tp": 14
+    },
+    "wheel_velocity": {
+      "f1": 0.9268472364405239,
+      "fn": 5,
+      "fp": 15287,
+      "precision": 0.863706068008773,
+      "recall": 0.9999483897605285,
+      "support": 96880,
+      "tp": 96875
+    }
+  },
+  "normalized_numeric_by_action": {
+    "pan_target.payload": {
+      "1": {
+        "mae": 2.006293388083577,
+        "rmse": 2.337540073239107,
+        "support": 8,
+        "tolerance": null,
+        "unit": "1",
+        "within_tolerance": null
+      }
+    },
+    "pan_velocity.payload": {
+      "1": {
+        "mae": 0.11015640367705311,
+        "rmse": 0.24438179500339827,
+        "support": 26753,
+        "tolerance": null,
+        "unit": "1",
+        "within_tolerance": null
+      }
+    },
+    "tilt_target.payload": {
+      "1": {
+        "mae": 0.09796512298513735,
+        "rmse": 0.17386180187455993,
+        "support": 10590,
+        "tolerance": null,
+        "unit": "1",
+        "within_tolerance": null
+      }
+    },
+    "wheel_velocity.payload": {
+      "1": {
+        "mae": 0.16350239487566534,
+        "rmse": 0.3194876264646893,
+        "support": 193750,
+        "tolerance": null,
+        "unit": "1",
+        "within_tolerance": null
+      }
+    }
+  },
+  "payload_support_unit": "valid scalar components on matched resource actions; same selection and masking as global VAL numeric metrics",
+  "support_zero_note": "No positive TEST evidence; empty-set score convention is inherited from existing metrics, not a learned-action success claim"
+}

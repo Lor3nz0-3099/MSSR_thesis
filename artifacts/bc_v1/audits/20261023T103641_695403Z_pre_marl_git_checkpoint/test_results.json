@@ -1,0 +1,74 @@
+{
+  "counts": {
+    "passed": 2077,
+    "failed": 0,
+    "skipped": 14,
+    "deselected": 1,
+    "error": 0
+  },
+  "exit_code": 0,
+  "failure_events": [],
+  "TEST_payload_access": 0,
+  "denied_attempts": [],
+  "skipped_details": [
+    {
+      "node": "drl/IL/tests/bc_v1/test_action_heads_bulk.py::test_bulk_validator_scalar_reads_are_bounded_not_per_argument_row[cuda]",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_action_heads_bulk.py', 46, 'Skipped: CUDA unavailable')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_action_heads_routing.py::test_scope_host_scalar_reads_do_not_scale_with_candidates[cuda]",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_action_heads_routing.py', 47, 'Skipped: CUDA unavailable')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_action_heads_routing.py::test_argument_selection_and_category_routes_have_bounded_scalar_reads[cuda]",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_action_heads_routing.py', 118, 'Skipped: CUDA unavailable')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_dataset_counts.py::test_unfiltered_source_matches_frozen_counts",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_dataset_counts.py', 76, 'Skipped: Explicit synthetic-only gate; real census runs in the final suite')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_dataset_counts.py::test_all_supervised_structural_arguments_are_resolvable",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_dataset_counts.py', 84, 'Skipped: Explicit synthetic-only gate; real census runs in the final suite')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_dataset_counts.py::test_source_fingerprints_unchanged_after_audit",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_dataset_counts.py', 93, 'Skipped: Explicit synthetic-only gate; real census runs in the final suite')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_dataset_counts.py::test_all_settle_targets_enabled_and_no_supervised_labels_discarded",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_dataset_counts.py', 99, 'Skipped: Explicit synthetic-only gate; real census runs in the final suite')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_dataset_counts.py::test_known_diagnostics_preserve_other_valid_resources",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_dataset_counts.py', 109, 'Skipped: Explicit synthetic-only gate; real census runs in the final suite')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_dataset_counts.py::test_all_three_new_assembly_episodes_are_included",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_dataset_counts.py', 115, 'Skipped: Explicit synthetic-only gate; real census runs in the final suite')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_no_structural.py::test_dense_multi_sample_joint_ce_is_cuda_safe",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_no_structural.py', 178, 'Skipped: CUDA unavailable')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_trainer.py::test_validation_host_postprocessing_matches_cuda_loss_and_metrics",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_trainer.py', 127, 'Skipped: CUDA postprocessing boundary')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_training.py::test_k2_real_first_batch_completes_optimizer_step",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_training.py', 232, 'Skipped: Explicit opt-in for one real TRAIN batch; TEST stays sealed')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_training.py::test_cuda_checkpoint_restores_adamw_step_on_cpu_and_moments_on_cuda",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_training.py', 379, 'Skipped: CUDA checkpoint placement regression')"
+    },
+    {
+      "node": "drl/IL/tests/bc_v1/test_training.py::test_checkpoint_verification_api_uses_eval_no_grad_and_determinism[cuda:0]",
+      "reason": "('/home/lorenzo/MSSR_thesis/drl/IL/tests/bc_v1/test_training.py', 461, 'Skipped: CUDA equivalence verification')"
+    }
+  ],
+  "deselected_details": [
+    "drl/IL/tests/bc_v1/test_dataset_counts.py::test_g1_materialized_cache_has_frozen_v6_split_counts"
+  ]
+}

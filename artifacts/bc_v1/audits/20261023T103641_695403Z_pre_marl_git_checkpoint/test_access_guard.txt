@@ -1,0 +1,6 @@
+PASS
+THIS TASK TEST payload access = 0
+Denied attempts = 0
+Previous certified episode-open audit hook and real-sidecar split guard reused; synthetic TEST fixtures allowed.
+Exact previous CPU exclusions retained; no real census or all-split G1 constructor.
+All parent/worker seal reports and both suite summaries checked.

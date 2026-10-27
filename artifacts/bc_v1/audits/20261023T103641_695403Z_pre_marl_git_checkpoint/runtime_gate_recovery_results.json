@@ -1,0 +1,13 @@
+{
+  "counts": {
+    "passed": 41,
+    "failed": 0,
+    "skipped": 0,
+    "deselected": 0,
+    "error": 0
+  },
+  "exit_code": 0,
+  "TEST_payload_access": 0,
+  "denied_attempts": [],
+  "failures": []
+}

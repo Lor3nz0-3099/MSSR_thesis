@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from smores_ep.config.simulation import SelfAssemblySimulationConfig
+from smores_ep.primitives.bc_runtime import attach_bc_runtime
 from smores_ep.control.teleop import SmoresCommand
 from smores_ep.isaac.command_router import IsaacMultiModuleCommandRouter
 from smores_ep.isaac.docking import IsaacDockingManager
@@ -183,6 +184,140 @@ def self_assembly_spawn_layout(
     if len(config.module_ids) == 3:
         return triangular_spawn_layout(config)
     return radial_spawn_layout(config)
+
+
+
+def place_composite_spawn_layout(
+    layout: Mapping[
+        str,
+        tuple[
+            float,
+            float,
+            float,
+            float,
+        ],
+    ],
+    obstacle_course: Any,
+    *,
+    layout_profile: str | None,
+) -> dict[
+    str,
+    tuple[
+        float,
+        float,
+        float,
+        float,
+    ],
+]:
+    """Place loose modules on the real composite start support.
+
+    Teleop-connected courses use the physical CompositeStartPlatform
+    centre as the swarm/root centre. Legacy composite layouts preserve
+    the historical -1.50 m X translation.
+    """
+
+    if layout_profile != "teleop_connected_v1":
+        return {
+            module_id: (
+                x_m - 1.50,
+                y_m,
+                z_m,
+                yaw_deg,
+            )
+            for module_id, (
+                x_m,
+                y_m,
+                z_m,
+                yaw_deg,
+            ) in layout.items()
+        }
+
+    start_box = next(
+        (
+            box
+            for box in obstacle_course.boxes
+            if box.semantic
+            == "composite_start_platform"
+        ),
+        None,
+    )
+
+    if start_box is None:
+        raise RuntimeError(
+            "teleop_connected_v1 requires "
+            "CompositeStartPlatform"
+        )
+
+    center_x = float(
+        start_box.center_xyz_m[0]
+    )
+
+    center_y = float(
+        start_box.center_xyz_m[1]
+    )
+
+    return {
+        module_id: (
+            x_m + center_x,
+            y_m + center_y,
+            z_m,
+            yaw_deg,
+        )
+        for module_id, (
+            x_m,
+            y_m,
+            z_m,
+            yaw_deg,
+        ) in layout.items()
+    }
+
+def place_button_spawn_layout(
+    layout: Mapping[str, tuple[float, float, float, float]],
+    obstacle_course: Any,
+) -> dict[str, tuple[float, float, float, float]]:
+    """Scale/rotate/translate a loose-module layout in front of a button.
+
+    The isolated button course owns the static spawn context.  This function
+    only maps the generic self-assembly layout into that context; it does not
+    hard-code a morphology or a runner-specific module assignment.
+    """
+
+    if not layout:
+        raise ValueError("Button assembly spawn layout cannot be empty")
+
+    center_x, center_y = (
+        float(obstacle_course.assembly_spawn_center_xy_m[0]),
+        float(obstacle_course.assembly_spawn_center_xy_m[1]),
+    )
+    target_radius = float(obstacle_course.assembly_spawn_radius_m)
+    yaw_rad = float(obstacle_course.assembly_spawn_yaw_rad)
+
+    source_center_x = sum(pose[0] for pose in layout.values()) / len(layout)
+    source_center_y = sum(pose[1] for pose in layout.values()) / len(layout)
+    source_radius = max(
+        math.hypot(pose[0] - source_center_x, pose[1] - source_center_y)
+        for pose in layout.values()
+    )
+    if source_radius <= 1.0e-9:
+        raise ValueError("Button assembly spawn source layout has zero radius")
+
+    scale = target_radius / source_radius
+    c = math.cos(yaw_rad)
+    s = math.sin(yaw_rad)
+    yaw_deg = math.degrees(yaw_rad)
+
+    placed = {}
+    for module_id, (x_m, y_m, z_m, module_yaw_deg) in layout.items():
+        dx = (float(x_m) - source_center_x) * scale
+        dy = (float(y_m) - source_center_y) * scale
+        placed[module_id] = (
+            center_x + c * dx - s * dy,
+            center_y + s * dx + c * dy,
+            float(z_m),
+            float(module_yaw_deg) + yaw_deg,
+        )
+
+    return placed
 
 
 def closest_module_to_centroid(
@@ -488,6 +623,8 @@ def run_parallel_self_assembly_scenario(
         PHYSICS_ROOT,
     )
     obstacle_course = None
+    composite_layout_profile = None
+
     if config.composite_mission_path is not None:
         from smores_ep.isaac.obstacle_course import (
             install_composite_obstacle_course,
@@ -496,6 +633,17 @@ def run_parallel_self_assembly_scenario(
         mission = json.loads(
             config.composite_mission_path.read_text(encoding="utf-8")
         )
+
+        raw_layout_profile = mission.get(
+            "layout_profile"
+        )
+
+        composite_layout_profile = (
+            None
+            if raw_layout_profile is None
+            else str(raw_layout_profile)
+        )
+
         seed_catalog = json.loads(
             config.composite_seed_catalog_path.read_text(encoding="utf-8")
         )
@@ -578,11 +726,30 @@ def run_parallel_self_assembly_scenario(
             ),
         )
     layout = self_assembly_spawn_layout(config)
+
     if config.composite_mission_path is not None:
-        layout = {
-            module_id: (x_m - 1.50, y_m, z_m, yaw_deg)
-            for module_id, (x_m, y_m, z_m, yaw_deg) in layout.items()
-        }
+        if obstacle_course is None:
+            raise RuntimeError(
+                "Composite mission did not create an obstacle course"
+            )
+
+        layout = place_composite_spawn_layout(
+            layout,
+            obstacle_course,
+            layout_profile=composite_layout_profile,
+        )
+
+    elif config.button_test_course:
+        if obstacle_course is None:
+            raise RuntimeError(
+                "Button test course did not create an obstacle course"
+            )
+
+        layout = place_button_spawn_layout(
+            layout,
+            obstacle_course,
+        )
+
     elif config.manual_obstacle_course:
         layout = {
             module_id: (
@@ -841,6 +1008,10 @@ def run_parallel_self_assembly_scenario(
         invalidate_command_sources
     )
     primitive_executor.reset_free_modules_callback = reset_free_modules
+    bc_runtime = attach_bc_runtime(
+        config.primitive_status_file.parent, action_channel, primitive_executor,
+        tuple(module_roots),
+    )
 
     previous_connection_count = 0
     previous_behavior_commands: dict[str, SmoresCommand] = {}
@@ -930,6 +1101,8 @@ def run_parallel_self_assembly_scenario(
                 dynamic_obstacle_path,
                 now_s,
             )
+        if bc_runtime is not None:
+            bc_runtime.service(now_s)
         admission_statuses: list[Any] = []
         try:
             primitive_goal = primitive_channel.poll_goal()
@@ -991,6 +1164,8 @@ def run_parallel_self_assembly_scenario(
             )
         except (TypeError, ValueError) as error:
             print(f"[behavior] REJECTED malformed action payload: {error}")
+        if bc_runtime is not None:
+            behavior_baseline = bc_runtime.filter_commands(behavior_baseline)
         diagnostics = action_channel.diagnostics
 
         behavior_source_seen = prepare_initial_manual_teleop_handoff(
@@ -1046,6 +1221,8 @@ def run_parallel_self_assembly_scenario(
             held_primitive_commands,
         )
         routed_rates = command_router.apply(routed_commands)
+        if bc_runtime is not None:
+            bc_runtime.record_applied(behavior_baseline, routed_commands, now_s)
         if behavior_baseline != previous_behavior_commands:
             if behavior_baseline:
                 behavior_started_step = physics_step
@@ -1139,6 +1316,8 @@ def run_parallel_self_assembly_scenario(
                     "deterministic_parallel_self_assembly"
                 ),
             )
+            if bc_runtime is not None:
+                bc_runtime.publish_status(SimulationManager.get_simulation_time())
 
         connection_count = len(docking.connections)
         if connection_count != previous_connection_count:

@@ -98,3 +98,71 @@ def test_ambiguous_live_match_never_guesses():
     )
 
     assert detector.detect(current) is None
+
+
+
+def test_authoritative_loose_graph_requires_eight_disconnected_modules():
+    from mssr_expert.graph.attributed_robot_graph import (
+        AttributedRobotGraph,
+        GraphNode,
+    )
+    from mssr_expert.teleop import topology
+
+    graph = AttributedRobotGraph(
+        nodes=tuple(
+            GraphNode(
+                f"smores_{index:02d}",
+                {
+                    "node_type": "physical_module",
+                    "robot_family": "smores_ep",
+                },
+            )
+            for index in range(8)
+        ),
+        edges=(),
+    )
+
+    assert topology.is_authoritative_loose_graph(graph) is True
+
+    seven_modules = AttributedRobotGraph(
+        nodes=graph.nodes[:7],
+        edges=(),
+    )
+
+    assert topology.is_authoritative_loose_graph(seven_modules) is False
+
+
+def test_authoritative_loose_graph_rejects_attached_modules():
+    from mssr_expert.graph.attributed_robot_graph import (
+        AttributedRobotGraph,
+        GraphEdge,
+        GraphNode,
+    )
+    from mssr_expert.teleop import topology
+
+    nodes = tuple(
+        GraphNode(
+            f"smores_{index:02d}",
+            {
+                "node_type": "physical_module",
+                "robot_family": "smores_ep",
+            },
+        )
+        for index in range(8)
+    )
+
+    graph = AttributedRobotGraph(
+        nodes=nodes,
+        edges=(
+            GraphEdge(
+                "smores_00",
+                "smores_01",
+                {
+                    "relation_type": "current_connection",
+                    "is_attached": True,
+                },
+            ),
+        ),
+    )
+
+    assert topology.is_authoritative_loose_graph(graph) is False

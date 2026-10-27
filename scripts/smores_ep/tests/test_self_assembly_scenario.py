@@ -7,9 +7,14 @@ import pytest
 from smores_ep.config.simulation import SelfAssemblySimulationConfig
 from smores_ep.control.teleop import SmoresCommand
 from smores_ep.isaac.physics_asset import PHYSICS_ROOT
+from smores_ep.isaac.obstacle_course import (
+    mobile_manipulator_button_test_course,
+    sample_button_target_spec,
+)
 from smores_ep.scenarios.parallel_self_assembly import (
     _publish_primitive_statuses,
     closest_module_to_centroid,
+    place_button_spawn_layout,
     radial_spawn_layout,
     self_assembly_module_roots,
     self_assembly_spawn_layout,
@@ -85,6 +90,55 @@ def test_seven_module_registry_and_radial_layout_scale_from_one_source(
         x_m, y_m, _, _ = layout[module_id]
         assert math.hypot(x_m, y_m) == pytest.approx(config.spawn_radius_m)
 
+
+
+def test_button_spawn_layout_is_seeded_in_front_of_fixture(tmp_path) -> None:
+    module_ids = tuple(f"smores_{index:02d}" for index in range(1, 9))
+    config = SelfAssemblySimulationConfig(
+        physics_usd=tmp_path / "physics.usd",
+        module_ids=module_ids,
+    )
+    base = radial_spawn_layout(config)
+
+    def placed(seed: int):
+        course = mobile_manipulator_button_test_course(
+            sample_button_target_spec(seed)
+        )
+        return course, place_button_spawn_layout(base, course)
+
+    course_a, first = placed(6101)
+    course_b, second = placed(6101)
+    _, different = placed(6102)
+
+    assert first == second
+    assert first != different
+    assert closest_module_to_centroid(first) == module_ids[0]
+
+    cx = sum(p[0] for p in first.values()) / len(first)
+    cy = sum(p[1] for p in first.values()) / len(first)
+    assert (cx, cy) == pytest.approx(course_a.assembly_spawn_center_xy_m)
+
+    bx, by, _ = course_a.button_center_xyz_m
+    nx, ny = course_a.press_direction_world_xy
+    for x_m, y_m, _, _ in first.values():
+        robot_side_clearance = (
+            (bx - x_m) * nx
+            + (by - y_m) * ny
+        )
+        assert robot_side_clearance >= 0.099
+
+    root_yaw_deg = first[module_ids[0]][3]
+    assert root_yaw_deg == pytest.approx(
+        math.degrees(math.atan2(-ny, -nx))
+    )
+
+    poses = list(first.values())
+    for i, pose_a in enumerate(poses):
+        for pose_b in poses[i + 1:]:
+            assert math.hypot(
+                pose_a[0] - pose_b[0],
+                pose_a[1] - pose_b[1],
+            ) > 0.15
 
 def test_sparse_behavior_commands_do_not_brake_omitted_modules() -> None:
     command = SmoresCommand(linear_x_m_s=0.04)
@@ -459,3 +513,107 @@ def test_prior_operational_source_prevents_mm8_direct_handoff_recapture() -> Non
     assert seen is True
     assert drives["m1"].captures == 0
     assert drives["m2"].captures == 0
+
+
+
+def test_v6_teleop_composite_spawn_centers_on_start_platform():
+    from types import SimpleNamespace
+
+    from smores_ep.scenarios import parallel_self_assembly
+
+    assert hasattr(
+        parallel_self_assembly,
+        "place_composite_spawn_layout",
+    )
+
+    layout = {
+        "smores_01": (
+            0.0,
+            0.0,
+            0.0316,
+            0.0,
+        ),
+        "smores_02": (
+            +0.34,
+            0.0,
+            0.0316,
+            180.0,
+        ),
+        "smores_03": (
+            -0.34,
+            0.0,
+            0.0316,
+            0.0,
+        ),
+    }
+
+    start = SimpleNamespace(
+        semantic="composite_start_platform",
+        center_xyz_m=(-1.05, 0.0, -0.01),
+    )
+
+    course = SimpleNamespace(
+        boxes=(start,),
+    )
+
+    placed = (
+        parallel_self_assembly
+        .place_composite_spawn_layout(
+            layout,
+            course,
+            layout_profile="teleop_connected_v1",
+        )
+    )
+
+    # Physical/root candidate is exactly in the middle
+    # of the real start platform.
+    assert placed["smores_01"][:2] == pytest.approx(
+        (-1.05, 0.0)
+    )
+
+    # Whole radial layout receives the same translation.
+    assert placed["smores_02"][:2] == pytest.approx(
+        (-0.71, 0.0)
+    )
+
+    assert placed["smores_03"][:2] == pytest.approx(
+        (-1.39, 0.0)
+    )
+
+
+def test_v6_legacy_composite_spawn_keeps_old_offset():
+    from types import SimpleNamespace
+
+    from smores_ep.scenarios import parallel_self_assembly
+
+    assert hasattr(
+        parallel_self_assembly,
+        "place_composite_spawn_layout",
+    )
+
+    layout = {
+        "root": (
+            0.0,
+            0.0,
+            0.0316,
+            0.0,
+        ),
+    }
+
+    course = SimpleNamespace(
+        boxes=(),
+    )
+
+    placed = (
+        parallel_self_assembly
+        .place_composite_spawn_layout(
+            layout,
+            course,
+            layout_profile=None,
+        )
+    )
+
+    assert placed["root"][:2] == (
+        -1.50,
+        0.0,
+    )

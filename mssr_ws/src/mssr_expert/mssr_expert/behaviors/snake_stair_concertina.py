@@ -39,7 +39,16 @@ class SnakeStairConcertinaPlanner:
     MODULE_COUNT = 8
     MAX_TRACK_TILT_SPEED_RAD_S = 0.45
 
-    def plan(
+    def plan(self, graph, assignments, parameters, neutral_tilt_rad_by_module=None):
+        from mssr_expert.behaviors.snake_gait_frame import local_planning_graph
+        projected = local_planning_graph(graph, parameters, "stairs")
+        if projected is None:
+            return self._plan_axis_aligned(graph, assignments, parameters, neutral_tilt_rad_by_module)
+        local_graph, frame = projected
+        return frame.bind_program(self._plan_axis_aligned(
+            local_graph, assignments, parameters, neutral_tilt_rad_by_module))
+
+    def _plan_axis_aligned(
         self,
         graph: AttributedRobotGraph,
         assignments: Sequence[AssignedModule],

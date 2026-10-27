@@ -153,10 +153,20 @@ class RcCarTeleopController:
                         tilt.lower_limit_rad if finite(tilt.lower_limit_rad) else self.geometry.tilt_min_rad)
             upper = min(0.0, self.geometry.tilt_max_rad,
                         tilt.upper_limit_rad if finite(tilt.upper_limit_rad) else self.geometry.tilt_max_rad)
-            if lower > upper or not lower - 1e-9 <= tilt.position_rad <= upper + 1e-9:
+            if lower > upper:
                 return self._safe()
+
+            # A loaded support can leave the calibrated height branch.
+            # Clamp only height calculations; keep RC traction available so
+            # the operator can continue driving without restarting the run.
             bounds[target.module_id] = (lower, upper)
-            positions[target.module_id] = tilt.position_rad
+            positions[target.module_id] = max(
+                lower,
+                min(
+                    upper,
+                    tilt.position_rad,
+                ),
+            )
         min_height = max(self._height(upper) for lower, upper in bounds.values())
         max_height = min(self._height(lower) for lower, upper in bounds.values())
         if min_height > max_height:

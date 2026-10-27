@@ -1,0 +1,33 @@
+{
+  "TEST_payload_access_this_task": 0,
+  "cause": "run_runtime_suite.py inserts repository root only; package is under scripts/smores_ep/src/smores_ep",
+  "classification": "B \u2014 AUDIT COMPLETE; COMMIT BLOCKED BY TEST/INTEGRITY ISSUE",
+  "commit_created": false,
+  "exact_error": "ModuleNotFoundError: No module named 'smores_ep'",
+  "files": [
+    "scripts/smores_ep/tests/test_bc_runtime.py",
+    "scripts/smores_ep/tests/test_command_router.py"
+  ],
+  "fix_attempted": false,
+  "kind": "supplemental audit-local runtime test composition error, not a scientific integrity failure",
+  "main_suite": {
+    "deselected": 1,
+    "error": 0,
+    "failed": 0,
+    "passed": 2077,
+    "skipped": 14
+  },
+  "package_exists": true,
+  "production_regression_established": false,
+  "real_runtime_assertions_executed": 0,
+  "retry_attempted": false,
+  "runtime_suite": {
+    "deselected": 0,
+    "error": 2,
+    "failed": 0,
+    "passed": 0,
+    "skipped": 0
+  },
+  "staging_performed": false,
+  "user_stop_rule": "If suite fails, STOP BEFORE COMMIT; diagnose and report; no automatic production correction"
+}

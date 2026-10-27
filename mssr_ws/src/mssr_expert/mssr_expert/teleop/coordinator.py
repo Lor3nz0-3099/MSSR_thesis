@@ -84,12 +84,17 @@ class RuntimeCoordinator:
         # decision for this same control tick.  Otherwise one final human
         # actuator command could leak after the reconfiguration has started.
         structural_request = status.get("structural_macro_request")
+        structural_kind = status.get("structural_macro_kind")
+
         if (
             structural_request is not None
             and not self._estop_latched
             and self._structural_request_handler is not None
         ):
-            self._structural_request_handler(structural_request)
+            self._structural_request_handler(
+                structural_request,
+                structural_kind,
+            )
 
         ready = self.runtime.ready(now)
 

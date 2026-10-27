@@ -1,0 +1,3211 @@
+{
+  "counting_method": "Independent pre-B2 streaming census of Canonical joint action commanded flags and module_resource_masks; no adapter audit used; no ALIGN filter; unique physical rows, not repeat-weighted timesteps.",
+  "expected": {
+    "bc_morphology_rows": {
+      "assembling": 529,
+      "mobile_manipulator8": 13541,
+      "rc_car8": 46620,
+      "reconfiguring": 435,
+      "snake8": 58475
+    },
+    "bc_useful_episodes": 73,
+    "bc_valid_rows": 119600,
+    "canonical_rows": 197240,
+    "command_instances": {
+      "align_faces": 552,
+      "dock": 526,
+      "gravity_settle": 24,
+      "pan_target": 646,
+      "pan_velocity": 194548,
+      "tilt_target": 84967,
+      "undock": 106,
+      "wheel_velocity": 586058
+    },
+    "command_types": {
+      "align_faces": 362,
+      "dock": 339,
+      "gravity_settle": 24,
+      "pan_target": 626,
+      "pan_velocity": 48637,
+      "tilt_target": 25251,
+      "undock": 81,
+      "wheel_velocity": 108132
+    },
+    "diagnostics": {
+      "conflicting_resources_supervised": 0,
+      "conflicts_on_bc_rows": 9,
+      "resource_conflicts": 18,
+      "unresolved_sequences": 94,
+      "unresolved_sequences_by_episode": {
+        "expert:button:seed-006101": 14,
+        "expert:button:seed-006103": 15,
+        "expert:button:seed-006107": 12,
+        "expert:button:seed-006251": 14,
+        "expert:button:seed-008568": 11,
+        "expert:button:seed-008936": 14,
+        "expert:button:seed-009974": 14
+      },
+      "unresolved_sequences_on_bc_rows": 0
+    },
+    "episodes": 80,
+    "episodes_by_kind": {
+      "expert": 59,
+      "teleop": 21
+    },
+    "generic_resource_instances": {
+      "internal_motion": {
+        "pan_delta": 0,
+        "pan_target": 611,
+        "pan_velocity": 186484,
+        "tilt_delta": 0,
+        "tilt_target": 84760,
+        "tilt_velocity": 0
+      },
+      "locomotion": {
+        "wheel_velocity": 576942
+      }
+    },
+    "morphology_rows": {
+      "assembling": 37678,
+      "mobile_manipulator8": 14419,
+      "rc_car8": 48640,
+      "reconfiguring": 31655,
+      "snake8": 64848
+    },
+    "per_episode": [
+      {
+        "bc_morphology_rows": {
+          "assembling": 19
+        },
+        "bc_valid_rows": 19,
+        "bytes": 107895842,
+        "canonical_rows": 2178,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 8
+        },
+        "command_types": {
+          "align_faces": 6,
+          "dock": 7,
+          "tilt_target": 7
+        },
+        "episode_id": "expert:assembly:seed-006217",
+        "file": "episodes/expert__assembly__seed-006217.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 2178
+        },
+        "sha256": "979f6f2c20a25d2104aaf27f06d608d65175d6e824bbceebbb7a074d36e55f4c",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 8
+        },
+        "task": "assembly"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 19
+        },
+        "bc_valid_rows": 19,
+        "bytes": 107035930,
+        "canonical_rows": 2162,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 8
+        },
+        "command_types": {
+          "align_faces": 6,
+          "dock": 5,
+          "tilt_target": 8
+        },
+        "episode_id": "expert:assembly:seed-006284",
+        "file": "episodes/expert__assembly__seed-006284.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 2162
+        },
+        "sha256": "7da54c43b8dac94d2b1e5484eed84a61e7838541f8c31e49be950abd773c8573",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 8
+        },
+        "task": "assembly"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 19
+        },
+        "bc_valid_rows": 19,
+        "bytes": 105735862,
+        "canonical_rows": 2133,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 8
+        },
+        "command_types": {
+          "align_faces": 6,
+          "dock": 6,
+          "tilt_target": 7
+        },
+        "episode_id": "expert:assembly:seed-006307",
+        "file": "episodes/expert__assembly__seed-006307.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 2133
+        },
+        "sha256": "6c392bae599dce18404fbf964d6eed3c253a44e0f2f5c0c13cf6a25fecabc934",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 8
+        },
+        "task": "assembly"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 0,
+          "mobile_manipulator8": 0,
+          "rc_car8": 0
+        },
+        "bc_valid_rows": 0,
+        "bytes": 28869090,
+        "canonical_rows": 548,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_target": 6,
+          "pan_velocity": 980,
+          "tilt_target": 28,
+          "wheel_velocity": 1102
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 3,
+          "pan_target": 3,
+          "pan_velocity": 245,
+          "tilt_target": 14,
+          "wheel_velocity": 306
+        },
+        "episode_id": "expert:button:seed-006101",
+        "file": "episodes/expert__button__seed-006101.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 202,
+          "mobile_manipulator8": 101,
+          "rc_car8": 245
+        },
+        "sha256": "f4ad13984897031179bf23ced56616d5831bc6c1a47318c129da800d18377b26",
+        "supervised_instances": {},
+        "task": "button"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 0,
+          "mobile_manipulator8": 0,
+          "rc_car8": 0
+        },
+        "bc_valid_rows": 0,
+        "bytes": 28658389,
+        "canonical_rows": 544,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_target": 4,
+          "pan_velocity": 960,
+          "tilt_target": 28,
+          "wheel_velocity": 1082
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "pan_target": 1,
+          "pan_velocity": 240,
+          "tilt_target": 15,
+          "wheel_velocity": 301
+        },
+        "episode_id": "expert:button:seed-006103",
+        "file": "episodes/expert__button__seed-006103.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 202,
+          "mobile_manipulator8": 102,
+          "rc_car8": 240
+        },
+        "sha256": "dd07f29aebad8ed3e8fe9c1eab5cb25002368b9279f8d2332f8151b894d7f6d4",
+        "supervised_instances": {},
+        "task": "button"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 0,
+          "mobile_manipulator8": 0,
+          "rc_car8": 0
+        },
+        "bc_valid_rows": 0,
+        "bytes": 29117965,
+        "canonical_rows": 553,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_target": 6,
+          "pan_velocity": 956,
+          "tilt_target": 28,
+          "wheel_velocity": 1100
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "pan_target": 3,
+          "pan_velocity": 239,
+          "tilt_target": 15,
+          "wheel_velocity": 311
+        },
+        "episode_id": "expert:button:seed-006107",
+        "file": "episodes/expert__button__seed-006107.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 201,
+          "mobile_manipulator8": 113,
+          "rc_car8": 239
+        },
+        "sha256": "aa57dd47c3a49adb831364ba08adba5c765dd27292a1d7d4ce3105fa79b01ed0",
+        "supervised_instances": {},
+        "task": "button"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 0,
+          "mobile_manipulator8": 0,
+          "rc_car8": 0
+        },
+        "bc_valid_rows": 0,
+        "bytes": 48234340,
+        "canonical_rows": 907,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_target": 5,
+          "pan_velocity": 2200,
+          "tilt_target": 28,
+          "wheel_velocity": 2426
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "pan_target": 2,
+          "pan_velocity": 550,
+          "tilt_target": 13,
+          "wheel_velocity": 663
+        },
+        "episode_id": "expert:button:seed-006251",
+        "file": "episodes/expert__button__seed-006251.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 204,
+          "mobile_manipulator8": 153,
+          "rc_car8": 550
+        },
+        "sha256": "9845e2abb86310731d17c32b8944bc201ad12584d41a63cc8a8bb0601e4f018f",
+        "supervised_instances": {},
+        "task": "button"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 0,
+          "mobile_manipulator8": 0,
+          "rc_car8": 0
+        },
+        "bc_valid_rows": 0,
+        "bytes": 29746233,
+        "canonical_rows": 565,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_target": 5,
+          "pan_velocity": 1012,
+          "tilt_target": 28,
+          "wheel_velocity": 1152
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "pan_target": 3,
+          "pan_velocity": 253,
+          "tilt_target": 13,
+          "wheel_velocity": 323
+        },
+        "episode_id": "expert:button:seed-008568",
+        "file": "episodes/expert__button__seed-008568.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 202,
+          "mobile_manipulator8": 110,
+          "rc_car8": 253
+        },
+        "sha256": "beafa91865a5094a93a9345071abf52eea29860e195aec8ede628fbaa63fedaa",
+        "supervised_instances": {},
+        "task": "button"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 0,
+          "mobile_manipulator8": 0,
+          "rc_car8": 0
+        },
+        "bc_valid_rows": 0,
+        "bytes": 30355073,
+        "canonical_rows": 574,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_target": 5,
+          "pan_velocity": 932,
+          "tilt_target": 28,
+          "wheel_velocity": 1130
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 5,
+          "pan_target": 2,
+          "pan_velocity": 233,
+          "tilt_target": 14,
+          "wheel_velocity": 332
+        },
+        "episode_id": "expert:button:seed-008936",
+        "file": "episodes/expert__button__seed-008936.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 201,
+          "mobile_manipulator8": 140,
+          "rc_car8": 233
+        },
+        "sha256": "83d869c601f65076b2a6cc2796916303fe497b2bc147b4de7c842ec3c002c939",
+        "supervised_instances": {},
+        "task": "button"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 0,
+          "mobile_manipulator8": 0,
+          "rc_car8": 0
+        },
+        "bc_valid_rows": 0,
+        "bytes": 28717804,
+        "canonical_rows": 546,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_target": 4,
+          "pan_velocity": 1008,
+          "tilt_target": 28,
+          "wheel_velocity": 1108
+        },
+        "command_types": {
+          "align_faces": 5,
+          "dock": 3,
+          "pan_target": 1,
+          "pan_velocity": 252,
+          "tilt_target": 13,
+          "wheel_velocity": 302
+        },
+        "episode_id": "expert:button:seed-009974",
+        "file": "episodes/expert__button__seed-009974.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 202,
+          "mobile_manipulator8": 92,
+          "rc_car8": 252
+        },
+        "sha256": "6ebc8148ec4def0b0b23568c94d41959bba3c8f5dea506b5a6ab1a208bae574e",
+        "supervised_instances": {},
+        "task": "button"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 246
+        },
+        "bc_valid_rows": 254,
+        "bytes": 28912854,
+        "canonical_rows": 546,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1944
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 36,
+          "wheel_velocity": 243
+        },
+        "episode_id": "expert:gap:seed-004100",
+        "file": "episodes/expert__gap__seed-004100.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 274,
+          "snake8": 272
+        },
+        "sha256": "f18d9ab5873ff58b7c50818d313133f8bee614ac476cd71cae6a9068b12284bf",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1944
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 236
+        },
+        "bc_valid_rows": 244,
+        "bytes": 27894448,
+        "canonical_rows": 529,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1856
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 35,
+          "wheel_velocity": 232
+        },
+        "episode_id": "expert:gap:seed-004102",
+        "file": "episodes/expert__gap__seed-004102.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 274,
+          "snake8": 255
+        },
+        "sha256": "a2eb67d4ea1bac19110fb2addb9d654213cabb13656ebdb9a5259e99d6d6b17d",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 150,
+          "wheel_velocity": 1856
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 264
+        },
+        "bc_valid_rows": 272,
+        "bytes": 29816371,
+        "canonical_rows": 562,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 2088
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 40,
+          "wheel_velocity": 261
+        },
+        "episode_id": "expert:gap:seed-004103",
+        "file": "episodes/expert__gap__seed-004103.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 270,
+          "snake8": 292
+        },
+        "sha256": "bdf7f26a4433d99c0967ca944df6ba041b6150a71c2cf3202533b589457916ab",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 2088
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 254
+        },
+        "bc_valid_rows": 262,
+        "bytes": 28928409,
+        "canonical_rows": 547,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 2000
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 37,
+          "wheel_velocity": 250
+        },
+        "episode_id": "expert:gap:seed-004104",
+        "file": "episodes/expert__gap__seed-004104.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 271,
+          "snake8": 276
+        },
+        "sha256": "7de322bea4ca1b9a44640c22d3fb992d2860e47737ca9bc24cb7ae0eafee194f",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 2000
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 9,
+          "snake8": 261
+        },
+        "bc_valid_rows": 270,
+        "bytes": 28489229,
+        "canonical_rows": 539,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 2056
+        },
+        "command_types": {
+          "align_faces": 5,
+          "dock": 4,
+          "tilt_target": 37,
+          "wheel_velocity": 257
+        },
+        "episode_id": "expert:gap:seed-004105",
+        "file": "episodes/expert__gap__seed-004105.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 271,
+          "snake8": 268
+        },
+        "sha256": "564527f3040fae7cc69c583df0e937bcb506e159454a551d887f2b7b598811b0",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 2056
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 250
+        },
+        "bc_valid_rows": 258,
+        "bytes": 29055072,
+        "canonical_rows": 549,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1968
+        },
+        "command_types": {
+          "align_faces": 5,
+          "dock": 5,
+          "tilt_target": 38,
+          "wheel_velocity": 246
+        },
+        "episode_id": "expert:gap:seed-004106",
+        "file": "episodes/expert__gap__seed-004106.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 272,
+          "snake8": 277
+        },
+        "sha256": "d0575ffad28e9858adee74f11d82170781b7770ac9d3ca8533c693549d76bf76",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1968
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 239
+        },
+        "bc_valid_rows": 247,
+        "bytes": 27813990,
+        "canonical_rows": 527,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1880
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 35,
+          "wheel_velocity": 235
+        },
+        "episode_id": "expert:gap:seed-004107",
+        "file": "episodes/expert__gap__seed-004107.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 270,
+          "snake8": 257
+        },
+        "sha256": "1470928e641a2f315a7b9c760f18e3fed7a74f1c05490b8c7689ae61c4b55012",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 150,
+          "wheel_velocity": 1880
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 10,
+          "snake8": 241
+        },
+        "bc_valid_rows": 251,
+        "bytes": 28108342,
+        "canonical_rows": 533,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1896
+        },
+        "command_types": {
+          "align_faces": 6,
+          "dock": 5,
+          "tilt_target": 35,
+          "wheel_velocity": 237
+        },
+        "episode_id": "expert:gap:seed-004108",
+        "file": "episodes/expert__gap__seed-004108.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 273,
+          "snake8": 260
+        },
+        "sha256": "54a50404868928030379e7f0b5c6ce11f2d7a60dee972bc3605727bb981b93f0",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 150,
+          "wheel_velocity": 1896
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 258
+        },
+        "bc_valid_rows": 266,
+        "bytes": 29588590,
+        "canonical_rows": 559,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 2032
+        },
+        "command_types": {
+          "align_faces": 5,
+          "dock": 4,
+          "tilt_target": 35,
+          "wheel_velocity": 254
+        },
+        "episode_id": "expert:gap:seed-004109",
+        "file": "episodes/expert__gap__seed-004109.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 273,
+          "snake8": 286
+        },
+        "sha256": "9e6791566fe9e7e939c9c3b576b6d65300c5226090aedacdd147005eba4a5ebe",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 2032
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 243
+        },
+        "bc_valid_rows": 251,
+        "bytes": 28166820,
+        "canonical_rows": 534,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1912
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 35,
+          "wheel_velocity": 239
+        },
+        "episode_id": "expert:gap:seed-004110",
+        "file": "episodes/expert__gap__seed-004110.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 272,
+          "snake8": 262
+        },
+        "sha256": "e504bb36b0e30592f55416e86db13c4b51b6f82a63e95d1fd65b8ee2b06ed347",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 150,
+          "wheel_velocity": 1912
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 7,
+          "snake8": 248
+        },
+        "bc_valid_rows": 255,
+        "bytes": 28635229,
+        "canonical_rows": 541,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1952
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 38,
+          "wheel_velocity": 244
+        },
+        "episode_id": "expert:gap:seed-004111",
+        "file": "episodes/expert__gap__seed-004111.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 271,
+          "snake8": 270
+        },
+        "sha256": "e9cbffad36744ae7b4e279dceb452487f6c5e950a8c8ddcafe57627b5fe6e668",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 151,
+          "wheel_velocity": 1952
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 229
+        },
+        "bc_valid_rows": 237,
+        "bytes": 26738360,
+        "canonical_rows": 507,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 165,
+          "wheel_velocity": 1800
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 40,
+          "wheel_velocity": 225
+        },
+        "episode_id": "expert:gap:seed-004303",
+        "file": "episodes/expert__gap__seed-004303.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 274,
+          "snake8": 233
+        },
+        "sha256": "8e69267caaaa3ef31cf33d04cf0c7bc048f819bccdc20fb86a55e84feeab01b1",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 164,
+          "wheel_velocity": 1800
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 7,
+          "snake8": 231
+        },
+        "bc_valid_rows": 238,
+        "bytes": 27601381,
+        "canonical_rows": 522,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 165,
+          "wheel_velocity": 1816
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 43,
+          "wheel_velocity": 227
+        },
+        "episode_id": "expert:gap:seed-005855",
+        "file": "episodes/expert__gap__seed-005855.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 273,
+          "snake8": 249
+        },
+        "sha256": "69f74111238c6fc0986994de3351f48cf25e7ad9e4868be7b7189948a9356f49",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 164,
+          "wheel_velocity": 1816
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 9,
+          "snake8": 235
+        },
+        "bc_valid_rows": 244,
+        "bytes": 31248184,
+        "canonical_rows": 586,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 158,
+          "wheel_velocity": 1848
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 5,
+          "tilt_target": 39,
+          "wheel_velocity": 231
+        },
+        "episode_id": "expert:gap:seed-005998",
+        "file": "episodes/expert__gap__seed-005998.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 272,
+          "snake8": 314
+        },
+        "sha256": "78e647b36cc09b6aaf1d8b6a2ef420db7decf537a98087990c940743e5b463c2",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 157,
+          "wheel_velocity": 1848
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 9,
+          "snake8": 255
+        },
+        "bc_valid_rows": 264,
+        "bytes": 29905913,
+        "canonical_rows": 564,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 165,
+          "wheel_velocity": 2008
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 5,
+          "tilt_target": 40,
+          "wheel_velocity": 251
+        },
+        "episode_id": "expert:gap:seed-006911",
+        "file": "episodes/expert__gap__seed-006911.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 273,
+          "snake8": 291
+        },
+        "sha256": "e22407088535ef7e0106ad0e8ddabfc99f03a8e046ededf3cb1debac47e136fc",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 164,
+          "wheel_velocity": 2008
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 244
+        },
+        "bc_valid_rows": 252,
+        "bytes": 29342270,
+        "canonical_rows": 554,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 166,
+          "wheel_velocity": 1912
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 44,
+          "wheel_velocity": 239
+        },
+        "episode_id": "expert:gap:seed-007564",
+        "file": "episodes/expert__gap__seed-007564.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 274,
+          "snake8": 280
+        },
+        "sha256": "e5a91a37a558015fc1d5c8e14df0f008a357231b297f20d15d55eeb1efe8591d",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 166,
+          "wheel_velocity": 1912
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 231
+        },
+        "bc_valid_rows": 239,
+        "bytes": 27870954,
+        "canonical_rows": 527,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 158,
+          "wheel_velocity": 1816
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 38,
+          "wheel_velocity": 227
+        },
+        "episode_id": "expert:gap:seed-012398",
+        "file": "episodes/expert__gap__seed-012398.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 272,
+          "snake8": 255
+        },
+        "sha256": "e769582a4e71691ba2f1f53840e40826df3740857b84e4ef7760fc062f7e541a",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 157,
+          "wheel_velocity": 1816
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 245
+        },
+        "bc_valid_rows": 253,
+        "bytes": 29134889,
+        "canonical_rows": 550,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 158,
+          "wheel_velocity": 1928
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 40,
+          "wheel_velocity": 241
+        },
+        "episode_id": "expert:gap:seed-014544",
+        "file": "episodes/expert__gap__seed-014544.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 274,
+          "snake8": 276
+        },
+        "sha256": "7671061428cf7635f0f59899936ea71e8577f170fa34de4765ee50602fa3a9bc",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 157,
+          "wheel_velocity": 1928
+        },
+        "task": "gap"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 5,
+          "rc_car8": 376
+        },
+        "bc_valid_rows": 381,
+        "bytes": 30602134,
+        "canonical_rows": 577,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1504,
+          "tilt_target": 4,
+          "wheel_velocity": 1504
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "pan_velocity": 376,
+          "tilt_target": 1,
+          "wheel_velocity": 376
+        },
+        "episode_id": "expert:rc_car:seed-005100",
+        "file": "episodes/expert__rc_car__seed-005100.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 201,
+          "rc_car8": 376
+        },
+        "sha256": "6e6e44569178d8a813b169bdfebc69bcb3359399e7bafecd88f316bcd0c453f1",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1504,
+          "tilt_target": 4,
+          "wheel_velocity": 1504
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 7,
+          "rc_car8": 230
+        },
+        "bc_valid_rows": 237,
+        "bytes": 22577842,
+        "canonical_rows": 431,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 920,
+          "tilt_target": 4,
+          "wheel_velocity": 920
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 3,
+          "pan_velocity": 230,
+          "tilt_target": 2,
+          "wheel_velocity": 230
+        },
+        "episode_id": "expert:rc_car:seed-005101",
+        "file": "episodes/expert__rc_car__seed-005101.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 201,
+          "rc_car8": 230
+        },
+        "sha256": "0f25577d4128a8deace4af7e6023c04c804bf338c464420dcf017072cb0b6cc7",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 920,
+          "tilt_target": 4,
+          "wheel_velocity": 920
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "rc_car8": 609
+        },
+        "bc_valid_rows": 617,
+        "bytes": 53442002,
+        "canonical_rows": 1011,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 2436,
+          "tilt_target": 4,
+          "wheel_velocity": 2436
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "pan_velocity": 609,
+          "tilt_target": 1,
+          "wheel_velocity": 609
+        },
+        "episode_id": "expert:rc_car:seed-005102",
+        "file": "episodes/expert__rc_car__seed-005102.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 402,
+          "rc_car8": 609
+        },
+        "sha256": "fc74b7cb86b48849e26a7e848a6b6d25015f1c9a869583184257c58518746050",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 2436,
+          "tilt_target": 4,
+          "wheel_velocity": 2436
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "rc_car8": 223
+        },
+        "bc_valid_rows": 231,
+        "bytes": 22197287,
+        "canonical_rows": 423,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 892,
+          "tilt_target": 4,
+          "wheel_velocity": 892
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "pan_velocity": 223,
+          "tilt_target": 1,
+          "wheel_velocity": 223
+        },
+        "episode_id": "expert:rc_car:seed-005103",
+        "file": "episodes/expert__rc_car__seed-005103.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 200,
+          "rc_car8": 223
+        },
+        "sha256": "f1eee716068ff9542cf35d095bda5474d878df65305403e19ef7049ed8abd0bf",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 892,
+          "tilt_target": 4,
+          "wheel_velocity": 892
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 5,
+          "rc_car8": 289
+        },
+        "bc_valid_rows": 294,
+        "bytes": 25901077,
+        "canonical_rows": 490,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1156,
+          "tilt_target": 4,
+          "wheel_velocity": 1156
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 3,
+          "pan_velocity": 289,
+          "tilt_target": 1,
+          "wheel_velocity": 289
+        },
+        "episode_id": "expert:rc_car:seed-005104",
+        "file": "episodes/expert__rc_car__seed-005104.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 201,
+          "rc_car8": 289
+        },
+        "sha256": "b4b5125b687feb4082bb59b2ca76955c05fa2b6f91452852f0e39e20c1a3d3ef",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1156,
+          "tilt_target": 4,
+          "wheel_velocity": 1156
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 5,
+          "rc_car8": 251
+        },
+        "bc_valid_rows": 256,
+        "bytes": 23682573,
+        "canonical_rows": 450,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1008,
+          "tilt_target": 4,
+          "wheel_velocity": 1008
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "pan_velocity": 252,
+          "tilt_target": 1,
+          "wheel_velocity": 252
+        },
+        "episode_id": "expert:rc_car:seed-005105",
+        "file": "episodes/expert__rc_car__seed-005105.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 198,
+          "rc_car8": 252
+        },
+        "sha256": "4271e50efa4d858dcec70e819e71346b57101e2290e4def1dd480c1a5956725a",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1004,
+          "tilt_target": 4,
+          "wheel_velocity": 1004
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "rc_car8": 269
+        },
+        "bc_valid_rows": 277,
+        "bytes": 24765857,
+        "canonical_rows": 470,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1076,
+          "tilt_target": 4,
+          "wheel_velocity": 1076
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "pan_velocity": 269,
+          "tilt_target": 1,
+          "wheel_velocity": 269
+        },
+        "episode_id": "expert:rc_car:seed-005106",
+        "file": "episodes/expert__rc_car__seed-005106.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 201,
+          "rc_car8": 269
+        },
+        "sha256": "9f5b96f223c572f7e1e1f56aa74213ef1e3af35d8b44c29609e352d6355979fa",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1076,
+          "tilt_target": 4,
+          "wheel_velocity": 1076
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "rc_car8": 295
+        },
+        "bc_valid_rows": 303,
+        "bytes": 26183634,
+        "canonical_rows": 497,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1180,
+          "tilt_target": 4,
+          "wheel_velocity": 1180
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 3,
+          "pan_velocity": 295,
+          "tilt_target": 2,
+          "wheel_velocity": 295
+        },
+        "episode_id": "expert:rc_car:seed-006000",
+        "file": "episodes/expert__rc_car__seed-006000.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 202,
+          "rc_car8": 295
+        },
+        "sha256": "3ed3d64f9d6b0e3c18f83444f6234202c7b5ce4634741b444c19e5d29d21c40b",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1180,
+          "tilt_target": 4,
+          "wheel_velocity": 1180
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 7,
+          "rc_car8": 304
+        },
+        "bc_valid_rows": 311,
+        "bytes": 26719871,
+        "canonical_rows": 506,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1216,
+          "tilt_target": 4,
+          "wheel_velocity": 1216
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 5,
+          "pan_velocity": 304,
+          "tilt_target": 1,
+          "wheel_velocity": 304
+        },
+        "episode_id": "expert:rc_car:seed-006001",
+        "file": "episodes/expert__rc_car__seed-006001.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 202,
+          "rc_car8": 304
+        },
+        "sha256": "30c2e8dd3a8414944e4c044a4299b0e319dd66d10e996ef4f76ea8dc1315425f",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1216,
+          "tilt_target": 4,
+          "wheel_velocity": 1216
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 7,
+          "rc_car8": 266
+        },
+        "bc_valid_rows": 273,
+        "bytes": 24556106,
+        "canonical_rows": 466,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1064,
+          "tilt_target": 4,
+          "wheel_velocity": 1064
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "pan_velocity": 266,
+          "tilt_target": 2,
+          "wheel_velocity": 266
+        },
+        "episode_id": "expert:rc_car:seed-006004",
+        "file": "episodes/expert__rc_car__seed-006004.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 200,
+          "rc_car8": 266
+        },
+        "sha256": "beb55db717aefa30e8c2a83c5567313a908c27173822e533a9ab5db0912cedba",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1064,
+          "tilt_target": 4,
+          "wheel_velocity": 1064
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 5,
+          "rc_car8": 264
+        },
+        "bc_valid_rows": 269,
+        "bytes": 24530770,
+        "canonical_rows": 465,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1060,
+          "tilt_target": 4,
+          "wheel_velocity": 1060
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 3,
+          "pan_velocity": 265,
+          "tilt_target": 1,
+          "wheel_velocity": 265
+        },
+        "episode_id": "expert:rc_car:seed-006017",
+        "file": "episodes/expert__rc_car__seed-006017.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 200,
+          "rc_car8": 265
+        },
+        "sha256": "e263aa8c1b049211d27e6dedf2cfbca192b8c1caa616fcea41e868860fd8bd2f",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1056,
+          "tilt_target": 4,
+          "wheel_velocity": 1056
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 10,
+          "rc_car8": 279
+        },
+        "bc_valid_rows": 289,
+        "bytes": 25507700,
+        "canonical_rows": 483,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1120,
+          "tilt_target": 4,
+          "wheel_velocity": 1120
+        },
+        "command_types": {
+          "align_faces": 5,
+          "dock": 5,
+          "pan_velocity": 280,
+          "tilt_target": 2,
+          "wheel_velocity": 280
+        },
+        "episode_id": "expert:rc_car:seed-006053",
+        "file": "episodes/expert__rc_car__seed-006053.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 203,
+          "rc_car8": 280
+        },
+        "sha256": "d40228a662fe02fe5ffbbcf998b8ed7d4b65328e8f442afdcfa041ea50848883",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1116,
+          "tilt_target": 4,
+          "wheel_velocity": 1116
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 6,
+          "rc_car8": 249
+        },
+        "bc_valid_rows": 255,
+        "bytes": 23751191,
+        "canonical_rows": 452,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 1000,
+          "tilt_target": 4,
+          "wheel_velocity": 1000
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 3,
+          "pan_velocity": 250,
+          "tilt_target": 1,
+          "wheel_velocity": 250
+        },
+        "episode_id": "expert:rc_car:seed-006056",
+        "file": "episodes/expert__rc_car__seed-006056.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 202,
+          "rc_car8": 250
+        },
+        "sha256": "70d969b24f27d10fdbc5eb8354c1cc4ec9a24ece99e2888035b7e858470fff25",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "pan_velocity": 996,
+          "tilt_target": 4,
+          "wheel_velocity": 996
+        },
+        "task": "rc_car"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 10,
+          "snake8": 388
+        },
+        "bc_valid_rows": 398,
+        "bytes": 39382948,
+        "canonical_rows": 719,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 109,
+          "wheel_velocity": 2232
+        },
+        "command_types": {
+          "align_faces": 5,
+          "dock": 5,
+          "tilt_target": 109,
+          "wheel_velocity": 279
+        },
+        "episode_id": "expert:stairs:seed-003100",
+        "file": "episodes/expert__stairs__seed-003100.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 271,
+          "snake8": 448
+        },
+        "sha256": "3bf10cb195a79fade51f7a8b8529eda48ce5f03fadd96a57c2a3b89f15caef89",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 109,
+          "wheel_velocity": 2232
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 460
+        },
+        "bc_valid_rows": 468,
+        "bytes": 48102320,
+        "canonical_rows": 867,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 136,
+          "wheel_velocity": 2600
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 136,
+          "wheel_velocity": 325
+        },
+        "episode_id": "expert:stairs:seed-003101",
+        "file": "episodes/expert__stairs__seed-003101.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 271,
+          "snake8": 596
+        },
+        "sha256": "80eec7aa3fdb81f53138589d642cb8967e99b8b865ba5fa12b7b84653ecf45c4",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 136,
+          "wheel_velocity": 2600
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 318
+        },
+        "bc_valid_rows": 326,
+        "bytes": 39506925,
+        "canonical_rows": 726,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 46,
+          "wheel_velocity": 2176
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 46,
+          "wheel_velocity": 272
+        },
+        "episode_id": "expert:stairs:seed-003102",
+        "file": "episodes/expert__stairs__seed-003102.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 272,
+          "snake8": 454
+        },
+        "sha256": "d53211d3e59e63510616642679627c22db7427e4706b6ed0ca442112e2af0f10",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 46,
+          "wheel_velocity": 2176
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 417
+        },
+        "bc_valid_rows": 425,
+        "bytes": 46263537,
+        "canonical_rows": 839,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 44,
+          "wheel_velocity": 3000
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 44,
+          "wheel_velocity": 375
+        },
+        "episode_id": "expert:stairs:seed-003104",
+        "file": "episodes/expert__stairs__seed-003104.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 273,
+          "snake8": 566
+        },
+        "sha256": "70ca9eca5948c6cf3e90c07a55a9f2cb8e8e679590327fe80f0273f280769506",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 44,
+          "wheel_velocity": 3000
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 1481
+        },
+        "bc_valid_rows": 1489,
+        "bytes": 108899808,
+        "canonical_rows": 1919,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 75,
+          "wheel_velocity": 11264
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 75,
+          "wheel_velocity": 1408
+        },
+        "episode_id": "expert:stairs:seed-003105",
+        "file": "episodes/expert__stairs__seed-003105.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 273,
+          "snake8": 1646
+        },
+        "sha256": "0cb96bf133940f2d84ca9096c38e5cdb70e58bc124864e96dd9f9981fa74814a",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 75,
+          "wheel_velocity": 11264
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 9,
+          "snake8": 330
+        },
+        "bc_valid_rows": 339,
+        "bytes": 43256997,
+        "canonical_rows": 787,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 49,
+          "wheel_velocity": 2248
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 5,
+          "tilt_target": 49,
+          "wheel_velocity": 281
+        },
+        "episode_id": "expert:stairs:seed-003106",
+        "file": "episodes/expert__stairs__seed-003106.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 275,
+          "snake8": 512
+        },
+        "sha256": "36295f99dbab946b8a76a43f90a3f91c657feab0fd7894795a8aaebfe3cb7c59",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 49,
+          "wheel_velocity": 2248
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 7,
+          "snake8": 446
+        },
+        "bc_valid_rows": 453,
+        "bytes": 46077767,
+        "canonical_rows": 835,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 74,
+          "wheel_velocity": 2976
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 74,
+          "wheel_velocity": 372
+        },
+        "episode_id": "expert:stairs:seed-003107",
+        "file": "episodes/expert__stairs__seed-003107.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 271,
+          "snake8": 564
+        },
+        "sha256": "f64b355c65d022dcfe4eca8b93d32207803835cf3d8e8620c5472e4e9395f6af",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 74,
+          "wheel_velocity": 2976
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 10,
+          "snake8": 363
+        },
+        "bc_valid_rows": 373,
+        "bytes": 38850602,
+        "canonical_rows": 712,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 98,
+          "wheel_velocity": 2128
+        },
+        "command_types": {
+          "align_faces": 6,
+          "dock": 4,
+          "tilt_target": 98,
+          "wheel_velocity": 266
+        },
+        "episode_id": "expert:stairs:seed-003108",
+        "file": "episodes/expert__stairs__seed-003108.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 274,
+          "snake8": 438
+        },
+        "sha256": "6a29f71a162f56d40db2fc574afb538fd8a50754a940a2fa4e24e8d0448992cd",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 98,
+          "wheel_velocity": 2128
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 9,
+          "snake8": 432
+        },
+        "bc_valid_rows": 441,
+        "bytes": 42592438,
+        "canonical_rows": 773,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 135,
+          "wheel_velocity": 2376
+        },
+        "command_types": {
+          "align_faces": 6,
+          "dock": 4,
+          "tilt_target": 135,
+          "wheel_velocity": 297
+        },
+        "episode_id": "expert:stairs:seed-003109",
+        "file": "episodes/expert__stairs__seed-003109.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 275,
+          "snake8": 498
+        },
+        "sha256": "bf0facc32428e577012ee8367cee6ffa03954e97bac4b5aa8bedded7d12c46d4",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 135,
+          "wheel_velocity": 2376
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 309
+        },
+        "bc_valid_rows": 317,
+        "bytes": 39727427,
+        "canonical_rows": 726,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 17,
+          "wheel_velocity": 2336
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 17,
+          "wheel_velocity": 292
+        },
+        "episode_id": "expert:stairs:seed-003110",
+        "file": "episodes/expert__stairs__seed-003110.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 272,
+          "snake8": 454
+        },
+        "sha256": "8621212c9e5f7f776df9017c5fe97bad50a97e235143510a03f08e3a42a9b23c",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 17,
+          "wheel_velocity": 2336
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 369
+        },
+        "bc_valid_rows": 377,
+        "bytes": 39533626,
+        "canonical_rows": 723,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 78,
+          "wheel_velocity": 2344
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 78,
+          "wheel_velocity": 293
+        },
+        "episode_id": "expert:stairs:seed-003111",
+        "file": "episodes/expert__stairs__seed-003111.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 269,
+          "snake8": 454
+        },
+        "sha256": "bda9c7639aa0eeb228102e5df146c9681154b36c04ca57047bc24e43cc3797bd",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 78,
+          "wheel_velocity": 2344
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 9,
+          "snake8": 430
+        },
+        "bc_valid_rows": 439,
+        "bytes": 59976672,
+        "canonical_rows": 1108,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 71,
+          "wheel_velocity": 2872
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 5,
+          "tilt_target": 71,
+          "wheel_velocity": 359
+        },
+        "episode_id": "expert:stairs:seed-003292",
+        "file": "episodes/expert__stairs__seed-003292.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 546,
+          "snake8": 562
+        },
+        "sha256": "3fdee2d789a9a5c8e53fc3579b743e88c11cabd494efcc502369457d08912495",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 71,
+          "wheel_velocity": 2872
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "snake8": 188
+        },
+        "bc_valid_rows": 188,
+        "bytes": 12286637,
+        "canonical_rows": 214,
+        "command_instances": {
+          "tilt_target": 94,
+          "wheel_velocity": 752
+        },
+        "command_types": {
+          "tilt_target": 94,
+          "wheel_velocity": 94
+        },
+        "episode_id": "expert:stairs:seed-004007",
+        "file": "episodes/expert__stairs__seed-004007.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "snake8": 214
+        },
+        "sha256": "e0b6334c87072622f2dc7036b9223eb02faa97d171a6fee1a7ca2cae8536c18a",
+        "supervised_instances": {
+          "tilt_target": 94,
+          "wheel_velocity": 752
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 7,
+          "snake8": 371
+        },
+        "bc_valid_rows": 378,
+        "bytes": 42601255,
+        "canonical_rows": 770,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 105,
+          "wheel_velocity": 2128
+        },
+        "command_types": {
+          "align_faces": 5,
+          "dock": 4,
+          "tilt_target": 105,
+          "wheel_velocity": 266
+        },
+        "episode_id": "expert:stairs:seed-004047",
+        "file": "episodes/expert__stairs__seed-004047.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 270,
+          "snake8": 500
+        },
+        "sha256": "dfaa10d9d67198538310ff3bf1b59f5441b664a67aff03b98321c1a430d1568f",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 105,
+          "wheel_velocity": 2128
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "snake8": 182
+        },
+        "bc_valid_rows": 182,
+        "bytes": 40524461,
+        "canonical_rows": 707,
+        "command_instances": {
+          "tilt_target": 57,
+          "wheel_velocity": 1000
+        },
+        "command_types": {
+          "tilt_target": 57,
+          "wheel_velocity": 125
+        },
+        "episode_id": "expert:stairs:seed-004676",
+        "file": "episodes/expert__stairs__seed-004676.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "snake8": 707
+        },
+        "sha256": "834db3383b6774d18c3cd665a1158dfe58b994a428c993f8bb0eeaa6666e54c9",
+        "supervised_instances": {
+          "tilt_target": 57,
+          "wheel_velocity": 1000
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "snake8": 286
+        },
+        "bc_valid_rows": 286,
+        "bytes": 54560865,
+        "canonical_rows": 942,
+        "command_instances": {
+          "tilt_target": 95,
+          "wheel_velocity": 1528
+        },
+        "command_types": {
+          "tilt_target": 95,
+          "wheel_velocity": 191
+        },
+        "episode_id": "expert:stairs:seed-004689",
+        "file": "episodes/expert__stairs__seed-004689.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "snake8": 942
+        },
+        "sha256": "9b2b2a747f03fe7fb606d61dcfbf5defc57d8d2927323cdf5ca73f8d2d6a08e4",
+        "supervised_instances": {
+          "tilt_target": 95,
+          "wheel_velocity": 1528
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 9,
+          "snake8": 727
+        },
+        "bc_valid_rows": 736,
+        "bytes": 80189902,
+        "canonical_rows": 1449,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 118,
+          "wheel_velocity": 4872
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 5,
+          "tilt_target": 118,
+          "wheel_velocity": 609
+        },
+        "episode_id": "expert:stairs:seed-006403",
+        "file": "episodes/expert__stairs__seed-006403.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 547,
+          "snake8": 902
+        },
+        "sha256": "f584ff01774582f33cce2bf3b524a0768f459a6f0742909086b796050c37c3e9",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 118,
+          "wheel_velocity": 4872
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 8,
+          "snake8": 441
+        },
+        "bc_valid_rows": 449,
+        "bytes": 49233465,
+        "canonical_rows": 884,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 90,
+          "wheel_velocity": 2824
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 4,
+          "tilt_target": 90,
+          "wheel_velocity": 353
+        },
+        "episode_id": "expert:stairs:seed-006922",
+        "file": "episodes/expert__stairs__seed-006922.jsonl",
+        "kind": "expert",
+        "morphology_rows": {
+          "assembling": 270,
+          "snake8": 614
+        },
+        "sha256": "64aaf5aee4c7dea97924e016eac964e7569e288cfd9715c2a5e2abf35b157d9e",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 7,
+          "tilt_target": 90,
+          "wheel_velocity": 2824
+        },
+        "task": "stairs"
+      },
+      {
+        "bc_morphology_rows": {
+          "rc_car8": 3817,
+          "reconfiguring": 26,
+          "snake8": 3927
+        },
+        "bc_valid_rows": 7770,
+        "bytes": 579304031,
+        "canonical_rows": 10443,
+        "command_instances": {
+          "align_faces": 8,
+          "dock": 8,
+          "gravity_settle": 1,
+          "pan_velocity": 15268,
+          "tilt_target": 2656,
+          "undock": 8,
+          "wheel_velocity": 34540
+        },
+        "command_types": {
+          "align_faces": 7,
+          "dock": 6,
+          "gravity_settle": 1,
+          "pan_velocity": 3817,
+          "tilt_target": 1658,
+          "undock": 6,
+          "wheel_velocity": 6226
+        },
+        "episode_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+        "file": "episodes/teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "rc_car8": 3818,
+          "reconfiguring": 2231,
+          "snake8": 4394
+        },
+        "sha256": "5042c553e4bf4a32845f99ba06d36cb2d38496ff1d53e6effd63962f548008dd",
+        "supervised_instances": {
+          "align_faces": 8,
+          "dock": 8,
+          "gravity_settle": 1,
+          "pan_velocity": 15268,
+          "tilt_target": 2656,
+          "undock": 8,
+          "wheel_velocity": 34540
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 11,
+          "mobile_manipulator8": 1006
+        },
+        "bc_valid_rows": 1017,
+        "bytes": 162904327,
+        "canonical_rows": 3193,
+        "command_instances": {
+          "align_faces": 6,
+          "dock": 3,
+          "pan_target": 9,
+          "tilt_target": 3325,
+          "wheel_velocity": 2014
+        },
+        "command_types": {
+          "align_faces": 6,
+          "dock": 3,
+          "pan_target": 9,
+          "tilt_target": 463,
+          "wheel_velocity": 1007
+        },
+        "episode_id": "teleop-170338d489a64eb397a10cf9910392a1",
+        "file": "episodes/teleop-170338d489a64eb397a10cf9910392a1.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "assembling": 2187,
+          "mobile_manipulator8": 1006
+        },
+        "sha256": "bc39c4b04289978ab3b9a0f3e7febd99d3b3678a1359eceaa9bd3d8601ed8f01",
+        "supervised_instances": {
+          "align_faces": 6,
+          "dock": 3,
+          "pan_target": 9,
+          "tilt_target": 3325,
+          "wheel_velocity": 2014
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "mobile_manipulator8": 699,
+          "rc_car8": 4447,
+          "reconfiguring": 48,
+          "snake8": 1822
+        },
+        "bc_valid_rows": 7016,
+        "bytes": 563126573,
+        "canonical_rows": 10553,
+        "command_instances": {
+          "align_faces": 12,
+          "dock": 12,
+          "gravity_settle": 3,
+          "pan_target": 8,
+          "pan_velocity": 17788,
+          "tilt_target": 3357,
+          "undock": 12,
+          "wheel_velocity": 33676
+        },
+        "command_types": {
+          "align_faces": 8,
+          "dock": 10,
+          "gravity_settle": 3,
+          "pan_target": 8,
+          "pan_velocity": 4447,
+          "tilt_target": 573,
+          "undock": 7,
+          "wheel_velocity": 6958
+        },
+        "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+        "file": "episodes/teleop-1bea8f28c1c04323a4c3ec7e2829d07c.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "mobile_manipulator8": 699,
+          "rc_car8": 4447,
+          "reconfiguring": 3562,
+          "snake8": 1845
+        },
+        "sha256": "911c6f0140afc8bebb70dcd7997bc3aa08fdc7985d6b16410b17ed593a3f14e0",
+        "supervised_instances": {
+          "align_faces": 12,
+          "dock": 12,
+          "gravity_settle": 3,
+          "pan_target": 8,
+          "pan_velocity": 17788,
+          "tilt_target": 3357,
+          "undock": 12,
+          "wheel_velocity": 33676
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 15,
+          "mobile_manipulator8": 808
+        },
+        "bc_valid_rows": 823,
+        "bytes": 151334145,
+        "canonical_rows": 2976,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 9,
+          "tilt_target": 2370,
+          "wheel_velocity": 1618
+        },
+        "command_types": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 9,
+          "tilt_target": 333,
+          "wheel_velocity": 809
+        },
+        "episode_id": "teleop-1f8b406b56f74377834cd863ebccf696",
+        "file": "episodes/teleop-1f8b406b56f74377834cd863ebccf696.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "assembling": 2168,
+          "mobile_manipulator8": 808
+        },
+        "sha256": "14ea8b7c3aaf3a2f416c948fb897387ec5ba3522430fea629c62fc963b14526d",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 9,
+          "tilt_target": 2370,
+          "wheel_velocity": 1618
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "mobile_manipulator8": 639,
+          "rc_car8": 3549,
+          "reconfiguring": 38,
+          "snake8": 1519
+        },
+        "bc_valid_rows": 5745,
+        "bytes": 440682716,
+        "canonical_rows": 8238,
+        "command_instances": {
+          "align_faces": 8,
+          "dock": 8,
+          "gravity_settle": 3,
+          "pan_target": 9,
+          "pan_velocity": 14196,
+          "tilt_target": 3927,
+          "undock": 8,
+          "wheel_velocity": 27530
+        },
+        "command_types": {
+          "align_faces": 7,
+          "dock": 5,
+          "gravity_settle": 3,
+          "pan_target": 9,
+          "pan_velocity": 3549,
+          "tilt_target": 629,
+          "undock": 7,
+          "wheel_velocity": 5695
+        },
+        "episode_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+        "file": "episodes/teleop-39e2f4b4cd684e9ea72734cc21baca94.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "mobile_manipulator8": 654,
+          "rc_car8": 3549,
+          "reconfiguring": 2494,
+          "snake8": 1541
+        },
+        "sha256": "80eab6f76a9ee9e8c7ceb2144c1dfbb7fdc839b52c26144c110da97abb10b518",
+        "supervised_instances": {
+          "align_faces": 8,
+          "dock": 8,
+          "gravity_settle": 3,
+          "pan_target": 9,
+          "pan_velocity": 14196,
+          "tilt_target": 3927,
+          "undock": 8,
+          "wheel_velocity": 27530
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "rc_car8": 3635,
+          "reconfiguring": 22,
+          "snake8": 1616
+        },
+        "bc_valid_rows": 5273,
+        "bytes": 402659261,
+        "canonical_rows": 7493,
+        "command_instances": {
+          "align_faces": 8,
+          "dock": 8,
+          "gravity_settle": 1,
+          "pan_velocity": 14540,
+          "tilt_target": 159,
+          "undock": 8,
+          "wheel_velocity": 27388
+        },
+        "command_types": {
+          "align_faces": 5,
+          "dock": 5,
+          "gravity_settle": 1,
+          "pan_velocity": 3635,
+          "tilt_target": 116,
+          "undock": 6,
+          "wheel_velocity": 5241
+        },
+        "episode_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53",
+        "file": "episodes/teleop-3aa4f69128774d5eba1f8d851c02cf53.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "rc_car8": 3635,
+          "reconfiguring": 2217,
+          "snake8": 1641
+        },
+        "sha256": "4bfefd26c54896290867f3374d249d45008449da7d5070212d141e905e8600ea",
+        "supervised_instances": {
+          "align_faces": 8,
+          "dock": 8,
+          "gravity_settle": 1,
+          "pan_velocity": 14540,
+          "tilt_target": 158,
+          "undock": 8,
+          "wheel_velocity": 27388
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "mobile_manipulator8": 581,
+          "rc_car8": 4895,
+          "reconfiguring": 28
+        },
+        "bc_valid_rows": 5504,
+        "bytes": 362704960,
+        "canonical_rows": 6829,
+        "command_instances": {
+          "align_faces": 4,
+          "dock": 4,
+          "gravity_settle": 2,
+          "pan_target": 9,
+          "pan_velocity": 19580,
+          "tilt_target": 3027,
+          "undock": 4,
+          "wheel_velocity": 20742
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 4,
+          "gravity_settle": 2,
+          "pan_target": 9,
+          "pan_velocity": 4895,
+          "tilt_target": 449,
+          "undock": 2,
+          "wheel_velocity": 5476
+        },
+        "episode_id": "teleop-5bb5a4712d924617aab5604b6deb20b4",
+        "file": "episodes/teleop-5bb5a4712d924617aab5604b6deb20b4.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "mobile_manipulator8": 581,
+          "rc_car8": 4895,
+          "reconfiguring": 1353
+        },
+        "sha256": "de6b58e3367cba9827b4f99c7cd322a47bc8880700fa5e1d21f6e3eec1fec4c1",
+        "supervised_instances": {
+          "align_faces": 4,
+          "dock": 4,
+          "gravity_settle": 2,
+          "pan_target": 9,
+          "pan_velocity": 19580,
+          "tilt_target": 3027,
+          "undock": 4,
+          "wheel_velocity": 20742
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "rc_car8": 1539,
+          "reconfiguring": 12,
+          "snake8": 8174
+        },
+        "bc_valid_rows": 9725,
+        "bytes": 627230037,
+        "canonical_rows": 11323,
+        "command_instances": {
+          "align_faces": 4,
+          "dock": 4,
+          "gravity_settle": 1,
+          "pan_velocity": 6156,
+          "tilt_target": 2876,
+          "undock": 4,
+          "wheel_velocity": 58524
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 2,
+          "gravity_settle": 1,
+          "pan_velocity": 1539,
+          "tilt_target": 1812,
+          "undock": 2,
+          "wheel_velocity": 8085
+        },
+        "episode_id": "teleop-5e0c4d97db80492bbb561b16ef132949",
+        "file": "episodes/teleop-5e0c4d97db80492bbb561b16ef132949.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "rc_car8": 1539,
+          "reconfiguring": 1191,
+          "snake8": 8593
+        },
+        "sha256": "944f63d720da5fbee6be47948358639cf002268d11a1975ced097dbdd234a63c",
+        "supervised_instances": {
+          "align_faces": 4,
+          "dock": 4,
+          "gravity_settle": 1,
+          "pan_velocity": 6156,
+          "tilt_target": 2876,
+          "undock": 4,
+          "wheel_velocity": 58524
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "mobile_manipulator8": 1039,
+          "rc_car8": 2883,
+          "reconfiguring": 25,
+          "snake8": 2842
+        },
+        "bc_valid_rows": 6789,
+        "bytes": 483722668,
+        "canonical_rows": 8823,
+        "command_instances": {
+          "align_faces": 6,
+          "dock": 6,
+          "gravity_settle": 1,
+          "pan_target": 45,
+          "pan_velocity": 11532,
+          "tilt_target": 8198,
+          "undock": 6,
+          "wheel_velocity": 27058
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 5,
+          "gravity_settle": 1,
+          "pan_target": 45,
+          "pan_velocity": 2883,
+          "tilt_target": 2150,
+          "undock": 5,
+          "wheel_velocity": 5603
+        },
+        "episode_id": "teleop-69b37b8db7e141339518d4eef585e4bd",
+        "file": "episodes/teleop-69b37b8db7e141339518d4eef585e4bd.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "mobile_manipulator8": 1039,
+          "rc_car8": 2883,
+          "reconfiguring": 1766,
+          "snake8": 3135
+        },
+        "sha256": "f9ea347bca42521a8023327721d92e7b56bd3a025db4482d48d16a3326edb452",
+        "supervised_instances": {
+          "align_faces": 6,
+          "dock": 6,
+          "gravity_settle": 1,
+          "pan_target": 45,
+          "pan_velocity": 11532,
+          "tilt_target": 8198,
+          "undock": 6,
+          "wheel_velocity": 27058
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 18,
+          "mobile_manipulator8": 869
+        },
+        "bc_valid_rows": 887,
+        "bytes": 154725798,
+        "canonical_rows": 3081,
+        "command_instances": {
+          "align_faces": 6,
+          "dock": 6,
+          "pan_target": 9,
+          "tilt_target": 2906,
+          "wheel_velocity": 1740
+        },
+        "command_types": {
+          "align_faces": 6,
+          "dock": 6,
+          "pan_target": 9,
+          "tilt_target": 410,
+          "wheel_velocity": 870
+        },
+        "episode_id": "teleop-8b55584534d24c86888b350e09c74e7b",
+        "file": "episodes/teleop-8b55584534d24c86888b350e09c74e7b.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "assembling": 2185,
+          "mobile_manipulator8": 896
+        },
+        "sha256": "f845ab0ef4c48c26ab8fe5067ef0d3b519af81631d6daef735f43c48b65ad146",
+        "supervised_instances": {
+          "align_faces": 6,
+          "dock": 6,
+          "pan_target": 9,
+          "tilt_target": 2906,
+          "wheel_velocity": 1740
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "mobile_manipulator8": 630,
+          "rc_car8": 2840,
+          "reconfiguring": 43,
+          "snake8": 4238
+        },
+        "bc_valid_rows": 7751,
+        "bytes": 587970372,
+        "canonical_rows": 10661,
+        "command_instances": {
+          "align_faces": 8,
+          "dock": 8,
+          "gravity_settle": 3,
+          "pan_target": 9,
+          "pan_velocity": 11360,
+          "tilt_target": 5793,
+          "undock": 8,
+          "wheel_velocity": 33966
+        },
+        "command_types": {
+          "align_faces": 5,
+          "dock": 7,
+          "gravity_settle": 3,
+          "pan_target": 9,
+          "pan_velocity": 2840,
+          "tilt_target": 2120,
+          "undock": 5,
+          "wheel_velocity": 6139
+        },
+        "episode_id": "teleop-952c36750c624fb19de8421019325d13",
+        "file": "episodes/teleop-952c36750c624fb19de8421019325d13.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "mobile_manipulator8": 630,
+          "rc_car8": 2841,
+          "reconfiguring": 2526,
+          "snake8": 4664
+        },
+        "sha256": "51e0d96c869af6b29370425c934c3ccc8b763e7777534e9ae5337b1ddc60d6f2",
+        "supervised_instances": {
+          "align_faces": 8,
+          "dock": 8,
+          "gravity_settle": 3,
+          "pan_target": 9,
+          "pan_velocity": 11360,
+          "tilt_target": 5793,
+          "undock": 8,
+          "wheel_velocity": 33966
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "mobile_manipulator8": 777,
+          "rc_car8": 3332,
+          "reconfiguring": 49,
+          "snake8": 1639
+        },
+        "bc_valid_rows": 5797,
+        "bytes": 498671899,
+        "canonical_rows": 9356,
+        "command_instances": {
+          "align_faces": 12,
+          "dock": 12,
+          "gravity_settle": 3,
+          "pan_target": 118,
+          "pan_velocity": 13328,
+          "tilt_target": 4272,
+          "undock": 12,
+          "wheel_velocity": 27900
+        },
+        "command_types": {
+          "align_faces": 8,
+          "dock": 6,
+          "gravity_settle": 3,
+          "pan_target": 118,
+          "pan_velocity": 3332,
+          "tilt_target": 720,
+          "undock": 11,
+          "wheel_velocity": 5737
+        },
+        "episode_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+        "file": "episodes/teleop-a7d7e08f5fd14a59bd3af6afb53ccde1.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "mobile_manipulator8": 777,
+          "rc_car8": 3332,
+          "reconfiguring": 3585,
+          "snake8": 1662
+        },
+        "sha256": "e9344ca67002202a1e1ba268f3835b5e1a3622f749eb675e6f14bbe370b607b0",
+        "supervised_instances": {
+          "align_faces": 12,
+          "dock": 12,
+          "gravity_settle": 3,
+          "pan_target": 118,
+          "pan_velocity": 13328,
+          "tilt_target": 4272,
+          "undock": 12,
+          "wheel_velocity": 27900
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "rc_car8": 2211,
+          "reconfiguring": 11,
+          "snake8": 4796
+        },
+        "bc_valid_rows": 7018,
+        "bytes": 470294388,
+        "canonical_rows": 8379,
+        "command_instances": {
+          "align_faces": 4,
+          "dock": 4,
+          "pan_target": 156,
+          "pan_velocity": 8844,
+          "tilt_target": 2892,
+          "undock": 4,
+          "wheel_velocity": 33284
+        },
+        "command_types": {
+          "align_faces": 4,
+          "dock": 3,
+          "pan_target": 156,
+          "pan_velocity": 2211,
+          "tilt_target": 1880,
+          "undock": 4,
+          "wheel_velocity": 5266
+        },
+        "episode_id": "teleop-adcf33433f954669838220b9f617d952",
+        "file": "episodes/teleop-adcf33433f954669838220b9f617d952.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "rc_car8": 2211,
+          "reconfiguring": 1078,
+          "snake8": 5090
+        },
+        "sha256": "8c9cd12300647fabbbf86861278d02cb4222403111ee7a935562296a3536f6e7",
+        "supervised_instances": {
+          "align_faces": 4,
+          "dock": 4,
+          "pan_target": 156,
+          "pan_velocity": 8844,
+          "tilt_target": 2892,
+          "undock": 4,
+          "wheel_velocity": 33284
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 12,
+          "mobile_manipulator8": 532
+        },
+        "bc_valid_rows": 544,
+        "bytes": 137018159,
+        "canonical_rows": 2703,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 8,
+          "tilt_target": 2317,
+          "wheel_velocity": 1064
+        },
+        "command_types": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 8,
+          "tilt_target": 338,
+          "wheel_velocity": 532
+        },
+        "episode_id": "teleop-b1456ab292aa4a319c9d4bcc17e7e57f",
+        "file": "episodes/teleop-b1456ab292aa4a319c9d4bcc17e7e57f.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "assembling": 2171,
+          "mobile_manipulator8": 532
+        },
+        "sha256": "1e2b4b9028f2edfbd2a521ea596a1c7ac833674468cacfc6505173d226558c52",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 8,
+          "tilt_target": 2317,
+          "wheel_velocity": 1064
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 16,
+          "mobile_manipulator8": 776
+        },
+        "bc_valid_rows": 792,
+        "bytes": 152530206,
+        "canonical_rows": 2983,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 8,
+          "tilt_target": 2339,
+          "wheel_velocity": 1554
+        },
+        "command_types": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 8,
+          "tilt_target": 323,
+          "wheel_velocity": 777
+        },
+        "episode_id": "teleop-beaa63ebe5f347c6abc58baff9d1394a",
+        "file": "episodes/teleop-beaa63ebe5f347c6abc58baff9d1394a.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "assembling": 2207,
+          "mobile_manipulator8": 776
+        },
+        "sha256": "998fd9b5edf2d7eb963429cc2d7f1549e787eb4ca7222f8d9a2b99db54bd0e70",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 8,
+          "tilt_target": 2339,
+          "wheel_velocity": 1554
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 14,
+          "mobile_manipulator8": 1046
+        },
+        "bc_valid_rows": 1060,
+        "bytes": 164651995,
+        "canonical_rows": 3214,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 133,
+          "tilt_target": 3737,
+          "wheel_velocity": 2092
+        },
+        "command_types": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 133,
+          "tilt_target": 590,
+          "wheel_velocity": 1046
+        },
+        "episode_id": "teleop-c78e0455357147369ad16bc1bf39a0c2",
+        "file": "episodes/teleop-c78e0455357147369ad16bc1bf39a0c2.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "assembling": 2167,
+          "mobile_manipulator8": 1047
+        },
+        "sha256": "b164f517e4e497a7b08c356391d127b9e4ab44570f54bfbe43e200692b455d39",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 3,
+          "pan_target": 133,
+          "tilt_target": 3737,
+          "wheel_velocity": 2092
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "mobile_manipulator8": 838,
+          "rc_car8": 2493,
+          "reconfiguring": 54,
+          "snake8": 6999
+        },
+        "bc_valid_rows": 10384,
+        "bytes": 818646730,
+        "canonical_rows": 14826,
+        "command_instances": {
+          "align_faces": 14,
+          "dock": 14,
+          "gravity_settle": 2,
+          "pan_target": 29,
+          "pan_velocity": 9972,
+          "tilt_target": 7487,
+          "undock": 14,
+          "wheel_velocity": 54616
+        },
+        "command_types": {
+          "align_faces": 11,
+          "dock": 9,
+          "gravity_settle": 2,
+          "pan_target": 29,
+          "pan_velocity": 2493,
+          "tilt_target": 2497,
+          "undock": 13,
+          "wheel_velocity": 8702
+        },
+        "episode_id": "teleop-ce8293656bb444ac999f87c0520672fc",
+        "file": "episodes/teleop-ce8293656bb444ac999f87c0520672fc.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "mobile_manipulator8": 838,
+          "rc_car8": 2494,
+          "reconfiguring": 4011,
+          "snake8": 7483
+        },
+        "sha256": "83ae284316d6a7533390ddb6c3c8efb8d8277342e6eeb94bcd564d68f687eacb",
+        "supervised_instances": {
+          "align_faces": 14,
+          "dock": 14,
+          "gravity_settle": 2,
+          "pan_target": 29,
+          "pan_velocity": 9972,
+          "tilt_target": 7487,
+          "undock": 14,
+          "wheel_velocity": 54616
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 14,
+          "mobile_manipulator8": 561
+        },
+        "bc_valid_rows": 575,
+        "bytes": 137983631,
+        "canonical_rows": 2737,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 5,
+          "pan_target": 8,
+          "tilt_target": 2389,
+          "wheel_velocity": 1122
+        },
+        "command_types": {
+          "align_faces": 7,
+          "dock": 5,
+          "pan_target": 8,
+          "tilt_target": 326,
+          "wheel_velocity": 561
+        },
+        "episode_id": "teleop-dd6bf8b9926d4a2aab6af7572646d026",
+        "file": "episodes/teleop-dd6bf8b9926d4a2aab6af7572646d026.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "assembling": 2176,
+          "mobile_manipulator8": 561
+        },
+        "sha256": "7141bb8b58ca06d6d0b4f05a1c03fb922644926151e732683559b9dc2dfb0a6e",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 5,
+          "pan_target": 8,
+          "tilt_target": 2389,
+          "wheel_velocity": 1122
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "assembling": 10,
+          "mobile_manipulator8": 974
+        },
+        "bc_valid_rows": 984,
+        "bytes": 161162137,
+        "canonical_rows": 3159,
+        "command_instances": {
+          "align_faces": 7,
+          "dock": 2,
+          "pan_target": 6,
+          "tilt_target": 3349,
+          "wheel_velocity": 1948
+        },
+        "command_types": {
+          "align_faces": 7,
+          "dock": 2,
+          "pan_target": 6,
+          "tilt_target": 452,
+          "wheel_velocity": 974
+        },
+        "episode_id": "teleop-edbefc66cecf40c180864b452aff8dab",
+        "file": "episodes/teleop-edbefc66cecf40c180864b452aff8dab.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "assembling": 2185,
+          "mobile_manipulator8": 974
+        },
+        "sha256": "49028937d11ad14f34902118abe7e73b1cf97af2546d934fd1ee0ff63170857b",
+        "supervised_instances": {
+          "align_faces": 7,
+          "dock": 2,
+          "pan_target": 6,
+          "tilt_target": 3349,
+          "wheel_velocity": 1948
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "mobile_manipulator8": 827,
+          "rc_car8": 2364,
+          "reconfiguring": 28,
+          "snake8": 1906
+        },
+        "bc_valid_rows": 5125,
+        "bytes": 366447706,
+        "canonical_rows": 6891,
+        "command_instances": {
+          "align_faces": 6,
+          "dock": 6,
+          "gravity_settle": 1,
+          "pan_target": 8,
+          "pan_velocity": 9460,
+          "tilt_target": 4719,
+          "undock": 6,
+          "wheel_velocity": 26364
+        },
+        "command_types": {
+          "align_faces": 3,
+          "dock": 5,
+          "gravity_settle": 1,
+          "pan_target": 8,
+          "pan_velocity": 2365,
+          "tilt_target": 2096,
+          "undock": 5,
+          "wheel_velocity": 5099
+        },
+        "episode_id": "teleop-f8888f12c46249fc80ef0af8c56b4dcf",
+        "file": "episodes/teleop-f8888f12c46249fc80ef0af8c56b4dcf.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "mobile_manipulator8": 827,
+          "rc_car8": 2364,
+          "reconfiguring": 1794,
+          "snake8": 1906
+        },
+        "sha256": "3eb688828c988c29e13cd069f3c73ff339266137fb54ce36171b7e833635e3df",
+        "supervised_instances": {
+          "align_faces": 6,
+          "dock": 6,
+          "gravity_settle": 1,
+          "pan_target": 8,
+          "pan_velocity": 9460,
+          "tilt_target": 4719,
+          "undock": 6,
+          "wheel_velocity": 26364
+        },
+        "task": "teleop"
+      },
+      {
+        "bc_morphology_rows": {
+          "mobile_manipulator8": 939,
+          "rc_car8": 4711,
+          "reconfiguring": 51,
+          "snake8": 6649
+        },
+        "bc_valid_rows": 12350,
+        "bytes": 912365975,
+        "canonical_rows": 16472,
+        "command_instances": {
+          "align_faces": 12,
+          "dock": 12,
+          "gravity_settle": 3,
+          "pan_target": 30,
+          "pan_velocity": 18844,
+          "tilt_target": 8313,
+          "undock": 12,
+          "wheel_velocity": 56218
+        },
+        "command_types": {
+          "align_faces": 11,
+          "dock": 10,
+          "gravity_settle": 3,
+          "pan_target": 30,
+          "pan_velocity": 4711,
+          "tilt_target": 3004,
+          "undock": 8,
+          "wheel_velocity": 10087
+        },
+        "episode_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+        "file": "episodes/teleop-fb69637be28d49ccbff572e721cfae24.jsonl",
+        "kind": "teleop",
+        "morphology_rows": {
+          "mobile_manipulator8": 963,
+          "rc_car8": 4712,
+          "reconfiguring": 3847,
+          "snake8": 6950
+        },
+        "sha256": "7f164cdc79812eaef23b5bfaa779e681a7386549353c11e77d3332b6f3902ce0",
+        "supervised_instances": {
+          "align_faces": 12,
+          "dock": 12,
+          "gravity_settle": 3,
+          "pan_target": 30,
+          "pan_velocity": 18844,
+          "tilt_target": 8313,
+          "undock": 12,
+          "wheel_velocity": 56218
+        },
+        "task": "teleop"
+      }
+    ],
+    "structural_counts": {
+      "align_faces": 503,
+      "dock": 477,
+      "gravity_settle": 24,
+      "undock": 106
+    },
+    "structural_targets_checked": 1110,
+    "supervised_instances": {
+      "align_faces": 503,
+      "dock": 477,
+      "gravity_settle": 24,
+      "pan_target": 611,
+      "pan_velocity": 186484,
+      "tilt_target": 84760,
+      "undock": 106,
+      "wheel_velocity": 576942
+    }
+  },
+  "fingerprint_policy": "Manifest bytes SHA256 plus sorted episode_id/file/bytes/manifest-recorded payload SHA256 inventory. Payload hashes are declarations, not recomputed verification. Volatile stat snapshots belong only to audit output.",
+  "internal_mode_instances": {
+    "pan_delta": 0,
+    "pan_target": 611,
+    "pan_velocity": 186484,
+    "tilt_delta": 0,
+    "tilt_target": 84760,
+    "tilt_velocity": 0
+  },
+  "schema_version": "mssr.bc_v1.source_counts.v1",
+  "source": {
+    "collection_schema": "mssr.canonical_dataset_collection.v5",
+    "dataset_name": "expert_v1_canonical_v6",
+    "episode_inventory_sha256": "edc455ffcd8cfe3ada1402c4191a4a310faef576069dcea200eabb189380eeef",
+    "manifest_sha256": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+    "transition_schemas": {
+      "mssr.canonical_transition.v5": 197240
+    }
+  }
+}

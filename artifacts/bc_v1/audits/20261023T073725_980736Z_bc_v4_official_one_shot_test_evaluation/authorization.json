@@ -1,0 +1,14 @@
+{
+  "TEST_access_authorized": true,
+  "official_test_evaluation_number": 1,
+  "checkpoint": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/runs/20261022T232532_854802073Z_207309_bc_v4_actor_visible_r1m_scratch_final/best.pt",
+  "epoch": 5,
+  "threshold_logit": 0.0,
+  "batch_size": 64,
+  "one_pass": true,
+  "no_checkpoint_comparison": true,
+  "no_retraining": true,
+  "retry_policy": "Only before any valid TEST prediction; stop otherwise",
+  "authorized_by": "Current explicit user attachment b21ffc8c-8e3e-40ad-be69-a91d66a36d5d",
+  "created_UTC": "2026-10-23T07:37:26.361441+00:00"
+}

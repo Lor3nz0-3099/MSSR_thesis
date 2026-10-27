@@ -1,0 +1,8 @@
+Finalize actor-visible BC-v4 warm start for MAPPO
+
+- finalize actor-visible ActionSet BC pipeline and data path
+- preserve target and reader performance optimizations
+- record final from-scratch BC training and selected epoch-5 checkpoint
+- freeze the official one-shot TEST assessment
+- version the MAPPO warm-start checkpoint and reproducibility metadata
+- keep superseded diagnostic artifacts local-only

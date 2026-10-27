@@ -1,0 +1,62 @@
+{
+  "schema_version": "mssr.bc_v1.action_heads.v3",
+  "hidden_dim": 128,
+  "activation": "silu",
+  "dropout": 0.1,
+  "resource_contract": {
+    "schema_version": "mssr.bc_v1.resource_decisions.v1",
+    "revision": "smores-resource-1",
+    "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "fixed": [
+      {
+        "module_type_id": "smores_ep_enhanced",
+        "resource_id": "locomotion",
+        "outcome_id": "WHEEL_STOP_FIXED",
+        "mode_id": "wheel_velocity",
+        "payload": [
+          0.0,
+          0.0
+        ],
+        "evidence": [
+          "preprocessing explicit vx/yaw zero converts to exact wheel zero; native wheel stop"
+        ]
+      },
+      {
+        "module_type_id": "smores_ep_enhanced",
+        "resource_id": "internal_motion",
+        "outcome_id": "PAN_HOLD_FIXED",
+        "mode_id": "pan_velocity",
+        "payload": [
+          0.0
+        ],
+        "evidence": [
+          "smores_ep/control/file_channel.py PAN zero selects InternalMotionMode.HOLD"
+        ]
+      }
+    ],
+    "tags": [
+      {
+        "module_type_id": "smores_ep_enhanced",
+        "resource_id": "locomotion",
+        "mode_id": "wheel_velocity",
+        "tag": "wheel_propulsion",
+        "predicate": "any_nonzero",
+        "epsilon": 1e-12
+      },
+      {
+        "module_type_id": "smores_ep_enhanced",
+        "resource_id": "internal_motion",
+        "mode_id": "pan_velocity",
+        "tag": "pan_traction",
+        "predicate": "any_nonzero",
+        "epsilon": 1e-12
+      }
+    ],
+    "forbidden_tag_pairs": [
+      [
+        "wheel_propulsion",
+        "pan_traction"
+      ]
+    ]
+  }
+}

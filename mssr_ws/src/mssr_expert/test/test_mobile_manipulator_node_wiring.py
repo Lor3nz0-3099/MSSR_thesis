@@ -87,13 +87,21 @@ def test_primitive_status_is_forwarded_to_mm8_posture_transport():
 
 def test_tick_steps_mm8_with_same_safety_decision_pattern():
     text = node_source()
+    flat = " ".join(text.split())
 
     assert "mm8_output = self._mm8.step(" in text
 
     assert (
-        'decision if controller == "mobile_manipulator8" '
-        "else disabled"
-        in text
+        'inactive_decision = ( decision '
+        'if decision.authority == "STRUCTURAL_MACRO" '
+        'else SafetyDecision("NONE", False, True, False) )'
+        in flat
+    )
+
+    assert (
+        'if controller == "mobile_manipulator8" '
+        'else inactive_decision'
+        in flat
     )
 
 

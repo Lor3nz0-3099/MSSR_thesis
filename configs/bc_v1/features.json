@@ -1,0 +1,198 @@
+{
+  "schema_version": "mssr.bc_v1.features.v1",
+  "input_contract": "mssr.bc_v1.policy_inputs.v1",
+  "geometry_contract": "FrameGeometryView",
+  "frame_policy": {
+    "owner": "E1",
+    "origin": "centroid_all_current_valid_modules",
+    "preference": ["certified_current_physical_task_frame", "certified_map_or_world_frame"],
+    "same_for_training_and_rollout": true,
+    "missing_certification": "invalid_no_inferred_frame"
+  },
+  "r6_convention": {"owner": "E1.matrix_to_r6", "columns": [0, 1], "flatten": "column_order"},
+  "missingness": {
+    "value_fill": "zero_only_with_invalid_channel",
+    "validity": "per_component",
+    "absent": "invalid",
+    "nonfinite_valid": "error",
+    "unknown_category": "invalid"
+  },
+  "cardinality": {"modules": "variable", "connectors": "variable", "resources": "variable", "coordinates": "variable"},
+  "robot_spec_policy": {
+    "capability_vocabulary": "sorted_union_by_entity_kind",
+    "resource_rows": "one_per_current_resource",
+    "coordinate_rows": "one_per_current_coordinate",
+    "argument_contract": "robot_spec_action_parameters",
+    "instance_ids": "routing_only"
+  },
+  "unit_resolvers": {
+    "coordinate_units": "RobotSpec.coordinate.units",
+    "coordinate_units_per_s": "RobotSpec.coordinate.units_divided_by_seconds",
+    "geometry_kind_units": "geometry_kinds.units",
+    "source_quantity_units": {"rule": "approved_source_name_unit", "metric_suffix": "_m", "dimensionless_names": ["stairs.step_count"]}
+  },
+  "source_shape_policy": {
+    "owner": "validated_policy_inputs",
+    "scope_sources": {"c_static": "context.static_geometry", "o_dynamic": "observation.features"},
+    "lookup": "source_scope_and_source_name",
+    "read": "component_count_only",
+    "learned": false,
+    "intrinsic_dispatch": "source_arity_even_when_values_missing",
+    "intrinsic_vector_width": "source_arity",
+    "plane_row_count": "source_arity",
+    "unknown_shape": "error_no_zero_or_scalar_guess"
+  },
+  "routing_metadata": {
+    "module_ref": {"learned": false, "encoding": "opaque_routing"},
+    "module_type_ref": {"learned": false, "encoding": "opaque_routing"},
+    "connector_ref": {"learned": false, "encoding": "opaque_routing"},
+    "resource_ref": {"learned": false, "encoding": "opaque_routing"},
+    "coordinate_ref": {"learned": false, "encoding": "opaque_routing"},
+    "connection_ref": {"learned": false, "encoding": "opaque_routing"},
+    "object_ref": {"learned": false, "encoding": "opaque_routing"},
+    "source_scope": {"learned": false, "encoding": "opaque_routing"},
+    "source_name": {"learned": false, "encoding": "opaque_routing"},
+    "geometry_kind": {"learned": false, "encoding": "opaque_routing"},
+    "primitive_part_ref": {"learned": false, "encoding": "opaque_routing"},
+    "action_id": {"learned": false, "encoding": "opaque_routing"},
+    "scope_members": {"learned": false, "encoding": "opaque_routing"},
+    "parameter_binding_ref": {"learned": false, "encoding": "opaque_routing"}
+  },
+  "geometry_kinds": {
+    "point3": {"e1_kinds": ["point"], "dimension": 3, "units": ["m", "m", "m"], "row_policy": "one_row", "when": "always"},
+    "vector3": {"e1_kinds": ["vector"], "dimension": 3, "units": ["1", "1", "1"], "row_policy": "one_row", "when": "always"},
+    "line": {"e1_kinds": ["line"], "dimension": 6, "units": ["m", "m", "m", "1", "1", "1"], "row_policy": "one_row_unknown_height_preserved", "when": "always"},
+    "plane": {"e1_kinds": ["planes"], "dimension": 4, "units": ["1", "1", "1", "m"], "row_policy": "one_plane_per_row_preserve_source_group", "when": "always"},
+    "heading": {"e1_kinds": ["heading"], "dimension": 3, "units": ["1", "1", "1"], "row_policy": "one_row", "when": "always"},
+    "planar_pose": {"e1_kinds": ["planar_pose"], "dimension": 9, "units": ["m", "m", "m", "1", "1", "1", "1", "1", "1"], "row_policy": "one_row_unknown_height_preserved", "when": "always"},
+    "angle_constraint": {"e1_kinds": ["angle_constraint"], "dimension": 10, "units": ["rad", "1", "1", "1", "1", "1", "1", "1", "1", "1"], "row_policy": "one_row_partial_attitude_preserved", "when": "always"},
+    "intrinsic_scalar": {"e1_kinds": ["intrinsic"], "dimension": 1, "units": ["source_quantity_units"], "row_policy": "one_row", "when": "length_eq_1"},
+    "intrinsic_vector": {"e1_kinds": ["intrinsic", "dimensions"], "dimension": "source_components", "units": "source_quantity_units", "row_policy": "one_row", "when": "length_gt_1"}
+  },
+  "entities": {
+    "module": {
+      "source_scopes": ["g_current"],
+      "routing_fields": ["module_ref", "module_type_ref"],
+      "packing": "all_values_then_matching_validity",
+      "fields": [
+        {"name": "relative_position", "source": "module.position", "codec": "point3", "dimension": 3, "units": "m", "frame": "robot_centroid", "validity": "per_component"},
+        {"name": "orientation_r6", "source": "module.orientation_matrix", "codec": "r6", "dimension": 6, "units": "1", "frame": "robot_centroid", "validity": "per_component"},
+        {"name": "linear_velocity", "source": "module.linear_velocity", "codec": "vector3", "dimension": 3, "units": "m/s", "frame": "robot_centroid", "validity": "per_component"},
+        {"name": "angular_velocity", "source": "module.angular_velocity", "codec": "vector3", "dimension": 3, "units": "rad/s", "frame": "robot_centroid", "validity": "per_component"}
+      ]
+    },
+    "connector": {
+      "source_scopes": ["g_current"],
+      "routing_fields": ["module_ref", "connector_ref"],
+      "packing": "all_values_then_matching_validity",
+      "fields": [
+        {"name": "position_body_m", "source": "connector.position_body_m", "codec": "point3", "dimension": 3, "units": "m", "frame": "module_body", "validity": "per_component"},
+        {"name": "normal_body", "source": "connector.normal_body", "codec": "vector3", "dimension": 3, "units": "1", "frame": "module_body", "validity": "per_component"},
+        {"name": "tangent_body", "source": "connector.tangent_body", "codec": "vector3", "dimension": 3, "units": "1", "frame": "module_body", "validity": "per_component"},
+        {"name": "kind", "source": "connector.kind", "codec": "one_hot", "dimension": "categories", "units": "1", "frame": "intrinsic", "validity": "per_component", "categories": ["fixed_port", "surface"]},
+        {"name": "status", "source": "connector.status", "codec": "one_hot", "dimension": "categories", "units": "1", "frame": "intrinsic", "validity": "per_component", "categories": ["available", "connected"]},
+        {"name": "capabilities", "source": "connector.capabilities", "codec": "multi_hot", "dimension": "robot_spec.connector_capabilities", "units": "1", "frame": "intrinsic", "validity": "per_component"}
+      ]
+    },
+    "resource": {
+      "source_scopes": ["g_current"],
+      "routing_fields": ["module_ref", "resource_ref"],
+      "packing": "all_values_then_matching_validity",
+      "fields": [
+        {"name": "capabilities", "source": "resource.capabilities", "codec": "multi_hot", "dimension": "robot_spec.resource_capabilities", "units": "1", "frame": "intrinsic", "validity": "per_component"}
+      ]
+    },
+    "actuator_coordinate": {
+      "source_scopes": ["g_current"],
+      "routing_fields": ["module_ref", "resource_ref", "coordinate_ref"],
+      "packing": "all_values_then_matching_validity",
+      "fields": [
+        {"name": "position", "source": "coordinate.position", "codec": "scalar", "dimension": 1, "units": "coordinate_units", "frame": "resource_local", "validity": "per_component"},
+        {"name": "velocity", "source": "coordinate.velocity", "codec": "scalar", "dimension": 1, "units": "coordinate_units_per_s", "frame": "resource_local", "validity": "per_component"},
+        {"name": "limits", "source": "coordinate.limits", "codec": "vector2", "dimension": 2, "units": "coordinate_units", "frame": "resource_local", "validity": "per_component"},
+        {"name": "periodic", "source": "coordinate.periodic", "codec": "boolean", "dimension": 1, "units": "1", "frame": "intrinsic", "validity": "per_component"}
+      ]
+    },
+    "connection": {
+      "source_scopes": ["g_current"],
+      "routing_fields": ["connection_ref", "connector_ref", "module_ref"],
+      "packing": "all_values_then_matching_validity",
+      "fields": [
+        {"name": "relative_position", "source": "connection.relative_position_m", "codec": "point3", "dimension": 3, "units": "m", "frame": "endpoint_a_body", "validity": "per_component"},
+        {"name": "relative_orientation_r6", "source": "connection.relative_orientation_xyzw", "codec": "quaternion_r6", "dimension": 6, "units": "1", "frame": "endpoint_a_body", "validity": "per_component"},
+        {"name": "clocking", "source": "connection.clocking_quarter_turns", "codec": "scalar", "dimension": 1, "units": "quarter_turn", "frame": "connection_intrinsic", "validity": "per_component"},
+        {"name": "allowed_relative_dofs", "source": "connection.allowed_relative_dofs", "codec": "multi_hot", "dimension": "categories", "units": "1", "frame": "intrinsic", "validity": "per_component", "categories": ["x", "y", "z", "roll", "pitch", "yaw", "normal", "tangent"]},
+        {"name": "relation", "source": "connection.relation_id", "codec": "one_hot", "dimension": "categories", "units": "1", "frame": "intrinsic", "validity": "per_component", "categories": ["current_connection", "contact", "rolling_contact"]}
+      ]
+    },
+    "environment": {
+      "source_scopes": ["c_static", "o_dynamic"],
+      "routing_fields": ["object_ref", "source_scope", "source_name", "geometry_kind", "primitive_part_ref"],
+      "packing": "all_values_then_matching_validity",
+      "fields": [
+        {"name": "geometry", "source": "environment.geometry", "codec": "geometry_kind", "dimension": "geometry_kind", "units": "geometry_kind_units", "frame": "from_e1_output_frame", "validity": "per_component"},
+        {"name": "object_type", "source": "environment.object_type", "codec": "one_hot", "dimension": "categories", "units": "1", "frame": "intrinsic", "validity": "per_component", "categories": ["button", "cone", "goal", "gap_boundary", "stair_riser", "collision_box", "task_frame", "environment_boundary", "intrinsic_quantity"]}
+      ]
+    },
+    "module_environment_relation": {
+      "source_scopes": ["g_current", "c_static", "o_dynamic"],
+      "routing_fields": ["module_ref", "object_ref", "source_scope", "source_name", "primitive_part_ref"],
+      "packing": "all_values_then_matching_validity",
+      "fields": [
+        {"name": "delta_xyz", "source": "relation.delta_xyz", "codec": "vector3", "dimension": 3, "units": "m", "frame": "robot_centroid", "validity": "per_component"},
+        {"name": "distance", "source": "relation.distance", "codec": "scalar", "dimension": 1, "units": "m", "frame": "intrinsic", "validity": "per_component"},
+        {"name": "direction", "source": "relation.normalized_direction", "codec": "vector3", "dimension": 3, "units": "1", "frame": "robot_centroid", "validity": "per_component"}
+      ]
+    },
+    "structural_candidate_metadata": {
+      "source_scopes": ["g_current"],
+      "routing_fields": ["action_id", "module_ref", "connector_ref", "resource_ref", "scope_members", "parameter_binding_ref"],
+      "packing": "routing_only",
+      "fields": []
+    }
+  },
+  "dedup_policy": {
+    "keep_distinct": {
+      "button_nominal_current": "preserve_nominal_and_current_roles",
+      "goal_point_support_volume": "preserve_destination_and_support_roles",
+      "module_state_relative_edge": "preserve_absolute_and_relative_semantics"
+    },
+    "canonicalize_equivalent": {
+      "cone_centers": {"requires_physical_equivalence": true, "prefer": "certified_3d_over_2d", "partial_geometry": "never_invent_missing_components"},
+      "cone_dimensions": {"requires_physical_equivalence": true, "prefer": "per_object_observed_over_shared_default", "partial_geometry": "never_invent_missing_components"},
+      "gap_edges": {"requires_physical_equivalence": true, "prefer": "most_informative_certified_geometry", "partial_geometry": "never_invent_missing_components"},
+      "stairs": {"requires_physical_equivalence": true, "prefer": "most_informative_certified_geometry", "partial_geometry": "never_invent_missing_components"}
+    }
+  },
+  "relation_policy": {
+    "allowed_inputs": ["current_object_type", "current_task_semantics", "current_physical_geometry"],
+    "selection": {
+      "rule": "nearest_valid_per_module_per_object_type",
+      "max_neighbors_per_type": 2,
+      "limit_semantics": "soft_at_equal_physical_distance",
+      "tie_policy": "retain_boundary_ties_no_instance_id_tiebreak",
+      "distance_metric": "kind_aware_closest_geometry",
+      "unknown_task": "no_relations"
+    },
+    "object_types_by_task": {
+      "button": ["button", "collision_box"],
+      "navigation": ["cone", "goal", "collision_box"],
+      "gap": ["gap_boundary", "collision_box"],
+      "stairs": ["stair_riser", "collision_box"]
+    },
+    "geometry_policy": "kind_aware_no_partial_point_cast",
+    "undefined_direction": "invalid_at_zero_distance"
+  },
+  "candidate_policy": {
+    "allowed_inputs": ["current_state_graph", "robot_spec", "connector_compatibility", "current_connection_state", "action_argument_requirements"],
+    "robot_spec_enabled_only": true,
+    "argument_contract": "robot_spec_action_parameters",
+    "feasibility_owner": "runtime_executor",
+    "actions": {
+      "align_faces": {"kind": "prepare_connection", "endpoints": "compatible_connector_pair", "scope": "from_robot_spec", "distance_only_pruning": false, "enabled_by_default": true},
+      "dock": {"kind": "connect", "endpoints": "compatible_connector_pair", "scope": "from_robot_spec", "distance_only_pruning": false, "enabled_by_default": true},
+      "undock": {"kind": "disconnect", "endpoints": "current_connection_pair", "scope": "from_robot_spec", "distance_only_pruning": false, "enabled_by_default": true},
+      "gravity_settle": {"kind": "skill", "endpoints": "none", "scope": "from_robot_spec_module_scope", "distance_only_pruning": false, "enabled_by_default": true}
+    }
+  }
+}

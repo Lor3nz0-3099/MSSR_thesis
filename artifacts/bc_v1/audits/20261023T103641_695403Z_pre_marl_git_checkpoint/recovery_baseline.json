@@ -1,0 +1,13 @@
+{
+  "HEAD": "fcbc88ec10416a98c12f33553212c55fb9a0a3a1",
+  "source_hashes_verified": 591,
+  "official_run_TEST_hashes_verified": 42,
+  "planned_manifest_paths_verified": 187,
+  "classification_rows": 12861,
+  "unchanged_main_suite_results_SHA256": "949d476107e0127f48ad48010175295a1f63c71a23ea74029eed8d92092d5e52",
+  "original_wrapper_SHA256": "65e63df860bb4eb96f208aab2ca8698b8366bb0b9829d061dbfd9dd1787d616e",
+  "existing_runtime_pytest_work": false,
+  "new_recovery_work_exists": false,
+  "production_source_changed": false,
+  "TEST_payload_access": 0
+}

@@ -155,11 +155,12 @@ class IsaacMultiModuleCommandRouter:
                 command.internal_motion
                 is InternalMotionMode.PAN_VELOCITY
             ):
-                # Continuous PAN is the only shape mode that deliberately
-                # releases the PAN position spring.  The wheels and TILT
-                # remain rigid so the requested rotation cannot twist the
-                # whole connected morphology.
-                control_mode = "pan_velocity_braked_support"
+                # Release PAN's position spring in both cases. A simultaneous
+                # wheel command needs velocity drives, not frozen wheel poses.
+                control_mode = (
+                    "pan_velocity_wheel_drive" if has_wheel_motion
+                    else "pan_velocity_braked_support"
+                )
             elif has_wheel_motion:
                 control_mode = "controlled"
             else:
@@ -177,6 +178,10 @@ class IsaacMultiModuleCommandRouter:
                     )
                 elif mode.control_mode == "pan_velocity_braked_support":
                     state.configure_pan_velocity_drive_with_braked_wheels(
+                        docked_faces
+                    )
+                elif mode.control_mode == "pan_velocity_wheel_drive":
+                    state.configure_pan_velocity_drive_with_powered_wheels(
                         docked_faces
                     )
                 elif mode.control_mode == "wheel_drive_passive_internal":

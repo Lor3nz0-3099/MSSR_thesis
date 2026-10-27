@@ -1,0 +1,452 @@
+{
+  "best_epoch_history": {
+    "actor_visibility": {
+      "fingerprint": "e6b819c2e23e1713f70649d83b547d7701d78ef8c0ec7a21668c803c7c8f6234",
+      "policy": {
+        "attribute_rules": [
+          {
+            "names": [
+              "gap.width_m",
+              "gap.bank_width_m",
+              "gap.bank_thickness_m",
+              "gap.crossing_direction_world_xy"
+            ],
+            "object_refs": [],
+            "object_types": [
+              "gap_boundary"
+            ]
+          },
+          {
+            "names": [
+              "gap.landing_length_m"
+            ],
+            "object_refs": [
+              "gap.far_edge"
+            ],
+            "object_types": []
+          },
+          {
+            "names": [
+              "stairs.rise_m",
+              "stairs.riser_depth_m",
+              "stairs.tread_depth_m",
+              "stairs.width_m",
+              "stairs.ascent_direction_world_xy"
+            ],
+            "object_refs": [],
+            "object_types": [
+              "stair_riser"
+            ]
+          },
+          {
+            "names": [
+              "cones.cone_radius_m",
+              "cones.cone_height_m"
+            ],
+            "object_refs": [],
+            "object_types": [
+              "cone"
+            ]
+          }
+        ],
+        "critic_only": [
+          "task_frame.origin_xyz_m",
+          "task_frame.yaw_rad",
+          "environment.floor_height_m",
+          "environment.upper_deck_height_m",
+          "environment.platform_bounds_xy_m",
+          "environment.clear_landing_length_m",
+          "stairs.step_count",
+          "button.plunger_depth_m",
+          "button.plunger_stroke_m",
+          "cones.corridor_width_m"
+        ],
+        "empirical_reference_mean_m": 0.47550612841561374,
+        "goal_policy": "certified_current_assigned_physical_goal_exempt",
+        "local_compound_parts": [
+          "stairs.top_heights_m",
+          "stairs.top_heights_world_m"
+        ],
+        "prefer_dynamic_object_types": [
+          "button"
+        ],
+        "radius_m": 1.0,
+        "radius_selection": "user design decision: approximately 0.8 m robot span; not the empirical mean",
+        "revision": "r1m-team-union-1",
+        "schema_version": "mssr.bc_v1.actor_visibility.v1",
+        "scope": "team_union_wireless",
+        "threshold": "<="
+      },
+      "schema_version": "mssr.bc_v1.actor_inputs.v1"
+    },
+    "dropout": {
+      "h1": 0.1,
+      "h2": 0.1
+    },
+    "epoch": 5,
+    "epoch_kind": "TRAINED_EPOCH",
+    "global_step": 6120,
+    "initialization": {
+      "fresh_model": true,
+      "fresh_optimizer": true,
+      "fresh_selection_state": true,
+      "mode": "scratch",
+      "pretrained_checkpoint": null,
+      "resume_checkpoint": null
+    },
+    "runtime": {
+      "amp": false,
+      "cache_budgets_bytes": {
+        "train_dynamic": 2147483648,
+        "train_template": 4294967296,
+        "validation_dynamic": 268435456,
+        "validation_template": 536870912
+      },
+      "compile": false,
+      "cpu_interop_threads": 1,
+      "cpu_threads": 1,
+      "numeric_mode": "FP32 eager",
+      "prefetch": false,
+      "sidecar_template_cache_entries": 0,
+      "tf32": false
+    },
+    "selection": {
+      "best_epoch": 5,
+      "best_val": 0.06868529843473761,
+      "counter": 0,
+      "initial_val": 6.3614860905739326,
+      "last_epoch": 5,
+      "min_delta": 0.002,
+      "patience": 8
+    },
+    "train": {
+      "families": {
+        "arg_boolean": {
+          "mean": 0.0,
+          "sum": 0.0,
+          "support": 0,
+          "weighted": 0.0
+        },
+        "arg_category": {
+          "mean": 3.6723521162550824e-06,
+          "sum": 0.11370336622348987,
+          "support": 30962,
+          "weighted": 3.6723521162550824e-06
+        },
+        "arg_numeric": {
+          "mean": 8.730766822612405e-05,
+          "sum": 0.030994222220274037,
+          "support": 355,
+          "weighted": 8.730766822612405e-05
+        },
+        "arg_reference": {
+          "mean": 0.0,
+          "sum": 0.0,
+          "support": 0,
+          "weighted": 0.0
+        },
+        "arg_reference_set": {
+          "mean": 9.603924718794934e-09,
+          "sum": 3.409393275172201e-06,
+          "support": 355,
+          "weighted": 9.603924718794934e-09
+        },
+        "presence": {
+          "mean": 0.024696972367986795,
+          "sum": 1934.6620274186134,
+          "support": 78336,
+          "weighted": 0.024696972367986795
+        },
+        "resource_payload": {
+          "mean": 0.031698507313016766,
+          "sum": 13204.39360332489,
+          "support": 416562,
+          "weighted": 0.031698507313016766
+        },
+        "scope": {
+          "mean": 5.258473496841807e-09,
+          "sum": 1.8667580913788416e-06,
+          "support": 355,
+          "weighted": 5.258473496841807e-09
+        }
+      },
+      "total_loss": 0.05648647456374416
+    },
+    "trained_epochs": 5,
+    "validation": {
+      "families": {
+        "arg_boolean": {
+          "mean": 0.0,
+          "sum": 0.0,
+          "support": 0,
+          "weighted": 0.0
+        },
+        "arg_category": {
+          "mean": 1.2273619160849666e-07,
+          "sum": 2.0742416381835938e-05,
+          "support": 169,
+          "weighted": 1.2273619160849666e-07
+        },
+        "arg_numeric": {
+          "mean": 0.00020789091363819048,
+          "sum": 0.001247345481829143,
+          "support": 6,
+          "weighted": 0.00020789091363819048
+        },
+        "arg_reference": {
+          "mean": 0.0,
+          "sum": 0.0,
+          "support": 0,
+          "weighted": 0.0
+        },
+        "arg_reference_set": {
+          "mean": 2.0214426678840287e-08,
+          "sum": 1.2128656007304173e-07,
+          "support": 6,
+          "weighted": 2.0214426678840287e-08
+        },
+        "presence": {
+          "mean": 0.023559378766042614,
+          "sum": 536.258579472662,
+          "support": 22762,
+          "weighted": 0.023559378766042614
+        },
+        "resource_payload": {
+          "mean": 0.044917884195972486,
+          "sum": 7207.4338623173535,
+          "support": 160458,
+          "weighted": 0.044917884195972486
+        },
+        "scope": {
+          "mean": 1.608466040914358e-09,
+          "sum": 9.650796245486148e-09,
+          "support": 6,
+          "weighted": 1.608466040914358e-09
+        }
+      },
+      "metrics": {
+        "cardinality_absolute_error": 3.278402600825938,
+        "exact_match": 0.5154643704419647,
+        "f1": 0.8111323571387073,
+        "false_negative": 97,
+        "false_negative_actions": 97,
+        "false_positive": 74674,
+        "false_positive_actions": 74674,
+        "jaccard": 0.7690017788523719,
+        "normalized_numeric": {
+          "arguments": {
+            "1": {
+              "mae": 0.01306754428272446,
+              "rmse": 0.020390729256445344,
+              "support": 6,
+              "tolerance": null,
+              "unit": "1",
+              "within_tolerance": null
+            }
+          },
+          "payload": {
+            "1": {
+              "mae": 0.15229359898073433,
+              "rmse": 0.32346878648374056,
+              "support": 266307,
+              "tolerance": null,
+              "unit": "1",
+              "within_tolerance": null
+            }
+          }
+        },
+        "normalized_payload_rmse": 0.32346878648374056,
+        "numeric": {},
+        "per_action": {
+          "align_faces": {
+            "f1": 0.3050847457627119,
+            "fn": 5,
+            "fp": 364,
+            "precision": 0.18202247191011237,
+            "recall": 0.9418604651162791,
+            "support": 86,
+            "tp": 81
+          },
+          "dock": {
+            "f1": 0.44808743169398907,
+            "fn": 1,
+            "fp": 201,
+            "precision": 0.28975265017667845,
+            "recall": 0.9879518072289156,
+            "support": 83,
+            "tp": 82
+          },
+          "gravity_settle": {
+            "f1": 0.14457831325301204,
+            "fn": 0,
+            "fp": 71,
+            "precision": 0.07792207792207792,
+            "recall": 1.0,
+            "support": 6,
+            "tp": 6
+          },
+          "pan_delta": {
+            "f1": 0.0,
+            "fn": 0,
+            "fp": 5,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 0,
+            "tp": 0
+          },
+          "pan_target": {
+            "f1": 0.06312292358803986,
+            "fn": 28,
+            "fp": 536,
+            "precision": 0.03423423423423423,
+            "recall": 0.40425531914893614,
+            "support": 47,
+            "tp": 19
+          },
+          "pan_velocity": {
+            "f1": 0.9985555096987206,
+            "fn": 0,
+            "fp": 112,
+            "precision": 0.9971151864825881,
+            "recall": 1.0,
+            "support": 38712,
+            "tp": 38712
+          },
+          "tilt_delta": {
+            "f1": 0.0,
+            "fn": 0,
+            "fp": 5,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 0,
+            "tp": 0
+          },
+          "tilt_target": {
+            "f1": 0.3717053070310465,
+            "fn": 63,
+            "fp": 52999,
+            "precision": 0.2284882451415678,
+            "recall": 0.9960022844089091,
+            "support": 15759,
+            "tp": 15696
+          },
+          "tilt_velocity": {
+            "f1": 0.0,
+            "fn": 0,
+            "fp": 5,
+            "precision": 0.0,
+            "recall": 0.0,
+            "support": 0,
+            "tp": 0
+          },
+          "undock": {
+            "f1": 0.36363636363636365,
+            "fn": 0,
+            "fp": 84,
+            "precision": 0.2222222222222222,
+            "recall": 1.0,
+            "support": 24,
+            "tp": 24
+          },
+          "wheel_velocity": {
+            "f1": 0.9125992798442534,
+            "fn": 0,
+            "fp": 20292,
+            "precision": 0.8392483680841625,
+            "recall": 1.0,
+            "support": 105940,
+            "tp": 105940
+          }
+        },
+        "precision": 0.6825543926473214,
+        "predicted_cardinality": 10.334504876548634,
+        "predicted_cardinality_max": 28,
+        "predicted_cardinality_mean": 10.334504876548634,
+        "predicted_cardinality_min": 1,
+        "recall": 0.9993962292337091,
+        "samples": 22762,
+        "set_exact_match": 0.5154643704419647,
+        "set_f1": 0.8111323571387073,
+        "set_jaccard": 0.7690017788523719,
+        "set_precision": 0.6825543926473214,
+        "set_recall": 0.9993962292337091,
+        "target_cardinality": 7.058123187769088,
+        "target_cardinality_max": 15,
+        "target_cardinality_mean": 7.058123187769088,
+        "target_cardinality_min": 1,
+        "true_positive": 160560
+      },
+      "total_loss": 0.06868529843473761
+    }
+  },
+  "config": {
+    "batch_size": 64,
+    "initialization": "scratch",
+    "lr": 0.0003,
+    "max_epochs": 30,
+    "min_delta": 0.002,
+    "model_contract": "action_set_v1",
+    "patience": 8,
+    "schema_version": "mssr.bc_v1.training_action_set.v1",
+    "seed": 20261021,
+    "threshold_logit": 0.0,
+    "weight_decay": 0.0001
+  },
+  "identity": {
+    "action_set_fingerprint": "9d4825f23380cce49ba5fd620334ecb3fc167e1963fe66a11cc4a538e644a4df",
+    "action_set_version": "mssr.bc_v1.action_set.v1",
+    "catalog_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "decode_config": {
+      "configured_arguments": {},
+      "threshold_logit": 0.0
+    },
+    "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+    "h1_config_fingerprint": "81154912d4eed35d00bf97433e8964c10b6fc0b261abe34e2124d15695d490bf",
+    "head_config": {
+      "activation": "silu",
+      "dropout": 0.1,
+      "hidden_dim": 128,
+      "schema_version": "mssr.bc_v1.action_set_head.v1"
+    },
+    "head_config_fingerprint": "3e3e5c930388f20283c0c6bb9c360ae0cb3a118279757035f74e90d37282d778",
+    "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+    "model_contract": "action_set_v1",
+    "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "source_identity": {
+      "canonical_sha": "31765272b6ecd7506c54b25e214b75d7b1b28691803ddfc286dafcce8b4ec562",
+      "f1_sha": "f6759e6af89d732078ac656133d40236e1fd3cec8b43c92708907ed90ac965c7",
+      "f2_fingerprint": "bdb5304cd620faa7461c448794044af4757b85e77e672ca7022a1083da9f37cd",
+      "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+      "g1_fingerprint": "56533e91e1d19404ac22c3aae260466ed8c2ef1ca5cdb89476b7098036fb5d0c",
+      "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+      "normalizer_sha": "2b2348763b5bf8ce9e87a8fa294250184124fea6efbc480b7c2b976dffb1b0c7",
+      "resource_contract_fingerprint": "7a77f9118c81a7ca7a9b80f8f1df78011c92492be9c53a17d3fc00188268d194",
+      "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+      "split_fingerprint": "aee975a2f8b044ad3f57f331fc659d6cfa91d7c1e493b90b812634fb6364e81b",
+      "storage_fingerprint": "5e6f4f093c58df71f9c23a3e5bb94086e9a615690309b52cec75a93abf920499",
+      "tensorizer_fingerprint": "2b04372e98e29f3a5759799e971b7e33147b91ce1f248e50e0914fab9c663192"
+    },
+    "source_manifest_fingerprint": "d80b0774ed1793dedfa101cbaa82e45b7cb460384bfdd36a4291a592e9d97a3f",
+    "source_schema_version": "mssr.bc_v1.g2_sidecar.v1",
+    "training_config_fingerprint": "495d9dfc7478fa5c1f61d13cbae0b01647413875f7197abbafd1ae8787f4c044"
+  },
+  "last_exists_local": true,
+  "last_versioning": "KEEP_LOCAL_IGNORE",
+  "official_log": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/manual_runs/20261022T232532_854802073Z_207309_bc_v4_actor_visible_r1m_scratch_final.log",
+  "run": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/runs/20261022T232532_854802073Z_207309_bc_v4_actor_visible_r1m_scratch_final",
+  "status": {
+    "TEST_payload_access": 0,
+    "global_step": 15912,
+    "phase": "COMPLETE",
+    "selection": {
+      "best_epoch": 5,
+      "best_val": 0.06868529843473761,
+      "counter": 8,
+      "initial_val": 6.3614860905739326,
+      "last_epoch": 13,
+      "min_delta": 0.002,
+      "patience": 8
+    }
+  },
+  "training_executed_this_task": false
+}

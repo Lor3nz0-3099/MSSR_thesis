@@ -1498,3 +1498,90 @@ def test_morphology_commands_wait_for_successful_self_assembly() -> None:
             }
         }
     ) == (False, "FAILED")
+
+
+def test_morphology_behavior_status_reports_owned_native_goal_ids():
+    from pathlib import Path
+
+    root = Path(__file__).parents[1]
+
+    executor_text = (
+        root
+        / "mssr_expert/execution/morphology_behavior_executor.py"
+    ).read_text(encoding="utf-8")
+
+    node_text = (
+        root
+        / "mssr_expert/nodes/smores_morphology_behavior_node.py"
+    ).read_text(encoding="utf-8")
+
+    # The resident behavior executor must expose the native primitives it
+    # currently owns so TELEOP can cancel them exactly like structural macros.
+    assert "def active_goal_ids(" in executor_text
+
+    # Every morphology status packet carries current ownership information.
+    assert '"active_goal_ids"' in node_text
+    assert "self._executor.active_goal_ids" in node_text
+
+
+def test_morphology_command_payload_keeps_recording_metadata_outside_planner_parameters():
+    from mssr_expert.nodes.smores_morphology_command_client import (
+        build_command_payload,
+    )
+
+    payload = build_command_payload(
+        command_id="teleop-snake-stairs-42",
+        morphology="snake8",
+        behavior="crawl_stairs_spatial_concertina",
+        parameters={
+            "linear_m_s": 0.040,
+            "crawl_goal_tolerance_m": 0.016,
+        },
+        dataset_path="/tmp/episode-42/structural/stairs.jsonl",
+        episode_id="teleop-episode-42",
+        stage_name="snake_stairs",
+    )
+
+    # Recording/provenance metadata is execution metadata, not planner input.
+    assert payload["parameters"] == {
+        "linear_m_s": 0.040,
+        "crawl_goal_tolerance_m": 0.016,
+    }
+
+    assert payload["recording"] == {
+        "dataset_path": "/tmp/episode-42/structural/stairs.jsonl",
+        "episode_id": "teleop-episode-42",
+        "stage_name": "snake_stairs",
+    }
+
+    assert "dataset_path" not in payload["parameters"]
+    assert "episode_id" not in payload["parameters"]
+    assert "stage_name" not in payload["parameters"]
+
+
+def test_morphology_behavior_node_consumes_command_scoped_dataset_metadata():
+    from pathlib import Path
+
+    root = Path(__file__).parents[1]
+
+    executor_text = (
+        root
+        / "mssr_expert/execution/morphology_behavior_executor.py"
+    ).read_text(encoding="utf-8")
+
+    node_text = (
+        root
+        / "mssr_expert/nodes/smores_morphology_behavior_node.py"
+    ).read_text(encoding="utf-8")
+
+    # MorphologyCommand must carry recording provenance independently
+    # from the planner's behavior parameters.
+    assert "dataset_path:" in executor_text
+    assert "episode_id:" in executor_text
+    assert "stage_name:" in executor_text
+
+    # The resident behavior node must use those command-scoped values
+    # when opening/logging the expert stream.
+    assert "command.dataset_path" in node_text
+    assert "command.episode_id" in node_text
+    assert "command.stage_name" in node_text

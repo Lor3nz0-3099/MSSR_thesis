@@ -1,0 +1,17 @@
+{
+  "PASS": true,
+  "TEST_payload_access_this_task": 0,
+  "diff_check_exit_code": 0,
+  "historical_artifacts_removed_from_tracking": 0,
+  "initial_tracked_artifact_count": 0,
+  "last_exists_locally": true,
+  "no_reset_restore_clean_stash_checkout_push": true,
+  "no_scientific_result_modified": true,
+  "official_run_TEST_files_byte_identical": 42,
+  "only_existing_BC_deltas_packaged": true,
+  "original_artifact_stats_unchanged": 11112,
+  "phase": "all pre-commit gates; post-commit record is local-only",
+  "production_tests_configs_unchanged_by_task": true,
+  "source_hashes_unchanged": 591,
+  "temporary_files_deleted": 0
+}

@@ -1,0 +1,23 @@
+{
+  "python": "/home/lorenzo/.local/share/mssr-bc-v1/venv/bin/python",
+  "pytest_argv": [
+    "drl/IL/tests/bc_v1",
+    "-q",
+    "-p",
+    "no:cacheprovider",
+    "--basetemp",
+    "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/audits/20261023T103641_695403Z_pre_marl_git_checkpoint/pytest_work",
+    "--deselect=drl/IL/tests/bc_v1/test_dataset_counts.py::test_g1_materialized_cache_has_frozen_v6_split_counts"
+  ],
+  "env": {
+    "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
+    "MSSR_BC_V1_SKIP_REAL_CENSUS": "1",
+    "MSSR_K2_REAL_TRAIN_SMOKE": "0",
+    "CUDA_VISIBLE_DEVICES": "",
+    "OMP_NUM_THREADS": "1",
+    "MKL_NUM_THREADS": "1",
+    "OPENBLAS_NUM_THREADS": "1"
+  },
+  "same_previous_selection": true,
+  "only_basetemp_and_audit_evidence_location_changed": true
+}

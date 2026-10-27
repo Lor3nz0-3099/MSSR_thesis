@@ -1,0 +1,85 @@
+{
+  "TEST_access_authorized": true,
+  "TEST_episode_count": 12,
+  "TEST_sample_count": 18536,
+  "checkpoint_sha256": "d90a73e9b5ba2ecb579e4fc8733066b1c55d9e60dafeb1d71c029c49a7c21c6d",
+  "end_timestamp": "2026-10-23T08:07:10.176159+00:00",
+  "episode_payload_loads": {
+    "expert:assembly:seed-006284": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 19
+    },
+    "expert:gap:seed-004107": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 247
+    },
+    "expert:gap:seed-004110": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 251
+    },
+    "expert:gap:seed-014544": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 253
+    },
+    "expert:rc_car:seed-006000": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 303
+    },
+    "expert:rc_car:seed-006004": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 273
+    },
+    "expert:stairs:seed-003101": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 468
+    },
+    "expert:stairs:seed-003106": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 339
+    },
+    "expert:stairs:seed-004676": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 182
+    },
+    "teleop-3aa4f69128774d5eba1f8d851c02cf53": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 5273
+    },
+    "teleop-b1456ab292aa4a319c9d4bcc17e7e57f": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 544
+    },
+    "teleop-ce8293656bb444ac999f87c0520672fc": {
+      "attempts": 1,
+      "completed": true,
+      "samples_metadata": 10384
+    }
+  },
+  "model_forward_calls": 290,
+  "no_checkpoint_comparison": true,
+  "no_retraining": true,
+  "no_retry_after_predictions": true,
+  "no_threshold_tuning": true,
+  "number_of_batches": 290,
+  "number_of_valid_model_predictions": 18536,
+  "official_TEST_evaluation_consumed": true,
+  "official_test_evaluation_number": 1,
+  "parameter_hash_after": "80cdf41cadd12d4b6e9af825e2619c2e5bba32f26fd0b81ac08005b440d59ad3",
+  "parameter_hash_before": "80cdf41cadd12d4b6e9af825e2619c2e5bba32f26fd0b81ac08005b440d59ad3",
+  "parameter_hash_equal": true,
+  "result_frozen": true,
+  "start_timestamp": "2026-10-23T07:42:58.510484+00:00",
+  "status": "COMPLETE",
+  "wall_time_s": 1451.6469005509862
+}

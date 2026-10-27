@@ -27,6 +27,7 @@ _CURRENT_STATE_FILES = (
     "state_graph.json",
     "task_metrics.json",
     "primitive_status.json",
+    "self_assembly_state.json",
 )
 
 _REPOSITORY_SENTINELS = (
@@ -120,6 +121,27 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         "--wheel-friction-scale",
         LaunchConfiguration("wheel_friction_scale").perform(context),
     ]
+    physics_hz = LaunchConfiguration(
+        "physics_hz"
+    ).perform(context).strip()
+
+    if physics_hz:
+        simulation_command.extend(
+            ("--physics-hz", physics_hz)
+        )
+
+    state_publish_hz = LaunchConfiguration(
+        "state_publish_hz"
+    ).perform(context).strip()
+
+    if state_publish_hz:
+        simulation_command.extend(
+            (
+                "--state-publish-hz",
+                state_publish_hz,
+            )
+        )
+
     tilt_effort_scale = LaunchConfiguration(
         "tilt_effort_scale"
     ).perform(context).strip()
@@ -208,6 +230,11 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
         str(primitive_cancel_file),
         "--primitive-status-file",
         str(primitive_status_file),
+        "--expert-state-file",
+        str(
+            runtime_dir
+            / "self_assembly_state.json"
+        ),
     ]
 
     return [
@@ -363,6 +390,20 @@ def generate_launch_description() -> LaunchDescription:
                 description=(
                     "Simulated seconds per wall second when performance "
                     "pacing is enabled."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "physics_hz",
+                default_value="",
+                description=(
+                    "Optional explicit Isaac physics frequency."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "state_publish_hz",
+                default_value="",
+                description=(
+                    "Optional explicit Isaac state publication frequency."
                 ),
             ),
             DeclareLaunchArgument(

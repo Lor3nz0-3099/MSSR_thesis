@@ -1,0 +1,29 @@
+  File "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/audits/20261023T073725_980736Z_bc_v4_official_one_shot_test_evaluation/official_evaluate.py", line 167
+    'parameter_hash_before':before,'parameter_hash_after':after,'parameter_hash_equal':True,
+                           ^
+SyntaxError: positional argument follows keyword argument
+OFFICIAL TEST START; frozen best epoch5; 18536 samples /12 episodes /290 batches
+Progress: 1600/18536; batches=25/290; elapsed=125.6s
+Progress: 3200/18536; batches=50/290; elapsed=290.8s
+Progress: 4800/18536; batches=75/290; elapsed=401.7s
+Progress: 6400/18536; batches=100/290; elapsed=524.9s
+Progress: 8000/18536; batches=125/290; elapsed=645.3s
+Progress: 9600/18536; batches=150/290; elapsed=825.4s
+Progress: 11200/18536; batches=175/290; elapsed=935.5s
+Progress: 12800/18536; batches=200/290; elapsed=1044.6s
+Progress: 14400/18536; batches=225/290; elapsed=1162.5s
+Progress: 16000/18536; batches=250/290; elapsed=1273.7s
+Progress: 17600/18536; batches=275/290; elapsed=1389.5s
+{
+  "status": "COMPLETE",
+  "samples": 18536,
+  "episodes": 12,
+  "batches": 290,
+  "loss": 0.07753449015633553,
+  "precision": 0.6997875486867593,
+  "recall": 0.9988776655443322,
+  "F1": 0.8230016687845431,
+  "exact_set": 0.48225075528700906,
+  "parameter_hash_equal": true,
+  "wall_time_s": 1451.6469005509862
+}

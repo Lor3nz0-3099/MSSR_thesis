@@ -288,9 +288,9 @@ class ArticulationStateReader:
             dof_indices=wheel_indices,
         )
         self._articulation.set_dof_gains(
-            # Both shape coordinates are load-bearing.  PAN remains
-            # continuous, but its unwrapped target is still a valid PhysX
-            # position target and must resist out-of-plane gravity loads.
+            # Both shape coordinates are load-bearing. PAN remains
+            # continuous in the software servo; set_targets keeps the
+            # PhysX position target inside its revolute angle range.
             stiffnesses=[
                 drive.tilt_stiffness_nm_per_rad,
                 drive.hold_stiffness_nm_per_rad,
@@ -639,6 +639,25 @@ class ArticulationStateReader:
             dof_indices=[pan_index],
         )
 
+    def configure_pan_velocity_drive_with_powered_wheels(
+        self,
+        docked_face_names: set[str] | frozenset[str],
+    ) -> None:
+        """Coactuate wheel/PAN velocities without wheel position brakes.
+
+        TILT retains the controlled profile. PAN-only reaction supports keep
+        using configure_pan_velocity_drive_with_braked_wheels unchanged.
+        """
+        self.configure_controlled_docking_mode(docked_face_names)
+        self._articulation.set_dof_gains(
+            stiffnesses=[0.0],
+            dampings=[self._drive.pan_damping_nm_s_per_rad],
+            dof_indices=[self._indices["pan"]],
+        )
+        self._articulation.set_dof_velocity_targets(
+            [0.0], dof_indices=[self._indices["pan"]],
+        )
+
     def _set_wheel_contact_mode(self, material_name: str) -> None:
         """Switch operational supports between tire grip and passive skid."""
 
@@ -767,10 +786,19 @@ class ArticulationStateReader:
         )
         self._position_targets["tilt"] = tilt_joint_position_rad
         self._position_targets["pan"] = pan_logical_target_rad
+        # The velocity servo uses the unwrapped logical target. PhysX only
+        # accepts revolute position targets in [-2*pi, 2*pi]; once the
+        # continuous branch crosses that bound, send an equivalent angle.
+        # Preserve the existing branch inside the accepted range.
+        physx_pan_target_rad = (
+            normalize_revolute_target(pan_logical_target_rad)
+            if abs(pan_logical_target_rad) > math.tau
+            else pan_logical_target_rad
+        )
         self._articulation.set_dof_position_targets(
             [
                 tilt_joint_position_rad,
-                pan_logical_target_rad,
+                physx_pan_target_rad,
             ],
             dof_indices=[self._indices["tilt"], self._indices["pan"]],
         )

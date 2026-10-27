@@ -1,0 +1,15 @@
+{
+  "raw_transcripts": [
+    "artifacts/bc_v1/audits/20261023T073725_980736Z_bc_v4_official_one_shot_test_evaluation/git_after.txt",
+    "artifacts/bc_v1/audits/20261023T073725_980736Z_bc_v4_official_one_shot_test_evaluation/git_before.txt",
+    "artifacts/bc_v1/audits/20261023T103641_695403Z_pre_marl_git_checkpoint/git_diff_before.patch"
+  ],
+  "original_findings": {
+    "raw_context_space_lines": 612,
+    "all_raw_offending_lines_exactly": "+ ",
+    "CRLF_generated_inventory_rows": 25624
+  },
+  "policy": "Per-command core.attributesFile points to audit-local whitespace_policy.gitattributes; only blank-at-eol checking is exempted for these three raw Git transcripts. No persistent Git config, .gitattributes or production/source/test/config edits. All other whitespace checks remain enabled.",
+  "raw_initial_check_log_local_only": "staged_diff_check_initial.txt",
+  "inventory_fix": "audit-local CSV writer explicitly uses LF; include staged path set in inventory recomputation"
+}

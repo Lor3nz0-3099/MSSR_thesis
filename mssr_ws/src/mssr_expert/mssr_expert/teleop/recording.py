@@ -49,6 +49,7 @@ class RecordingManager:
         self._finalizer_thread: threading.Thread | None = None
         self._writer_error: str | None = None
         self._unwritten_records = 0
+        self._written_records = 0
         self._state_lock = threading.RLock()
         self._manifest: dict[str, Any] = {}
         self._structural_streams: list[dict[str, str]] = []
@@ -78,6 +79,7 @@ class RecordingManager:
         self._queue = queue.Queue(maxsize=self.queue_capacity)
         self._writer_error = None
         self._unwritten_records = 0
+        self._written_records = 0
         self._structural_streams = []
 
         self._manifest = {
@@ -236,13 +238,9 @@ class RecordingManager:
         self._queue.join()
         self._thread.join()
 
-        records = sum(
-            1
-            for line in self.human_path.read_text(
-                encoding="utf-8"
-            ).splitlines()
-            if line.strip()
-        )
+        with self._state_lock:
+            records = self._written_records
+
         byte_count = self.human_path.stat().st_size
 
         started_at = float(self._manifest["started_at"])
@@ -288,6 +286,9 @@ class RecordingManager:
 
                     stream.write(dumps_json(item) + "\n")
                     stream.flush()
+
+                    with self._state_lock:
+                        self._written_records += 1
                 except Exception as error:
                     self._latch_error(
                         f"writer_error:{type(error).__name__}:{error}",
@@ -582,6 +583,30 @@ class TeleopRecordingController:
     def wait_finalized(self, timeout: float | None = None) -> None:
         if self.manager is not None:
             self.manager.wait_finalized(timeout)
+
+    def shutdown(
+        self,
+        *,
+        ended_at: float,
+        task_success: bool | None = None,
+        timeout: float | None = None,
+    ) -> None:
+        """Finalize any active recording before process shutdown."""
+        manager = self.manager
+
+        if manager is None:
+            return
+
+        if manager.recording and not manager.finalizing:
+            if self.sampler is not None:
+                self.sampler.close()
+
+            manager.request_stop(
+                ended_at=float(ended_at),
+                task_success=task_success,
+            )
+
+        manager.wait_finalized(timeout)
 
     def register_structural_stream(
         self,

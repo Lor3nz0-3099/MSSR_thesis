@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import math
 import random
 from typing import Any, Mapping
@@ -1067,6 +1067,9 @@ class CompositeButtonFixture:
     plunger_name: str
     center_xyz_m: tuple[float, float, float]
     press_direction_world_xy: tuple[float, float]
+    # Authored world yaw shared by ButtonWall and ButtonPlunger.
+    # Legacy axis-aligned composite fixtures remain at zero.
+    yaw_deg: float = 0.0
 
 
 @dataclass(frozen=True)
@@ -1089,9 +1092,10 @@ class CompositeObstacleCourse:
     navigation_cones: tuple[CompositeNavigationCone, ...]
     final_floor_height_m: float
     goal_center_xyz_m: tuple[float, float, float]
+    layout_metadata: Mapping[str, Any] = field(default_factory=dict)
 
     def to_observation(self) -> dict[str, Any]:
-        return {
+        observation = {
             "frame_id": "world",
             "course_profile": "composite_mission_v1",
             "mission": {
@@ -1111,6 +1115,11 @@ class CompositeObstacleCourse:
             ],
             "collision_boxes": _collision_box_observations(self.boxes),
         }
+
+        if self.layout_metadata:
+            observation.update(dict(self.layout_metadata))
+            observation["mission"].update(dict(self.layout_metadata))
+        return observation
 
 
 def _support_box(
@@ -1154,6 +1163,13 @@ def composite_obstacle_course(
     the generated course therefore never asks an expert to descend stairs.
     """
 
+    profile = mission.get("layout_profile")
+    if profile == "teleop_connected_v1":
+        from .teleop_composite_course import build_teleop_course
+
+        return build_teleop_course(mission, validated_seeds)
+    if profile is not None:
+        raise ValueError(f"Unsupported layout_profile: {profile!r}")
     if mission.get("schema_version") != "mssr.composite_mission.v1":
         raise ValueError("Unsupported composite mission schema")
     raw_tasks = mission.get("tasks")
@@ -2115,6 +2131,14 @@ BUTTON_REFERENCE_CENTER_XYZ_M = (
 BUTTON_PLATFORM_CENTER_XY_M = (1.10, 0.0)
 BUTTON_PLATFORM_SIZE_XY_M = (5.60, 4.20)
 
+# Button rerecording starts from loose modules directly in front of
+# the fixture.  The root candidate is intentionally a little closer
+# than the manipulation standoff, so restore_drive is followed by a
+# short signed back-away/reposition step.  The outer modules stay on
+# the robot side of the wall with conservative clearance.
+BUTTON_ASSEMBLY_SPAWN_STANDOFF_M = 1.200
+BUTTON_ASSEMBLY_SPAWN_RADIUS_M = 0.340
+
 BUTTON_SAMPLE_X_RANGE_M = (0.65, 2.95)
 BUTTON_SAMPLE_Y_RANGE_M = (-1.20, 1.20)
 BUTTON_SAMPLE_Z_RANGE_M = (0.10, 0.17623346377092517)
@@ -2269,6 +2293,9 @@ class ButtonTestCourse:
     press_direction_world_xy: tuple[float, float]
     base_standoff_xy_m: tuple[float, float]
     base_standoff_yaw_rad: float
+    assembly_spawn_center_xy_m: tuple[float, float]
+    assembly_spawn_yaw_rad: float
+    assembly_spawn_radius_m: float
     spec: ButtonTargetSpec
 
     def to_observation(self) -> dict[str, Any]:
@@ -2326,6 +2353,20 @@ class ButtonTestCourse:
 
                 "base_standoff_yaw_rad":
                     self.base_standoff_yaw_rad,
+
+                "assembly_spawn": {
+                    "layout":
+                        "button_relative_scaled_radial_v1",
+
+                    "center_xy_m":
+                        list(self.assembly_spawn_center_xy_m),
+
+                    "yaw_rad":
+                        self.assembly_spawn_yaw_rad,
+
+                    "radius_m":
+                        self.assembly_spawn_radius_m,
+                },
 
                 "plunger_depth_m":
                     BUTTON_PLUNGER_DEPTH_M,
@@ -2698,6 +2739,30 @@ def mobile_manipulator_button_test_course(
         BUTTON_PLATFORM_SIZE_XY_M
     )
 
+    assembly_spawn_standoff_m = {
+        6341: 0.60,
+        6265: 0.60,
+    }.get(
+        spec.seed,
+        BUTTON_ASSEMBLY_SPAWN_STANDOFF_M,
+    )
+
+    assembly_spawn_center = (
+        button_center[0]
+        - nx * assembly_spawn_standoff_m,
+
+        button_center[1]
+        - ny * assembly_spawn_standoff_m,
+    )
+
+    # Match the validated RC->MM8 handoff orientation: the robot's
+    # longitudinal +X points away from the button so its rear/manipulator
+    # side faces the fixture.
+    assembly_spawn_yaw = math.atan2(
+        -ny,
+        -nx,
+    )
+
     return ButtonTestCourse(
         boxes=(
             CourseBox(
@@ -2758,6 +2823,15 @@ def mobile_manipulator_button_test_course(
         # +Y => +90 degrees.
         base_standoff_yaw_rad=
             math.atan2(ny, nx),
+
+        assembly_spawn_center_xy_m=
+            assembly_spawn_center,
+
+        assembly_spawn_yaw_rad=
+            assembly_spawn_yaw,
+
+        assembly_spawn_radius_m=
+            BUTTON_ASSEMBLY_SPAWN_RADIUS_M,
 
         spec=spec,
     )
@@ -2981,6 +3055,7 @@ def _install_button_prismatic_joint(
     plunger_name: str,
     center_xyz_m: tuple[float, float, float],
     press_direction_world_xy: tuple[float, float],
+    plunger_yaw_deg: float = 0.0,
     joint_name: str,
 ) -> None:
     """Make one course plunger independently depressible."""
@@ -3009,7 +3084,24 @@ def _install_button_prismatic_joint(
     joint.CreateLocalPos0Attr().Set(Gf.Vec3f(*center_xyz_m))
     joint.CreateLocalRot0Attr().Set(Gf.Quatf(1.0))
     joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0.0, 0.0, 0.0))
-    joint.CreateLocalRot1Attr().Set(Gf.Quatf(1.0))
+
+    # Body0 is the world frame.  ButtonPlunger, however, can already carry
+    # an authored world yaw because the complete button fixture was rotated
+    # with its stage.  An identity body-side joint frame would therefore
+    # force PhysX to rotate the dynamic plunger until the two joint frames
+    # agree, while the static ButtonWall stays in place.
+    #
+    # Express the world-aligned joint frame in the plunger's local frame:
+    # R_world_plunger * R_local1 = I  ->  R_local1 = R_world_plunger^-1.
+    half_inverse_yaw = -0.5 * math.radians(plunger_yaw_deg)
+    joint.CreateLocalRot1Attr().Set(
+        Gf.Quatf(
+            math.cos(half_inverse_yaw),
+            0.0,
+            0.0,
+            math.sin(half_inverse_yaw),
+        )
+    )
 
 
 def install_composite_obstacle_course(
@@ -3020,6 +3112,11 @@ def install_composite_obstacle_course(
     """Install an ordered multi-obstacle course and all button joints."""
 
     course = composite_obstacle_course(mission, validated_seeds)
+    if mission.get("layout_profile") == "teleop_connected_v1":
+        from .course_geometry_audit import validate_teleop_course
+        audit = validate_teleop_course(course)
+        if not audit["valid"]:
+            raise ValueError(f"Invalid teleoperation course: {audit['errors']}")
     root_path = "/World/CompositeObstacleCourse"
     _install_course_boxes(stage, root_path, course.boxes)
     _install_composite_navigation_cones(
@@ -3034,6 +3131,7 @@ def install_composite_obstacle_course(
             plunger_name=fixture.plunger_name,
             center_xyz_m=fixture.center_xyz_m,
             press_direction_world_xy=fixture.press_direction_world_xy,
+            plunger_yaw_deg=fixture.yaw_deg,
             joint_name=f"ButtonPrismaticJoint{index + 1:02d}",
         )
     return course

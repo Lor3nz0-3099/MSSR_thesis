@@ -11,6 +11,7 @@ from smores_ep.isaac.obstacle_course import (
     UniformStairSpec,
     manual_obstacle_course,
     mobile_manipulator_button_test_course,
+    sample_button_target_spec,
     sample_coplanar_gap_spec,
     sample_uniform_stair_spec,
     snake8_gap_test_course,
@@ -99,6 +100,46 @@ def test_button_test_course_is_flat_isolated_and_nav2_addressable() -> None:
     )
     assert platform.center_xyz_m[2] == pytest.approx(-0.01)
 
+
+
+def test_button_course_exposes_button_relative_assembly_spawn() -> None:
+    course = mobile_manipulator_button_test_course()
+    observation = course.to_observation()
+    spawn = observation["button"]["assembly_spawn"]
+
+    button_x, button_y, _ = course.button_center_xyz_m
+    center_x, center_y = spawn["center_xy_m"]
+    nx, ny = course.press_direction_world_xy
+
+    signed_standoff = (
+        (button_x - center_x) * nx
+        + (button_y - center_y) * ny
+    )
+    assert signed_standoff == pytest.approx(1.200)
+    assert spawn["radius_m"] == pytest.approx(0.340)
+    assert signed_standoff - spawn["radius_m"] >= 0.099
+    # MobileManipulator8's manipulator/rear side must face the button.
+    # The old validated RC->MM8 handoff established this by pointing the
+    # RC rear toward the fixture, so direct assembly must use the opposite
+    # heading from the physical press direction.
+    assert spawn["yaw_rad"] == pytest.approx(
+        math.atan2(-ny, -nx)
+    )
+
+    # Seeded target pose/direction deterministically moves the static
+    # assembly region with the task rather than hard-coding world poses.
+    seeded_a = mobile_manipulator_button_test_course(
+        sample_button_target_spec(6101)
+    )
+    seeded_b = mobile_manipulator_button_test_course(
+        sample_button_target_spec(6101)
+    )
+    assert seeded_a.assembly_spawn_center_xy_m == pytest.approx(
+        seeded_b.assembly_spawn_center_xy_m
+    )
+    assert seeded_a.assembly_spawn_yaw_rad == pytest.approx(
+        seeded_b.assembly_spawn_yaw_rad
+    )
 
 def test_gap_test_course_has_no_collider_across_open_interval() -> None:
     course = snake8_gap_test_course()

@@ -296,7 +296,7 @@ def test_pan_position_target_uses_nearest_periodic_branch() -> None:
 
 
 def test_physx_pan_target_preserves_unwrapped_continuous_branch() -> None:
-    """PhysX must receive the continuous PAN branch selected upstream."""
+    """Within PhysX's range, preserve the continuous branch selected upstream."""
     from smores_ep.isaac.dynamic_stage import ArticulationStateReader
 
     class FakeArticulation:
@@ -344,3 +344,43 @@ def test_physx_pan_target_preserves_unwrapped_continuous_branch() -> None:
     # choice belongs to DynamicDriveController, not this PhysX writer.
     assert position_values[1] == pytest.approx(requested_pan)
     assert reader.target_positions()[1] == pytest.approx(requested_pan)
+
+
+def test_physx_pan_target_stays_in_revolute_range_after_branch_crossing() -> None:
+    """Keep the logical turn count but give PhysX an accepted target angle."""
+    from smores_ep.isaac.dynamic_stage import ArticulationStateReader
+
+    class FakeArticulation:
+        def __init__(self) -> None:
+            self.position_call = None
+            self.velocity_call = None
+
+        def set_dof_velocity_targets(self, values, *, dof_indices):
+            self.velocity_call = (list(values), list(dof_indices))
+
+        def set_dof_position_targets(self, values, *, dof_indices):
+            self.position_call = (list(values), list(dof_indices))
+
+    articulation = FakeArticulation()
+    reader = object.__new__(ArticulationStateReader)
+    reader._articulation = articulation
+    reader._indices = {
+        "left_wheel": 0, "right_wheel": 1, "tilt": 2, "pan": 3,
+    }
+    reader._position_targets = {"tilt": 0.0, "pan": 0.0}
+
+    logical_target = 6.280893802642822 + 0.38871062595585215
+    reader.set_targets(
+        left_wheel_velocity_rad_s=0.0,
+        right_wheel_velocity_rad_s=0.0,
+        tilt_joint_position_rad=-0.14,
+        pan_joint_velocity_rad_s=1.25,
+        pan_logical_target_rad=logical_target,
+    )
+
+    assert articulation.position_call is not None
+    assert articulation.position_call[0][1] == pytest.approx(
+        math.remainder(logical_target, math.tau)
+    )
+    assert reader.target_positions()[1] == pytest.approx(logical_target)
+    assert articulation.velocity_call[0][2] == pytest.approx(1.25)

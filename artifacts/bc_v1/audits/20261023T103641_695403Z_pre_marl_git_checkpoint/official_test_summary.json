@@ -1,0 +1,174 @@
+{
+  "THIS_TASK_TEST_payload_access": 0,
+  "audit": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/audits/20261023T073725_980736Z_bc_v4_official_one_shot_test_evaluation",
+  "batches": 290,
+  "checkpoint_epoch": 5,
+  "checkpoint_sha256": "d90a73e9b5ba2ecb579e4fc8733066b1c55d9e60dafeb1d71c029c49a7c21c6d",
+  "episodes": 12,
+  "evaluation_number": 1,
+  "metrics": {
+    "cardinality_absolute_error": 3.106009926629262,
+    "exact_match": 0.48225075528700906,
+    "f1": 0.8230016687845431,
+    "false_negative": 151,
+    "false_negative_actions": 151,
+    "false_positive": 57654,
+    "false_positive_actions": 57654,
+    "jaccard": 0.7755218967145973,
+    "mean_FN_per_sample": 0.008146309883470005,
+    "mean_FP_per_sample": 3.1103798014674147,
+    "membership_semantics": "Same raw candidate identity/logit>=0 VAL contract; values/feasibility excluded from exact-set",
+    "normalized_numeric": {
+      "arguments": {
+        "1": {
+          "mae": 0.0071437744578967495,
+          "rmse": 0.007591174044198279,
+          "support": 3,
+          "tolerance": null,
+          "unit": "1",
+          "within_tolerance": null
+        }
+      },
+      "payload": {
+        "1": {
+          "mae": 0.15438749410106245,
+          "rmse": 0.30669723404705834,
+          "support": 231101,
+          "tolerance": null,
+          "unit": "1",
+          "within_tolerance": null
+        }
+      }
+    },
+    "normalized_payload_rmse": 0.30669723404705834,
+    "numeric": {},
+    "parameter_hash_after": "80cdf41cadd12d4b6e9af825e2619c2e5bba32f26fd0b81ac08005b440d59ad3",
+    "parameter_hash_before": "80cdf41cadd12d4b6e9af825e2619c2e5bba32f26fd0b81ac08005b440d59ad3",
+    "parameter_hash_equal": true,
+    "per_action": {
+      "align_faces": {
+        "f1": 0.3008130081300813,
+        "fn": 11,
+        "fp": 333,
+        "precision": 0.18181818181818182,
+        "recall": 0.8705882352941177,
+        "support": 85,
+        "tp": 74
+      },
+      "dock": {
+        "f1": 0.477124183006536,
+        "fn": 8,
+        "fp": 152,
+        "precision": 0.3244444444444444,
+        "recall": 0.9012345679012346,
+        "support": 81,
+        "tp": 73
+      },
+      "gravity_settle": {
+        "f1": 0.02553191489361702,
+        "fn": 0,
+        "fp": 229,
+        "precision": 0.01293103448275862,
+        "recall": 1.0,
+        "support": 3,
+        "tp": 3
+      },
+      "pan_delta": {
+        "f1": 0.0,
+        "fn": 0,
+        "fp": 15,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0,
+        "tp": 0
+      },
+      "pan_target": {
+        "f1": 0.028469750889679714,
+        "fn": 29,
+        "fp": 517,
+        "precision": 0.015238095238095238,
+        "recall": 0.21621621621621623,
+        "support": 37,
+        "tp": 8
+      },
+      "pan_velocity": {
+        "f1": 0.997260171845004,
+        "fn": 3,
+        "fp": 144,
+        "precision": 0.9946462430754359,
+        "recall": 0.9998878756166841,
+        "support": 26756,
+        "tp": 26753
+      },
+      "tilt_delta": {
+        "f1": 0.0,
+        "fn": 0,
+        "fp": 14,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0,
+        "tp": 0
+      },
+      "tilt_target": {
+        "f1": 0.34393166834464617,
+        "fn": 87,
+        "fp": 40315,
+        "precision": 0.20803457420685592,
+        "recall": 0.9918516437201461,
+        "support": 10677,
+        "tp": 10590
+      },
+      "tilt_velocity": {
+        "f1": 0.0,
+        "fn": 0,
+        "fp": 15,
+        "precision": 0.0,
+        "recall": 0.0,
+        "support": 0,
+        "tp": 0
+      },
+      "undock": {
+        "f1": 0.04185351270553064,
+        "fn": 8,
+        "fp": 633,
+        "precision": 0.021638330757341576,
+        "recall": 0.6363636363636364,
+        "support": 22,
+        "tp": 14
+      },
+      "wheel_velocity": {
+        "f1": 0.9268472364405239,
+        "fn": 5,
+        "fp": 15287,
+        "precision": 0.863706068008773,
+        "recall": 0.9999483897605285,
+        "support": 96880,
+        "tp": 96875
+      }
+    },
+    "precision": 0.6997875486867593,
+    "predicted_cardinality": 10.360595597755719,
+    "predicted_cardinality_max": 21,
+    "predicted_cardinality_mean": 10.360595597755719,
+    "predicted_cardinality_min": 1,
+    "recall": 0.9988776655443322,
+    "samples": 18536,
+    "samples_per_s": 12.768945390896704,
+    "set_exact_match": 0.48225075528700906,
+    "set_f1": 0.8230016687845431,
+    "set_jaccard": 0.7755218967145973,
+    "set_precision": 0.6997875486867593,
+    "set_recall": 0.9988776655443322,
+    "target_cardinality": 7.258362106171774,
+    "target_cardinality_max": 15,
+    "target_cardinality_mean": 7.258362106171774,
+    "target_cardinality_min": 1,
+    "total_loss": 0.07753449015633553,
+    "true_positive": 134390,
+    "wall_time_s": 1451.6469005509862
+  },
+  "result_frozen": true,
+  "samples": 18536,
+  "source_reports_only": true,
+  "warm_start_verdict": "SUITABLE_FOR_MAPPO_WARM_START"
+}

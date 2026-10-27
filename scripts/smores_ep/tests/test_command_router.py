@@ -290,3 +290,56 @@ def test_emergency_stop_clear_does_not_move_robot_and_fresh_command_can_resume()
     )
 
     assert drives["locomotor"].commands[-1].linear_x_m_s == 0.03
+
+
+def test_pan_wheel_coactuation_final_targets_and_drive_gains():
+    """Real router/reader/drive; fake only the external PhysX articulation."""
+    import pytest
+    from types import SimpleNamespace
+    from smores_ep.config.geometry import SmoresGeometry
+    from smores_ep.config.physics import SmoresActuatorConfig
+    from smores_ep.isaac.dynamic_stage import ArticulationStateReader,DynamicDriveController
+
+    class Articulation:
+        def __init__(self):
+            self.velocity=[0.]*4;self.position=[0.]*4
+            self.stiffness=[0.]*4;self.damping=[0.]*4;self.events=[]
+        def get_dof_positions(self):return SimpleNamespace(numpy=lambda:[[0.]*4])
+        def get_dof_velocities(self):return SimpleNamespace(numpy=lambda:[self.velocity])
+        def set_dof_gains(self,*,stiffnesses,dampings,dof_indices):
+            for i,k,d in zip(dof_indices,stiffnesses,dampings):self.stiffness[i]=k;self.damping[i]=d
+            self.events.append(('gains',tuple(self.stiffness)))
+        def set_dof_position_targets(self,values,*,dof_indices):
+            for i,v in zip(dof_indices,values):self.position[i]=v
+            self.events.append(('position',tuple(self.position)))
+        def set_dof_velocity_targets(self,values,*,dof_indices):
+            for i,v in zip(dof_indices,values):self.velocity[i]=v
+            self.events.append(('velocity',tuple(self.velocity)))
+        def set_dof_max_efforts(self,values,*,dof_indices):pass
+        def set_dof_max_velocities(self,values,*,dof_indices):pass
+
+    art=Articulation();state=object.__new__(ArticulationStateReader)
+    state._articulation=art;state._stage=None;state._wheel_contact_mode=None
+    state._indices=dict(left_wheel=0,right_wheel=1,tilt=2,pan=3)
+    state._position_targets=dict(tilt=0.,pan=0.);state._drive=SmoresActuatorConfig()
+    drive=DynamicDriveController(state,SmoresGeometry(),12.)
+    router=IsaacMultiModuleCommandRouter({'m':state},{'m':drive},SimpleNamespace(module_ids=('m',),connections=()))
+    pan=SmoresCommand(internal_motion=InternalMotionMode.PAN_VELOCITY,pan_velocity_rad_s=1.)
+    # Existing PAN-only support braking stays intact.
+    router.apply({'m':pan});assert all(k>0 for k in art.stiffness[:2])
+    from dataclasses import replace
+    together=replace(pan,linear_x_m_s=.063)
+    for command in (together,together,pan,together):
+        router.apply({'m':command})
+        assert art.velocity[3]==1.
+        assert art.stiffness[3]==0.
+        if command.linear_x_m_s:
+            assert art.velocity[:2]==pytest.approx([2.,2.])
+            # Nonzero velocities must not fight retained position brakes.
+            assert art.stiffness[:2]==[0.,0.]
+            assert art.damping[:2]==[state._drive.wheel_damping_nm_s_per_rad]*2
+        else:
+            assert art.velocity[:2]==[0.,0.]
+            assert all(k>0 for k in art.stiffness[:2])
+    router.set_emergency_stop(True);router.apply({'m':together})
+    assert art.velocity[:2]==[0.,0.] and all(k>0 for k in art.stiffness[:2])

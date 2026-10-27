@@ -30,6 +30,8 @@ class UniformStaircase:
         stairs = course.get("stairs")
         if not isinstance(stairs, Mapping):
             raise SnakeStairGaitError("Course has no stair landmarks")
+        if stairs.get("coordinate_frame", "world") != "world":
+            raise SnakeStairGaitError("Stage-local stair landmarks require the gait stage_frame adapter")
         try:
             first = float(stairs["first_riser_x_m"])
             depth = float(stairs["riser_depth_m"])

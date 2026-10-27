@@ -1,0 +1,25 @@
+{
+  "schema_version": "mssr.bc_v1.training_smoke.v1",
+  "seed": 20261006,
+  "device": "cuda:0",
+  "dtype": "float32",
+  "amp": false,
+  "workers": 0,
+  "cpu_threads": 1,
+  "optimizer": "AdamW",
+  "learning_rate": 0.0003,
+  "weight_decay": 0.0001,
+  "gradient_clip": 1.0,
+  "scheduler": null,
+  "batch_size": 8,
+  "max_steps": 1500,
+  "eval_interval": 50,
+  "required_keys": [
+    ["expert:rc_car:seed-005100", 0],
+    ["expert:gap:seed-004303", 299],
+    ["expert:assembly:seed-006307", 0],
+    ["expert:assembly:seed-006307", 444]
+  ],
+  "audit_dir": "artifacts/bc_v1/audits/j_small_overfit_v1",
+  "checkpoint_dir": "artifacts/bc_v1/checkpoints/j_small_overfit_v1"
+}

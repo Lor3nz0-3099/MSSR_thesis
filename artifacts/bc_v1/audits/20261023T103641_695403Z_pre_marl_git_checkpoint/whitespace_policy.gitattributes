@@ -1,0 +1,4 @@
+# Audit-local, per-command policy: preserve literal blank diff context lines in exact raw Git evidence.
+artifacts/bc_v1/audits/20261023T073725_980736Z_bc_v4_official_one_shot_test_evaluation/git_after.txt whitespace=-blank-at-eol
+artifacts/bc_v1/audits/20261023T073725_980736Z_bc_v4_official_one_shot_test_evaluation/git_before.txt whitespace=-blank-at-eol
+artifacts/bc_v1/audits/20261023T103641_695403Z_pre_marl_git_checkpoint/git_diff_before.patch whitespace=-blank-at-eol
