@@ -36,6 +36,7 @@ from smores_ep.control.button_ik_math import (
     bounded_normal_waypoint,
     bounded_position_waypoint,
     orientation_residual,
+    plan_mm8_reposition_command,
     shortest_angular_delta,
     vector_angle_deg,
 )
@@ -450,7 +451,7 @@ def wait_assembly(graph_path, runtime):
 
         time.sleep(0.5)
 
-    raise TimeoutError("RC-Car8 assembly timeout.")
+    raise TimeoutError("Eight-module assembly timeout.")
 
 
 
@@ -687,28 +688,34 @@ def approach_mm8(
         "/odom unavailable before MM8 approach.",
     )
 
-    # Desired base center immediately before unfolding.
-    # It always lies on the robot-side of the oriented button.
-    tx = (
-        bx
-        - press_nx * standoff_m
-    )
+    # Desired base center before unfolding.
+    tx = bx - press_nx * standoff_m
+    ty = by - press_ny * standoff_m
 
-    ty = (
-        by
-        - press_ny * standoff_m
-    )
+    # Direct MM8 assembly fixes the locomotion axis.
+    # MM8 forward is opposite to the button press direction.
+    drive_axis_x = -press_nx
+    drive_axis_y = -press_ny
 
     print()
     print("============================================================")
     print(f" {label}")
     print("============================================================")
+    print("Motion policy: translation only")
     print(
-        "Semantic drive pair: "
+        "Semantic translation pair: "
         "front_support + arm_lift"
     )
-    print(f"button = ({bx:+.3f}, {by:+.3f}, {bz:+.3f})")
-    print(f"target = ({tx:+.3f}, {ty:+.3f})")
+    print(
+        f"button = ({bx:+.3f}, {by:+.3f}, {bz:+.3f})"
+    )
+    print(
+        f"target = ({tx:+.3f}, {ty:+.3f})"
+    )
+    print(
+        f"drive axis = "
+        f"({drive_axis_x:+.3f}, {drive_axis_y:+.3f})"
+    )
     print()
 
     start = time.monotonic()
@@ -730,28 +737,46 @@ def approach_mm8(
             dx = tx - x
             dy = ty - y
 
-            longitudinal = (
-                dx * math.cos(yaw)
-                + dy * math.sin(yaw)
+            longitudinal_error = (
+                dx * drive_axis_x
+                + dy * drive_axis_y
             )
 
-            lateral = (
-                -dx * math.sin(yaw)
-                + dy * math.cos(yaw)
+            lateral_error = (
+                -dx * drive_axis_y
+                + dy * drive_axis_x
             )
 
-            error = abs(longitudinal)
+            command = plan_mm8_reposition_command(
+                current_x_m=x,
+                current_y_m=y,
+                current_yaw_rad=yaw,
+                target_x_m=tx,
+                target_y_m=ty,
+                drive_axis_x=-press_nx,
+                drive_axis_y=-press_ny,
+                position_tolerance_m=MM8_LONG_TOL_M,
+            )
 
-            if error <= MM8_LONG_TOL_M:
+            phase = str(command["phase"])
+
+            if phase == "done":
                 print()
                 print("MM8 manipulation region reached.")
                 break
 
-            if abs(lateral) > MM8_MAX_LATERAL_M:
+            if phase != "translate":
                 raise RuntimeError(
-                    "Lateral error too large: "
-                    f"{lateral*1000:.1f} mm"
+                    f"Unexpected MM8 reposition phase: {phase}"
                 )
+
+            # MM8 is not steerable.
+            if abs(float(command["angular_z_rad_s"])) > 1.0e-12:
+                raise RuntimeError(
+                    "MM8 planner requested forbidden angular motion."
+                )
+
+            error = abs(longitudinal_error)
 
             if error < best_error - 0.002:
                 best_error = error
@@ -765,22 +790,12 @@ def approach_mm8(
                     "MM8 locomotion stalled for 12 s."
                 )
 
-            if error > 0.12:
-                speed = 0.050
-            else:
-                # Keep enough wheel command near the target.
-                # At 0.020 m/s the scorpion stopped making
-                # measurable progress at ~50 mm residual error.
-                speed = 0.035
-
-            speed = math.copysign(
-                speed,
-                longitudinal,
-            )
-
             cmd = Twist()
-            cmd.linear.x = speed
+            cmd.linear.x = float(
+                command["linear_x_m_s"]
+            )
             cmd.angular.z = 0.0
+
             monitor.cmd_pub.publish(cmd)
 
             routing = validate_mm8_routing(
@@ -817,18 +832,19 @@ def approach_mm8(
                 print(
                     f"root=({x:+.3f},{y:+.3f}) "
                     f"yaw={math.degrees(yaw):+.1f}° | "
-                    f"long={longitudinal*1000:+.1f} mm "
-                    f"lat={lateral*1000:+.1f} mm "
-                    f"cmd={speed:+.3f}"
+                    f"phase={phase} "
+                    f"long={longitudinal_error*1000:+.1f} mm "
+                    f"lat={lateral_error*1000:+.1f} mm "
+                    f"v={cmd.linear.x:+.3f} "
+                    f"w={cmd.angular.z:+.3f}"
                 )
-
                 last_print = now
 
             time.sleep(0.04)
 
         else:
             raise RuntimeError(
-                "MM8 approach wall timeout."
+                "MM8 reposition timeout."
             )
 
     finally:
@@ -850,12 +866,14 @@ def approach_mm8(
 
     return {
         "button_xyz_m": [bx, by, bz],
-
         "press_direction_world_xy": [
             press_nx,
             press_ny,
         ],
-
+        "drive_axis_world_xy": [
+            drive_axis_x,
+            drive_axis_y,
+        ],
         "target_xy_m": [tx, ty],
         "root_xy_m": [x, y],
         "root_yaw_rad": yaw,
@@ -865,8 +883,7 @@ def approach_mm8(
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "Run the validated RC-Car8 -> MobileManipulator8 "
-            "button-press expert."
+            "Run the direct-assembly MobileManipulator8 button-press expert."
         )
     )
     parser.add_argument(
@@ -891,8 +908,8 @@ def parse_args():
         type=float,
         default=None,
         help=(
-            "Override the post-reconfiguration MM8/Scorpion "
-            "settle distance from the button. Default: use the "
+            "Override the post-assembly MM8/Scorpion "
+            "reposition distance from the button. Default: use the "
             "validated legacy MM8_STANDOFF_M."
         ),
     )
@@ -910,8 +927,9 @@ def parse_args():
         "--external-runtime-dir",
         type=Path,
         help=(
-            "Attach to an already-running composite runtime. The robot must "
-            "currently have the validated RC-Car8 topology."
+            "Attach to an already-running runtime whose robot already has "
+            "the validated MobileManipulator8 topology. Standalone "
+            "rerecording should omit this option so direct assembly is logged."
         ),
     )
     parser.add_argument(
@@ -928,8 +946,9 @@ def parse_args():
         "--dataset-layout-json",
         type=Path,
         help=(
-            "Composite-only JSON mapping button sub-stages to distinct "
-            "raw dataset paths. Legacy --dataset-path remains supported."
+            "Optional JSON mapping direct button sub-stages to distinct raw "
+            "dataset paths. Supported keys: assembly, mm8_behavior, "
+            "manipulation. Legacy --dataset-path remains supported."
         ),
     )
     parser.add_argument(
@@ -993,6 +1012,8 @@ def main():
         else run / "button_dataset.jsonl"
     )
 
+    explicit_dataset_path = args.dataset_path is not None
+
     if args.dataset_layout_json is not None:
         dataset_layout_path = (
             args.dataset_layout_json.expanduser().resolve()
@@ -1005,55 +1026,35 @@ def main():
                 "--dataset-layout-json must contain a JSON object"
             )
 
-        required_dataset_layout_keys = (
-            "rc_behavior",
-            "rc_to_mm8_reconfiguration",
-            "mm8_behavior",
-            "manipulation",
-            "mm8_to_rc_reconfiguration",
-        )
-        missing_dataset_layout_keys = [
-            key
-            for key in required_dataset_layout_keys
-            if not isinstance(dataset_layout.get(key), str)
-            or not str(dataset_layout[key]).strip()
-        ]
-        if missing_dataset_layout_keys:
-            raise SystemExit(
-                "--dataset-layout-json is missing valid paths for: "
-                + ", ".join(missing_dataset_layout_keys)
-            )
-
-        def _resolve_dataset_layout_path(key):
-            candidate = Path(str(dataset_layout[key])).expanduser()
+        def _optional_layout_path(key, fallback):
+            raw = dataset_layout.get(key)
+            if not isinstance(raw, str) or not raw.strip():
+                return Path(fallback).resolve()
+            candidate = Path(raw).expanduser()
             if not candidate.is_absolute():
                 candidate = dataset_layout_path.parent / candidate
             return candidate.resolve()
 
-        rc_behavior_dataset_path = _resolve_dataset_layout_path(
-            "rc_behavior"
+        assembly_dataset_path = _optional_layout_path(
+            "assembly",
+            dataset_path,
         )
-        rc_to_mm8_dataset_path = _resolve_dataset_layout_path(
-            "rc_to_mm8_reconfiguration"
+        mm8_behavior_dataset_path = _optional_layout_path(
+            "mm8_behavior",
+            dataset_path,
         )
-        mm8_behavior_dataset_path = _resolve_dataset_layout_path(
-            "mm8_behavior"
+        manipulation_dataset_path = _optional_layout_path(
+            "manipulation",
+            dataset_path,
         )
-        manipulation_dataset_path = _resolve_dataset_layout_path(
-            "manipulation"
-        )
-        mm8_to_rc_dataset_path = _resolve_dataset_layout_path(
-            "mm8_to_rc_reconfiguration"
-        )
-    else:
-        # Legacy standalone/backward-compatible mode: preserve the
-        # historical single-file behavior until the individual writers
-        # below are migrated to their dedicated variables.
-        rc_behavior_dataset_path = dataset_path
-        rc_to_mm8_dataset_path = dataset_path
+    elif explicit_dataset_path:
+        assembly_dataset_path = dataset_path
         mm8_behavior_dataset_path = dataset_path
         manipulation_dataset_path = dataset_path
-        mm8_to_rc_dataset_path = dataset_path
+    else:
+        assembly_dataset_path = run / "assembly_dataset.jsonl"
+        mm8_behavior_dataset_path = run / "behavior_dataset.jsonl"
+        manipulation_dataset_path = run / "manipulation_dataset.jsonl"
 
     Path(
         "/tmp/mssr_button_current_run"
@@ -1072,8 +1073,6 @@ def main():
 
     runtime = None
     assembly = None
-    nav2 = None
-    reconfig = None
 
     success = False
 
@@ -1130,7 +1129,7 @@ def main():
                 "tilt_effort_scale:=8.0",
 
                 "behavior_dataset_path:="
-                + str(rc_behavior_dataset_path),
+                + str(mm8_behavior_dataset_path),
                 "behavior_dataset_episode_id:="
                 + episode_id,
                 "behavior_dataset_stage_name:="
@@ -1178,52 +1177,44 @@ def main():
         print("Runtime READY.")
 
         # ========================================================
-        # 2. RC-CAR8 ASSEMBLY
+        # 2. DIRECT MOBILEMANIPULATOR8 ASSEMBLY
         # ========================================================
 
         print()
         print("============================================================")
-        print(" PHASE 2 — RC-CAR8 ASSEMBLY")
+        print(" PHASE 2 — MOBILEMANIPULATOR8 ASSEMBLY")
         print("============================================================")
 
-        assembly_log = (
-            run / "assembly.log"
-        ).open("w")
+        assembly_log = (run / "assembly.log").open("w")
 
         assembly = (
             None
             if args.external_runtime_dir is not None
             else subprocess.Popen(
-            [
-                "ros2", "run",
-                "mssr_expert",
-                "mssr_smores_self_assembly_node",
-                "--ros-args",
-
-                "-p",
-                "target_graph_path:="
-                + str(
-                    ROOT
-                    / "mssr_ws/src/mssr_expert/"
-                      "config/smores_rc_car8.json"
-                ),
-
-                "-p",
-                "execution_id:="
-                + run_id + "-assembly",
-
-                "-p",
-                "episode_id:=" + episode_id,
-
-                "-p",
-                "dataset_path:="
-                + str(dataset_path),
-            ],
-            cwd=ROOT,
-            env=env,
-            stdout=assembly_log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
+                [
+                    "ros2", "run",
+                    "mssr_expert",
+                    "mssr_smores_self_assembly_node",
+                    "--ros-args",
+                    "-p",
+                    "target_graph_path:="
+                    + str(
+                        ROOT
+                        / "mssr_ws/src/mssr_expert/"
+                          "config/smores_mobile_manipulator8.json"
+                    ),
+                    "-p",
+                    "execution_id:=" + run_id + "-assembly",
+                    "-p",
+                    "episode_id:=" + episode_id,
+                    "-p",
+                    "dataset_path:=" + str(assembly_dataset_path),
+                ],
+                cwd=ROOT,
+                env=env,
+                stdout=assembly_log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
             )
         )
 
@@ -1232,292 +1223,9 @@ def main():
             runtime,
         )
 
-        # Let final post-assembly posture settle. An attached composite
-        # orchestrator already verified the RC-Car8 physical topology.
         time.sleep(1 if args.external_runtime_dir is not None else 8)
-
         stop_process(assembly)
-
-        set_behavior_dataset_context(
-            env,
-            dataset_path=rc_behavior_dataset_path,
-            stage_name="button_rc_behavior",
-        )
         assembly = None
-
-        print("RC-Car8 READY.")
-
-        monitor.spin_until(
-            lambda: monitor.odom is not None,
-            15,
-            "RC-Car /odom unavailable.",
-        )
-
-        # ========================================================
-        # 3. BUTTON-DERIVED NAV2 GOAL
-        # ========================================================
-
-        state = read_json(
-            runtime_dir / "state_graph.json"
-        )
-
-        bx, by, bz = button_xyz(state)
-
-        (
-            press_nx,
-            press_ny,
-        ) = button_press_direction_xy(
-            state
-        )
-
-        # Goal lies on the robot-side of the button.
-        gx = (
-            bx
-            - press_nx * RC_STANDOFF_M
-        )
-
-        gy = (
-            by
-            - press_ny * RC_STANDOFF_M
-        )
-
-        # RC-Car front points AWAY from the button,
-        # therefore the rear points along +press_direction.
-        gyaw = math.atan2(
-            -press_ny,
-            -press_nx,
-        )
-
-        print()
-        print("============================================================")
-        print(" PHASE 3 — RC-CAR NAV2 PREALIGNMENT")
-        print("============================================================")
-        print(
-            f"button = ({bx:+.3f},"
-            f"{by:+.3f},{bz:+.3f})"
-        )
-        print(
-            f"normal = "
-            f"({press_nx:+.1f},"
-            f"{press_ny:+.1f})"
-        )
-
-        print(
-            f"goal   = ({gx:+.3f},"
-            f"{gy:+.3f},"
-            f"{math.degrees(gyaw):+.1f}°)"
-        )
-
-        nav2_log = (
-            run / "nav2.log"
-        ).open("w")
-
-        nav2 = subprocess.Popen(
-            [
-                "ros2", "launch",
-                "mssr_expert",
-                "smores_nav2.launch.py",
-                "autostart:=true",
-                "log_level:=warn",
-            ],
-            cwd=ROOT,
-            env=env,
-            stdout=nav2_log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-
-        wait_nav2(env)
-
-        route_cmd = [
-            "python3",
-            str(
-                ROOT
-                / "scripts/smores_ep/"
-                  "run_rc_car_nav2_route.py"
-            ),
-            "--seed", str(SEED),
-            "--goal-x", str(gx),
-            "--goal-y", str(gy),
-            "--goal-yaw", str(gyaw),
-            "--action-timeout-s", "600",
-            "--result-json",
-            str(run / "nav2_result.json"),
-        ]
-
-        try:
-            route = subprocess.run(
-                route_cmd,
-                cwd=ROOT,
-                env=env,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                check=False,
-                timeout=620,
-            )
-
-            (
-                run / "nav2_route.log"
-            ).write_text(route.stdout)
-
-            route_rc = route.returncode
-
-        except subprocess.TimeoutExpired as exc:
-
-            output = (
-                exc.stdout.decode()
-                if isinstance(exc.stdout, bytes)
-                else (exc.stdout or "")
-            )
-
-            (
-                run / "nav2_route.log"
-            ).write_text(output)
-
-            route_rc = 124
-
-        # Allow final /odom update.
-        for _ in range(10):
-            rclpy.spin_once(
-                monitor,
-                timeout_sec=0.1,
-            )
-
-        x, y, yaw = monitor.pose()
-
-        pos_err = math.hypot(
-            gx - x,
-            gy - y,
-        )
-
-        yaw_err = abs(
-            angle_error(yaw, gyaw)
-        )
-
-        accepted = (
-            pos_err <= RC_ACCEPT_POSITION_M
-            and yaw_err <= RC_ACCEPT_YAW_RAD
-        )
-
-        print()
-        print(
-            f"Nav2 result code = {route_rc}"
-        )
-        print(
-            f"physical position error = "
-            f"{pos_err*1000:.1f} mm"
-        )
-        print(
-            f"physical yaw error = "
-            f"{math.degrees(yaw_err):.1f}°"
-        )
-
-        if route_rc == 0:
-            print("Nav2 terminal success.")
-
-        elif accepted:
-            print(
-                "NAV2 ACCEPTED BY PHYSICAL REGION."
-            )
-
-        else:
-            raise RuntimeError(
-                "Nav2 stopped outside the "
-                "pre-reconfiguration acceptance region."
-            )
-
-        stop_process(nav2)
-        nav2 = None
-
-        # Ensure Nav2 no longer owns /cmd_vel.
-        time.sleep(2)
-
-        # ========================================================
-        # 3B. FINAL RC-CAR YAW ALIGNMENT
-        # Rear of RC-Car points directly toward the live button.
-        # ========================================================
-
-        rc_align = align_rc_rear_to_button(
-            monitor,
-            runtime_dir / "state_graph.json",
-        )
-
-        (
-            run / "rc_final_alignment.json"
-        ).write_text(
-            json.dumps(rc_align, indent=2) + "\n"
-        )
-
-        time.sleep(1)
-
-        # ========================================================
-        # 4. RC-CAR -> MM8
-        # ========================================================
-
-        print()
-        print("============================================================")
-        print(" PHASE 4 — RC-CAR8 -> MOBILEMANIPULATOR8")
-        print("============================================================")
-
-        reconfig_log = (
-            run / "reconfiguration.log"
-        ).open("w")
-
-        monitor.reconfiguration = None
-
-        set_behavior_dataset_context(
-            env,
-            dataset_path=None,
-        )
-
-        reconfig = subprocess.Popen(
-            [
-                "ros2", "run",
-                "mssr_expert",
-                "mssr_smores_self_reconfiguration_node",
-                "--ros-args",
-                "-p", "source_graph_path:=auto",
-                "-p",
-                "target_morphology:=mobile_manipulator8",
-                "-p", "episode_id:=" + episode_id,
-                "-p", "dataset_path:=" + str(rc_to_mm8_dataset_path),
-            ],
-            cwd=ROOT,
-            env=env,
-            stdout=reconfig_log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-
-        monitor.spin_until(
-            lambda: (
-                isinstance(
-                    monitor.reconfiguration,
-                    dict,
-                )
-                and monitor.reconfiguration.get(
-                    "done"
-                ) is True
-            ),
-            480,
-            "Self-reconfiguration timeout.",
-        )
-
-        terminal = monitor.reconfiguration
-
-        print(json.dumps(
-            terminal,
-            indent=2,
-        ))
-
-        if terminal.get("success") is not True:
-            raise RuntimeError(
-                "RC-Car8 -> MM8 failed."
-            )
-
-        stop_process(reconfig)
-        reconfig = None
 
         set_behavior_dataset_context(
             env,
@@ -1525,119 +1233,49 @@ def main():
             stage_name="button_mm8_behavior",
         )
 
-        time.sleep(2)
+        print("MobileManipulator8 READY.")
 
-        # Measure how much yaw the reconfiguration itself changed.
-        for _ in range(15):
-            rclpy.spin_once(monitor, timeout_sec=0.1)
-
-        px, py, pyaw = monitor.pose()
-
-        bx, by, _ = rc_align["button_xyz_m"]
-        pbearing = math.atan2(by - py, bx - px)
-        pdesired = math.atan2(
-            math.sin(pbearing + math.pi),
-            math.cos(pbearing + math.pi),
-        )
-
-        yaw_shift = angle_error(
-            pyaw,
-            rc_align["yaw_after_rad"],
-        )
-
-        post = {
-            "rc_alignment": rc_align,
-            "mm8_xy_after_reconfiguration_m": [px, py],
-            "mm8_yaw_after_reconfiguration_rad": pyaw,
-            "reconfiguration_yaw_shift_rad": yaw_shift,
-            "rear_to_button_yaw_error_after_reconfiguration_rad":
-                angle_error(pdesired, pyaw),
-        }
-
-        (
-            run / "pre_post_reconfiguration_alignment.json"
-        ).write_text(
-            json.dumps(post, indent=2) + "\n"
-        )
-
-        print()
-        print("============================================================")
-        print(" PRE / POST RECONFIGURATION YAW")
-        print("============================================================")
-        print(
-            f"RC aligned yaw = "
-            f"{math.degrees(rc_align['yaw_after_rad']):+.2f} deg"
-        )
-        print(
-            f"MM8 yaw        = "
-            f"{math.degrees(pyaw):+.2f} deg"
-        )
-        print(
-            f"yaw shift      = "
-            f"{math.degrees(yaw_shift):+.2f} deg"
-        )
-        print(
-            f"MM8 rear-to-button error = "
-            f"{math.degrees(angle_error(pdesired, pyaw)):+.2f} deg"
+        monitor.spin_until(
+            lambda: monitor.odom is not None,
+            15,
+            "MobileManipulator8 /odom unavailable.",
         )
 
         # ========================================================
-        # 5. SCORPION HOLD
-        #
-        # RC-Car8 -> MobileManipulator8 already terminates in the
-        # validated drive_ready / Scorpion posture.  Do not issue a
-        # second posture command before locomotion: preserve exactly
-        # the physical configuration produced by self-reconfiguration.
+        # 4. BUTTON-RELATIVE REPOSITION / BACK-AWAY
         # ========================================================
 
         print()
         print("============================================================")
-        print(" PHASE 5 — SCORPION PRESERVED FROM RECONFIGURATION")
-        print(" no posture command")
-        print("============================================================")
-
-        time.sleep(1)
-
-        # ========================================================
-        # 6. APPROACH WITH CORRECT SEMANTIC DRIVE PAIR
-        # ========================================================
-
-        print()
-        print("============================================================")
-        print(" PHASE 6 — MM8 APPROACH")
+        print(" PHASE 4 — MM8 BUTTON-RELATIVE REPOSITION")
         print(" front_support + arm_lift")
         print("============================================================")
 
-        result_approach = approach_mm8(
+        result_reposition = approach_mm8(
             monitor,
             runtime_dir / "state_graph.json",
             standoff_m=args.mm8_settle_distance_m,
+            label="MM8 REPOSITION / BACK-AWAY",
         )
 
-        (
-            run / "mm8_approach.json"
-        ).write_text(
-            json.dumps(
-                result_approach,
-                indent=2,
-            ) + "\n"
+        (run / "mm8_reposition.json").write_text(
+            json.dumps(result_reposition, indent=2) + "\n"
         )
 
         # ========================================================
-        # 7. UNFOLD FOR MANIPULATION
+        # 5. UNFOLD FOR MANIPULATION
         # ========================================================
 
         print()
         print("============================================================")
-        print(" PHASE 7 — PREPARE MANIPULATION")
+        print(" PHASE 5 — PREPARE MANIPULATION")
         print("============================================================")
 
         behavior(
             env,
             "prepare_manipulation",
         )
-
-        time.sleep(1)
+        time.sleep(1.0)
 
         state = read_json(
             runtime_dir / "state_graph.json"
@@ -1741,8 +1379,8 @@ def main():
 
             "q_current": q,
 
-            "approach":
-                result_approach,
+            "reposition":
+                result_reposition,
         }
 
         (
@@ -1822,7 +1460,7 @@ def main():
             "Isaac + bridge + behavior node remain OPEN."
         )
         print(
-            "Nav2 / assembly / reconfiguration are STOPPED."
+            "Assembly is STOPPED; MM8 behavior/primitive executor remain active."
         )
         if args.stop_before_ik:
             print(
@@ -1839,7 +1477,7 @@ def main():
         print("5-DoF BOTTOM-face IK follows.")
 
         # ========================================================
-        # 8. 5-DOF BOTTOM-FACE IK
+        # 6. 5-DOF BOTTOM-FACE IK
         #
         # The free task face is end_effector.BOTTOM.
         # No physical finite-difference probing is performed.
@@ -1856,7 +1494,7 @@ def main():
 
         print()
         print("============================================================")
-        print(" PHASE 8 — 5-DOF BOTTOM-FACE IK")
+        print(" PHASE 6 — 5-DOF BOTTOM-FACE IK")
         print(" no physical probes")
         print("============================================================")
 
@@ -1970,11 +1608,6 @@ def main():
         _IK_PRE_GAP_M = 0.0300
         _IK_PRESS_DEPTH_M = 0.0038
 
-        # After the physical press and return to q_pre, retract the
-        # end-effector farther from the wall before folding back into
-        # the scorpion posture.  This prevents the scorpion recovery
-        # sweep from crossing the button again.
-        _IK_POST_PRESS_CLEARANCE_M = 0.0600
 
         # --------------------------------------------------------
         # Effective BOTTOM contact patch.
@@ -2074,16 +1707,11 @@ def main():
         # --------------------------------------------------------
         # Raw manipulation dataset.
         #
-        # One record represents ONE complete 5-DoF configuration
-        # command.  TILT targets are absolute; PAN targets are sent
-        # as physical ROTATE_PAN_BY deltas so IK remains independent
-        # from the reconfiguration PAN reference offset.  The five
-        # resource-safe primitive goals used to physically execute it are
-        # retained inside expert_action.primitive_sequence.
-        #
-        # Therefore the outer CLIK is naturally sub-sampled at its
-        # control-decision rate rather than logging every low-level
-        # wait/poll tick.
+        # One record now represents ONE actually admitted low-level
+        # internal-motion primitive.  The complete q_target / CLIK decision
+        # remains provenance, while the supervised action is the single
+        # primitive_goal that physically produced G_t -> G_t+1.
+        # Busy/poll states are never emitted as WAIT labels.
         # --------------------------------------------------------
 
         _ik_robot_graph_path = (
@@ -2187,6 +1815,31 @@ def main():
 
             return _ik_graph_from_dict(
                 payload
+            )
+
+        def _ik_read_transition_endpoint(
+            graph_before,
+            *,
+            timeout_s=2.0,
+        ):
+            """Return a real post-action sample with a newer physical stamp."""
+
+            deadline = time.monotonic() + float(timeout_s)
+            last_state = None
+            last_graph = None
+
+            while time.monotonic() < deadline:
+                last_state = _ik_read_state()
+                last_graph = _ik_read_robot_graph()
+                if last_graph.stamp > graph_before.stamp:
+                    return last_state, last_graph
+                rclpy.spin_once(_ik_node, timeout_sec=0.02)
+                time.sleep(0.01)
+
+            raise RuntimeError(
+                "IK primitive completed but no newer physical graph sample "
+                f"arrived after stamp {graph_before.stamp!r}; "
+                f"last_stamp={getattr(last_graph, 'stamp', None)!r}"
             )
 
         def _ik_button_depression(
@@ -2490,369 +2143,153 @@ def main():
                 "absolute_joint_configuration",
             )
 
-        def _ik_record_configuration_transition(
+        def _ik_record_primitive_transition(
             *,
             label,
             q_target,
-            executed_goals,
+            primitive_goal,
+            primitive_index,
+            primitive_count,
             state_before,
             graph_before,
             state_after,
             graph_after,
             context,
         ):
+            """Write exactly one physical primitive transition for BC."""
 
             nonlocal _ik_dataset_timestep
 
-            if not executed_goals:
+            primitive_goal = dict(primitive_goal or {})
+            if not primitive_goal.get("primitive"):
                 raise RuntimeError(
-                    "Cannot record an IK configuration "
-                    "without executed primitive goals."
+                    "Cannot record an IK transition without primitive_goal"
                 )
 
-            phase, controller = (
-                _ik_dataset_phase(
-                    str(label)
-                )
-            )
-
+            phase, controller = _ik_dataset_phase(str(label))
             q_target_map = {
-                f"{role}.{joint}":
-                    float(
-                        q_target[index]
-                    )
-                for index, (
-                    role,
-                    joint,
-                ) in enumerate(
-                    _IK_DOF
-                )
+                f"{role}.{joint}": float(q_target[index])
+                for index, (role, joint) in enumerate(_IK_DOF)
             }
 
-            depression_before = (
-                _ik_button_depression(
-                    state_before
-                )
-            )
-
-            depression_after = (
-                _ik_button_depression(
-                    state_after
-                )
-            )
-
+            depression_before = _ik_button_depression(state_before)
+            depression_after = _ik_button_depression(state_after)
             progress = max(
                 0.0,
                 min(
                     1.0,
                     depression_after
-                    / max(
-                        _IK_SUCCESS_DEPRESSION_M,
-                        1.0e-12,
-                    ),
+                    / max(_IK_SUCCESS_DEPRESSION_M, 1.0e-12),
                 ),
             )
-
-            context = dict(
-                context or {}
-            )
+            context = dict(context or {})
 
             primitive_params = {
-                "configuration_label":
-                    str(label),
-
-                "controller":
-                    controller,
-
-                "q_target_rad":
-                    q_target_map,
-
-                "primitive_count":
-                    len(
-                        executed_goals
-                    ),
-
+                "configuration_label": str(label),
+                "controller": controller,
+                "q_target_rad": q_target_map,
+                "primitive_index": int(primitive_index),
+                "primitive_count": int(primitive_count),
                 **context,
             }
-
             task_metrics = {
-                "phase":
-                    phase,
-
-                "progress":
-                    progress,
-
-                "button_depression_before_m":
-                    depression_before,
-
-                "button_depression_after_m":
-                    depression_after,
-
-                "button_success_threshold_m":
-                    _IK_SUCCESS_DEPRESSION_M,
-
-                "controller":
-                    controller,
-
+                "phase": phase,
+                "progress": progress,
+                "button_depression_before_m": depression_before,
+                "button_depression_after_m": depression_after,
+                "button_success_threshold_m": _IK_SUCCESS_DEPRESSION_M,
+                "controller": controller,
                 **context,
             }
 
-            observation_before = (
-                _ik_dataset_observation(
-                    state_before,
-                    graph_before,
-                    str(label),
-                )
+            observation_before = _ik_dataset_observation(
+                state_before,
+                graph_before,
+                str(label),
+            )
+            observation_after = _ik_dataset_observation(
+                state_after,
+                graph_after,
+                str(label),
             )
 
-            observation_after = (
-                _ik_dataset_observation(
-                    state_after,
-                    graph_after,
-                    str(label),
-                )
-            )
-
-            active_primitive = (
-                "clik_joint_configuration"
-                if str(label).startswith(
-                    "clik-"
-                )
-                else
-                "ik_joint_configuration"
-            )
-
+            active_primitive = str(primitive_goal["primitive"])
             record = {
-                "schema_version":
-                    "mssr.expert_transition.v3",
-
-                "episode_id":
-                    episode_id,
-
-                "timestep":
-                    int(
-                        _ik_dataset_timestep
-                    ),
-
-                "stamp":
-                    graph_before.stamp,
-
-                "stage_id":
-                    int(
-                        _ik_dataset_timestep
-                    ),
-
-                "stage_name":
-                    "button_expert",
-
-                "task_type":
-                    "button_manipulation_ik",
-
-                "difficulty":
-                    0.0,
-
-                "fsm_state":
-                    phase,
-
-                "is_first":
-                    _ik_dataset_timestep == 0,
-
-                # This is a RAW manipulation stream, not the
-                # episode-terminal record.
-                "is_last":
-                    False,
-
-                "is_terminal":
-                    False,
-
-                "action_valid":
-                    True,
-
-                "reward":
-                    0.0,
-
-                "discount":
-                    1.0,
-
-                "observation":
-                    observation_before,
-
-                "observation_t_plus_1":
-                    observation_after,
-
-                "graph_t":
-                    graph_before.to_dict(),
-
-                "target_graph":
-                    _ik_target_graph.to_dict(),
-
-                "task_graph_t":
-                    graph_before.to_dict(),
-
-                "assignment_target_to_module":
-                    dict(
-                        _ik_assignment
-                    ),
-
-                "graph_t_plus_1":
-                    graph_after.to_dict(),
-
-                "attributed_graph":
-                    graph_before.to_dict(),
-
-                "attributed_task_graph":
-                    graph_before.to_dict(),
-
-                "graph_features":
-                    _ik_graph_to_features(
-                        graph_before
-                    ),
-
+                "schema_version": "mssr.expert_transition.v3",
+                "episode_id": episode_id,
+                "timestep": int(_ik_dataset_timestep),
+                "stamp": graph_before.stamp,
+                "stage_id": int(_ik_dataset_timestep),
+                "stage_name": "button_expert",
+                "task_type": "button_manipulation_ik",
+                "difficulty": 0.0,
+                "fsm_state": phase,
+                "is_first": _ik_dataset_timestep == 0,
+                "is_last": False,
+                "is_terminal": False,
+                "action_valid": True,
+                "reward": 0.0,
+                "discount": 1.0,
+                "observation": observation_before,
+                "observation_t_plus_1": observation_after,
+                "graph_t": graph_before.to_dict(),
+                "target_graph": _ik_target_graph.to_dict(),
+                "task_graph_t": graph_before.to_dict(),
+                "assignment_target_to_module": dict(_ik_assignment),
+                "graph_t_plus_1": graph_after.to_dict(),
+                "attributed_graph": graph_before.to_dict(),
+                "attributed_task_graph": graph_before.to_dict(),
+                "graph_features": _ik_graph_to_features(graph_before),
                 "expert_action": {
                     "locomotion": {},
-
                     "magnetic": [],
-
-                    # The physical actuator transport remains the
-                    # already-validated set_tilt/set_pan protocol.
-                    #
-                    # At the learning decision level, however, one
-                    # CLIK outer step is one full 5-DoF target.
-                    "primitive_goal":
-                        None,
-
-                    "joint_configuration": {
-                        "schema_version":
-                            "mssr.joint_configuration_action.v1",
-
-                        "dofs": [
-                            f"{role}.{joint}"
-                            for role, joint
-                            in _IK_DOF
-                        ],
-
-                        "target_rad":
-                            q_target_map,
-                    },
-
-                    # Exact low-level commands that were actually
-                    # sent to Isaac for this configuration.
-                    "primitive_sequence": [
-                        dict(goal)
-                        for goal
-                        in executed_goals
-                    ],
+                    "primitive_goal": primitive_goal,
                 },
-
                 "supervision": {
-                    "label_source":
-                        "deterministic_expert",
-
-                    "executed_action_source":
-                        "deterministic_expert",
-
-                    "expert_intervention":
-                        False,
-
-                    "valid_for_behavior_cloning":
-                        True,
+                    "label_source": "deterministic_expert",
+                    "executed_action_source": "deterministic_expert",
+                    "expert_intervention": False,
+                    "valid_for_behavior_cloning": True,
                 },
-
                 "expert_annotation": {
-                    "fsm_state":
-                        phase,
-
-                    "active_primitive":
-                        active_primitive,
-
-                    "primitive_params":
-                        primitive_params,
-
-                    "task_metrics":
-                        task_metrics,
-
+                    "fsm_state": phase,
+                    "active_primitive": active_primitive,
+                    "primitive_params": primitive_params,
+                    "task_metrics": task_metrics,
                     "debug": {
-                        "message":
-                            (
-                                "One complete validated 5-DoF "
-                                "configuration execution."
-                            ),
-
-                        "command_id":
-                            f"button-ik-{label}",
-
-                        "morphology":
-                            "mobile_manipulator8",
-
-                        "behavior":
-                            "button_manipulation_ik",
+                        "message": "One accepted low-level IK primitive.",
+                        "command_id": str(primitive_goal.get("goal_id", "")),
+                        "morphology": "mobile_manipulator8",
+                        "behavior": "button_manipulation_ik",
                     },
                 },
-
-                "active_primitive":
-                    active_primitive,
-
-                "primitive_params":
-                    primitive_params,
-
-                "module_roles":
-                    dict(roles),
-
-                "attachment_modes":
-                    {},
-
-                "task_metrics":
-                    task_metrics,
-
-                "success":
-                    False,
-
-                "done":
-                    False,
-
+                "active_primitive": active_primitive,
+                "primitive_params": primitive_params,
+                "module_roles": dict(roles),
+                "attachment_modes": {},
+                "task_metrics": task_metrics,
+                "success": False,
+                "done": False,
                 "debug": {
-                    "message":
-                        (
-                            "One complete validated 5-DoF "
-                            "configuration execution."
-                        ),
-
-                    "command_id":
-                        f"button-ik-{label}",
-
-                    "morphology":
-                        "mobile_manipulator8",
-
-                    "behavior":
-                        "button_manipulation_ik",
+                    "message": "One accepted low-level IK primitive.",
+                    "command_id": str(primitive_goal.get("goal_id", "")),
+                    "morphology": "mobile_manipulator8",
+                    "behavior": "button_manipulation_ik",
                 },
             }
 
-            with _ik_dataset_path.open(
-                "a",
-                encoding="utf-8",
-            ) as stream:
+            with _ik_dataset_path.open("a", encoding="utf-8") as stream:
                 stream.write(
-                    json.dumps(
-                        record,
-                        separators=(
-                            ",",
-                            ":",
-                        ),
-                    )
-                    + "\n"
+                    json.dumps(record, separators=(",", ":")) + "\n"
                 )
 
             print(
                 "IL manipulation sample "
-                f"{_ik_dataset_timestep}: "
-                f"{phase} | "
-                f"primitive_sequence="
-                f"{len(executed_goals)} | "
-                f"depression="
-                f"{depression_after*1000:.3f} mm"
+                f"{_ik_dataset_timestep}: {phase} | "
+                f"primitive={active_primitive} | "
+                f"index={primitive_index}/{primitive_count} | "
+                f"depression={depression_after*1000:.3f} mm"
             )
-
             _ik_dataset_timestep += 1
 
         def _ik_read_state():
@@ -4051,6 +3488,7 @@ def main():
             dataset_context=None,
             only_dofs=None,
         ):
+            """Execute one configuration while logging each physical primitive."""
 
             selected_dofs = (
                 None
@@ -4060,69 +3498,49 @@ def main():
                     for role, joint in only_dofs
                 }
             )
+            dataset_context = dict(dataset_context or {})
 
-            dataset_context = dict(
-                dataset_context or {}
-            )
-
-            dataset_state_before = (
-                _ik_read_state()
-            )
-
-            dataset_graph_before = (
-                _ik_read_robot_graph()
-            )
-
-            executed_goals = []
-
-            print()
-            print(
-                f"COMMAND ABSOLUTE CONFIGURATION: "
-                f"{label}"
-            )
-
-            for index, (
-                role,
-                joint,
-            ) in enumerate(_IK_DOF):
-
-                if (
-                    selected_dofs is not None
-                    and (role, joint) not in selected_dofs
-                ):
-                    continue
-
-                target = float(
-                    q_target[index]
+            selected = [
+                (index, role, joint)
+                for index, (role, joint) in enumerate(_IK_DOF)
+                if selected_dofs is None
+                or (role, joint) in selected_dofs
+            ]
+            if not selected:
+                raise RuntimeError(
+                    f"{label}: configuration selected no executable DoFs"
                 )
 
-                # PAN and TILT of one SMORES module share the
-                # ``internal_motion:<module>`` primitive resource, so
-                # this joint's goal can arrive before the previous
-                # joint on the same module has finished releasing it
-                # and be REJECTED (RESOURCE_BUSY) outright. Retry with
-                # a fresh goal_id instead of silently waiting on a
-                # joint that was never actually commanded.
+            primitive_count = len(selected)
+            carried_state = None
+            carried_graph = None
+            final_primitive = None
+
+            print()
+            print(f"COMMAND ABSOLUTE CONFIGURATION: {label}")
+
+            for primitive_index, (index, role, joint) in enumerate(
+                selected,
+                start=1,
+            ):
+                target = float(q_target[index])
+                accepted_state_before = None
+                accepted_graph_before = None
+                accepted_goal = None
                 status = None
 
                 for attempt in range(20):
+                    if attempt == 0 and carried_state is not None:
+                        state_before = carried_state
+                        graph_before = carried_graph
+                    else:
+                        state_before = _ik_read_state()
+                        graph_before = _ik_read_robot_graph()
 
                     if joint == "pan":
-                        # IK q values are physical joint angles.  SET_PAN is
-                        # intentionally relative to the docking reference
-                        # after reconfiguration, so it cannot be used here
-                        # for an absolute physical IK target.  Re-read the
-                        # actual physical PAN immediately before admission
-                        # and command only the wrapped physical delta.
-                        pan_state = _ik_read_state()
-                        pan_module = _ik_module(
-                            pan_state,
-                            role,
-                        )
+                        pan_module = _ik_module(state_before, role)
                         pan_actual = float(
-                            pan_module["actuators"]["pan"][
-                                "position_rad"
-                            ]
+                            pan_module["actuators"]["pan"]["position_rad"]
                         )
                         pan_delta = shortest_angular_delta(
                             pan_actual,
@@ -4131,13 +3549,7 @@ def main():
                         primitive_name = "rotate_pan_by"
                         primitive_parameters = {
                             "delta_rad": pan_delta,
-
-                            # Cartesian IK cares about physical orientation,
-                            # not which unwrapped 2*pi PAN branch represents it.
-                            # Keep ordinary ROTATE_PAN_BY multi-turn semantics
-                            # unchanged everywhere else.
                             "periodic_equivalent": True,
-
                             "tolerance_rad": math.radians(0.6),
                             "max_servo_speed_rad_s": 0.12,
                         }
@@ -4148,190 +3560,81 @@ def main():
                             "tolerance_rad": math.radians(0.6),
                         }
 
-                    request = (
-                        _IKPrimitiveGoalRequest(
-                            goal_id=(
-                                f"button-ik-"
-                                f"{label}-"
-                                f"{role}-"
-                                f"{joint}-"
-                                f"{time.time_ns()}"
-                            ),
-                            primitive=primitive_name,
-                            module_ids=(
-                                role_to_module[
-                                    role
-                                ],
-                            ),
-                            parameters=primitive_parameters,
-                            timeout_s=20.0,
-                        )
-                    )
-
-                    executed_goals.append(
-                        request.to_dict()
+                    request = _IKPrimitiveGoalRequest(
+                        goal_id=(
+                            f"button-ik-{label}-{role}-{joint}-"
+                            f"{time.time_ns()}"
+                        ),
+                        primitive=primitive_name,
+                        module_ids=(role_to_module[role],),
+                        parameters=primitive_parameters,
+                        timeout_s=20.0,
                     )
 
                     message = _IKString()
+                    message.data = json.dumps(request.to_dict())
+                    _ik_goal_pub.publish(message)
 
-                    message.data = json.dumps(
-                        request.to_dict()
-                    )
-
-                    _ik_goal_pub.publish(
-                        message
-                    )
-
-                    admission_deadline = (
-                        time.monotonic() + 2.0
-                    )
-
+                    admission_deadline = time.monotonic() + 2.0
                     status = None
-
-                    while (
-                        time.monotonic()
-                        < admission_deadline
-                    ):
-                        rclpy.spin_once(
-                            _ik_node,
-                            timeout_sec=0.05,
-                        )
-                        status = _ik_goal_status(
-                            request.goal_id
-                        )
+                    while time.monotonic() < admission_deadline:
+                        rclpy.spin_once(_ik_node, timeout_sec=0.05)
+                        status = _ik_goal_status(request.goal_id)
                         if status is not None:
                             break
 
                     if (
                         status is not None
-                        and status.get("state")
-                        == "rejected"
+                        and str(status.get("state", "")).lower() == "rejected"
                     ):
                         print(
-                            f"  {role}.{joint}: "
-                            f"goal rejected "
-                            f"({status.get('message', '')}); "
-                            "retrying"
+                            f"  {role}.{joint}: goal rejected "
+                            f"({status.get('message', '')}); retrying"
                         )
+                        carried_state = None
+                        carried_graph = None
                         time.sleep(0.2)
                         continue
 
+                    accepted_state_before = state_before
+                    accepted_graph_before = graph_before
+                    accepted_goal = request.to_dict()
                     break
-
                 else:
                     raise RuntimeError(
-                        f"{label}: {role}.{joint} "
-                        "goal was repeatedly rejected"
+                        f"{label}: {role}.{joint} goal was repeatedly rejected"
                     )
 
-                # q_target is expressed in PHYSICAL joint coordinates.
-                # TILT is executed as an absolute target; PAN is converted
-                # above into a physical relative delta from the live state.
-                # Higher-level PRE/CLIK loops decide when to re-linearize.
-                joint_deadline = (
-                    time.monotonic()
-                    + 20.0
-                )
-
-                joint_stable_since = None
-
-                while (
-                    time.monotonic()
-                    < joint_deadline
-                ):
-
-                    rclpy.spin_once(
-                        _ik_node,
-                        timeout_sec=0.05,
-                    )
-
-                    joint_state = (
-                        _ik_read_state()
-                    )
-
-                    joint_module = (
-                        _ik_module(
-                            joint_state,
-                            role,
-                        )
-                    )
-
-                    joint_actuator = (
-                        joint_module[
-                            "actuators"
-                        ][joint]
-                    )
-
-                    joint_actual = float(
-                        joint_actuator[
-                            "position_rad"
-                        ]
-                    )
-
+                joint_deadline = time.monotonic() + 20.0
+                while time.monotonic() < joint_deadline:
+                    rclpy.spin_once(_ik_node, timeout_sec=0.05)
+                    joint_state = _ik_read_state()
+                    joint_module = _ik_module(joint_state, role)
+                    joint_actuator = joint_module["actuators"][joint]
+                    joint_actual = float(joint_actuator["position_rad"])
                     joint_velocity = abs(
-                        float(
-                            joint_actuator.get(
-                                "velocity_rad_s",
-                                0.0,
-                            )
-                        )
+                        float(joint_actuator.get("velocity_rad_s", 0.0))
                     )
-
                     joint_error = abs(
                         _ik_joint_error(
                             joint_actual,
-                            float(
-                                q_target[
-                                    index
-                                ]
-                            ),
+                            target,
                             joint,
                         )
                     )
-
-                    joint_now = (
-                        time.monotonic()
-                    )
-
-                    # The primitive executor itself declares
-                    # JOINT_TARGET_REACHED on position tolerance.
-                    #
-                    # Do NOT require the individual joint to become
-                    # dynamically settled here: this is a loaded,
-                    # compliant serial chain and a joint may still
-                    # have non-zero velocity after reaching its
-                    # commanded angle.
-                    #
-                    # Full configuration settling (position +
-                    # velocity for all 5 DoFs) is checked below,
-                    # after every absolute target has been issued.
-                    if (
-                        joint_error
-                        <= math.radians(1.2)
-                    ):
+                    if joint_error <= math.radians(1.2):
                         print(
-                            f"  {role}.{joint}: "
-                            f"target reached "
-                            f"(error="
-                            f"{math.degrees(joint_error):.2f}°, "
-                            f"velocity="
-                            f"{joint_velocity:.3f} rad/s)"
+                            f"  {role}.{joint}: target reached "
+                            f"(error={math.degrees(joint_error):.2f}°, "
+                            f"velocity={joint_velocity:.3f} rad/s)"
                         )
                         break
-
                     time.sleep(0.05)
-
                 else:
                     raise RuntimeError(
-                        f"{label}: "
-                        f"{role}.{joint} "
-                        f"did not reach its absolute target"
+                        f"{label}: {role}.{joint} did not reach its target"
                     )
 
-                # Position tolerance and primitive lifetime are
-                # different contracts.  Do not reuse the module's
-                # internal_motion resource until the admitted primitive
-                # itself reports a terminal success and releases it.
                 _ik_wait_goal_terminal(
                     request.goal_id,
                     label,
@@ -4340,147 +3643,108 @@ def main():
                     timeout_s=20.0,
                 )
 
-            deadline = (
-                time.monotonic()
-                + 20.0
-            )
+                # The graph file may lag behind primitive status. Anchor
+                # after terminal success, then require a subsequently
+                # published physical graph before supervising this action.
+                terminal_anchor_graph = _ik_read_robot_graph()
 
-            stable_since = None
-
-            while (
-                time.monotonic()
-                < deadline
-            ):
-
-                rclpy.spin_once(
-                    _ik_node,
-                    timeout_sec=0.05,
+                final_primitive = (
+                    primitive_index,
+                    accepted_goal,
+                    accepted_state_before,
+                    accepted_graph_before,
                 )
 
-                state = _ik_read_state()
+                if primitive_index < primitive_count:
+                    state_after, graph_after = _ik_read_transition_endpoint(
+                        terminal_anchor_graph
+                    )
+                    _ik_record_primitive_transition(
+                        label=str(label),
+                        q_target=q_target,
+                        primitive_goal=accepted_goal,
+                        primitive_index=primitive_index,
+                        primitive_count=primitive_count,
+                        state_before=accepted_state_before,
+                        graph_before=accepted_graph_before,
+                        state_after=state_after,
+                        graph_after=graph_after,
+                        context=dataset_context,
+                    )
+                    # No independent sample is inserted before the next
+                    # immediate dispatch: exact physical continuity is kept.
+                    carried_state = state_after
+                    carried_graph = graph_after
 
+            # The last physical primitive owns the configuration-level settle
+            # interval.  Its G_t+1 is therefore the stable state used by the
+            # next PRE/CLIK decision.
+            deadline = time.monotonic() + 20.0
+            stable_since = None
+            while time.monotonic() < deadline:
+                rclpy.spin_once(_ik_node, timeout_sec=0.05)
+                state = _ik_read_state()
                 errors = []
                 velocities = []
 
-                for index, (
-                    role,
-                    joint,
-                ) in enumerate(_IK_DOF):
-
-                    if (
-                        selected_dofs is not None
-                        and (role, joint) not in selected_dofs
-                    ):
-                        continue
-
-                    module = _ik_module(
-                        state,
-                        role,
-                    )
-
-                    actuator = (
-                        module[
-                            "actuators"
-                        ][joint]
-                    )
-
-                    actual = float(
-                        actuator[
-                            "position_rad"
-                        ]
-                    )
-
+                for index, role, joint in selected:
+                    module = _ik_module(state, role)
+                    actuator = module["actuators"][joint]
+                    actual = float(actuator["position_rad"])
                     velocity = abs(
-                        float(
-                            actuator.get(
-                                "velocity_rad_s",
-                                0.0,
-                            )
-                        )
+                        float(actuator.get("velocity_rad_s", 0.0))
                     )
-
                     errors.append(
-                        abs(
-                            _ik_joint_error(
-                                actual,
-                                float(
-                                    q_target[
-                                        index
-                                    ]
-                                ),
-                                joint,
-                            )
-                        )
+                        abs(_ik_joint_error(actual, float(q_target[index]), joint))
                     )
+                    velocities.append(velocity)
 
-                    velocities.append(
-                        velocity
-                    )
-
-                within = (
-                    max(errors)
-                    <= math.radians(1.2)
-                )
-
+                within = max(errors) <= math.radians(1.2)
                 now = time.monotonic()
-
-                # The loaded MM8 arm is compliant and individual
-                # actuator velocity estimates remain non-zero even
-                # while the commanded configuration is being held.
-                #
-                # For the absolute IK configuration, require the
-                # complete 5-DoF pose to remain inside the joint
-                # position tolerance continuously for 0.6 s.
-                #
-                # The task-space PRE/PRESS geometry is validated
-                # separately by the IK and by the physical button
-                # depression criterion.
                 if within:
-
                     if stable_since is None:
                         stable_since = now
-
-                    elif (
-                        now - stable_since
-                        >= 0.6
-                    ):
+                    elif now - stable_since >= 0.6:
                         print(
                             f"{label}: reached "
-                            f"(max error "
-                            f"{math.degrees(max(errors)):.2f}°, "
-                            f"max velocity "
-                            f"{max(velocities):.3f} rad/s)"
+                            f"(max error {math.degrees(max(errors)):.2f}°, "
+                            f"max velocity {max(velocities):.3f} rad/s)"
                         )
 
-                        dataset_state_after = (
-                            _ik_read_state()
+                        # Stable is a controller condition observed
+                        # now. Require one graph publication after that
+                        # condition before closing the final transition.
+                        settle_anchor_graph = _ik_read_robot_graph()
+                        state_after, graph_after = _ik_read_transition_endpoint(
+                            settle_anchor_graph
                         )
+                        (
+                            primitive_index,
+                            primitive_goal,
+                            state_before,
+                            graph_before,
+                        ) = final_primitive
 
-                        dataset_graph_after = (
-                            _ik_read_robot_graph()
-                        )
-
-                        _ik_record_configuration_transition(
+                        _ik_record_primitive_transition(
                             label=str(label),
                             q_target=q_target,
-                            executed_goals=executed_goals,
-                            state_before=dataset_state_before,
-                            graph_before=dataset_graph_before,
-                            state_after=dataset_state_after,
-                            graph_after=dataset_graph_after,
+                            primitive_goal=primitive_goal,
+                            primitive_index=primitive_index,
+                            primitive_count=primitive_count,
+                            state_before=state_before,
+                            graph_before=graph_before,
+                            state_after=state_after,
+                            graph_after=graph_after,
                             context=dataset_context,
                         )
-
                         return
-
                 else:
                     stable_since = None
 
                 time.sleep(0.05)
 
             raise RuntimeError(
-                f"{label} absolute configuration "
-                f"did not settle"
+                f"{label} absolute configuration did not settle"
             )
 
         def _ik_plan_end_effector_tilt_preorientation(
@@ -5858,7 +5122,7 @@ def main():
         )
 
         # --------------------------------------------------------
-        # 8A. CLOSED-LOOP PRE TRAJECTORY
+        # 6A. CLOSED-LOOP PRE TRAJECTORY
         #
         # PRE is not a one-shot q target anymore.  The controller
         # repeatedly reads the REAL state, creates a bounded position
@@ -6137,7 +5401,7 @@ def main():
         )
 
         # --------------------------------------------------------
-        # 8B. CLOSED-LOOP PRESS TRAJECTORY
+        # 6B. CLOSED-LOOP PRESS TRAJECTORY
         #
         # The old architecture solved one q_press and then executed
         # it open-loop.  This phase now follows the Cartesian
@@ -6223,12 +5487,7 @@ def main():
             )
 
             print(
-                "Returning to physical q_pre."
-            )
-
-            _ik_command_configuration(
-                "pre-return",
-                q_pre_actual,
+                "No recovery primitive is recorded after a failed press."
             )
 
             _ik_node.destroy_node()
@@ -6285,152 +5544,10 @@ def main():
         )
 
         # --------------------------------------------------------
-        # 8C. Absolute return to the REAL q_pre.
+        # 6C. TERMINAL PHYSICAL SUCCESS
         # --------------------------------------------------------
-
-        _ik_command_configuration(
-            "pre-return",
-            q_pre_actual,
-        )
-
-        time.sleep(0.8)
-
-        # --------------------------------------------------------
-        # 8D. POST-PRESS ARM CLEARANCE
-        #
-        # q_pre is about 30 mm from the resting button face.  That
-        # is sufficient for manipulation, but the large scorpion
-        # recovery motion can sweep the arm back through the button.
-        #
-        # Before restore_drive, move the BOTTOM face farther away
-        # from the wall while preserving its current X/Z location
-        # and +Y-facing orientation.
-        #
-        # This motion is AWAY from the obstacle; the validated CLIK
-        # remains responsible for the actual contact/press phase.
-        # --------------------------------------------------------
-
-        clearance_state = _ik_read_state()
-
-        clearance_bottom0 = _ik_connector(
-            clearance_state,
-            "end_effector",
-            "BOTTOM",
-        )
-
-        clearance_center0 = _np.asarray(
-            clearance_bottom0[
-                "position_world"
-            ],
-            dtype=float,
-        )
-
-        clearance_normal_coordinate = (
-            rest_front_s
-            - _IK_POST_PRESS_CLEARANCE_M
-        )
-
-        clearance_target = (
-            clearance_center0.copy()
-        )
-
-        clearance_target += (
-            clearance_normal_coordinate
-            - float(
-                clearance_center0
-                @ _IK_TARGET_NORMAL
-            )
-        ) * _IK_TARGET_NORMAL
-
-        print()
-        print(
-            "------------------------------------------------------------"
-        )
-        print(
-            "POST-PRESS ARM CLEARANCE"
-        )
-        print(
-            "------------------------------------------------------------"
-        )
-        print(
-            f"current BOTTOM N = "
-            f"{float(clearance_center0 @ _IK_TARGET_NORMAL):+.5f} m"
-        )
-        print(
-            f"clearance target = "
-            f"{_IK_POST_PRESS_CLEARANCE_M*1000:.1f} mm "
-            f"from resting button face"
-        )
-        print(
-            f"target BOTTOM N = "
-            f"{clearance_normal_coordinate:+.5f} m"
-        )
-
-        clearance_solution = _ik_solve(
-            clearance_state,
-            clearance_target,
-            "POST-PRESS CLEARANCE",
-        )
-
-        _ik_print_solution(
-            clearance_solution,
-            clearance_target,
-        )
-
-        plan[
-            "post_press_clearance"
-        ] = _ik_plan_payload(
-            clearance_solution,
-            clearance_target,
-        )
-
-        plan[
-            "post_press_clearance"
-        ][
-            "clearance_m"
-        ] = (
-            _IK_POST_PRESS_CLEARANCE_M
-        )
-
-        (
-            run
-            / "bottom_face_5dof_ik_plan.json"
-        ).write_text(
-            json.dumps(
-                plan,
-                indent=2,
-            ) + "\n"
-        )
-
-        if not clearance_solution["success"]:
-
-            print()
-            print(
-                "POST-PRESS CLEARANCE IK DID NOT CONVERGE."
-            )
-            print(
-                "Scorpion restore intentionally NOT executed."
-            )
-            print(
-                "Runtime left open for inspection."
-            )
-
-            _ik_node.destroy_node()
-
-            success = False
-            if not args.headless:
-                runtime = None
-            raise SystemExit(1)
-
-        _ik_command_configuration(
-            "post-press-clearance",
-            clearance_solution["q"],
-        )
-
-        time.sleep(0.8)
 
         final_state = _ik_read_state()
-
         final_bottom = _ik_connector(
             final_state,
             "end_effector",
@@ -6438,273 +5555,53 @@ def main():
         )
 
         result = {
-            "schema_version":
-                "mssr.button_bottom_face_press.v4",
-
+            "schema_version": "mssr.button_bottom_face_press.v5",
             "press_direction_world_xy": [
-                float(
-                    _IK_TARGET_NORMAL[0]
-                ),
-                float(
-                    _IK_TARGET_NORMAL[1]
-                ),
+                float(_IK_TARGET_NORMAL[0]),
+                float(_IK_TARGET_NORMAL[1]),
             ],
-
-            "success":
-                bool(
-                    depression
-                    >= _IK_SUCCESS_DEPRESSION_M
-                ),
-
-            "depression_m":
-                depression,
-
-            "threshold_m":
-                _IK_SUCCESS_DEPRESSION_M,
-
-            "pre_gap_m":
-                _IK_PRE_GAP_M,
-
-            "press_depth_m":
-                _IK_PRESS_DEPTH_M,
-
-            "post_press_clearance_m":
-                _IK_POST_PRESS_CLEARANCE_M,
-
-            "press_bottom_center_xyz_m":
-                press_bottom[
-                    "position_world"
-                ],
-
-            "press_bottom_normal":
-                press_bottom[
-                    "outward_normal_world"
-                ],
-
-            "returned_bottom_center_xyz_m":
-                final_bottom[
-                    "position_world"
-                ],
-
-            "returned_bottom_normal":
-                final_bottom[
-                    "outward_normal_world"
-                ],
+            "success": bool(
+                depression >= _IK_SUCCESS_DEPRESSION_M
+            ),
+            "depression_m": depression,
+            "threshold_m": _IK_SUCCESS_DEPRESSION_M,
+            "pre_gap_m": _IK_PRE_GAP_M,
+            "press_depth_m": _IK_PRESS_DEPTH_M,
+            "press_bottom_center_xyz_m": press_bottom["position_world"],
+            "press_bottom_normal": press_bottom["outward_normal_world"],
+            "terminal_bottom_center_xyz_m": final_bottom["position_world"],
+            "terminal_bottom_normal": final_bottom["outward_normal_world"],
         }
 
-        (
-            run / "button_press.json"
-        ).write_text(
-            json.dumps(
-                result,
-                indent=2,
-            ) + "\n"
+        (run / "button_press.json").write_text(
+            json.dumps(result, indent=2) + "\n"
         )
 
         _ik_node.destroy_node()
 
-        # ========================================================
-        # 9. RETURN TO VALIDATED SCORPION POSTURE
-        # ========================================================
+        for _ in range(10):
+            rclpy.spin_once(monitor, timeout_sec=0.1)
 
-        print()
-        print("============================================================")
-        print(" PHASE 9 — RETURN TO SCORPION")
-        print("============================================================")
-
-        behavior(
-            env,
-            "restore_drive",
-        )
-
-        time.sleep(1.0)
-
-        print()
-        print(
-            f"button_press.json = "
-            f"{run / 'button_press.json'}"
-        )
-
-        print(
-            f"physical success = "
-            f"{result['success']}"
-        )
-
-        # ========================================================
-        # 10. RETREAT IN VALIDATED SCORPION LOCOMOTION
-        #
-        # Reuse the exact same longitudinal controller and semantic
-        # drive pair used by PHASE 6.  The only difference is the
-        # desired standoff: move away from the button until the
-        # connected MM8 root reaches the RC navigation standoff.
-        # ========================================================
-
-        print()
-        print("============================================================")
-        print(" PHASE 10 — SCORPION RETREAT")
-        print(" front_support + arm_lift")
-        print("============================================================")
-        print(
-            f"Retreat target standoff = "
-            f"{RC_STANDOFF_M*1000:.1f} mm"
-        )
-
-        result_retreat = approach_mm8(
-            monitor,
-            runtime_dir / "state_graph.json",
-            standoff_m=RC_STANDOFF_M,
-            label="MM8 RETREAT",
-        )
-
-        (
-            run / "mm8_retreat.json"
-        ).write_text(
-            json.dumps(
-                result_retreat,
-                indent=2,
-            ) + "\n"
-        )
-
-        # Stop command is already handled by approach_mm8().
-        time.sleep(1.0)
-
-        # ========================================================
-        # 11. MOBILEMANIPULATOR8 -> RC-CAR8
-        #
-        # Same self-reconfiguration contract already validated in
-        # PHASE 4, but with the target morphology reversed.
-        # ========================================================
-
-        print()
-        print("============================================================")
-        print(" PHASE 11 — MOBILEMANIPULATOR8 -> RC-CAR8")
-        print("============================================================")
-
-        return_reconfig_log = (
-            run / "return_reconfiguration.log"
-        ).open("w")
-
-        monitor.reconfiguration = None
-
-        reconfig = subprocess.Popen(
-            [
-                "ros2", "run",
-                "mssr_expert",
-                "mssr_smores_self_reconfiguration_node",
-                "--ros-args",
-                "-p", "source_graph_path:=auto",
-                "-p", "target_morphology:=rc_car8",
-                "-p", "episode_id:=" + episode_id,
-                "-p", "dataset_path:=" + str(mm8_to_rc_dataset_path),
-            ],
-            cwd=ROOT,
-            env=env,
-            stdout=return_reconfig_log,
-            stderr=subprocess.STDOUT,
-            start_new_session=True,
-        )
-
-        monitor.spin_until(
-            lambda: (
-                isinstance(
-                    monitor.reconfiguration,
-                    dict,
-                )
-                and monitor.reconfiguration.get(
-                    "done"
-                ) is True
-            ),
-            480,
-            "MM8 -> RC-Car8 self-reconfiguration timeout.",
-        )
-
-        return_terminal = (
-            monitor.reconfiguration
-        )
-
-        print(
-            json.dumps(
-                return_terminal,
-                indent=2,
-            )
-        )
-
-        (
-            run / "return_reconfiguration.json"
-        ).write_text(
-            json.dumps(
-                return_terminal,
-                indent=2,
-            ) + "\n"
-        )
-
-        if (
-            return_terminal.get(
-                "success"
-            )
-            is not True
-        ):
-            raise RuntimeError(
-                "MobileManipulator8 -> RC-Car8 failed."
-            )
-
-        stop_process(reconfig)
-        reconfig = None
-
-        time.sleep(2)
-
-        # Let /odom and the state graph settle after the topology
-        # transition, then record the final connected-robot pose.
-        for _ in range(15):
-            rclpy.spin_once(
-                monitor,
-                timeout_sec=0.1,
-            )
-
-        final_x, final_y, final_yaw = (
-            monitor.pose()
-        )
-
-        final_state = read_json(
+        final_x, final_y, final_yaw = monitor.pose()
+        final_course_state = read_json(
             runtime_dir / "state_graph.json"
         )
-
         final_button = (
-            button_xyz(final_state)
-            if final_state
+            button_xyz(final_course_state)
+            if final_course_state
             else None
         )
 
         final_summary = {
-            "schema_version":
-                "mssr.button_expert_complete.v1",
-
-            "seed":
-                SEED,
-
-            "success":
-                True,
-
-            "button_pressed":
-                True,
-
-            "retreat":
-                result_retreat,
-
-            "return_reconfiguration":
-                return_terminal,
-
-            "final_morphology":
-                "rc_car8",
-
-            "final_root_xy_m": [
-                float(final_x),
-                float(final_y),
-            ],
-
-            "final_root_yaw_rad":
-                float(final_yaw),
-
+            "schema_version": "mssr.button_expert_complete.v2",
+            "seed": SEED,
+            "success": True,
+            "button_pressed": True,
+            "final_morphology": "mobile_manipulator8",
+            "reposition": result_reposition,
+            "button_press": result,
+            "final_root_xy_m": [float(final_x), float(final_y)],
+            "final_root_yaw_rad": float(final_yaw),
             "button_xyz_m": (
                 list(final_button)
                 if final_button is not None
@@ -6712,40 +5609,28 @@ def main():
             ),
         }
 
-        (
-            run / "expert_complete.json"
-        ).write_text(
-            json.dumps(
-                final_summary,
-                indent=2,
-            ) + "\n"
+        (run / "expert_complete.json").write_text(
+            json.dumps(final_summary, indent=2) + "\n"
         )
 
         print()
         print("============================================================")
-        print(" BUTTON EXPERT — END-TO-END SUCCESS")
+        print(" BUTTON EXPERT — TERMINAL SUCCESS")
         print("============================================================")
-        print("button press        = SUCCEEDED")
-        print("pre-return          = SUCCEEDED")
-        print("scorpion restore    = SUCCEEDED")
-        print("scorpion retreat    = SUCCEEDED")
-        print("MM8 -> RC-Car8      = SUCCEEDED")
+        print("direct MM8 assembly = SUCCEEDED")
+        print("Scorpion/reposition = SUCCEEDED")
+        print("button press         = SUCCEEDED")
         print(
-            f"final root          = "
-            f"({final_x:+.3f},{final_y:+.3f})"
+            f"final root           = ({final_x:+.3f},{final_y:+.3f})"
         )
         print(
-            f"final yaw           = "
-            f"{math.degrees(final_yaw):+.2f} deg"
+            f"final yaw            = {math.degrees(final_yaw):+.2f} deg"
         )
         print(
-            f"expert_complete.json = "
-            f"{run / 'expert_complete.json'}"
+            f"expert_complete.json = {run / 'expert_complete.json'}"
         )
         print()
-        print(
-            "Runtime left OPEN in RC-Car8 posture."
-        )
+        print("Runtime left OPEN in MobileManipulator8 press posture.")
 
         success = True
 
@@ -6758,8 +5643,6 @@ def main():
     finally:
 
         stop_process(assembly)
-        stop_process(nav2)
-        stop_process(reconfig)
 
         if args.headless or not success:
             stop_process(runtime)

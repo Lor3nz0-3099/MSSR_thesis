@@ -23,6 +23,61 @@ def shortest_angular_delta(actual_rad: float, target_rad: float) -> float:
     )
 
 
+
+def plan_mm8_reposition_command(
+    *,
+    current_x_m: float,
+    current_y_m: float,
+    current_yaw_rad: float,
+    target_x_m: float,
+    target_y_m: float,
+    drive_axis_x: float,
+    drive_axis_y: float,
+    final_yaw_rad: float | None = None,
+    position_tolerance_m: float = 0.005,
+    linear_speed_m_s: float = 0.05,
+) -> dict[str, float | str]:
+    """Plan translation-only MM8 motion along its fixed drive axis."""
+
+    # MM8 cannot steer.  Root/odom yaw is intentionally irrelevant.
+    _ = current_yaw_rad
+    _ = final_yaw_rad
+
+    axis_norm = math.hypot(
+        float(drive_axis_x),
+        float(drive_axis_y),
+    )
+    if axis_norm <= 1.0e-12:
+        raise ValueError("MM8 drive axis must be non-zero")
+
+    axis_x = float(drive_axis_x) / axis_norm
+    axis_y = float(drive_axis_y) / axis_norm
+
+    dx = float(target_x_m) - float(current_x_m)
+    dy = float(target_y_m) - float(current_y_m)
+
+    longitudinal_error = (
+        dx * axis_x
+        + dy * axis_y
+    )
+
+    if abs(longitudinal_error) <= float(position_tolerance_m):
+        return {
+            "phase": "done",
+            "linear_x_m_s": 0.0,
+            "angular_z_rad_s": 0.0,
+        }
+
+    return {
+        "phase": "translate",
+        "linear_x_m_s": math.copysign(
+            float(linear_speed_m_s),
+            longitudinal_error,
+        ),
+        "angular_z_rad_s": 0.0,
+    }
+
+
 def orientation_residual(
     normal: np.ndarray,
     target_normal: np.ndarray,
