@@ -350,6 +350,16 @@ class SelfAssemblySimulationConfig:
     composite_mission_path: Path | None = None
     composite_seed_catalog_path: Path | None = None
     stair_test_course: bool = False
+    phase1_stairs_course: bool = False
+    phase1_stairs_split: str = "train"
+    phase1_stairs_seed: int | None = None
+
+    phase1_gap_course: bool = False
+    phase1_gap_split: str = "train"
+    phase1_gap_seed: int | None = None
+    phase1_manipulation_course: bool = False
+    phase1_manipulation_split: str = "train"
+    phase1_manipulation_seed: int | None = None
     button_test_course: bool = False
     gap_test_course: bool = False
     rc_car_planar_test_course: bool = False
@@ -379,11 +389,121 @@ class SelfAssemblySimulationConfig:
     geometry: SmoresGeometry = field(default_factory=SmoresGeometry)
 
     def __post_init__(self) -> None:
+
+        if self.phase1_manipulation_course:
+            if (
+                isinstance(
+                    self.phase1_manipulation_seed,
+                    bool,
+                )
+                or not isinstance(
+                    self.phase1_manipulation_seed,
+                    int,
+                )
+            ):
+                raise ValueError(
+                    "Phase-1 manipulation course requires "
+                    "an integer manipulation seed"
+                )
+
+            if self.phase1_manipulation_split not in {
+                "train",
+                "validation",
+                "test",
+                "challenge",
+            }:
+                raise ValueError(
+                    "Invalid Phase-1 manipulation split"
+                )
+
+            other_course_flags = [
+                name
+                for name
+                in self.__dataclass_fields__
+                if (
+                    name.endswith("_course")
+                    and name
+                    != "phase1_manipulation_course"
+                    and bool(
+                        getattr(
+                            self,
+                            name,
+                        )
+                    )
+                )
+            ]
+
+            if (
+                other_course_flags
+                or self.composite_mission_path
+                is not None
+            ):
+                raise ValueError(
+                    "Phase-1 manipulation course is exclusive "
+                    "with every other physical course"
+                )
+
+
+        if self.phase1_gap_course:
+            if self.phase1_gap_seed is None:
+                raise ValueError(
+                    "Phase-1 gap course requires a gap seed"
+                )
+
+            if (
+                isinstance(
+                    self.phase1_gap_seed,
+                    bool,
+                )
+                or not isinstance(
+                    self.phase1_gap_seed,
+                    int,
+                )
+            ):
+                raise ValueError(
+                    "Phase-1 gap seed must be an integer"
+                )
+
+            if self.phase1_gap_split not in {
+                "train",
+                "validation",
+                "test",
+                "challenge",
+            }:
+                raise ValueError(
+                    "Invalid Phase-1 gap split"
+                )
+
+            other_courses = tuple(
+                name
+                for name
+                in self.__dataclass_fields__
+                if (
+                    name.endswith("_course")
+                    and name != "phase1_gap_course"
+                    and bool(
+                        getattr(
+                            self,
+                            name,
+                            False,
+                        )
+                    )
+                )
+            )
+
+            if other_courses:
+                raise ValueError(
+                    "Phase-1 gap course is mutually exclusive "
+                    "with other physical courses: "
+                    f"{other_courses}"
+                )
+
         if sum(
             (
                 self.manual_obstacle_course,
                 self.composite_mission_path is not None,
                 self.stair_test_course,
+                self.phase1_stairs_course,
                 self.button_test_course,
                 self.gap_test_course,
                 self.rc_car_planar_test_course,
@@ -414,6 +534,25 @@ class SelfAssemblySimulationConfig:
             raise TypeError(
                 "Phase-1 training seed must be an integer"
             )
+        if self.phase1_stairs_split not in {
+            "train",
+            "validation",
+            "test",
+            "challenge",
+        }:
+            raise ValueError(
+                "Phase-1 stairs split must be "
+                "train, validation, test or challenge"
+            )
+
+        if (
+            self.phase1_stairs_course
+            and self.phase1_stairs_seed is None
+        ):
+            raise ValueError(
+                "Phase-1 stairs course requires a seed"
+            )
+
         if self.steps < 0:
             raise ValueError("Step count cannot be negative")
         if self.headless and self.steps == 0:

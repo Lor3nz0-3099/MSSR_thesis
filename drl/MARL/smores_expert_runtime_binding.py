@@ -536,7 +536,7 @@ class SMORESExpertRuntimeBinding:
         process = self._processes[env_index]
         if process is not None:
             if process.poll() is None:
-                for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGKILL):
+                for sig in (signal.SIGTERM, signal.SIGKILL):
                     try:
                         os.killpg(process.pid, sig)
                     except ProcessLookupError:

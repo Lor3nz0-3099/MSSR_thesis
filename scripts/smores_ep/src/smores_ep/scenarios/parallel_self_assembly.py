@@ -666,6 +666,42 @@ def run_parallel_self_assembly_scenario(
         )
 
         obstacle_course = install_manual_obstacle_course(stage)
+    elif config.phase1_stairs_course:
+        from smores_ep.isaac.phase1_stairs_curriculum import (
+            install_phase1_stairs_curriculum_course,
+        )
+
+        if config.phase1_stairs_seed is None:
+            raise RuntimeError(
+                "Phase-1 stairs runtime reached Isaac without a seed"
+            )
+
+        obstacle_course = (
+            install_phase1_stairs_curriculum_course(
+                stage,
+                config.phase1_stairs_seed,
+                config.phase1_stairs_split,
+            )
+        )
+
+    elif config.phase1_gap_course:
+        from smores_ep.isaac.phase1_gap_curriculum import (
+            install_phase1_gap_curriculum_course,
+        )
+
+        if config.phase1_gap_seed is None:
+            raise RuntimeError(
+                "Phase-1 gap runtime reached Isaac without a seed"
+            )
+
+        obstacle_course = (
+            install_phase1_gap_curriculum_course(
+                stage,
+                seed=config.phase1_gap_seed,
+                split=config.phase1_gap_split,
+            )
+        )
+
     elif config.stair_test_course:
         from smores_ep.isaac.obstacle_course import (
             UniformStairSpec,
@@ -682,6 +718,24 @@ def run_parallel_self_assembly_scenario(
                 seed=config.stair_seed,
             ),
         )
+    elif config.phase1_manipulation_course:
+        from smores_ep.isaac.phase1_manipulation_curriculum import (
+            install_phase1_manipulation_curriculum_course,
+        )
+
+        if config.phase1_manipulation_seed is None:
+            raise RuntimeError(
+                "Phase-1 manipulation seed unexpectedly missing"
+            )
+
+        obstacle_course = (
+            install_phase1_manipulation_curriculum_course(
+                stage,
+                seed=config.phase1_manipulation_seed,
+                split=config.phase1_manipulation_split,
+            )
+        )
+
     elif config.button_test_course:
         from smores_ep.isaac.obstacle_course import (
             install_mobile_manipulator_button_test_course,
@@ -748,6 +802,21 @@ def run_parallel_self_assembly_scenario(
         )
     layout = self_assembly_spawn_layout(config)
 
+    if config.phase1_stairs_course:
+        if obstacle_course is None:
+            raise RuntimeError(
+                "Phase-1 stairs course was not materialized"
+            )
+
+        from smores_ep.isaac.phase1_stairs_curriculum import (
+            place_phase1_stairs_spawn_layout,
+        )
+
+        layout = place_phase1_stairs_spawn_layout(
+            layout,
+            obstacle_course,
+        )
+
     if config.composite_mission_path is not None:
         if obstacle_course is None:
             raise RuntimeError(
@@ -758,6 +827,18 @@ def run_parallel_self_assembly_scenario(
             layout,
             obstacle_course,
             layout_profile=composite_layout_profile,
+        )
+
+    elif config.phase1_manipulation_course:
+        if obstacle_course is None:
+            raise RuntimeError(
+                "Phase-1 manipulation course did not "
+                "create an obstacle course"
+            )
+
+        layout = place_button_spawn_layout(
+            layout,
+            obstacle_course,
         )
 
     elif config.button_test_course:
@@ -933,7 +1014,7 @@ def run_parallel_self_assembly_scenario(
                 else 2.80
                 if config.rc_car_planar_test_course
                 else 1.25
-                if config.button_test_course or config.gap_test_course
+                if config.button_test_course or config.phase1_manipulation_course or config.gap_test_course
                 else 0.0
             )
             camera_extent_m = max(
@@ -1124,6 +1205,14 @@ def run_parallel_self_assembly_scenario(
             )
         if bc_runtime is not None:
             bc_runtime.service(now_s)
+            if bc_runtime.needs_state_publish:
+                state_graph_publisher.publish(now_s,experiment_profile="deterministic_parallel_self_assembly")
+                bc_runtime.publish_status(now_s)
+            if not bc_runtime.can_advance:
+                # Poll the owner mailbox without SimulationApp.update(), which
+                # would advance physics while the learner computes its policy.
+                time.sleep(0.002)
+                continue
         admission_statuses: list[Any] = []
         try:
             primitive_goal = primitive_channel.poll_goal()
@@ -1158,7 +1247,8 @@ def run_parallel_self_assembly_scenario(
             print(f"[primitive] REJECTED malformed payload: {error}")
 
         primitive_statuses: tuple[Any, ...] = ()
-        if physics_step % primitive_control_interval == 0:
+        if (physics_step % primitive_control_interval == 0
+                or (bc_runtime is not None and bc_runtime.requires_primitive_step)):
             primitive_step = primitive_executor.step(now_s)
             held_primitive_commands = dict(primitive_step.commands)
             primitive_statuses = primitive_step.statuses
@@ -1320,17 +1410,26 @@ def run_parallel_self_assembly_scenario(
             if render_pacer is not None:
                 render_pacer.wait()
 
+        # Lease/source validation at the drive boundary can revoke authority
+        # after the mailbox gate above. Such failure must never advance physics.
+        if bc_runtime is not None and not bc_runtime.can_advance:
+            bc_runtime.publish_status()
+            continue
         _advance_simulation(
             simulation_app,
             SimulationManager,
-            render=render_due,
+            render=render_due and not (bc_runtime is not None and bc_runtime.lockstep and bc_runtime.armed),
         )
+
+        completed_bc_step = False
+        if bc_runtime is not None:
+            completed_bc_step = bc_runtime.after_physics(SimulationManager.get_simulation_time())
 
         physics_step = (
             SimulationManager.get_num_physics_steps()
             - initial_step
         )
-        if physics_step % state_publish_interval == 0:
+        if completed_bc_step or physics_step % state_publish_interval == 0:
             state_graph_publisher.publish(
                 SimulationManager.get_simulation_time(),
                 experiment_profile=(

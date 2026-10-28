@@ -655,9 +655,14 @@ class DirectMARLEnv:
         }
 
         # Una sola avanzata fisica per l'intero vector batch.
-        physics_result = (
-            self._physics_step()
-        )
+        try:
+            physics_result = self._physics_step()
+        except Exception:
+            # A missing/invalid causal completion cannot leave the action
+            # producer authorized to issue another decision in this episode.
+            for env_index in active_env_ids:
+                self._handoffs[env_index].finish_episode()
+            raise
 
         next_states = {
             env_index:
@@ -743,6 +748,8 @@ class DirectMARLEnv:
                     episode_step
                 ),
             )
+            if bool(getattr(evaluation, 'terminated', False)) or bool(getattr(evaluation, 'truncated', False)):
+                self._handoffs[env_index].finish_episode()
 
         return tuple(
             results

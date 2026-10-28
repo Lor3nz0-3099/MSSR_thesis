@@ -3072,34 +3072,29 @@ def _install_button_prismatic_joint(
         f"{root_path}/{joint_name}",
     )
     nx, ny = press_direction_world_xy
-    joint_axis, joint_sign = ("X", nx) if abs(nx) > 0.5 else ("Y", ny)
-    joint.CreateAxisAttr(joint_axis)
-    if joint_sign > 0.0:
-        joint.CreateLowerLimitAttr(0.0)
-        joint.CreateUpperLimitAttr(BUTTON_PLUNGER_STROKE_M)
-    else:
-        joint.CreateLowerLimitAttr(-BUTTON_PLUNGER_STROKE_M)
-        joint.CreateUpperLimitAttr(0.0)
+    press_yaw = math.atan2(ny, nx)
+    # Joint-local +X is the exact horizontal press normal. Coordinate zero
+    # is the nominal pose and positive travel is physical depression.
+    joint.CreateAxisAttr("X")
+    joint.CreateLowerLimitAttr(0.0)
+    joint.CreateUpperLimitAttr(BUTTON_PLUNGER_STROKE_M)
     joint.CreateBody1Rel().SetTargets([Sdf.Path(plunger_path)])
     joint.CreateLocalPos0Attr().Set(Gf.Vec3f(*center_xyz_m))
-    joint.CreateLocalRot0Attr().Set(Gf.Quatf(1.0))
+    joint.CreateLocalRot0Attr().Set(
+        Gf.Quatf(math.cos(0.5 * press_yaw), 0.0, 0.0, math.sin(0.5 * press_yaw))
+    )
     joint.CreateLocalPos1Attr().Set(Gf.Vec3f(0.0, 0.0, 0.0))
 
-    # Body0 is the world frame.  ButtonPlunger, however, can already carry
-    # an authored world yaw because the complete button fixture was rotated
-    # with its stage.  An identity body-side joint frame would therefore
-    # force PhysX to rotate the dynamic plunger until the two joint frames
-    # agree, while the static ButtonWall stays in place.
-    #
-    # Express the world-aligned joint frame in the plunger's local frame:
-    # R_world_plunger * R_local1 = I  ->  R_local1 = R_world_plunger^-1.
-    half_inverse_yaw = -0.5 * math.radians(plunger_yaw_deg)
+    # Body0 is the world anchor. Express the same joint frame in the
+    # rotated plunger body: R_body * R_local1 = R_press. Otherwise PhysX
+    # rotates the plunger to reconcile inconsistent joint frames.
+    half_relative_yaw = 0.5 * (press_yaw - math.radians(plunger_yaw_deg))
     joint.CreateLocalRot1Attr().Set(
         Gf.Quatf(
-            math.cos(half_inverse_yaw),
+            math.cos(half_relative_yaw),
             0.0,
             0.0,
-            math.sin(half_inverse_yaw),
+            math.sin(half_relative_yaw),
         )
     )
 
@@ -3154,87 +3149,19 @@ def install_mobile_manipulator_button_test_course(
 ) -> ButtonTestCourse:
     """Replace the infinite floor with the isolated button fixture."""
 
-    from pxr import Gf, Sdf, UsdPhysics
-
     course = mobile_manipulator_button_test_course(spec)
     root_path = "/World/MobileManipulatorButtonTestCourse"
-
-    _install_course_boxes(
+    _install_course_boxes(stage, root_path, course.boxes)
+    plunger = next(box for box in course.boxes if box.semantic == "button")
+    _install_button_prismatic_joint(
         stage,
-        root_path,
-        course.boxes,
+        root_path=root_path,
+        plunger_name=plunger.name,
+        center_xyz_m=course.button_center_xyz_m,
+        press_direction_world_xy=course.press_direction_world_xy,
+        plunger_yaw_deg=plunger.yaw_deg,
+        joint_name="ButtonPrismaticJoint",
     )
-
-    # ButtonPlunger is the only dynamic element of the fixture.
-    # body0 is intentionally omitted: USD Physics interprets the
-    # empty body relationship as a world anchor.
-    plunger_path = f"{root_path}/ButtonPlunger"
-    plunger_prim = stage.GetPrimAtPath(plunger_path)
-    if not plunger_prim or not plunger_prim.IsValid():
-        raise RuntimeError(
-            f"Button plunger prim was not created: {plunger_path}"
-        )
-
-    UsdPhysics.RigidBodyAPI.Apply(plunger_prim)
-
-    joint = UsdPhysics.PrismaticJoint.Define(
-        stage,
-        f"{root_path}/ButtonPrismaticJoint",
-    )
-    nx, ny = (
-        course.press_direction_world_xy
-    )
-
-    if abs(nx) > 0.5:
-        joint_axis = "X"
-        joint_sign = nx
-    else:
-        joint_axis = "Y"
-        joint_sign = ny
-
-    joint.CreateAxisAttr(
-        joint_axis
-    )
-
-    # Coordinate zero is always the unpressed pose.
-    #
-    # For +X/+Y the plunger moves from 0 to +stroke.
-    # For -X/-Y it moves from 0 to -stroke.
-    if joint_sign > 0.0:
-
-        joint.CreateLowerLimitAttr(
-            0.0
-        )
-
-        joint.CreateUpperLimitAttr(
-            BUTTON_PLUNGER_STROKE_M
-        )
-
-    else:
-
-        joint.CreateLowerLimitAttr(
-            -BUTTON_PLUNGER_STROKE_M
-        )
-
-        joint.CreateUpperLimitAttr(
-            0.0
-        )
-
-    joint.CreateBody1Rel().SetTargets(
-        [Sdf.Path(plunger_path)]
-    )
-
-    # World-side joint frame coincides with the nominal,
-    # unpressed plunger centre.  The body-side frame is the
-    # plunger origin, therefore joint coordinate 0 is its rest pose.
-    joint.CreateLocalPos0Attr().Set(
-        Gf.Vec3f(*course.button_center_xyz_m)
-    )
-    joint.CreateLocalRot0Attr().Set(Gf.Quatf(1.0))
-    joint.CreateLocalPos1Attr().Set(
-        Gf.Vec3f(0.0, 0.0, 0.0)
-    )
-    joint.CreateLocalRot1Attr().Set(Gf.Quatf(1.0))
 
     return course
 

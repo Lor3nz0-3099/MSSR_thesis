@@ -141,6 +141,40 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help="Installed allowlist for composite obstacle seeds",
     )
     parser.add_argument(
+        "--phase1-stairs-split",
+        choices=(
+            "train",
+            "validation",
+            "test",
+            "challenge",
+        ),
+        default="train",
+        help="C1 stairs curriculum split",
+    )
+    parser.add_argument(
+        "--phase1-gap-split",
+        choices=(
+            "train",
+            "validation",
+            "test",
+            "challenge",
+        ),
+        default="train",
+        help="Phase-1 gap curriculum split.",
+    )
+    parser.add_argument(
+        "--phase1-stairs-seed",
+        type=int,
+        default=None,
+        help="Seed allocated to the selected C1 stairs split",
+    )
+    parser.add_argument(
+        "--phase1-gap-seed",
+        type=int,
+        default=None,
+        help="Seed allocated to the selected Phase-1 gap split.",
+    )
+    parser.add_argument(
         "--stair-seed",
         type=int,
         default=None,
@@ -159,6 +193,29 @@ def build_argument_parser() -> argparse.ArgumentParser:
         help=(
             "Replace the infinite floor with an isolated three-step Snake8 "
             "behavior test course"
+        ),
+    )
+    course_group.add_argument(
+        "--phase1-stairs-course",
+        action="store_true",
+        help=(
+            "Materialize one C1 procedural Snake8 stairs "
+            "training/validation course"
+        ),
+    )
+    course_group.add_argument(
+        "--phase1-gap-course",
+        action="store_true",
+        help=(
+            "Load one procedural Phase-1 Snake8 gap course."
+        ),
+    )
+    course_group.add_argument(
+        "--phase1-manipulation-course",
+        action="store_true",
+        help=(
+            "Use the held-out C1 MobileManipulator8 "
+            "procedural manipulation fixture"
         ),
     )
     course_group.add_argument(
@@ -229,6 +286,21 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Seed selecting the RC-Car8 S-curve/slalom/loop route",
+    )
+    parser.add_argument(
+        "--phase1-manipulation-split",
+        choices=(
+            "train",
+            "validation",
+            "test",
+            "challenge",
+        ),
+        default="train",
+    )
+    parser.add_argument(
+        "--phase1-manipulation-seed",
+        type=int,
+        default=None,
     )
     parser.add_argument(
         "--button-seed",
@@ -404,6 +476,15 @@ def main() -> None:
                 composite_mission_path=args.composite_mission,
                 composite_seed_catalog_path=args.composite_seed_catalog,
                 stair_test_course=args.stair_test_course,
+                phase1_stairs_course=args.phase1_stairs_course,
+                phase1_stairs_split=args.phase1_stairs_split,
+                phase1_stairs_seed=args.phase1_stairs_seed,
+                phase1_gap_course=args.phase1_gap_course,
+                phase1_gap_split=args.phase1_gap_split,
+                phase1_gap_seed=args.phase1_gap_seed,
+                phase1_manipulation_course=args.phase1_manipulation_course,
+                phase1_manipulation_split=args.phase1_manipulation_split,
+                phase1_manipulation_seed=args.phase1_manipulation_seed,
                 button_test_course=args.button_test_course,
                 button_seed=args.button_seed,
                 gap_test_course=args.gap_test_course,

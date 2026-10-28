@@ -1,4 +1,5 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from copy import deepcopy
 from typing import Any
 
 import torch
@@ -30,6 +31,7 @@ class StructuredRolloutSample:
     routing_snapshot: Any
     graph_snapshot: Any
     critic_graph_snapshot: Any = None
+    next_critic_graph_snapshot: Any = None
 
 
 @dataclass(frozen=True)
@@ -166,9 +168,10 @@ class MSSRMAPPO(MAPPO):
         self.shared_actor = self.policies[first_uid]
         self.shared_critic = self.values[first_uid]
 
-        for uid in self.possible_agents:
-            self.checkpoint_modules[uid]["policy"] = self.policies[uid]
-            self.checkpoint_modules[uid]["value"] = self.values[uid]
+        # skrl saves each UID registry. Shared models belong to the first UID
+        # once, rather than eight duplicate aliases of the same state.
+        self.checkpoint_modules[first_uid]["policy"] = self.shared_actor
+        self.checkpoint_modules[first_uid]["value"] = self.shared_critic
 
         self._device_type = torch.device(self.device).type
         self.scaler = torch.amp.GradScaler(
@@ -193,6 +196,9 @@ class MSSRMAPPO(MAPPO):
             "critic": self.critic_optimizer,
         }
         self.schedulers = {}
+        self.checkpoint_modules[first_uid]["actor_optimizer"] = self.actor_optimizer
+        self.checkpoint_modules[first_uid]["critic_optimizer"] = self.critic_optimizer
+        self._last_update_metrics = {}
 
         self._observation_preprocessor = {}
         self._state_preprocessor = {}
@@ -650,8 +656,9 @@ class MSSRMAPPO(MAPPO):
 
         self._structured_rollout_sidecar.append_step(
             [
-                decision.structured_sample
-                for decision in decisions
+                replace(decision.structured_sample,
+                        next_critic_graph_snapshot=deepcopy(next_graph))
+                for decision, next_graph in zip(decisions, next_critic_graphs, strict=True)
             ]
         )
 
@@ -932,6 +939,10 @@ class MSSRMAPPO(MAPPO):
             self.mean_field_critic_optimizer
         )
 
+        registry = self.checkpoint_modules[first_uid]
+        registry.update(owner_critic=owner_critic, mean_field_critic=mean_field_critic,
+                        owner_critic_optimizer=self.owner_critic_optimizer,
+                        mean_field_critic_optimizer=self.mean_field_critic_optimizer)
         self._training_advantage_mode = (
             "altruistic"
         )
@@ -2060,6 +2071,7 @@ class MSSRMAPPO(MAPPO):
         possible_agents,
         owner_critic,
         mean_field_critic,
+        next_state=False,
     ):
         """Evaluate V_i(s_t) and V_i^MF(s_t) over a recorded rollout.
 
@@ -2158,7 +2170,7 @@ class MSSRMAPPO(MAPPO):
             ):
                 graph = getattr(
                     structured_sample,
-                    "critic_graph_snapshot",
+                    "next_critic_graph_snapshot" if next_state else "critic_graph_snapshot",
                     None,
                 )
 
@@ -2169,7 +2181,7 @@ class MSSRMAPPO(MAPPO):
 
                 row_map = getattr(
                     altruistic_sample,
-                    "owner_row_index",
+                    "next_owner_row_index" if next_state else "owner_row_index",
                     None,
                 )
 
@@ -2307,6 +2319,9 @@ class MSSRMAPPO(MAPPO):
         discount_factor: float,
         lambda_coefficient: float,
         alpha,
+        terminated=None,
+        owner_next_values=None,
+        mean_field_next_values=None,
     ):
         """Build APPO GAE targets from the recorded local-reward rollout.
 
@@ -2510,6 +2525,8 @@ class MSSRMAPPO(MAPPO):
 
         for uid in agents:
             owner_result = compute_gae_channel(
+                terminated=terminated,
+                next_values=None if owner_next_values is None else owner_next_values[uid],
                 rewards=(
                     owner_rewards[
                         uid
@@ -2536,6 +2553,8 @@ class MSSRMAPPO(MAPPO):
 
             mean_field_result = (
                 compute_gae_channel(
+                    terminated=terminated,
+                    next_values=None if mean_field_next_values is None else mean_field_next_values[uid],
                     rewards=(
                         mean_field_rewards[
                             uid
@@ -2951,6 +2970,7 @@ class MSSRMAPPO(MAPPO):
         """
         del timestep
         del timesteps
+        self._reset_update_metrics()
 
         if not self.memories:
             return
@@ -3094,6 +3114,17 @@ class MSSRMAPPO(MAPPO):
             | truncated
         )
 
+        owner_next_values = mean_field_next_values = None
+        if bool((truncated & ~terminated).any()):
+            owner_next_values, mean_field_next_values = self.evaluate_altruistic_rollout_values(
+                structured_samples=structured_all,
+                altruistic_sidecar=self._altruistic_rollout_sidecar,
+                possible_agents=self.possible_agents,
+                owner_critic=self.altruistic_owner_critic,
+                mean_field_critic=self.altruistic_mean_field_critic,
+                next_state=True,
+            )
+
         targets = (
             self
             .compute_altruistic_rollout_targets(
@@ -3117,6 +3148,9 @@ class MSSRMAPPO(MAPPO):
                     mean_field_bootstrap
                 ),
                 dones=dones,
+                terminated=terminated,
+                owner_next_values=owner_next_values,
+                mean_field_next_values=mean_field_next_values,
                 discount_factor=(
                     self
                     .cfg
@@ -3482,7 +3516,11 @@ class MSSRMAPPO(MAPPO):
                     )
                 )
 
-                self.coordinated_altruistic_optimizer_step(
+                policy_metrics = self.policy_update_diagnostics(
+                    new_log_probs=new_log_probs, old_log_probs=old_log_probs,
+                    owner_entropies=owner_entropies, owner_active_masks=owner_active_masks,
+                    ratio_clip=self.cfg.ratio_clip[first_uid])
+                step_metrics = self.coordinated_altruistic_optimizer_step(
                     owner_policy_losses=(
                         owner_policy_losses
                     ),
@@ -3508,6 +3546,7 @@ class MSSRMAPPO(MAPPO):
                         active_owners
                     ),
                 )
+                self._record_update_metrics(step_metrics, policy_metrics)
 
     def coordinated_update(
         self,
@@ -3530,7 +3569,8 @@ class MSSRMAPPO(MAPPO):
                 timesteps=timesteps,
             )
 
-        # Existing team-MAPPO path below is intentionally unchanged.
+        self._reset_update_metrics()
+        # Existing team-MAPPO objective below is unchanged.
         if not self.memories:
             return
 
@@ -3620,13 +3660,76 @@ class MSSRMAPPO(MAPPO):
                     value_loss_scale=self.cfg.value_loss_scale[first_uid],
                 )
 
-                self.coordinated_optimizer_step(
+                policy_metrics = self.policy_update_diagnostics(
+                    new_log_probs=new_log_probs, old_log_probs=old_log_probs,
+                    owner_entropies=owner_entropies, owner_active_masks=owner_active_masks,
+                    ratio_clip=self.cfg.ratio_clip[first_uid])
+                step_metrics = self.coordinated_optimizer_step(
                     owner_policy_losses=owner_policy_losses,
                     value_loss=value_loss,
                     actor_optimizer=self.actor_optimizer,
                     critic_optimizer=self.critic_optimizer,
                     active_owners=active_owners,
                 )
+                self._record_update_metrics(step_metrics, policy_metrics)
+
+    @property
+    def last_update_metrics(self):
+        """JSON-safe means across the most recent update's actual minibatches."""
+        return dict(getattr(self, "_last_update_metrics", {}))
+
+    def _reset_update_metrics(self):
+        self._last_update_metrics = {key: 0 for key in (
+            "actor_optimizer_steps", "global_critic_optimizer_steps",
+            "owner_critic_optimizer_steps", "mean_field_critic_optimizer_steps", "minibatches")}
+        self._update_metric_sums = {}
+
+    def _record_update_metrics(self, step_metrics, policy_metrics):
+        aliases = {"policy_loss": "actor_loss", "value_loss": "global_critic_loss",
+                   "owner_value_loss": "owner_critic_loss", "mean_field_value_loss": "mean_field_critic_loss"}
+        self._last_update_metrics["minibatches"] += 1
+        count = self._last_update_metrics["minibatches"]
+        for key, value in {**step_metrics, **policy_metrics}.items():
+            key = aliases.get(key, key)
+            value = float(value.detach().item()) if torch.is_tensor(value) else float(value)
+            if not torch.isfinite(torch.tensor(value, dtype=torch.float64)).item():
+                raise ValueError(f"nonfinite update metric {key}")
+            if key.endswith("optimizer_steps"):
+                self._last_update_metrics[key] = self._last_update_metrics.get(key, 0) + int(value)
+            else:
+                self._update_metric_sums[key] = self._update_metric_sums.get(key, 0.) + value
+                self._last_update_metrics[key] = self._update_metric_sums[key]/count
+
+    @staticmethod
+    def policy_update_diagnostics(*, new_log_probs, old_log_probs, owner_entropies,
+                                  owner_active_masks, ratio_clip):
+        """Evaluate PPO diagnostics on exactly the active owner/sample mask."""
+        differences, entropies = [], []
+        for uid, new in new_log_probs.items():
+            mask = owner_active_masks[uid].to(device=new.device, dtype=torch.bool)
+            if not bool(mask.any().item()):
+                continue
+            differences.append((new-old_log_probs[uid])[mask].detach().reshape(-1))
+            entropy = owner_entropies[uid]
+            entropies.append((entropy if entropy.ndim == 0 else entropy[mask]).detach().reshape(-1))
+        if not differences:
+            return {}
+        log_ratio = torch.cat(differences)
+        ratio = log_ratio.exp()
+        result = dict(entropy=torch.cat(entropies).mean(), ratio_mean=ratio.mean(),
+                      approx_kl=((ratio-1)-log_ratio).mean(),
+                      clip_fraction=((ratio-1).abs() > ratio_clip).float().mean())
+        if any(not bool(torch.isfinite(value).all().item()) for value in result.values()):
+            raise ValueError("nonfinite policy diagnostics")
+        return result
+
+    @staticmethod
+    def _optimizer_gradient_norm(optimizer):
+        gradients = [parameter.grad.detach() for group in optimizer.param_groups
+                     for parameter in group["params"] if parameter.grad is not None]
+        if any(not bool(torch.isfinite(grad).all().item()) for grad in gradients):
+            raise ValueError("nonfinite optimizer gradient")
+        return sum(float(grad.double().square().sum().item()) for grad in gradients)**.5
 
     @staticmethod
     def sample_aligned_owner_batches(
@@ -3817,12 +3920,14 @@ class MSSRMAPPO(MAPPO):
             .mean()
         )
 
+        if any(not bool(torch.isfinite(loss).all().item()) for loss in (policy_loss, owner_value_loss, mean_field_value_loss)):
+            raise ValueError("nonfinite APPO optimizer loss")
         actor_optimizer.zero_grad(
             set_to_none=True
         )
 
         policy_loss.backward()
-
+        actor_grad_norm = MSSRMAPPO._optimizer_gradient_norm(actor_optimizer)
         actor_optimizer.step()
 
         owner_critic_optimizer.zero_grad(
@@ -3830,7 +3935,7 @@ class MSSRMAPPO(MAPPO):
         )
 
         owner_value_loss.backward()
-
+        owner_grad_norm = MSSRMAPPO._optimizer_gradient_norm(owner_critic_optimizer)
         owner_critic_optimizer.step()
 
         mean_field_critic_optimizer.zero_grad(
@@ -3838,10 +3943,16 @@ class MSSRMAPPO(MAPPO):
         )
 
         mean_field_value_loss.backward()
-
+        mf_grad_norm = MSSRMAPPO._optimizer_gradient_norm(mean_field_critic_optimizer)
         mean_field_critic_optimizer.step()
 
         return {
+            "actor_grad_norm": actor_grad_norm,
+            "owner_critic_grad_norm": owner_grad_norm,
+            "mean_field_critic_grad_norm": mf_grad_norm,
+            "actor_optimizer_steps": 1,
+            "owner_critic_optimizer_steps": 1,
+            "mean_field_critic_optimizer_steps": 1,
             "policy_loss":
                 policy_loss,
             "owner_value_loss":
@@ -3870,15 +3981,23 @@ class MSSRMAPPO(MAPPO):
             [owner_policy_losses[uid] for uid in owners]
         ).mean()
 
+        if any(not bool(torch.isfinite(loss).all().item()) for loss in (policy_loss, value_loss)):
+            raise ValueError("nonfinite MAPPO optimizer loss")
         actor_optimizer.zero_grad(set_to_none=True)
         policy_loss.backward()
+        actor_grad_norm = MSSRMAPPO._optimizer_gradient_norm(actor_optimizer)
         actor_optimizer.step()
 
         critic_optimizer.zero_grad(set_to_none=True)
         value_loss.backward()
+        critic_grad_norm = MSSRMAPPO._optimizer_gradient_norm(critic_optimizer)
         critic_optimizer.step()
 
         return {
             "policy_loss": policy_loss,
             "value_loss": value_loss,
+            "actor_grad_norm": actor_grad_norm,
+            "global_critic_grad_norm": critic_grad_norm,
+            "actor_optimizer_steps": 1,
+            "global_critic_optimizer_steps": 1,
         }

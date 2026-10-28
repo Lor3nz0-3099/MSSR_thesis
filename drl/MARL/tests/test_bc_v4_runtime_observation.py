@@ -172,3 +172,49 @@ def test_repository_bridge_fails_closed_on_missing_physical_measurement():
             ),
             observation=c.ObservationBundle(),
         )
+
+
+def test_privileged_current_goal_changes_critic_view_without_actor_visibility_leak():
+    bridge = make_bridge()
+    raw = live_test.snapshot(n=8, rc=True)
+    def prepare(goal_x):
+        return bridge.prepare_snapshot(raw, task_context=c.TaskContext('navigation', (
+            c.NumericFeature('world.goal.position_xyz_m', (goal_x, 4., 0.)),)),
+            observation=c.ObservationBundle())
+    first, second = prepare(5.), prepare(25.)
+    assert first.privileged_graph is not None
+    assert first.privileged_graph is not first.actor_graph
+    def equal_tree(left, right):
+        if isinstance(left, torch.Tensor):
+            assert torch.equal(left, right)
+        elif isinstance(left, dict):
+            assert left.keys() == right.keys()
+            for key in left:equal_tree(left[key], right[key])
+        else:assert left == right
+    equal_tree(first.actor_graph, second.actor_graph)
+    assert first.actor_graph['environment']=={}
+    key='c_static:goal.position_xyz_m:point3:3'
+    assert not torch.equal(first.privileged_graph['environment'][key]['x'],
+        second.privileged_graph['environment'][key]['x'])
+    assert not torch.equal(first.privileged_graph['relation_x'],second.privileged_graph['relation_x'])
+    for result in (first, second):
+        assert result.physical_state.stamp == 12.5
+        assert result.routing_snapshot['audit'].physical_stamp == 12.5
+        assert result.privileged_graph['graph_ptr'].tolist() == [0,8]
+        assert result.privileged_graph['module_batch'].tolist() == [0]*8
+        assert [ref.module_id for ref in result.routing_snapshot['module_refs']] == [f'module-{i}' for i in range(8)]
+        equal_tree(result.privileged_graph['module_x'], result.actor_graph['module_x'])
+        equal_tree(result.privileged_graph['connector_to_module'], result.actor_graph['connector_to_module'])
+
+
+def test_privileged_missing_normalizer_fails_with_exact_key():
+    from dataclasses import replace
+    from drl.IL.bc_v1.normalization import feature_key
+    bridge=make_bridge()
+    key=feature_key('environment','geometry',0,'m',geometry_kind='point3')
+    assert key in dict(bridge.normalizers.scalers)
+    bridge.normalizers=replace(bridge.normalizers,scalers=tuple((name,value) for name,value in bridge.normalizers.scalers if name!=key))
+    with pytest.raises(ValueError,match='Missing privileged normalizer coverage') as error:
+        bridge.prepare_snapshot(live_test.snapshot(n=8,rc=True),task_context=c.TaskContext('navigation',(
+            c.NumericFeature('world.goal.position_xyz_m',(5.,4.,0.)),)))
+    assert key in str(error.value)

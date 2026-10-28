@@ -17,7 +17,8 @@ from smores_ep.primitives.model import PrimitiveGoal, PrimitiveState
 
 
 class BcRuntimeBridge:
-    def __init__(self,directory,session,action_channel,executor,invalidate_callback,module_ids,*,clock=time.monotonic):
+    def __init__(self,directory,session,action_channel,executor,invalidate_callback,module_ids,*,clock=time.monotonic,
+                 lockstep=False,default_step_ticks=8):
         self.directory=Path(directory);self.session=session;self.epoch=uuid4().hex
         self.request_file=self.directory/'bc_request.json';self.status_file=self.directory/'bc_status.json'
         self.action_file=self.directory/'actions.json'
@@ -27,6 +28,39 @@ class BcRuntimeBridge:
         self._held={};self._signature=None;self._deadline=None;self._goals=set();self._packet_id=''
         self._published_stamp=None;self.last_ack=None
         self.applied_packets=0;self.last_applied=None;self._applied_generation=None
+        self.lockstep=bool(lockstep);self.default_step_ticks=default_step_ticks
+        self._lockstep_started=False;self._pending=None;self._seen_commands=set()
+        self.last_completed=None;self.needs_state_publish=False
+
+    @property
+    def requires_primitive_step(self):
+        """Refresh admitted goals before the first acknowledged drive tick."""
+        return (self.lockstep and self._pending is not None
+                and self._pending['applied_stamp'] is None)
+
+    @property
+    def can_advance(self):
+        """Expert runs freely; after explicit arm only a bounded command advances."""
+        if not self.lockstep:return True
+        if self.failure:return False
+        if not self._lockstep_started:return True
+        return self.armed and self._pending is not None
+
+    def after_physics(self,sim_stamp):
+        """Called once after each actual physics tick, before publishing its state."""
+        if not self.lockstep or self._pending is None:return False
+        pending=self._pending
+        if pending['applied_stamp'] is None or sim_stamp<=pending['applied_stamp']:
+            self._clear('Physics advanced without native application acknowledgement');return False
+        pending['ticks']+=1
+        if pending['ticks']<pending['step_ticks']:return False
+        rejections=[dict(row) for row in self.rejections[pending['rejection_start']:]]
+        code=rejections[0]['code'] if rejections else pending['outcome'].upper()
+        self.last_completed=dict(command_id=pending['command_id'],applied_stamp=pending['applied_stamp'],
+            completed_stamp=sim_stamp,ticks=pending['ticks'],outcome=pending['outcome'],
+            code=code,rejections=rejections)
+        self._pending=None;self._deadline=None;self.needs_state_publish=True
+        return True
 
     def claims(self):
         return set(resource for goal in self.executor.active_goals for resource in self.executor._resources_for(goal))
@@ -37,15 +71,18 @@ class BcRuntimeBridge:
             if key[0] in module_ids:
                 self.invalidated.add((key,row['generation']));self._held.pop(key)
 
-    def _retire(self,key,row,reason):
+    def _retire(self,key,row,reason,*,code=None):
         self.invalidated.add((key,row['generation']))
-        self.rejections.append(dict(key=list(key),generation=row['generation'],reason=reason))
+        self.rejections.append(dict(key=list(key),generation=row['generation'],reason=reason,
+            code=code,owner_ids=[key[0]]))
+        if self.lockstep and self._pending is not None:self._pending['outcome']='rejected'
 
     def _clear(self,reason):
         self.invalidate(self.modules)
         self._invalidate(self.modules)
         self._write_actions()
         self.failure=str(reason);self.armed=False
+        if self.lockstep:self._pending=None
 
     def _write_actions(self):
         commands={};traction=[];geometry=SmoresGeometry()
@@ -87,14 +124,29 @@ class BcRuntimeBridge:
                 if self.executor.active_goals:raise ValueError('Native setup goals still active')
                 self._invalidate(self.modules)
                 self.armed=True;self.last_ack={'kind':'arm','wall':now,'sim_stamp':sim_stamp}
+                if self.lockstep:self._lockstep_started=True;self.needs_state_publish=True
                 self.publish_status();return
             if kind=='revoke':
                 self._clear(request.get('reason','BC authority revoked'));self.publish_status();return
             if kind!='update' or not self.armed or self.failure:raise ValueError('BC authority is not armed')
+            if self.lockstep:
+                command_id=request.get('command_id')
+                if (not isinstance(command_id,str) or not command_id.startswith(f'bc:{self.session}:')
+                        or not command_id[len(f'bc:{self.session}:'):].isdigit()):
+                    raise ValueError('Lockstep requires a unique BC command_id')
+                if command_id in self._seen_commands:raise ValueError('Repeated lockstep command_id')
+                if self._pending is not None:raise ValueError('Lockstep command still in flight')
+                step_ticks=request.get('step_ticks',self.default_step_ticks)
+                if type(step_ticks) is not int or not 1<=step_ticks<=240:
+                    raise ValueError('Lockstep step_ticks must be in [1, 240]')
+                self._seen_commands.add(command_id)
+                rejection_start=len(self.rejections)
             deadline=request['state_deadline'];stamp=request['state_stamp']
             if (type(deadline) not in (int,float) or not math.isfinite(deadline) or not now<deadline<=now+1.01
                     or type(stamp) not in (int,float) or not math.isfinite(stamp) or stamp>sim_stamp):
                 raise ValueError('Expired/invalid BC state proof')
+            if self.lockstep and stamp!=sim_stamp:
+                raise ValueError('Lockstep state proof must match the held physical state')
             self._deadline=deadline
             for row in request['goals']:
                 key=self._validate_row(row);goal_id=row['generation']+':'+':'.join(key)
@@ -108,7 +160,7 @@ class BcRuntimeBridge:
                 status=self.executor.submit(goal,sim_stamp)
                 self._goals.add(goal_id)
                 if status.state is PrimitiveState.REJECTED:
-                    self._retire(key,row,'native admission rejected');continue
+                    self._retire(key,row,'native admission rejected',code=str(status.code));continue
                 # Retire only overlapping continuous resources. SETTLE's module
                 # quarantine remains the native executor callback on its first step.
                 claims=set(self.executor._resources_for(goal))
@@ -128,10 +180,16 @@ class BcRuntimeBridge:
                     component=self.executor._connected_component_module_ids((mid,))
                     physical_busy |= any(f'locomotion:{m}' in busy for m in component)
                 if physical_busy:
-                    self._retire(key,row,'BUSY at owner dispatch');continue
+                    self._retire(key,row,'BUSY at owner dispatch',code='RESOURCE_BUSY');continue
                 accepted[key]=row
             self._held=accepted
             self._packet_id=max((r['generation'] for r in accepted.values()),default='bc:'+self.session+':empty')
+            if self.lockstep:
+                self._packet_id=command_id
+                proposed=bool(request['continuous'] or request['goals'])
+                outcome='rejected' if len(self.rejections)>rejection_start else ('accepted' if proposed else 'empty')
+                self._pending=dict(command_id=command_id,step_ticks=step_ticks,ticks=0,
+                    applied_stamp=None,outcome=outcome,rejection_start=rejection_start)
             self._write_actions()
             self.last_ack={'kind':'update','wall':now,'sim_stamp':sim_stamp,
                 'generations':sorted({r['generation'] for r in accepted.values()}),'physical_packet':bool(accepted)}
@@ -154,7 +212,7 @@ class BcRuntimeBridge:
             if resource=='internal_motion':
                 blocked |= any(f'locomotion:{m}' in busy for m in self.executor._connected_component_module_ids((mid,)))
             if blocked:
-                self._retire(key,row,'BUSY at final drive boundary')
+                self._retire(key,row,'BUSY at final drive boundary',code='RESOURCE_BUSY')
                 self._held.pop(key);changed=True
         if changed:
             self._write_actions()
@@ -162,19 +220,28 @@ class BcRuntimeBridge:
         return baseline
 
     def record_applied(self,baseline,routed,sim_stamp):
-        if not self.armed or not baseline:return
+        if not self.armed or (not baseline and not self.lockstep):return
+        if self.lockstep:
+            if self._pending is None:return
+            if self._pending['applied_stamp'] is not None:return
+            self._pending['applied_stamp']=sim_stamp
         if self._packet_id!=self._applied_generation:
             self.applied_packets+=1;self._applied_generation=self._packet_id
         self.last_applied=dict(generation=self._packet_id,sim_stamp=sim_stamp,wall_monotonic=self.clock(),
             pan={m:float(routed[m].pan_velocity_rad_s) for m in baseline if m in routed})
+        if self.lockstep:
+            self.last_applied.update(command_id=self._packet_id,applied_stamp=sim_stamp)
+            self.publish_status()
 
     def publish_status(self,published_stamp=None):
-        if published_stamp is not None:self._published_stamp=published_stamp
+        if published_stamp is not None:
+            self._published_stamp=published_stamp;self.needs_state_publish=False
         status=dict(schema_version='mssr.bc_runtime_status.v1',session=self.session,epoch=self.epoch,pid=os.getpid(),
             wall_monotonic=self.clock(),published_stamp=self._published_stamp,armed=self.armed,failure=self.failure,
             busy=sorted(self.claims()),active_goal_ids=[g.goal_id for g in self.executor.active_goals],
             invalidated=[[list(k),g] for k,g in sorted(self.invalidated)],rejections=self.rejections,
-            acknowledged_goal_ids=sorted(self._goals),last_ack=self.last_ack,applied_packets=self.applied_packets,last_applied=self.last_applied)
+            acknowledged_goal_ids=sorted(self._goals),last_ack=self.last_ack,applied_packets=self.applied_packets,last_applied=self.last_applied,
+            lockstep=self.lockstep,last_completed=self.last_completed)
         PrimitiveFileChannel._write_atomic(self.status_file,json.dumps(status,allow_nan=False))
 
 
@@ -183,7 +250,8 @@ def attach_bc_runtime(directory,channel,executor,module_ids):
     if not session:return None
     invalidate=executor.invalidate_module_command_sources_callback
     if invalidate is None:raise ValueError('BC requires existing native source invalidation')
-    bridge=BcRuntimeBridge(directory,session,channel,executor,invalidate,module_ids)
+    bridge=BcRuntimeBridge(directory,session,channel,executor,invalidate,module_ids,
+        lockstep=os.environ.get('MSSR_C1_LOCKSTEP','').lower() in ('1','true','yes'))
     def notified(ids):
         invalidate(ids)
         bridge.invalidate(ids)

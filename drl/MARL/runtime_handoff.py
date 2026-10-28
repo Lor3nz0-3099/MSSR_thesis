@@ -21,6 +21,7 @@ class RuntimePhase(str, Enum):
     ASSEMBLING = "ASSEMBLING"
     VERIFYING_TOPOLOGY = "VERIFYING_TOPOLOGY"
     MARL_CONTROL = "MARL_CONTROL"
+    TERMINAL = "TERMINAL"
     FAILED = "FAILED"
 
 
@@ -63,6 +64,12 @@ class DirectMARLHandoff:
         self._phase = RuntimePhase.IDLE
         self._target_morphology: str | None = None
         self._last_expert_success: bool | None = None
+
+    def finish_episode(self) -> None:
+        """Latch terminal authority closure until reset starts a new assembly."""
+        if self.marl_active:
+            self._authority = RuntimeAuthority.NONE
+            self._phase = RuntimePhase.TERMINAL
 
     def begin_expert(
         self,

@@ -638,3 +638,43 @@ def test_vectorized_runtime_keeps_env_authorities_independent():
     assert bridge_calls == [
         0
     ]
+
+
+@pytest.mark.parametrize('terminal_flag',['terminated','truncated'])
+def test_terminal_transition_revokes_authority_per_env_until_reset(terminal_flag):
+    from types import SimpleNamespace
+    from drl.MARL.direct_marl_env import DirectMARLEnv
+    from drl.MARL.runtime_handoff import DirectMARLHandoff
+    handoffs=(DirectMARLHandoff(),DirectMARLHandoff())
+    calls=[]
+    class Bridge:
+        def step(self,index):calls.append(index)
+    env=DirectMARLEnv(handoffs=handoffs,expert_launcher=lambda i,t:True,
+        expert_status_reader=lambda i:True,topology_observer=lambda i:'rc_car8',actuation_bridge=Bridge(),
+        state_reader=lambda i:{'x':i},physics_step=lambda:None,
+        transition_evaluator=lambda **kw:SimpleNamespace(**{terminal_flag:kw['env_index']==0}))
+    env.reset();env.advance_all_handoffs();env.advance_all_handoffs()
+    env.step_marl_transitions()
+    assert not handoffs[0].marl_active and handoffs[1].marl_active
+    assert env.step_marl_actuation(0) is None
+    calls.clear();result=env.step_marl_transitions()
+    assert calls==[1] and result[0] is None
+    env.reset((0,));env.advance_handoff(0);env.advance_handoff(0)
+    assert handoffs[0].marl_active
+
+
+def test_physics_timeout_revokes_batch_authority_without_fabricated_transition():
+    from drl.MARL.direct_marl_env import DirectMARLEnv
+    from drl.MARL.runtime_handoff import DirectMARLHandoff
+    handoff=DirectMARLHandoff();calls=[]
+    class Bridge:
+        def step(self,index):calls.append(index)
+    def physics():raise TimeoutError('missing native completion')
+    env=DirectMARLEnv(handoffs=(handoff,),expert_launcher=lambda i,t:True,
+        expert_status_reader=lambda i:True,topology_observer=lambda i:'rc_car8',actuation_bridge=Bridge(),
+        state_reader=lambda i:{'x':i},physics_step=physics,transition_evaluator=lambda **kw:None)
+    env.reset();env.advance_all_handoffs();env.advance_all_handoffs()
+    with pytest.raises(TimeoutError):env.step_marl_transitions()
+    assert not handoff.marl_active
+    assert env.step_marl_actuation(0) is None and calls==[0]
+    assert env.episode_steps==(0,)

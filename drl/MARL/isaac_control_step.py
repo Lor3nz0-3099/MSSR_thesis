@@ -68,6 +68,7 @@ class FileBackedIsaacControlStep:
         poll_interval_s: float = 0.005,
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        application_source: Callable[[int], Mapping[str, Any]] | None = None,
     ) -> None:
         if not runtime_dirs:
             raise ValueError(
@@ -170,6 +171,11 @@ class FileBackedIsaacControlStep:
 
         self._monotonic = monotonic
         self._sleep = sleep
+        if application_source is not None and not callable(application_source):
+            raise TypeError('application_source must be callable')
+        self._application_source = application_source
+        self._expected_actions: dict[int, str] = {}
+
 
         # Per-environment state machine:
         #
@@ -214,6 +220,32 @@ class FileBackedIsaacControlStep:
     @property
     def num_envs(self) -> int:
         return len(self.runtime_dirs)
+
+    def expect_action(self, env_index: int, command_id: str) -> None:
+        """Bind this transition to the existing native BC command identifier."""
+        env_index = self._validate_env_index(env_index)
+        if self._application_source is None:
+            raise RuntimeError('expected action requires application_source')
+        if self._phase[env_index] != 'ARMED':
+            raise RuntimeError('expected action requires an armed pre-state')
+        if not isinstance(command_id, str) or not command_id:
+            raise ValueError('command_id must be nonempty')
+        if env_index in self._expected_actions:
+            raise RuntimeError('expected action already registered')
+        self._expected_actions[env_index] = command_id
+
+    def _causal_frame(self, env_index: int, snapshot: _PhysicalSnapshot, previous: float) -> bool:
+        if self._application_source is None:
+            return snapshot.stamp > previous
+        status = self._application_source(env_index)
+        if status.get('failure'):
+            raise RuntimeError(f"Native action application failed: {status['failure']}")
+        completed = status.get('last_completed')
+        if not isinstance(completed, Mapping) or completed.get('command_id') != self._expected_actions[env_index]:
+            return False
+        applied = self._finite_number(completed.get('applied_stamp'), label='action applied stamp')
+        post = self._finite_number(completed.get('completed_stamp'), label='action completed stamp')
+        return applied >= previous and post > applied and snapshot.stamp == post
 
     @property
     def armed_env_indices(
@@ -683,6 +715,8 @@ class FileBackedIsaacControlStep:
             raise RuntimeError(
                 "Isaac control step has no armed environments"
             )
+        if self._application_source is not None and any(index not in self._expected_actions for index in armed):
+            raise RuntimeError('Isaac control step has no expected action for an armed environment')
 
         previous = {
             env_index: (
@@ -727,10 +761,7 @@ class FileBackedIsaacControlStep:
                 if snapshot is None:
                     continue
 
-                if (
-                    snapshot.stamp
-                    > previous[env_index]
-                ):
+                if self._causal_frame(env_index, snapshot, previous[env_index]):
                     accepted[
                         env_index
                     ] = snapshot
@@ -781,6 +812,7 @@ class FileBackedIsaacControlStep:
             self._phase[
                 env_index
             ] = "READY"
+            self._expected_actions.pop(env_index, None)
 
         return IsaacControlStepResult(
             previous_stamp_by_env=dict(
@@ -814,6 +846,7 @@ class FileBackedIsaacControlStep:
             )
 
         for env_index in indexes:
+            self._expected_actions.pop(env_index, None)
             self._phase[
                 env_index
             ] = "IDLE"

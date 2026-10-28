@@ -392,3 +392,110 @@ def test_reward_contract_rejects_missing_module_or_unknown_event_owner():
                 }),
             ),
         )
+
+
+@pytest.mark.parametrize("gamma", [0.5, 0.99, 1.0])
+def test_rc_progress_target_entry_and_outside_road_closed_cycles_do_not_pay(gamma):
+    from drl.MARL.phase1_reward import compute_phase1_raw_reward
+    course = phase1_rc_car_training_course(5102)
+    cx,cy = course.target_platform.center_xy_m
+    states = [_owners_at(0.5,0), _owners_at(0.6,0),
+              _owners_at(0.6,course.road_width_m), _owners_at(cx,cy)]
+    frames = [compute_phase1_raw_reward(course,a,b,shaping_gamma=gamma)
+              for a,b in zip(states, states[1:]+states[:1])]
+    assert any(frame.team.outside_road > 0 for frame in frames)
+    for field in ("progress", "target_entry"):
+        assert sum(getattr(frame.team, field) for frame in frames) <= 1e-12
+    assert frames[-1].team.target_entry < 0
+
+
+def test_rc_success_absorbs_shaping_without_erasing_sparse_success():
+    from drl.MARL.phase1_reward import compute_phase1_raw_reward
+    course = phase1_rc_car_training_course(5102)
+    cx,cy = course.target_platform.center_xy_m
+    frame = compute_phase1_raw_reward(course, _owners_at(0.5,0), _owners_at(cx,cy),
+                                     shaping_gamma=0.99, terminated=True)
+    assert frame.team.success == 1.0
+    assert frame.team.progress <= 0.0
+    assert frame.team.target_entry == 0.0
+
+
+@pytest.mark.parametrize("gamma", [-0.1, 1.1, float("nan"), float("inf")])
+def test_shaping_gamma_must_be_a_finite_discount(gamma):
+    from drl.MARL.phase1_reward import compute_phase1_raw_reward
+    course = phase1_rc_car_training_course(5102)
+    state = _owners_at(0.5,0)
+    with pytest.raises(ValueError, match="gamma"):
+        compute_phase1_raw_reward(course, state, state, shaping_gamma=gamma)
+
+
+@pytest.mark.parametrize("domain", ["navigation", "stairs", "gap", "manipulation"])
+def test_task_evaluators_apply_discount_and_absorb_only_true_terminal(domain):
+    from drl.MARL.phase1_reward import ActionOutcomeSignals
+    neutral_signals = lambda *_args, **_kwargs: ActionOutcomeSignals()
+    if domain == "navigation":
+        from drl.MARL.phase1_transition import Phase1TransitionEvaluator
+        course = phase1_rc_car_training_course(5102)
+        evaluator = Phase1TransitionEvaluator(courses=(course,), max_episode_steps=1,
+            signals_provider=neutral_signals, shaping_gamma=0.99)
+        before = _owners_at(0.5, 0)
+        cx,cy = course.target_platform.center_xy_m
+        goal = _owners_at(cx,cy)
+        field = "progress"
+    elif domain == "stairs":
+        from drl.MARL.stairs_transition import StairsTransitionEvaluator
+        from smores_ep.isaac.phase1_stairs_curriculum import phase1_stairs_curriculum_course
+        course = phase1_stairs_curriculum_course(12000, split="train")
+        evaluator = StairsTransitionEvaluator(courses=(course,), max_episode_steps=1,
+            signals_provider=neutral_signals, shaping_gamma=0.99)
+        before = {owner:(0,0,0.0315) for owner in _owners_at(0,0)}
+        goal = {owner:(course.goal_platform_start_x_m+0.1,0,course.goal_height_m+0.0315)
+                for owner in before}
+        field = "profile_progress"
+    elif domain == "gap":
+        from drl.MARL.gap_transition import GapTransitionEvaluator
+        from smores_ep.isaac.phase1_gap_curriculum import phase1_gap_curriculum_course
+        course = phase1_gap_curriculum_course(16000, split="train")
+        evaluator = GapTransitionEvaluator(courses=(course,), max_episode_steps=1,
+            signals_provider=neutral_signals, shaping_gamma=0.99)
+        before = {owner:(course.near_edge_x_m-0.1,0,0.0315) for owner in _owners_at(0,0)}
+        goal = {owner:(course.far_edge_x_m+0.1,course.landing_center_y_m,0.0315) for owner in before}
+        field = "approach_progress"
+    else:
+        from drl.MARL.manipulation_transition import ManipulationTransitionEvaluator
+        from drl.MARL.tests.test_manipulation_reward import _course, _obs
+        course = _course()
+        evaluator = ManipulationTransitionEvaluator(course=course,
+            signal_builder=neutral_signals, shaping_gamma=0.99)
+        before = _obs(course, standoff_m=0.325)
+        goal = _obs(course, standoff_m=0.325, depression_m=0.0035)
+        field = "approach_progress"
+    steady = evaluator(env_index=0, previous_state=before, next_state=before,
+        actuation_result=None, physics_result=None, episode_step=1)
+    # A time-limit truncation keeps the next potential: only (gamma-1)*Phi.
+    steady_value = getattr(steady.raw_reward.team, field)
+    assert -0.02 < steady_value < 0
+    if domain != "manipulation":
+        assert steady.truncated and not steady.terminated
+    terminal = evaluator(env_index=0, previous_state=before, next_state=goal,
+        actuation_result=None, physics_result=None, episode_step=1)
+    assert terminal.terminated
+    assert terminal.raw_reward.team.success == 1
+    assert getattr(terminal.raw_reward.team, field) == pytest.approx(100 * steady_value)
+
+
+def test_manipulation_connection_loss_absorbs_potentials_as_failure():
+    from drl.MARL.manipulation_transition import ManipulationTransitionEvaluator
+    from drl.MARL.tests.test_manipulation_reward import _course, _obs
+    from drl.MARL.phase1_reward import ActionOutcomeSignals
+    course = _course()
+    evaluator = ManipulationTransitionEvaluator(course=course, shaping_gamma=0.99,
+        signal_builder=lambda **_kwargs: ActionOutcomeSignals())
+    result = evaluator(env_index=0,
+        previous_state=_obs(course, standoff_m=0.325),
+        next_state=_obs(course, standoff_m=0.325, connection_count=6),
+        actuation_result=None, physics_result=None, episode_step=1)
+    assert result.terminated
+    assert result.failure_reason == "connection_loss"
+    assert result.raw_reward.team.approach_progress == pytest.approx(-1)
+    assert result.raw_reward.team.success == 0

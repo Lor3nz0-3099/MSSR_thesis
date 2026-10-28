@@ -19,6 +19,8 @@ from dataclasses import dataclass, field
 import math
 from typing import Mapping
 
+from drl.MARL.reward_potential import potential_difference, validate_shaping_discount
+
 from smores_ep.isaac.phase1_training_course import (
     Phase1TrainingCourse,
 )
@@ -323,8 +325,12 @@ def compute_phase1_raw_reward(
     next_module_xy_m: Mapping[str, XY],
     *,
     signals: ActionOutcomeSignals | None = None,
+    shaping_gamma: float = 1.0,
+    terminated: bool = False,
 ) -> Phase1RawRewardFrame:
     """Compute unweighted reward terms for one Phase-1 transition."""
+
+    validate_shaping_discount(shaping_gamma)
 
     previous_owners = _validate_module_positions(
         previous_module_xy_m,
@@ -402,14 +408,18 @@ def compute_phase1_raw_reward(
     ] = {}
 
     for owner in owners:
-        progress = (
-            next_projection[owner].s_m
-            - previous_projection[owner].s_m
-        ) / route_length_m
+        progress = potential_difference(
+            previous_projection[owner].s_m / route_length_m,
+            next_projection[owner].s_m / route_length_m,
+            shaping_gamma=shaping_gamma,
+            terminated=terminated,
+        )
 
-        target_entry = float(
-            int(next_inside[owner])
-            - int(previous_inside[owner])
+        target_entry = potential_difference(
+            float(previous_inside[owner]),
+            float(next_inside[owner]),
+            shaping_gamma=shaping_gamma,
+            terminated=terminated,
         )
 
         lateral_excess_m = max(
@@ -507,14 +517,7 @@ def compute_phase1_raw_reward(
             "progress"
         ),
 
-        target_entry=(
-            sum(
-                int(next_inside[owner])
-                - int(previous_inside[owner])
-                for owner in owners
-            )
-            / count
-        ),
+        target_entry=mean("target_entry"),
 
         success=float(
             successful

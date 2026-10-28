@@ -1,6 +1,7 @@
 import pytest
+from dataclasses import replace
 
-from drl.MARL.mappo import MSSRMAPPO
+from drl.MARL.mappo import MSSRMAPPO, StructuredRolloutSample
 
 
 @pytest.mark.parametrize("n_agents", [1, 3, 8, 11])
@@ -2884,12 +2885,14 @@ def test_record_online_rollout_batch_writes_real_skrl_memory_and_sidecar():
 
     assert (
         sidecar_samples[0]
-        is decisions[0].structured_sample
+        == replace(decisions[0].structured_sample,
+            next_critic_graph_snapshot=next_critic_graphs[0])
     )
 
     assert (
         sidecar_samples[1]
-        is decisions[1].structured_sample
+        == replace(decisions[1].structured_sample,
+            next_critic_graph_snapshot=next_critic_graphs[1])
     )
 
     assert (
@@ -4320,7 +4323,8 @@ def test_record_online_rollout_batch_invokes_altruistic_recording_bridge():
             global_value=torch.tensor(
                 0.5
             ),
-            structured_sample=object(),
+            structured_sample=StructuredRolloutSample(
+                action=None, hard_mask=None, owner_active_mask={}, routing_snapshot=None, graph_snapshot=None),
         ),
         SimpleNamespace(
             owner_log_probs={
@@ -4334,7 +4338,8 @@ def test_record_online_rollout_batch_invokes_altruistic_recording_bridge():
             global_value=torch.tensor(
                 0.6
             ),
-            structured_sample=object(),
+            structured_sample=StructuredRolloutSample(
+                action=None, hard_mask=None, owner_active_mask={}, routing_snapshot=None, graph_snapshot=None),
         ),
     ]
 

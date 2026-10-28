@@ -18,7 +18,7 @@ from drl.IL.bc_v1.candidates import enumerate_candidates
 from drl.IL.bc_v1.dataset import CachedInputs, CachedSample
 from drl.IL.bc_v1.feature_schema import load_feature_schema
 from drl.IL.bc_v1.smores_adapter import SMORESAdapter
-from drl.IL.bc_v1.tensorization import load_tensor_layout
+from drl.IL.bc_v1.tensorization import load_tensor_layout, tensorize_policy_sample
 
 
 @dataclass(frozen=True)
@@ -35,6 +35,10 @@ class BCV4RuntimeObservation:
 
     # Full collated batch required later by the ActionSet decoder.
     decoder_batch: Mapping[str, Any]
+
+    # Centralized critic input from the same current physical sample, before
+    # actor visibility projection. Never passed to H1/H2 by this bridge.
+    privileged_graph: Mapping[str, Any] | None = None
 
 
 class BCV4RuntimeObservationBridge:
@@ -282,6 +286,25 @@ class BCV4RuntimeObservationBridge:
             ),
         )
 
+        # Keep the centralized critic's true current environment measurements.
+        # Ordinary G2 tensorization reuses the frozen F2 catalog and units. Do
+        # not silently take its default scaler path for absent coverage.
+        scalers = dict(self.normalizers.scalers)
+        for _, row, index, key, _ in f2._feature_components(
+            features, self.spec, self.feature_schema, self.normalization_policy
+        ):
+            if key is not None and row.validity[index] and key not in scalers:
+                raise ValueError(f'Missing privileged normalizer coverage: {key}')
+        privileged_sample = tensorize_policy_sample(
+            sample,
+            spec=self.spec,
+            feature_schema=self.feature_schema,
+            normalization_policy=self.normalization_policy,
+            normalizers=self.normalizers,
+            tensor_layout=self.tensor_layout,
+        )
+        privileged_batch = collate_policy_samples([privileged_sample])
+
         # IMPORTANT:
         # actor visibility projection happens HERE, before F2 tensorization.
         tensor_sample = tensorize_actor_sample(
@@ -305,4 +328,5 @@ class BCV4RuntimeObservationBridge:
             actor_graph=decoder_batch["inputs"],
             routing_snapshot=tensor_sample["routing"],
             decoder_batch=decoder_batch,
+            privileged_graph=privileged_batch['inputs'],
         )

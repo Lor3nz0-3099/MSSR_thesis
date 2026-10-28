@@ -56,7 +56,7 @@ def test_owned_expert_is_reaped_and_can_restart(tmp_path, monkeypatch, terminal)
     else:
         assert binding.expert_status(0) is terminal
 
-    assert signals == [(processes[0].pid, signal.SIGINT)]
+    assert signals == [(processes[0].pid, signal.SIGTERM)]
     assert processes[0].poll() is not None
     assert log.closed
     assert binding.launch_expert(0, "rc_car8")

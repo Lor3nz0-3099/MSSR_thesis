@@ -406,3 +406,43 @@ def test_task4a_rejects_invalid_or_incomplete_physical_state(
         match="finite stamp",
     ):
         control.state_reader(0)
+
+
+def test_causal_barrier_requires_completed_command_and_exact_post_apply_frame(tmp_path):
+    FileBackedIsaacControlStep,_=_api()
+    _write_state_graph(tmp_path,stamp=1.,xs=(0.,)*8)
+    clock=[0.]; polls=[0]
+    status={'last_completed':None}
+    def sleep(dt):
+        clock[0]+=dt;polls[0]+=1
+        if polls[0]==1:
+            # A fresh frame published before apply is never sufficient.
+            _write_state_graph(tmp_path,stamp=1.1,xs=(99.,)*8)
+        elif polls[0]==2:
+            status['last_completed']=dict(command_id='bc:s:1',applied_stamp=1.1,completed_stamp=1.2,ticks=8,outcome='rejected')
+        elif polls[0]==3:
+            _write_state_graph(tmp_path,stamp=1.2,xs=(2.,)*8)
+    control=FileBackedIsaacControlStep(runtime_dirs=(tmp_path,),application_source=lambda index:status,
+        monotonic=lambda:clock[0],sleep=sleep,timeout_s=.1,poll_interval_s=.01)
+    control.state_reader(0);control.expect_action(0,'bc:s:1')
+    result=control.physics_step()
+    assert polls[0]==3 and result.next_stamp_by_env=={0:1.2}
+    post=control.state_reader(0)
+    _write_state_graph(tmp_path,stamp=1.3,xs=(3.,)*8)
+    assert control.state_reader(0)==post
+    with pytest.raises(RuntimeError,match='expected action'):
+        control.physics_step()
+
+
+def test_causal_newer_frame_without_matching_completion_times_out(tmp_path):
+    FileBackedIsaacControlStep,_=_api()
+    _write_state_graph(tmp_path,stamp=1.,xs=(0.,)*8)
+    clock=[0.]
+    def sleep(dt):clock[0]+=dt
+    control=FileBackedIsaacControlStep(runtime_dirs=(tmp_path,),application_source=lambda index:{'last_completed':dict(
+        command_id='bc:s:old',applied_stamp=1.,completed_stamp=2.)},
+        monotonic=lambda:clock[0],sleep=sleep,timeout_s=.03,poll_interval_s=.01)
+    control.state_reader(0);control.expect_action(0,'bc:s:1')
+    _write_state_graph(tmp_path,stamp=2.,xs=(2.,)*8)
+    with pytest.raises(TimeoutError):control.physics_step()
+    assert control.armed_env_indices==(0,)

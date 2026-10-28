@@ -17,6 +17,8 @@ from collections.abc import (
 from dataclasses import dataclass
 from typing import Any
 
+from drl.MARL.reward_potential import validate_shaping_discount
+
 from drl.MARL.phase1_reward import (
     ActionOutcomeSignals,
     Phase1RawRewardFrame,
@@ -170,6 +172,7 @@ class Phase1TransitionEvaluator:
         *,
         courses: Sequence[Any],
         max_episode_steps: int,
+        shaping_gamma: float = 1.0,
         signals_provider: Callable[
             [
                 int,
@@ -186,6 +189,7 @@ class Phase1TransitionEvaluator:
             ActionOutcomeSignals,
         ] | None = None,
     ) -> None:
+        self.shaping_gamma = validate_shaping_discount(shaping_gamma)
         self._courses = tuple(
             courses
         )
@@ -314,18 +318,20 @@ class Phase1TransitionEvaluator:
             ]
         )
 
+        terminated = bool(
+            course.success(
+                next_state
+            )
+        )
+
         raw_reward = (
             compute_phase1_raw_reward(
                 course,
                 previous_state,
                 next_state,
                 signals=signals,
-            )
-        )
-
-        terminated = bool(
-            course.success(
-                next_state
+                shaping_gamma=self.shaping_gamma,
+                terminated=terminated,
             )
         )
 

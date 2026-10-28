@@ -687,6 +687,8 @@ def compute_gae_channel(
     dones: torch.Tensor,
     discount: float,
     gae_lambda: float,
+    terminated: torch.Tensor | None = None,
+    next_values: torch.Tensor | None = None,
 ) -> GAEChannelResult:
     """Compute one independent GAE/value-target channel.
 
@@ -814,6 +816,23 @@ def compute_gae_channel(
         device=rewards.device,
     )
 
+    # Stop the trace at both terminal and collection/reset boundaries, but
+    # bootstrap time limits from THEIR captured next state. Never use the
+    # following episode's initial state as that value.
+    terminal_mask = done_mask
+    if terminated is not None:
+        if terminated.shape != rewards.shape:
+            raise ValueError('terminated shape must match rewards')
+        terminal_mask = terminated.to(dtype=torch.bool, device=rewards.device)
+        if bool((terminal_mask & ~done_mask).any()):
+            raise ValueError('terminated must also be an episode boundary')
+        if bool((done_mask & ~terminal_mask).any()) and next_values is None:
+            raise ValueError('time-limit bootstrap requires captured next_values')
+    if next_values is not None:
+        if (next_values.shape != rewards.shape or next_values.dtype != rewards.dtype
+                or next_values.device != rewards.device or not torch.isfinite(next_values).all()):
+            raise ValueError('next_values must be finite and match rewards shape/dtype/device')
+
     advantages = torch.zeros_like(
         rewards
     )
@@ -841,8 +860,8 @@ def compute_gae_channel(
                 timestep
             ]
             + discount
-            * next_value
-            * nonterminal
+            * (next_value if next_values is None else next_values[timestep])
+            * (~terminal_mask[timestep]).to(dtype=rewards.dtype)
             - values[
                 timestep
             ]

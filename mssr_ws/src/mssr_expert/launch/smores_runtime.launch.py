@@ -194,8 +194,55 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
                 LaunchConfiguration("composite_seed_catalog").perform(context),
             )
         )
+    for course, split, seed, course_cli, split_cli, seed_cli in _C1_COURSES:
+        if _as_bool(LaunchConfiguration(course).perform(context)):
+            simulation_command.extend((course_cli, split_cli,
+                                       LaunchConfiguration(split).perform(context)))
+            value = LaunchConfiguration(seed).perform(context).strip()
+            if value:
+                simulation_command.extend((seed_cli, value))
     if _as_bool(LaunchConfiguration("stair_test_course").perform(context)):
         simulation_command.append("--stair-test-course")
+    if _as_bool(
+        LaunchConfiguration(
+            "phase1_manipulation_course"
+        ).perform(context)
+    ):
+        simulation_command.append(
+            "--phase1-manipulation-course"
+        )
+
+        manipulation_split = (
+            LaunchConfiguration(
+                "phase1_manipulation_split"
+            )
+            .perform(context)
+            .strip()
+        )
+
+        simulation_command.extend(
+            (
+                "--phase1-manipulation-split",
+                manipulation_split,
+            )
+        )
+
+        manipulation_seed = (
+            LaunchConfiguration(
+                "phase1_manipulation_seed"
+            )
+            .perform(context)
+            .strip()
+        )
+
+        if manipulation_seed:
+            simulation_command.extend(
+                (
+                    "--phase1-manipulation-seed",
+                    manipulation_seed,
+                )
+            )
+
     if _as_bool(LaunchConfiguration("button_test_course").perform(context)):
         simulation_command.append("--button-test-course")
     button_seed = (
@@ -284,12 +331,25 @@ def _launch_runtime(context: LaunchContext) -> list[object]:
     ]
 
 
+_C1_COURSES = (
+    ("phase1_marl_course", "phase1_marl_split", "phase1_marl_seed",
+     "--phase1-marl-course", "--phase1-marl-split", "--phase1-marl-seed"),
+    ("phase1_stairs_course", "phase1_stairs_split", "phase1_stairs_seed",
+     "--phase1-stairs-course", "--phase1-stairs-split", "--phase1-stairs-seed"),
+    ("phase1_gap_course", "phase1_gap_split", "phase1_gap_seed",
+     "--phase1-gap-course", "--phase1-gap-split", "--phase1-gap-seed"),
+)
+
+
 def generate_launch_description() -> LaunchDescription:
     """Create the pre-assembly SMORES runtime launch description."""
 
     repository_root = _default_repository_root()
     return LaunchDescription(
-        [
+        [argument for course, split, seed, *_ in _C1_COURSES
+         for argument in (DeclareLaunchArgument(course, default_value="false"),
+                          DeclareLaunchArgument(split, default_value="train"),
+                          DeclareLaunchArgument(seed, default_value=""))] + [
             DeclareLaunchArgument(
                 "repository_root",
                 default_value=str(repository_root),
@@ -343,6 +403,30 @@ def generate_launch_description() -> LaunchDescription:
                 "stair_test_course",
                 default_value="false",
                 description="Spawn the isolated three-step Snake8 test stage.",
+            ),
+            DeclareLaunchArgument(
+                "phase1_manipulation_course",
+                default_value="false",
+                description=(
+                    "Spawn the C1 procedural "
+                    "MobileManipulator8 manipulation course."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "phase1_manipulation_split",
+                default_value="train",
+                description=(
+                    "C1 manipulation split: "
+                    "train, validation, test or challenge."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "phase1_manipulation_seed",
+                default_value="",
+                description=(
+                    "Seed belonging to the selected "
+                    "C1 manipulation split."
+                ),
             ),
             DeclareLaunchArgument(
                 "button_test_course",

@@ -240,3 +240,122 @@ def test_native_locomotion_still_blocks_new_pan_bc(tmp_path):
     request(b,rows=[row()])
     assert b.armed and b.rejections and not c.commands(t.now)
     assert len(e.active_goals)==1 and e.active_goals[0].goal_id=='drive-owner'
+
+
+def lockstep_armed(tmp_path):
+    b,t,c,e=setup(tmp_path)
+    b.lockstep=True
+    request(b,'arm')
+    return b,t,c,e
+
+
+def test_lockstep_does_not_freeze_expert_and_arm_holds_physics(tmp_path):
+    b,t,c,e=setup(tmp_path);b.lockstep=True
+    assert b.can_advance
+    request(b,'arm')
+    assert not b.can_advance and b.needs_state_publish
+
+
+@pytest.mark.parametrize('rows,expected', [([], 'empty'), ([row()], 'accepted')])
+def test_lockstep_exact_ticks_ack_empty_and_actuated(tmp_path,rows,expected):
+    b,t,c,e=lockstep_armed(tmp_path)
+    request(b,rows=rows,command_id='bc:session:1',step_ticks=2)
+    assert b.can_advance
+    b.record_applied(c.commands(0.),{},1.)
+    assert b.last_applied['command_id']=='bc:session:1'
+    assert not b.after_physics(1.+1/240)
+    assert b.can_advance
+    assert b.after_physics(1.+2/240)
+    assert not b.can_advance
+    b.publish_status(1.+2/240)
+    done=json.loads(b.status_file.read_text())['last_completed']
+    assert done==dict(command_id='bc:session:1',applied_stamp=1.,completed_stamp=1.+2/240,ticks=2,
+        outcome=expected,code=expected.upper(),rejections=[])
+    t.now=10.;b.service(done['completed_stamp'])
+    assert not b.can_advance and not b.failure  # policy inference may take wall time
+
+
+def test_lockstep_rejected_native_proposal_still_completes_command(tmp_path):
+    b,t,c,e=lockstep_armed(tmp_path)
+    active=PrimitiveGoal.from_dict(dict(goal_id='old',primitive='set_tilt',module_ids=['m1'],parameters={'angle_rad':.2}))
+    e.submit(active,1.)
+    request(b,rows=[row()],command_id='bc:session:9',step_ticks=1)
+    b.record_applied({}, {}, 1.)
+    assert b.after_physics(1.01)
+    assert b.last_completed['command_id']=='bc:session:9'
+    assert b.last_completed['outcome']=='rejected'
+    assert e.active_goals[0].goal_id=='old'
+
+
+def test_lockstep_timeout_fails_closed_after_arm(tmp_path):
+    b,t,c,e=lockstep_armed(tmp_path)
+    request(b,rows=[row()],command_id='bc:session:1',step_ticks=8)
+    t.now=1.;b.service(1.)
+    assert b.failure and not b.can_advance
+
+
+def test_lockstep_refuses_missing_or_repeated_command_id(tmp_path):
+    b,t,c,e=lockstep_armed(tmp_path)
+    request(b,rows=[])
+    assert b.failure and not b.can_advance
+
+
+def test_lockstep_goals_only_ack_and_replay_fail_closed(tmp_path):
+    b,t,c,e=lockstep_armed(tmp_path)
+    goal=dict(generation='bc:session:1',key=['m1','internal_motion'],source_stamp=1.,
+        payload={'command':'set_tilt','module_ids':['m1'],'parameters':{'angle_rad':.2}})
+    request(b,goals=[goal],command_id='bc:session:1',step_ticks=1)
+    assert b.requires_primitive_step  # even off the normal 4-tick executor phase
+    b.record_applied({}, {}, 1.)
+    assert not b.requires_primitive_step
+    assert b.after_physics(1.01)
+    assert b.last_completed['outcome']=='accepted' and b.applied_packets==1
+    request(b,command_id='bc:session:1',step_ticks=1,state_stamp=1.01)
+    assert b.failure and not b.can_advance
+
+
+def test_lockstep_final_boundary_rejection_is_in_completion(tmp_path):
+    b,t,c,e=lockstep_armed(tmp_path)
+    request(b,rows=[row()],command_id='bc:session:1',step_ticks=1)
+    active=PrimitiveGoal.from_dict(dict(goal_id='racing',primitive='set_tilt',module_ids=['m1'],parameters={'angle_rad':.2}))
+    e.submit(active,1.)
+    b.filter_commands(c.commands(0.))
+    b.record_applied({}, {}, 1.)
+    b.after_physics(1.01)
+    assert b.last_completed['outcome']=='rejected'
+
+
+def test_lockstep_rejects_outdated_prestate_proof(tmp_path):
+    b,t,c,e=lockstep_armed(tmp_path)
+    request(b,command_id='bc:session:1',state_stamp=.9)
+    assert b.failure and not b.can_advance
+
+
+@pytest.mark.parametrize('angle,preexisting,code', [(100.,False,'INVALID_GOAL'),(.2,True,'RESOURCE_BUSY')])
+def test_native_rejection_preserves_exact_code_owner_and_completion_delta(tmp_path,angle,preexisting,code):
+    b,t,c,e=lockstep_armed(tmp_path)
+    if preexisting:
+        active=PrimitiveGoal.from_dict(dict(goal_id='old',primitive='set_tilt',module_ids=['m1'],parameters={'angle_rad':.2}))
+        e.submit(active,1.)
+    b.rejections.append(dict(key=['m1','internal_motion'],generation='bc:session:old',reason='historical',code='OLD',owner_ids=['m1']))
+    goal=dict(generation='bc:session:7',key=['m1','internal_motion'],source_stamp=1.,
+        payload={'command':'set_tilt','module_ids':['m1'],'parameters':{'angle_rad':angle}})
+    request(b,goals=[goal],command_id='bc:session:7',step_ticks=1)
+    b.record_applied({}, {}, 1.);b.after_physics(1.01)
+    done=b.last_completed
+    assert done['code']==code
+    assert done['rejections']==[dict(key=['m1','internal_motion'],generation='bc:session:7',
+        reason='native admission rejected',code=code,owner_ids=['m1'])]
+    assert len(b.rejections)==2
+
+
+def test_cooperative_rejection_attributes_only_candidate_owner_not_stationary_peer(tmp_path):
+    b,t,c,e=lockstep_armed(tmp_path)
+    proposal=dict(generation='bc:session:8',key=['m1','structure'],source_stamp=1.,
+        payload={'command':'dock','module_ids':['m1','stationary-peer'],
+                 'parameters':{'face_a':'TOP','face_b':'BOTTOM'}})
+    request(b,goals=[proposal],command_id='bc:session:8',step_ticks=1)
+    b.record_applied({}, {}, 1.);b.after_physics(1.01)
+    rejection=b.last_completed['rejections'][0]
+    assert rejection['code']=='UNKNOWN_MODULE'
+    assert rejection['owner_ids']==['m1']

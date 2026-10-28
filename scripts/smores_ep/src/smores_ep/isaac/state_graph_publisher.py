@@ -538,118 +538,30 @@ class SmoresStateGraphPublisher:
             course["mission"] = updated_mission
             return course
 
-        if course.get("course_profile") != (
-            "mobile_manipulator8_button_test"
-        ):
+        profile = course.get("course_profile")
+        if profile not in {
+            "mobile_manipulator8_button_test",
+            "phase1_mobile_manipulator8_manipulation",
+        }:
             return course
 
         button_payload = course.get("button")
         if not isinstance(button_payload, Mapping):
             return course
-
-        nominal_center = button_payload.get("center_xyz_m")
-        if (
-            not isinstance(nominal_center, (list, tuple))
-            or len(nominal_center) < 3
-        ):
-            return course
-
-        plunger_path = (
-            "/World/MobileManipulatorButtonTestCourse/"
-            "ButtonPlunger"
-        )
-        plunger = self._stage.GetPrimAtPath(plunger_path)
-
-        if not plunger or not plunger.IsValid():
-            return course
-
-        from pxr import Usd, UsdGeom
-
-        transform = UsdGeom.Xformable(
-            plunger
-        ).ComputeLocalToWorldTransform(
-            Usd.TimeCode.Default()
-        )
-        translation = transform.ExtractTranslation()
-
-        current_center = [
-            float(translation[0]),
-            float(translation[1]),
-            float(translation[2]),
-        ]
-
-        direction = (
-            button_payload.get(
-                "press_direction_world_xy",
-                (0.0, 1.0),
-            )
-        )
-
-        try:
-            nx = float(direction[0])
-            ny = float(direction[1])
-
-        except (
-            TypeError,
-            ValueError,
-            IndexError,
-        ):
-            nx, ny = 0.0, 1.0
-
-        norm = (
-            nx * nx
-            + ny * ny
-        ) ** 0.5
-
-        if norm <= 1.0e-12:
-            nx, ny = 0.0, 1.0
-        else:
-            nx /= norm
-            ny /= norm
-
-        # Positive depression always means motion IN THE
-        # episode's actual press direction.
-        depression_m = (
-            (
-                current_center[0]
-                - float(nominal_center[0])
-            )
-            * nx
-            +
-            (
-                current_center[1]
-                - float(nominal_center[1])
-            )
-            * ny
-        )
-
         button = dict(button_payload)
-
-        button[
-            "press_direction_world_xy"
-        ] = [
-            nx,
-            ny,
-        ]
-
-        button[
-            "current_center_xyz_m"
-        ] = current_center
-
-        button[
-            "depression_m"
-        ] = float(
-            depression_m
-        )
-
-        course["button"] = button
+        if profile == "mobile_manipulator8_button_test":
+            button.setdefault(
+                "plunger_path",
+                "/World/MobileManipulatorButtonTestCourse/ButtonPlunger",
+            )
+        course["button"] = self._runtime_button_observation(button)
         return course
 
     def _runtime_button_observation(
         self,
         button_payload: Mapping[str, Any],
     ) -> dict[str, Any]:
-        """Add live position and depression to one composite button."""
+        """Project the live USD plunger displacement onto its press normal."""
 
         result = dict(button_payload)
         nominal = button_payload.get("center_xyz_m")
