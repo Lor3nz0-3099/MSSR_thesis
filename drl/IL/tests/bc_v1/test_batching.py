@@ -84,3 +84,23 @@ def test_participant_scope_membership_shifts_to_its_graph_domain():
     assert torch.equal(y['scope_membership_index'][4:], b['supervision']['structural']['scope_membership_index']+offset)
     assert torch.equal(y['scope_membership_value'][4:], b['supervision']['structural']['scope_membership_value'])
     assert torch.equal(y['scope_membership_valid'][4:], b['supervision']['structural']['scope_membership_valid'])
+
+
+def test_collate_policy_inputs_matches_full_sample_input_collation():
+    batcher = api()
+    a, b = pair()
+    expected = batcher.collate_policy_samples([a, b])["inputs"]
+    actual = batcher.collate_policy_inputs([a["inputs"], b["inputs"]])
+
+    def assert_tree_equal(left, right):
+        assert type(left) is type(right)
+        if torch.is_tensor(left):
+            assert torch.equal(left, right)
+        elif isinstance(left, dict):
+            assert set(left) == set(right)
+            for key in left:
+                assert_tree_equal(left[key], right[key])
+        else:
+            assert left == right
+
+    assert_tree_equal(actual, expected)

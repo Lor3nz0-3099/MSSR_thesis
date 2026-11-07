@@ -23,12 +23,21 @@ from drl.IL.bc_v1.feature_schema import (
 from drl.IL.bc_v1.model import (
     load_model_config,
 )
+from drl.IL.bc_v1.batching import (
+    collate_policy_inputs,
+)
 
 from drl.MARL.policy import (
     bind_marl_candidates,
     compose_structural_payload_views,
     map_structural_payloads_to_candidates,
     route_resource_payloads,
+    route_structural_numeric_arguments,
+    route_structural_categorical_arguments,
+    route_structural_boolean_arguments,
+    route_structural_reference_arguments,
+    route_structural_reference_set_arguments,
+    route_structural_scopes,
 )
 
 
@@ -85,6 +94,8 @@ class BCV4SharedActorWrapper(Model):
         )
 
         self.policy = policy.to(self.device)
+        # Explicit capability: MAPPO may request lazy payload views.
+        self.prefer_lazy_payloads = True
 
         self.resource_log_std = nn.Parameter(
             torch.tensor(
@@ -107,6 +118,11 @@ class BCV4SharedActorWrapper(Model):
         self.checkpoint_step: int | None = None
         self.checkpoint_identity: dict[str, Any] | None = None
         self.checkpoint_config: dict[str, Any] | None = None
+        self.presence_threshold_logit = 0.0
+        self.presence_calibration_sha256 = None
+        self.presence_calibration_path = None
+        # Toggle for controlled A/B parity tests; no checkpoint state change.
+        self.prefer_batched_h2 = isinstance(self.policy, ActionSetPolicy)
 
     def compute(
         self,
@@ -402,30 +418,23 @@ class BCV4SharedActorWrapper(Model):
             head_config_path
         )
 
+        from drl.MARL.bc_v4_runtime_inference import load_bc_v4_runtime_inference_config
+        calibration = load_bc_v4_runtime_inference_config(repo_root)
+        calibration_path = Path(repo_root).resolve() / 'configs/bc_v1/runtime_inference_v1.json'
+        wrapper.presence_threshold_logit = float(calibration['deterministic_presence_threshold_logit'])
+        wrapper.presence_calibration_sha256 = hashlib.sha256(calibration_path.read_bytes()).hexdigest()
+        wrapper.presence_calibration_path = str(calibration_path)
+
         return wrapper
 
-    def forward_all_owners(
+    def _materialize_forward_output(
         self,
         *,
+        output: dict[str, Any],
         graph: Any,
         routing: dict,
-        possible_agents: list[str],
+        lazy_payloads: bool = False,
     ) -> dict[str, Any]:
-        """Run H1/H2 once and expose MARL distribution views.
-
-        ``possible_agents`` is deliberately not used to size the network:
-        module count is carried by the graph/routing inputs. This keeps
-        the actor variable-N by construction.
-        """
-        del possible_agents
-
-        if routing is None:
-            raise ValueError(
-                "BCV4SharedActorWrapper requires a routing snapshot"
-            )
-
-        output = self.policy(graph)
-
         if not isinstance(output, dict):
             raise TypeError(
                 "ActionSetPolicy forward must return a dictionary"
@@ -437,7 +446,25 @@ class BCV4SharedActorWrapper(Model):
         records = bind_marl_candidates(
             routing=routing,
             presence_logits=presence_logits,
+            presence_threshold_logit=self.presence_threshold_logit,
         )
+
+        if lazy_payloads:
+            from drl.MARL.runtime_payloads import RuntimePayloadCache
+            cache = getattr(self, '_runtime_payload_cache', None)
+            if cache is None:
+                cache = self._runtime_payload_cache = RuntimePayloadCache()
+            resources, structural = cache.views(
+                parameters=parameters, graph=graph, routing=routing
+            )
+            return dict(
+                prediction_template=output,
+                records=records,
+                resource_payloads=resources,
+                structural_payloads=structural,
+                resource_log_std=self.resource_log_std,
+                structural_log_std=self.structural_log_std,
+            )
 
         resource_payloads = route_resource_payloads(
             parameters["resource"]
@@ -446,54 +473,162 @@ class BCV4SharedActorWrapper(Model):
         structural = parameters["structural"]
         arguments = structural["arguments"]
 
-        local_structural_payloads = (
-            compose_structural_payload_views(
-                binding_count=len(
-                    routing["structural_bindings"]
-                ),
-                numeric=arguments.get(
-                    "numeric",
-                    {},
-                ),
-                categorical=arguments.get(
-                    "categorical",
-                    {},
-                ),
-                boolean=arguments.get(
-                    "boolean",
-                    {},
-                ),
-                reference=arguments.get(
-                    "reference",
-                    {},
-                ),
-                reference_set=arguments.get(
-                    "reference_set",
-                    {},
-                ),
-                scope=structural["scope"],
-            )
+        def routed(head, family, router):
+            if "argument" in head:
+                return router(
+                    **{family: head},
+                    structural_inputs=graph["structural"],
+                )
+            return head
+
+        local_structural_payloads = compose_structural_payload_views(
+            binding_count=len(routing["structural_bindings"]),
+            numeric=routed(
+                arguments.get("numeric", {}),
+                "numeric",
+                route_structural_numeric_arguments,
+            ),
+            categorical=routed(
+                arguments.get("category", arguments.get("categorical", {})),
+                "categorical",
+                route_structural_categorical_arguments,
+            ),
+            boolean=routed(
+                arguments.get("boolean", {}),
+                "boolean",
+                route_structural_boolean_arguments,
+            ),
+            reference=routed(
+                arguments.get("reference", {}),
+                "reference",
+                route_structural_reference_arguments,
+            ),
+            reference_set=routed(
+                arguments.get("reference_set", {}),
+                "reference_set",
+                route_structural_reference_set_arguments,
+            ),
+            scope=(
+                route_structural_scopes(structural["scope"])
+                if "binding" in structural["scope"]
+                else structural["scope"]
+            ),
         )
 
-        structural_payloads = (
-            map_structural_payloads_to_candidates(
-                records=records,
-                structural_payloads=(
-                    local_structural_payloads
-                ),
-            )
+        structural_payloads = map_structural_payloads_to_candidates(
+            records=records,
+            structural_payloads=local_structural_payloads,
         )
 
         return {
-            # Preserve the exact raw ActionSetPolicy output from this SAME
-            # H1/H2 forward. Runtime action materialization must not rerun
-            # the actor after MARL sampling.
             "prediction_template": output,
             "records": records,
             "resource_payloads": resource_payloads,
             "structural_payloads": structural_payloads,
             "resource_log_std": self.resource_log_std,
-            "structural_log_std": (
-                self.structural_log_std
-            ),
+            "structural_log_std": self.structural_log_std,
         }
+
+    @staticmethod
+    def _split_h1_latents(
+        *,
+        batched_latents: dict[str, torch.Tensor],
+        graphs: list[dict[str, Any]],
+    ) -> list[dict[str, torch.Tensor]]:
+        graph_keys = ("graph_h", "context_h", "observation_h")
+        family_keys = (
+            ("module_h", "module_x"),
+            ("connector_h", "connector_x"),
+            ("resource_h", "resource_x"),
+        )
+        offsets = {latent_key: 0 for latent_key, _ in family_keys}
+        result = []
+
+        for graph_index, graph in enumerate(graphs):
+            local = {
+                key: batched_latents[key][graph_index:graph_index + 1]
+                for key in graph_keys
+            }
+            for latent_key, input_key in family_keys:
+                count = len(graph[input_key])
+                start = offsets[latent_key]
+                stop = start + count
+                local[latent_key] = batched_latents[latent_key][start:stop]
+                offsets[latent_key] = stop
+            result.append(local)
+
+        return result
+
+    def forward_all_owners_batch(
+        self,
+        *,
+        graphs: list[Any],
+        routings: list[dict],
+        possible_agents: list[str],
+        lazy_payloads: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Batch H1 and H2 across graphs, preserving per-graph MARL output ABI."""
+        del possible_agents
+        graphs = list(graphs)
+        routings = list(routings)
+
+        if not graphs:
+            return []
+        if len(graphs) != len(routings):
+            raise ValueError("graph and routing batches must have the same size")
+        if any(routing is None for routing in routings):
+            raise ValueError("BCV4SharedActorWrapper requires routing snapshots")
+
+        batched_inputs = collate_policy_inputs(graphs)
+        batched_latents = self.policy.backbone.encode(batched_inputs)
+        if self.prefer_batched_h2:
+            from drl.MARL.h2_batching import split_action_set_h2_batch
+
+            packed_output = self.policy.head(batched_latents, batched_inputs)
+            outputs = split_action_set_h2_batch(
+                packed=packed_output, graphs=graphs,
+            )
+        else:
+            # Reference path for A/B regressions; no numerical shortcuts.
+            local_latents = self._split_h1_latents(
+                batched_latents=batched_latents, graphs=graphs,
+            )
+            outputs = [
+                self.policy.head(latents, graph)
+                for latents, graph in zip(local_latents, graphs, strict=True)
+            ]
+
+        return [
+            self._materialize_forward_output(
+                output=output,
+                graph=graph,
+                routing=routing,
+                lazy_payloads=lazy_payloads,
+            )
+            for output, graph, routing in zip(
+                outputs, graphs, routings, strict=True
+            )
+        ]
+
+    def forward_all_owners(
+        self,
+        *,
+        graph: Any,
+        routing: dict,
+        possible_agents: list[str],
+        lazy_payloads: bool = False,
+    ) -> dict[str, Any]:
+        """Run H1/H2 once and expose MARL distribution views."""
+        del possible_agents
+
+        if routing is None:
+            raise ValueError(
+                "BCV4SharedActorWrapper requires a routing snapshot"
+            )
+
+        return self._materialize_forward_output(
+            output=self.policy(graph),
+            graph=graph,
+            routing=routing,
+            lazy_payloads=lazy_payloads,
+        )

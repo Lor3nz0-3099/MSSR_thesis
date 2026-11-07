@@ -4,7 +4,7 @@ from itertools import combinations
 import json
 import math
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from smores_ep.config.geometry import SmoresGeometry
 from smores_ep.config.physics import SmoresActuatorConfig
@@ -29,6 +29,7 @@ class SmoresStateGraphPublisher:
         roles: Mapping[str, Mapping[str, Any]] | None = None,
         include_contact_candidates: bool = True,
         course_observation: Mapping[str, Any] | None = None,
+        velocity_provider: Callable[[str], tuple[tuple[float, float, float], tuple[float, float, float]]] | None = None,
     ) -> None:
         if set(module_roots) != set(states):
             raise ValueError("State publisher requires one reader per module")
@@ -53,6 +54,7 @@ class SmoresStateGraphPublisher:
             for module_id, payload in (roles or {}).items()
         }
         self._course_observation = dict(course_observation or {})
+        self._velocity_provider = velocity_provider
         self._last_sample: dict[
             str,
             tuple[float, tuple[float, float, float], float],
@@ -78,13 +80,13 @@ class SmoresStateGraphPublisher:
             "functional_role": dict(functional_role or {}),
         }
 
-    def publish(
+    def snapshot(
         self,
         stamp_s: float,
         *,
         support_engaged_by_module: Mapping[str, bool] | None = None,
         experiment_profile: str = "nominal",
-    ) -> None:
+    ) -> dict[str, Any]:
         face_poses = {
             module_id: self._docking.face_poses_for(module_id)
             for module_id in self._module_roots
@@ -186,9 +188,35 @@ class SmoresStateGraphPublisher:
             "state": state_payload,
             "graph": graph_payload,
         }
-        self._write("module_states.json", state_payload)
-        self._write("robot_graph.json", graph_payload)
-        self._write("state_graph.json", combined)
+        return combined
+
+    def publish(
+        self,
+        stamp_s: float,
+        *,
+        support_engaged_by_module: Mapping[str, bool] | None = None,
+        experiment_profile: str = "nominal",
+    ) -> None:
+        """Preserve the legacy file-backed publishing contract."""
+
+        combined = self.snapshot(
+            stamp_s,
+            support_engaged_by_module=support_engaged_by_module,
+            experiment_profile=experiment_profile,
+        )
+
+        self._write(
+            "module_states.json",
+            combined["state"],
+        )
+        self._write(
+            "robot_graph.json",
+            combined["graph"],
+        )
+        self._write(
+            "state_graph.json",
+            combined,
+        )
 
     def _module_payload(
         self,
@@ -344,9 +372,7 @@ class SmoresStateGraphPublisher:
         from pxr import Gf, Usd, UsdGeom
 
         path = f"{self._module_roots[module_id]}/body_link"
-        matrix = UsdGeom.Xformable(
-            self._stage.GetPrimAtPath(path)
-        ).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
+        matrix = self._docking.world_transform(path)
         translation = matrix.ExtractTranslation()
         quaternion = matrix.ExtractRotationQuat()
         imaginary = quaternion.GetImaginary()
@@ -374,6 +400,10 @@ class SmoresStateGraphPublisher:
         tuple[float, float, float],
         tuple[float, float, float],
     ]:
+        if self._velocity_provider is not None:
+            # Native PhysX measurements remain valid across repeated reads and
+            # reset teleports; they must not touch finite-difference history.
+            return self._velocity_provider(module_id)
         previous = self._last_sample.get(module_id)
         self._last_sample[module_id] = (stamp_s, position, yaw)
         if previous is None:
@@ -609,9 +639,7 @@ class SmoresStateGraphPublisher:
 
         def body_matrix(module_id: str) -> Any:
             path = f"{self._module_roots[module_id]}/body_link"
-            return UsdGeom.Xformable(
-                self._stage.GetPrimAtPath(path)
-            ).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
+            return self._docking.world_transform(path)
 
         relative = Gf.Transform(
             body_matrix(second_module_id)

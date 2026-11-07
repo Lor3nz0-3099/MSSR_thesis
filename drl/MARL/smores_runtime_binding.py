@@ -50,6 +50,12 @@ class SMORESMARLProposalOutcome:
     message: str
     owner_ids: tuple[str, ...] = ()
     statuses: tuple[object, ...] = ()
+    conflict_owner_ids: tuple[str, ...] = ()
+    invalid_owner_ids: tuple[str, ...] = ()
+    projection: object | None = None
+    physical_drops: tuple[object, ...] = ()
+    executed_candidate_ids: tuple[str, ...] = ()
+    admission_events: tuple[object, ...] = ()
 
 
 class SMORESMARLActionRejected(RuntimeError):
@@ -2693,6 +2699,96 @@ class SMORESNativeDispatcher:
         return self._last_outcome_by_env.get(
             env_index
         )
+
+    def _preview_projected_goal(self, env_index, decoded):
+        _, rows = self._continuous_specs((decoded,))
+        if not rows:
+            return None
+        command,module_ids,parameters = rows[0]
+        return self._build_primitive_goal(env_index=env_index,
+            sequence=self._sequence_by_env.get(env_index,0)+1,action_index=0,
+            command=command,module_ids=module_ids,parameters=parameters)
+
+    def check_projected_candidate(self, env_index, candidate):
+        """Read native admission/ownership using existing executor rules."""
+        executor = self.executor_provider(env_index)
+        if executor is None:
+            raise RuntimeError(f'No primitive executor for env {env_index}')
+        try:
+            goal = self._preview_projected_goal(env_index,candidate.decoded)
+        except ValueError as error:
+            return 'INVALID_GOAL',str(error)
+        if goal is not None:
+            status = executor.check_admission(goal,self.now_provider(env_index))
+            if status is None or getattr(status,'state',None)==self.accepted_state:
+                return None
+            code = str(status.code)
+            if code not in self._EXPECTED_POLICY_REJECTION_CODES:
+                raise RuntimeError(f'Unexpected infrastructure rejection: {code}: {status.message}')
+            return code,str(status.message)
+        from drl.IL.bc_v1.live_policy import claim_key
+        busy = executor.resource_claim_conflicts({claim_key(c):'exclusive' for c in candidate.claims})
+        if busy:
+            return 'RESOURCE_BUSY',', '.join(f"{r} owned by {', '.join(owners)}" for r,owners in sorted(busy.items()))
+        return None
+
+    def dispatch_projected(self, *, env_index, projection):
+        """Admit projected members independently, preserving successes/events.
+
+        A late expected rejection drops one member. Infrastructure failures roll
+        back this call's admitted goals and remain fatal. Legacy __call__ stays
+        atomic. The raw action and its projection never replace rollout actions.
+        """
+        from drl.MARL.action_projection import ProjectionDrop
+        from drl.MARL.projected_runtime import projection_outcome
+        accepted, statuses, dropped, admitted_goal_ids, admission_events = [], [], [], [], []
+        executor = self.executor_provider(env_index)
+        if executor is None:
+            raise RuntimeError(f'No primitive executor for env {env_index}')
+        try:
+            for candidate in projection.accepted_candidates:
+                goal = self._preview_projected_goal(env_index,candidate.decoded)
+                try:
+                    member_statuses = self(env_index=env_index,decoded_actions=(candidate.decoded,),context=None)
+                except SMORESMARLActionRejected as error:
+                    dropped.append(ProjectionDrop(candidate.candidate_id,candidate.candidate_index,
+                        candidate.raw_presence_logit,candidate.owner_ids,error.outcome.code,error.outcome.message))
+                    holders = ()
+                    if error.outcome.code == 'RESOURCE_BUSY' and hasattr(executor, 'active_resource_snapshot'):
+                        from drl.IL.bc_v1.live_policy import claim_key
+                        modes = (dict(executor.resource_claims_for(goal)) if goal is not None else
+                                 {claim_key(c): 'exclusive' for c in candidate.claims})
+                        conflicts = executor.resource_claim_conflicts(modes)
+                        goal_ids = {g for owners in conflicts.values() for g in owners}
+                        holders = tuple(r for r in executor.active_resource_snapshot() if r.goal_id in goal_ids)
+                    admission_events.append(dict(candidate_id=candidate.candidate_id, accepted=False,
+                        code=error.outcome.code, message=error.outcome.message,
+                        active_claims=holders))
+                    continue
+                accepted.append(candidate)
+                statuses.extend(member_statuses)
+                admission_events.append(dict(candidate_id=candidate.candidate_id, accepted=True,
+                    goal_id=goal.goal_id if goal is not None else None))
+                if goal is not None:
+                    admitted_goal_ids.append(goal.goal_id)
+            specs,_ = self._continuous_specs(tuple(c.decoded for c in accepted))
+            self._continuous_by_env[env_index] = self._build_continuous_commands(specs)
+            from dataclasses import replace
+            self._last_outcome_by_env[env_index] = replace(projection_outcome(projection,
+                executed=tuple(c.candidate_id for c in accepted),physical_drops=dropped,statuses=statuses),
+                admission_events=tuple(admission_events))
+            return tuple(statuses)
+        except Exception:
+            rollback_errors = []
+            for goal_id in reversed(admitted_goal_ids):
+                try:
+                    executor.cancel(goal_id,self.now_provider(env_index))
+                except Exception as error:
+                    rollback_errors.append((goal_id,str(error)))
+            self.clear(env_index)
+            if rollback_errors:
+                raise RuntimeError(f'Projected native rollback failed: {rollback_errors}')
+            raise
 
     def clear(
         self,

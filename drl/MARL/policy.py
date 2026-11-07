@@ -12,6 +12,12 @@ class MARLCandidateRecord:
     owner_agent_id: str
     participant_agent_ids: tuple[str, ...]
     presence_logit: torch.Tensor
+    presence_threshold_logit: float = 0.0
+
+    @property
+    def effective_presence_logit(self):
+        """Calibrated stochastic boundary, retaining raw H2 for arbitration."""
+        return self.presence_logit - self.presence_threshold_logit
 
 
 @dataclass(frozen=True)
@@ -334,6 +340,15 @@ def compose_structural_payload_views(
     }
 
 
+def _host_scalar_values(value):
+    """Snapshot non-differentiable flat support in one device-to-host read.
+
+    Keep the scalar reference path for other shapes, including its validation.
+    No logits, distribution arithmetic, sums or random draws are changed.
+    """
+    return value.detach().cpu().tolist() if value.ndim == 1 else None
+
+
 def compute_owner_presence_log_probs(
     *,
     records: tuple[MARLCandidateRecord, ...],
@@ -342,6 +357,7 @@ def compute_owner_presence_log_probs(
     possible_agents: tuple[str, ...],
 ) -> dict[str, torch.Tensor]:
     """Compute Bernoulli presence log-prob independently for each owner."""
+    mask_values = _host_scalar_values(hard_mask)
     log_probs = {
         uid: torch.zeros(
             (),
@@ -354,11 +370,11 @@ def compute_owner_presence_log_probs(
     for record in records:
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
         distribution = torch.distributions.Bernoulli(
-            logits=record.presence_logit,
+            logits=record.effective_presence_logit,
         )
         contribution = distribution.log_prob(
             sampled_presence[index].to(
@@ -384,6 +400,8 @@ def compute_owner_resource_categorical_log_probs(
     possible_agents: tuple[str, ...],
 ) -> dict[str, torch.Tensor]:
     """Compute categorical resource payload log-prob per owner."""
+    mask_values = _host_scalar_values(hard_mask)
+    presence_values = _host_scalar_values(sampled_presence)
     log_probs = {
         uid: torch.zeros(
             (),
@@ -399,10 +417,10 @@ def compute_owner_resource_categorical_log_probs(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
-        if not bool(sampled_presence[index].item()):
+        if not (presence_values[index] if presence_values is not None else bool(sampled_presence[index].item())):
             continue
 
         payload = resource_payloads.get(index)
@@ -436,6 +454,8 @@ def compute_owner_resource_numeric_log_probs(
     log_std: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Compute Gaussian resource payload log-prob independently per owner."""
+    mask_values = _host_scalar_values(hard_mask)
+    presence_values = _host_scalar_values(sampled_presence)
     log_probs = {
         uid: torch.zeros(
             (),
@@ -451,10 +471,10 @@ def compute_owner_resource_numeric_log_probs(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
-        if not bool(sampled_presence[index].item()):
+        if not (presence_values[index] if presence_values is not None else bool(sampled_presence[index].item())):
             continue
 
         payload = resource_payloads.get(index)
@@ -514,6 +534,8 @@ def compute_owner_structural_boolean_log_probs(
     possible_agents: tuple[str, ...],
 ) -> dict[str, torch.Tensor]:
     """Compute structural boolean argument log-prob per owner."""
+    mask_values = _host_scalar_values(hard_mask)
+    presence_values = _host_scalar_values(sampled_presence)
     log_probs = {
         uid: torch.zeros(
             (),
@@ -529,10 +551,10 @@ def compute_owner_structural_boolean_log_probs(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
-        if not bool(sampled_presence[index].item()):
+        if not (presence_values[index] if presence_values is not None else bool(sampled_presence[index].item())):
             continue
 
         payload = structural_payloads.get(index)
@@ -570,6 +592,8 @@ def compute_owner_structural_categorical_log_probs(
     possible_agents: tuple[str, ...],
 ) -> dict[str, torch.Tensor]:
     """Compute structural categorical argument log-prob per owner."""
+    mask_values = _host_scalar_values(hard_mask)
+    presence_values = _host_scalar_values(sampled_presence)
     log_probs = {
         uid: torch.zeros(
             (),
@@ -585,10 +609,10 @@ def compute_owner_structural_categorical_log_probs(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
-        if not bool(sampled_presence[index].item()):
+        if not (presence_values[index] if presence_values is not None else bool(sampled_presence[index].item())):
             continue
 
         payload = structural_payloads.get(index)
@@ -624,6 +648,8 @@ def compute_owner_structural_numeric_log_probs(
     log_std: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Compute Gaussian structural numeric-argument log-prob per owner."""
+    mask_values = _host_scalar_values(hard_mask)
+    presence_values = _host_scalar_values(sampled_presence)
     log_probs = {
         uid: torch.zeros(
             (),
@@ -639,10 +665,10 @@ def compute_owner_structural_numeric_log_probs(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
-        if not bool(sampled_presence[index].item()):
+        if not (presence_values[index] if presence_values is not None else bool(sampled_presence[index].item())):
             continue
 
         payload = structural_payloads.get(index)
@@ -689,6 +715,8 @@ def compute_owner_structural_reference_log_probs(
     possible_agents: tuple[str, ...],
 ) -> dict[str, torch.Tensor]:
     """Compute single-reference structural argument log-prob per owner."""
+    mask_values = _host_scalar_values(hard_mask)
+    presence_values = _host_scalar_values(sampled_presence)
     log_probs = {
         uid: torch.zeros(
             (),
@@ -704,10 +732,10 @@ def compute_owner_structural_reference_log_probs(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
-        if not bool(sampled_presence[index].item()):
+        if not (presence_values[index] if presence_values is not None else bool(sampled_presence[index].item())):
             continue
 
         payload = structural_payloads.get(index)
@@ -756,6 +784,8 @@ def compute_owner_structural_reference_set_log_probs(
     possible_agents: tuple[str, ...],
 ) -> dict[str, torch.Tensor]:
     """Compute optional reference-set membership log-prob per owner."""
+    mask_values = _host_scalar_values(hard_mask)
+    presence_values = _host_scalar_values(sampled_presence)
     log_probs = {
         uid: torch.zeros(
             (),
@@ -771,10 +801,10 @@ def compute_owner_structural_reference_set_log_probs(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
-        if not bool(sampled_presence[index].item()):
+        if not (presence_values[index] if presence_values is not None else bool(sampled_presence[index].item())):
             continue
 
         payload = structural_payloads.get(index)
@@ -819,6 +849,8 @@ def compute_owner_structural_scope_log_probs(
     possible_agents: tuple[str, ...],
 ) -> dict[str, torch.Tensor]:
     """Compute optional structural-scope membership log-prob per owner."""
+    mask_values = _host_scalar_values(hard_mask)
+    presence_values = _host_scalar_values(sampled_presence)
     log_probs = {
         uid: torch.zeros(
             (),
@@ -834,10 +866,10 @@ def compute_owner_structural_scope_log_probs(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
-        if not bool(sampled_presence[index].item()):
+        if not (presence_values[index] if presence_values is not None else bool(sampled_presence[index].item())):
             continue
 
         payload = structural_payloads.get(index)
@@ -1016,8 +1048,21 @@ def sample_marl_action_bundle(
     hard_mask: torch.Tensor,
     resource_log_std: torch.Tensor,
     structural_log_std: torch.Tensor,
+    deterministic: bool = False,
+    bulk_host_reads: bool = True,
 ) -> MARLActionBundle:
-    """Sample a MARL action bundle from the current policy distributions."""
+    """Sample the calibrated policy; explicit evaluation uses distribution modes.
+
+    Calibration only shifts membership logits, never continuous payloads.
+    """
+    def draw(distribution):
+        if not deterministic:
+            return distribution.sample()
+        if isinstance(distribution, torch.distributions.Bernoulli):
+            return (distribution.logits >= 0).to(distribution.logits.dtype)
+        if isinstance(distribution, torch.distributions.Categorical):
+            return distribution.logits.argmax(dim=-1)
+        return distribution.mean
     if records:
         reference = records[0].presence_logit
         presence = torch.zeros(
@@ -1032,27 +1077,35 @@ def sample_marl_action_bundle(
             device=hard_mask.device,
         )
 
+    # Two bulk transfers replace candidate-wise device scalar reads. Keep
+    # each Bernoulli draw and all payload-family draw ordering unchanged.
+    if records and hard_mask.numel() != len(records):
+        bulk_host_reads = False  # Preserve legacy diagnostics for malformed masks.
+    mask_values = hard_mask.detach().reshape(-1).cpu().tolist() if bulk_host_reads else None
     for record in records:
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if bulk_host_reads else bool(hard_mask[index].item())):
             presence[index] = 0.0
             continue
 
         distribution = torch.distributions.Bernoulli(
-            logits=record.presence_logit,
+            logits=record.effective_presence_logit,
         )
-        presence[index] = distribution.sample()
+        presence[index] = draw(distribution)
+
+    presence_values = presence.detach().cpu().tolist() if bulk_host_reads else None
+    selected_records = tuple(r for r in records if presence_values[r.candidate_index]) if bulk_host_reads else records
 
     resource_numeric = {}
 
-    for record in records:
+    for record in selected_records:
         if record.candidate_kind != "resource":
             continue
 
         index = record.candidate_index
 
-        if not bool(presence[index].item()):
+        if not bulk_host_reads and not bool(presence[index].item()):
             continue
 
         payload = resource_payloads.get(index)
@@ -1070,17 +1123,17 @@ def sample_marl_action_bundle(
             scale=std,
         )
 
-        resource_numeric[index] = distribution.sample()
+        resource_numeric[index] = draw(distribution)
 
     resource_categorical = {}
 
-    for record in records:
+    for record in selected_records:
         if record.candidate_kind != "resource":
             continue
 
         index = record.candidate_index
 
-        if not bool(presence[index].item()):
+        if not bulk_host_reads and not bool(presence[index].item()):
             continue
 
         payload = resource_payloads.get(index)
@@ -1091,17 +1144,17 @@ def sample_marl_action_bundle(
             logits=payload.categorical_logits,
         )
 
-        resource_categorical[index] = distribution.sample()
+        resource_categorical[index] = draw(distribution)
 
     structural_numeric = {}
 
-    for record in records:
+    for record in selected_records:
         if record.candidate_kind != "structural":
             continue
 
         index = record.candidate_index
 
-        if not bool(presence[index].item()):
+        if not bulk_host_reads and not bool(presence[index].item()):
             continue
 
         payload = structural_payloads.get(index)
@@ -1124,20 +1177,20 @@ def sample_marl_action_bundle(
 
             sampled_arguments[
                 argument.argument_index
-            ] = distribution.sample()
+            ] = draw(distribution)
 
         if sampled_arguments:
             structural_numeric[index] = sampled_arguments
 
     structural_boolean = {}
 
-    for record in records:
+    for record in selected_records:
         if record.candidate_kind != "structural":
             continue
 
         index = record.candidate_index
 
-        if not bool(presence[index].item()):
+        if not bulk_host_reads and not bool(presence[index].item()):
             continue
 
         payload = structural_payloads.get(index)
@@ -1153,20 +1206,20 @@ def sample_marl_action_bundle(
 
             sampled_arguments[
                 argument.argument_index
-            ] = distribution.sample()
+            ] = draw(distribution)
 
         if sampled_arguments:
             structural_boolean[index] = sampled_arguments
 
     structural_categorical = {}
 
-    for record in records:
+    for record in selected_records:
         if record.candidate_kind != "structural":
             continue
 
         index = record.candidate_index
 
-        if not bool(presence[index].item()):
+        if not bulk_host_reads and not bool(presence[index].item()):
             continue
 
         payload = structural_payloads.get(index)
@@ -1182,20 +1235,20 @@ def sample_marl_action_bundle(
 
             sampled_arguments[
                 argument.argument_index
-            ] = distribution.sample()
+            ] = draw(distribution)
 
         if sampled_arguments:
             structural_categorical[index] = sampled_arguments
 
     structural_reference = {}
 
-    for record in records:
+    for record in selected_records:
         if record.candidate_kind != "structural":
             continue
 
         index = record.candidate_index
 
-        if not bool(presence[index].item()):
+        if not bulk_host_reads and not bool(presence[index].item()):
             continue
 
         payload = structural_payloads.get(index)
@@ -1209,7 +1262,7 @@ def sample_marl_action_bundle(
                 logits=argument.logits,
             )
 
-            local_position = distribution.sample()
+            local_position = draw(distribution)
 
             sampled_arguments[
                 argument.argument_index
@@ -1222,13 +1275,13 @@ def sample_marl_action_bundle(
 
     structural_reference_set = {}
 
-    for record in records:
+    for record in selected_records:
         if record.candidate_kind != "structural":
             continue
 
         index = record.candidate_index
 
-        if not bool(presence[index].item()):
+        if not bulk_host_reads and not bool(presence[index].item()):
             continue
 
         payload = structural_payloads.get(index)
@@ -1242,7 +1295,7 @@ def sample_marl_action_bundle(
                 logits=argument.optional_logits,
             )
 
-            optional_membership = distribution.sample().bool()
+            optional_membership = draw(distribution).bool()
 
             selected_optional = argument.optional_domain_indices[
                 optional_membership
@@ -1264,13 +1317,13 @@ def sample_marl_action_bundle(
 
     structural_scope = {}
 
-    for record in records:
+    for record in selected_records:
         if record.candidate_kind != "structural":
             continue
 
         index = record.candidate_index
 
-        if not bool(presence[index].item()):
+        if not bulk_host_reads and not bool(presence[index].item()):
             continue
 
         payload = structural_payloads.get(index)
@@ -1283,7 +1336,7 @@ def sample_marl_action_bundle(
             logits=scope.optional_logits,
         )
 
-        optional_membership = distribution.sample().bool()
+        optional_membership = draw(distribution).bool()
 
         selected_optional = scope.optional_domain_indices[
             optional_membership
@@ -1318,6 +1371,7 @@ def compute_owner_presence_entropies(
     possible_agents: tuple[str, ...],
 ) -> dict[str, torch.Tensor]:
     """Compute Bernoulli presence entropy per candidate owner."""
+    mask_values = _host_scalar_values(hard_mask)
     if records:
         reference = records[0].presence_logit
         entropies = {
@@ -1341,11 +1395,11 @@ def compute_owner_presence_entropies(
     for record in records:
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
         distribution = torch.distributions.Bernoulli(
-            logits=record.presence_logit,
+            logits=record.effective_presence_logit,
         )
 
         entropies[record.owner_agent_id] = (
@@ -1365,6 +1419,7 @@ def compute_owner_resource_payload_entropies(
     log_std: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Compute expected resource-payload entropy per owner."""
+    mask_values = _host_scalar_values(hard_mask)
     if records:
         reference = records[0].presence_logit
         entropies = {
@@ -1391,7 +1446,7 @@ def compute_owner_resource_payload_entropies(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
         payload = resource_payloads.get(index)
@@ -1429,7 +1484,7 @@ def compute_owner_resource_payload_entropies(
             continue
 
         presence_probability = torch.sigmoid(
-            record.presence_logit
+            record.effective_presence_logit
         )
 
         contribution = (
@@ -1453,6 +1508,7 @@ def compute_owner_structural_payload_entropies(
     log_std: torch.Tensor,
 ) -> dict[str, torch.Tensor]:
     """Compute expected structural-payload entropy per owner."""
+    mask_values = _host_scalar_values(hard_mask)
     if records:
         reference = records[0].presence_logit
         entropies = {
@@ -1479,7 +1535,7 @@ def compute_owner_structural_payload_entropies(
 
         index = record.candidate_index
 
-        if bool(hard_mask[index].item()):
+        if (mask_values[index] if mask_values is not None else bool(hard_mask[index].item())):
             continue
 
         payload = structural_payloads.get(index)
@@ -1565,7 +1621,7 @@ def compute_owner_structural_payload_entropies(
             continue
 
         presence_probability = torch.sigmoid(
-            record.presence_logit
+            record.effective_presence_logit
         )
 
         entropies[record.owner_agent_id] = (
@@ -1623,6 +1679,7 @@ def bind_marl_candidates(
     *,
     routing: dict,
     presence_logits: torch.Tensor,
+    presence_threshold_logit: float = 0.0,
 ) -> tuple[MARLCandidateRecord, ...]:
     """Bind BC-v4 candidate routing to MARL owner/participant semantics."""
     records = []
@@ -1644,6 +1701,7 @@ def bind_marl_candidates(
                 owner_agent_id=module_id,
                 participant_agent_ids=(),
                 presence_logit=presence_logits[index],
+                presence_threshold_logit=presence_threshold_logit,
             )
         )
         index += 1
@@ -1676,6 +1734,7 @@ def bind_marl_candidates(
                 owner_agent_id=owner_id,
                 participant_agent_ids=participants,
                 presence_logit=presence_logits[index],
+                presence_threshold_logit=presence_threshold_logit,
             )
         )
         index += 1

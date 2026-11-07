@@ -32,9 +32,15 @@ def decode_action_sets(prediction,batch,normalizers,*,configured_arguments=None,
     domains=tuple(d for r in routes for d in r['argument_domains'])
     args=_Arguments(structural,x['structural'],modules,connectors,domains,normalizers)
     bindings={(b.module_type_id,b.resource_id,b.mode_id):b for b in normalizers.resource_bindings}
-    argument_rows=defaultdict(list)
-    for i,binding in enumerate(x['structural']['argument_binding'].cpu().tolist()):argument_rows[binding].append(i)
-    st=x['structural'];scope_ptr=st['scope_ptr'].cpu().tolist();members=st['scope_members'].cpu().tolist();required=st['scope_required'].cpu().tolist()
+    cached=batch.get('runtime_decoder_layout')
+    if (cached is not None and len(routes)==1 and cached.token==routes[0].get('runtime_candidate_layout_token')
+            and cached.resource_count==rq and len(cached.argument_rows)==sq):
+        argument_rows=cached.argument_rows
+        scope_ptr,members,required=cached.scope_ptr,cached.members,cached.required
+    else:
+        argument_rows=defaultdict(list)
+        for i,binding in enumerate(x['structural']['argument_binding'].cpu().tolist()):argument_rows[binding].append(i)
+        st=x['structural'];scope_ptr=st['scope_ptr'].cpu().tolist();members=st['scope_members'].cpu().tolist();required=st['scope_required'].cpu().tolist()
     results=[];ro=so=0;configured={} if configured_arguments is None else configured_arguments
     for route in routes:
         actions=[]

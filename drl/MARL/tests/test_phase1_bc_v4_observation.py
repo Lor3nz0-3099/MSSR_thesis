@@ -440,5 +440,5 @@ def test_task4c2_real_checkpoint_consumes_exact_live_actor_graph(
         == pytest.approx(30.0)
     )
 
-    # Critical contract: this is stochastic-MAPPO actor preparation.
-    # No deterministic 4.5 validation threshold is used here.
+    # Raw H2 logits stay observable. MARL sampling shifts their configured
+    # boundary; it does not hard-threshold the stochastic training action.

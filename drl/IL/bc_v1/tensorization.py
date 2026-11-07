@@ -93,8 +93,10 @@ def _width(spec, schema, family):
     return sum(f.width for f in _resolved_fields(schema, SCHEMA_FAMILIES.get(family, family), vocab, coordinate))
 
 
-def _candidate_inputs(table, spec, indices, routing):
+def _candidate_inputs(table, spec, indices, routing, static_cache=None):
     """Catalog/group/domain routing, built before reading any expert targets."""
+    if static_cache is not None:
+        return static_cache.pack(table, spec, indices, routing, _candidate_inputs)
     actions = tuple(sorted(spec.actions, key=lambda a: a.action_id))
     action_index = {a.action_id:i for i,a in enumerate(actions)}
     parameter_catalog = tuple((a.action_id,p.name) for a in actions for p in sorted(a.parameters,key=lambda p:p.name))
@@ -229,7 +231,7 @@ def _target_tensors(resource_targets, structural_targets, indices, routing, inpu
     return {'resource': resource, 'structural': structural}
 
 
-def tensorize_policy_sample(sample, *, spec, feature_schema, normalization_policy, normalizers, tensor_layout):
+def tensorize_policy_sample(sample, *, spec, feature_schema, normalization_policy, normalizers, tensor_layout, static_cache=None):
     """Inputs are label-independent. Supervision is normalized separately once."""
     d2._validate_selected_inputs(sample.inputs.policy)
     view = f2.normalize_features(sample.inputs.features, normalizers, feature_schema, normalization_policy, spec)
@@ -289,7 +291,7 @@ def tensorize_policy_sample(sample, *, spec, feature_schema, normalization_polic
     routing.update(environment_refs=tuple(r.ref for r in view.environment), environment_layouts=layouts,
         object_refs=tuple(objects), task_vocabulary=tensor_layout['task_vocabulary'])
     routing['module_types'] = tuple(row.catalog_ref for row in view.modules)
-    inputs['resource_candidates'], inputs['structural'] = _candidate_inputs(sample.inputs.candidates, spec, indices, routing)
+    inputs['resource_candidates'], inputs['structural'] = _candidate_inputs(sample.inputs.candidates, spec, indices, routing, static_cache)
     _representable(sample.supervision, sample.inputs.candidates)
     resource_targets = tuple(f2.normalize_target(t, normalizers, module_type_id=module_types[t.resource.module])
         for t in sample.supervision.resource_targets)

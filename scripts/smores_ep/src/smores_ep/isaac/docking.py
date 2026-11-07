@@ -44,6 +44,7 @@ class IsaacDockingManager:
         module_roots: Mapping[str, str],
         thresholds: DockingThresholds | None = None,
         joints_root: str = "/World/SmoresEPDockingJoints",
+        world_transform_provider=None,
     ) -> None:
         if len(module_roots) < 2:
             raise ValueError("Docking requires at least two registered modules")
@@ -53,6 +54,7 @@ class IsaacDockingManager:
         self._module_roots = dict(module_roots)
         self._thresholds = thresholds or DockingThresholds()
         self._joints_root = joints_root
+        self._world_transform_provider = world_transform_provider
         self._faces = self._discover_faces()
         self._connections: dict[frozenset[str], DockingConnection] = {}
         self._joint_serial = 0
@@ -82,6 +84,123 @@ class IsaacDockingManager:
             for connection in self._connections.values()
             for face in (connection.first_face, connection.second_face)
         )
+
+    def export_connections(self) -> list[dict]:
+        """Copy registered fixed-joint frames, with module-relative body paths.
+
+        The native articulation pose is captured separately. USD is authoritative
+        here only for the authored joint frames and relationship endpoints.
+        """
+        from pxr import UsdPhysics
+        result = []
+        for connection in self.connections:
+            joint = UsdPhysics.FixedJoint(self._stage.GetPrimAtPath(connection.joint_path))
+            if not joint:
+                raise ValueError('registered docking joint is missing')
+            edge = {}
+            for index,(side,face) in enumerate((('first',connection.first_face),
+                                               ('second',connection.second_face))):
+                relation = joint.GetBody0Rel() if index == 0 else joint.GetBody1Rel()
+                if [str(p) for p in relation.GetTargets()] != [face.rigid_body_path]:
+                    raise ValueError('docking joint body relationship mismatch')
+                root = self._module_roots[face.module_id]+'/'
+                if not face.rigid_body_path.startswith(root):
+                    raise ValueError('docking body outside module root')
+                edge[side+'_owner'] = face.module_id
+                edge[side+'_port'] = face.face_name
+                edge[side+'_body_relative_path'] = face.rigid_body_path[len(root):]
+                position = joint.GetLocalPos0Attr().Get() if index == 0 else joint.GetLocalPos1Attr().Get()
+                rotation = joint.GetLocalRot0Attr().Get() if index == 0 else joint.GetLocalRot1Attr().Get()
+                edge[f'local_pos{index}'] = [float(v) for v in position]
+                edge[f'local_rot{index}_xyzw'] = [*map(float,rotation.GetImaginary()),float(rotation.GetReal())]
+            edge['collision_enabled'] = bool(joint.GetCollisionEnabledAttr().Get())
+            edge['exclude_from_articulation'] = bool(joint.GetExcludeFromArticulationAttr().Get())
+            result.append(edge)
+        self.validate_connection_states(result)
+        return result
+
+    def validate_connection_states(self, states):
+        """Preflight every restored joint against this manager's discovered ports."""
+        if not isinstance(states,list):
+            raise ValueError('connection states must be a list')
+        occupied, pairs = set(), set()
+        for state in states:
+            keys = []
+            for side in ('first','second'):
+                owner,port = state.get(side+'_owner'),state.get(side+'_port')
+                faces = self._faces.get(owner,())
+                face = next((face for face in faces if face.face_name == port),None)
+                if face is None:
+                    raise ValueError('unknown docking owner/port')
+                relative = state.get(side+'_body_relative_path')
+                if (not isinstance(relative,str) or relative.startswith('/') or
+                    any(part in ('','.','..') for part in relative.split('/')) or
+                    self._module_roots[owner]+'/'+relative != face.rigid_body_path):
+                    raise ValueError('unknown docking root/body path')
+                keys.append(face.key)
+            pair = frozenset(key[0] for key in keys)
+            if len(pair) != 2 or pair in pairs or any(key in occupied for key in keys):
+                raise ValueError('duplicate docking pair or occupied port')
+            pairs.add(pair);occupied.update(keys)
+            for index in (0,1):
+                for field,count in ((f'local_pos{index}',3),(f'local_rot{index}_xyzw',4)):
+                    values = state.get(field)
+                    if (not isinstance(values,(tuple,list)) or len(values) != count or
+                        any(type(v) not in (int,float) or not math.isfinite(v) for v in values)):
+                        raise ValueError('invalid finite docking joint frame')
+                    if count == 4 and abs(sum(v*v for v in values)-1.) > 1e-4:
+                        raise ValueError('invalid docking joint quaternion')
+            if state.get('collision_enabled') is not False or state.get('exclude_from_articulation') is not True:
+                raise ValueError('incompatible docking joint physics')
+
+    def restore_connections(self, states) -> tuple[DockingConnection, ...]:
+        """Reconstruct previously certified exact joints; no attach gate or snap.
+
+        Call only after physical snapshot validation and detached router reset.
+        All endpoint paths are resolved from the existing owner/port registry;
+        a snapshot cannot choose a USD destination or joint body.
+        """
+        from pxr import Gf,Sdf,UsdPhysics
+        import posixpath
+        self.validate_connection_states(states)
+        if self.connections:
+            raise ValueError('restore requires detached docking connections')
+        parents = {posixpath.dirname(root) for root in self._module_roots.values()}
+        if len(parents) != 1 or not self._joints_root.startswith(next(iter(parents))+'/'):
+            raise ValueError('docking joints root outside module environment')
+        created = []
+        try:
+            for state in states:
+                faces = [next(face for face in self._faces[state[side+'_owner']]
+                              if face.face_name == state[side+'_port']) for side in ('first','second')]
+                # Choose fresh names without replacing any pre-existing prim.
+                while True:
+                    self._joint_serial += 1
+                    path = f'{self._joints_root}/snapshot_{self._joint_serial:06d}'
+                    if not self._stage.GetPrimAtPath(path):
+                        break
+                joint = UsdPhysics.FixedJoint.Define(self._stage,path)
+                created.append(path)
+                joint.CreateBody0Rel().SetTargets([Sdf.Path(faces[0].rigid_body_path)])
+                joint.CreateBody1Rel().SetTargets([Sdf.Path(faces[1].rigid_body_path)])
+                joint.CreateCollisionEnabledAttr(False)
+                joint.CreateExcludeFromArticulationAttr(True)
+                for index in (0,1):
+                    position = Gf.Vec3f(*state[f'local_pos{index}'])
+                    rotation = state[f'local_rot{index}_xyzw']
+                    quaternion = Gf.Quatf(rotation[3],Gf.Vec3f(*rotation[:3]))
+                    if index == 0:
+                        joint.CreateLocalPos0Attr(position);joint.CreateLocalRot0Attr(quaternion)
+                    else:
+                        joint.CreateLocalPos1Attr(position);joint.CreateLocalRot1Attr(quaternion)
+                connection = DockingConnection(path,*faces)
+                self._connections[connection.module_pair] = connection
+        except Exception:
+            for path in created:
+                self._stage.RemovePrim(path)
+            self._connections.clear()
+            raise
+        return self.connections
 
     def faces_for(self, module_id: str) -> tuple[DockingFace, ...]:
         self._require_module(module_id)
@@ -173,13 +292,18 @@ class IsaacDockingManager:
             discovered[module_id] = tuple(faces)
         return discovered
 
+    def world_transform(self, path):
+        """Read a live native pose when supplied, otherwise legacy USD."""
+        provider = getattr(self, '_world_transform_provider', None)
+        if provider is not None:
+            return provider(str(path))
+        from pxr import UsdGeom
+        return UsdGeom.XformCache().GetLocalToWorldTransform(self._stage.GetPrimAtPath(path))
+
     def _read_face_pose(self, face: DockingFace) -> DockingFacePose:
         from pxr import Gf, Usd, UsdGeom
 
-        prim = self._stage.GetPrimAtPath(face.frame_path)
-        transform = UsdGeom.Xformable(prim).ComputeLocalToWorldTransform(
-            Usd.TimeCode.Default()
-        )
+        transform = self.world_transform(face.frame_path)
         position = transform.ExtractTranslation()
         normal = transform.TransformDir(Gf.Vec3d(1.0, 0.0, 0.0))
         tangent = transform.TransformDir(Gf.Vec3d(0.0, 1.0, 0.0))
@@ -362,12 +486,8 @@ class IsaacDockingManager:
         joint.CreateExcludeFromArticulationAttr(True)
 
         cache = UsdGeom.XformCache()
-        first_face_world = cache.GetLocalToWorldTransform(
-            self._stage.GetPrimAtPath(first.frame_path)
-        )
-        second_face_world = cache.GetLocalToWorldTransform(
-            self._stage.GetPrimAtPath(second.frame_path)
-        )
+        first_face_world = self.world_transform(first.frame_path)
+        second_face_world = self.world_transform(second.frame_path)
         common_world = first_face_world
         for body_index, (body_path, face_world) in enumerate(
             (
@@ -375,9 +495,7 @@ class IsaacDockingManager:
                 (second.rigid_body_path, second_face_world),
             )
         ):
-            body_world = cache.GetLocalToWorldTransform(
-                self._stage.GetPrimAtPath(body_path)
-            )
+            body_world = self.world_transform(body_path)
             local = Gf.Transform(common_world) * Gf.Transform(
                 body_world.GetInverse()
             )
@@ -396,12 +514,8 @@ class IsaacDockingManager:
             # preserving it forever. The common current orientation remains
             # unchanged, avoiding a 180-degree impulse from the opposed
             # outward-normal convention.
-            first_body_world = cache.GetLocalToWorldTransform(
-                self._stage.GetPrimAtPath(first.rigid_body_path)
-            )
-            second_body_world = cache.GetLocalToWorldTransform(
-                self._stage.GetPrimAtPath(second.rigid_body_path)
-            )
+            first_body_world = self.world_transform(first.rigid_body_path)
+            second_body_world = self.world_transform(second.rigid_body_path)
             first_local = Gf.Transform(first_face_world) * Gf.Transform(
                 first_body_world.GetInverse()
             )

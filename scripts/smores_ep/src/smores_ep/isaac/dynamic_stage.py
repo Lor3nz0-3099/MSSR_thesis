@@ -238,8 +238,12 @@ class ArticulationStateReader:
         module_root: str = PHYSICS_ROOT,
         actuators: SmoresActuatorConfig | None = None,
         stage: Any | None = None,
+        *,
+        articulation: Any | None = None,
     ) -> None:
-        from isaacsim.core.experimental.prims import Articulation
+        if articulation is None:
+            from isaacsim.core.experimental.prims import Articulation
+            articulation = Articulation(module_root)
 
         self.module_root = module_root
         self._stage = stage
@@ -247,7 +251,7 @@ class ArticulationStateReader:
         self._pan_contact_mode: str | None = None
         drive = actuators or SmoresActuatorConfig()
         self._drive = drive
-        self._articulation = Articulation(module_root)
+        self._articulation = articulation
         paths = self._articulation.dof_paths[0]
         self.dof_paths = tuple(paths)
         joints_root = f"{module_root}/joints"

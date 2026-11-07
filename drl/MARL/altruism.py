@@ -689,6 +689,7 @@ def compute_gae_channel(
     gae_lambda: float,
     terminated: torch.Tensor | None = None,
     next_values: torch.Tensor | None = None,
+    duration_steps: torch.Tensor | None = None,
 ) -> GAEChannelResult:
     """Compute one independent GAE/value-target channel.
 
@@ -816,6 +817,26 @@ def compute_gae_channel(
         device=rewards.device,
     )
 
+    if duration_steps is None:
+        duration_steps = torch.ones_like(rewards, dtype=torch.long)
+    else:
+        if (
+            not torch.is_tensor(duration_steps)
+            or duration_steps.shape != rewards.shape
+            or duration_steps.device != rewards.device
+        ):
+            raise ValueError(
+                "duration_steps must match rewards shape/device"
+            )
+        if duration_steps.dtype == torch.bool or duration_steps.is_floating_point():
+            raise TypeError(
+                "duration_steps must use an integer dtype"
+            )
+        if bool((duration_steps < 0).any()):
+            raise ValueError(
+                "duration_steps must be non-negative"
+            )
+
     # Stop the trace at both terminal and collection/reset boundaries, but
     # bootstrap time limits from THEIR captured next state. Never use the
     # following episode's initial state as that value.
@@ -847,41 +868,39 @@ def compute_gae_channel(
         -1,
         -1,
     ):
+        valid = duration_steps[timestep] > 0
+        if not bool(valid.any()):
+            # Padding rows are not decision epochs. They must not alter the
+            # value/GAE recursion of the surrounding SMDP transitions.
+            continue
+
         nonterminal = (
-            ~done_mask[
-                timestep
-            ]
-        ).to(
-            dtype=rewards.dtype
+            ~done_mask[timestep]
+        ).to(dtype=rewards.dtype)
+        duration = duration_steps[timestep].to(dtype=rewards.dtype)
+        discount_k = torch.pow(
+            torch.full_like(duration, discount),
+            duration,
         )
-
+        bootstrap = next_value if next_values is None else next_values[timestep]
         delta = (
-            rewards[
-                timestep
-            ]
-            + discount
-            * (next_value if next_values is None else next_values[timestep])
+            rewards[timestep]
+            + discount_k
+            * bootstrap
             * (~terminal_mask[timestep]).to(dtype=rewards.dtype)
-            - values[
-                timestep
-            ]
+            - values[timestep]
         )
-
-        next_gae = (
+        candidate_gae = (
             delta
-            + discount
+            + discount_k
             * gae_lambda
             * nonterminal
             * next_gae
         )
-
-        advantages[
-            timestep
-        ] = next_gae
-
-        next_value = values[
-            timestep
-        ]
+        valid_float = valid.to(dtype=rewards.dtype)
+        next_gae = valid_float * candidate_gae + (1.0 - valid_float) * next_gae
+        advantages[timestep] = valid_float * next_gae
+        next_value = valid_float * values[timestep] + (1.0 - valid_float) * next_value
 
     return GAEChannelResult(
         advantages=advantages,

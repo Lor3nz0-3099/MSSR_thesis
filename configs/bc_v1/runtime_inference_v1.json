@@ -14,5 +14,5 @@
     "target_cardinality_mean": 7.05812319
   },
   "TEST_payload_access": 0,
-  "notes": "Inference-only deterministic BC-v4 threshold. Must not be used for stochastic MAPPO/APPO sampling."
+  "notes": "Validated unified presence boundary. Deterministic BC uses raw_logit >= threshold; calibrated stochastic MARL uses Bernoulli(logits=raw_logit-threshold). Continuous payloads are unchanged."
 }

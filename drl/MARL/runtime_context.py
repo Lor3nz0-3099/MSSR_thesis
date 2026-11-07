@@ -269,7 +269,7 @@ class DirectMARLRuntimeContextProvider:
                 snapshot
             )
 
-            if handoff.marl_active:
+            if handoff.marl_active and getattr(context, "rollout_active", True):
                 action_row = self._action_encoder(
                     decision,
                     env_index,

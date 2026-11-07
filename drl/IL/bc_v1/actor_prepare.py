@@ -142,14 +142,15 @@ def publish_actor_normalizers(stats, output_dir, *, source_root, visibility):
 
 
 def tensorize_actor_sample(sample, *, spec, feature_schema, normalization_policy,
-                            normalizers, tensor_layout, visibility, assigned_goal=None):
+                            normalizers, tensor_layout, visibility, assigned_goal=None, static_cache=None):
     if normalizers.metadata.get('actor_visibility_fingerprint') != visibility.fingerprint:
         raise ValueError('Normalizer incompatible with actor visibility')
     view = project_actor_features(sample.inputs.features, sample.inputs.policy.context.task_id,
         visibility, feature_schema, assigned_goal=assigned_goal)
     projected = replace(sample, inputs=replace(sample.inputs, features=view))
     result = tensorize_policy_sample(projected, spec=spec, feature_schema=feature_schema,
-        normalization_policy=normalization_policy, normalizers=normalizers, tensor_layout=tensor_layout)
+        normalization_policy=normalization_policy, normalizers=normalizers, tensor_layout=tensor_layout,
+        **({'static_cache':static_cache} if static_cache is not None else {}))
     result['routing'].update(actor_input_schema=INPUT_SCHEMA,
         actor_visibility_fingerprint=visibility.fingerprint)
     return result

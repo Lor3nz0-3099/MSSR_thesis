@@ -120,6 +120,11 @@ def test_full_fixed_alpha_update_exposes_finite_losses_policy_diagnostics_and_st
     assert metrics["ratio_mean"] == pytest.approx(1.)
     assert metrics["approx_kl"] == pytest.approx(0.)
     assert metrics["clip_fraction"] == 0.
+    assert metrics["owner_advantage_count"] == 4
+    assert metrics["owner_advantage_mean"] == pytest.approx(2.5)
+    assert metrics["mean_field_advantage_mean"] == pytest.approx(2.5)
+    assert metrics["scaled_mean_field_advantage_mean"] == pytest.approx(1.25)
+    assert metrics["combined_advantage_mean"] == pytest.approx(3.75)
     assert all(math.isfinite(value) for value in metrics.values())
     assert all(metrics[key] > 0 for key in ("actor_grad_norm", "owner_critic_grad_norm", "mean_field_critic_grad_norm"))
     assert agent.shared_critic.weight.item() == 7.
@@ -148,3 +153,39 @@ def test_optimizer_profile_preserves_parameters_gradients_and_event_order():
         assert torch.equal(original.grad, timed.grad)
     for key in ("actor_grad_norm", "owner_critic_grad_norm", "mean_field_critic_grad_norm"):
         assert metrics[key] == baseline_metrics[key]
+
+
+def test_all_expert_real_update_skips_models_and_post_clears_sidecars():
+    from types import SimpleNamespace
+    agent = make_agent()
+    agent.memories = {uid: Memory() for uid in agent.possible_agents}
+    samples = [SimpleNamespace(rollout_active=False, owner_active_mask={uid: False for uid in agent.possible_agents})
+               for _ in range(2)]
+    agent._structured_rollout_sidecar.append_step(samples)
+    payload = list(samples)
+    agent._altruistic_rollout_sidecar = SimpleNamespace(flatten=lambda: payload, clear=payload.clear)
+    def unexpected_model_call(*args, **kwargs):
+        raise AssertionError('all Expert rollout must not evaluate actor or critics')
+    agent.evaluate_altruistic_rollout_values = unexpected_model_call
+    agent.evaluate_altruistic_bootstrap_values = unexpected_model_call
+    agent.reevaluate_structured_minibatch = unexpected_model_call
+    before = [parameter.detach().clone() for model in
+              (agent.shared_actor, agent.altruistic_owner_critic, agent.altruistic_mean_field_critic)
+              for parameter in model.parameters()]
+    agent.coordinated_altruistic_update(timestep=0, timesteps=2)
+    assert agent.last_update_metrics['minibatches'] == 0
+    assert all(value == 0 for key, value in agent.last_update_metrics.items() if key.endswith('optimizer_steps'))
+    assert len(agent._structured_rollout_sidecar) == 2
+    # The production post hook still owns clearing, even when the update has no data.
+    agent.training = True
+    agent._rollout = 0
+    agent.cfg.rollouts = 1
+    agent.cfg.learning_starts = 0
+    agent.checkpoint_interval = agent.write_interval = 0
+    agent.post_interaction(timestep=0, timesteps=2)
+    assert len(agent._structured_rollout_sidecar) == 0
+    assert payload == []
+    after = [parameter for model in
+             (agent.shared_actor, agent.altruistic_owner_critic, agent.altruistic_mean_field_critic)
+             for parameter in model.parameters()]
+    assert all(torch.equal(left, right) for left, right in zip(before, after))

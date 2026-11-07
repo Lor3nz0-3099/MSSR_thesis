@@ -525,6 +525,38 @@ class _FakeDocking:
     module_ids = ("module_a", "module_b")
     connections = ()
 
+    def face_poses_for(self, module_id: str):
+        """Return deterministic physical face poses for executor unit tests.
+
+        Adjacent parity groups are separated by 0.5 mm with opposed normals,
+        so the real evaluate_face_pair() gate sees genuinely eligible and
+        ineligible pairs instead of bypassing physical readiness.
+        """
+        try:
+            index = tuple(self.module_ids).index(module_id)
+        except ValueError as error:
+            raise KeyError(module_id) from error
+
+        even = (index % 2) == 0
+        position = (0.0 if even else 0.0005, 0.0, 0.0)
+        normal = (1.0, 0.0, 0.0) if even else (-1.0, 0.0, 0.0)
+        tangent = (0.0, 1.0, 0.0)
+
+        return tuple(
+            DockingFacePose(
+                DockingFace(
+                    module_id,
+                    face_name,
+                    f"/{module_id}/{face_name}",
+                    f"/{module_id}/body",
+                ),
+                position,
+                normal,
+                tangent,
+            )
+            for face_name in ("BOTTOM", "LEFT", "RIGHT", "TOP")
+        )
+
 
 class _FakeDockingThree:
     module_ids = ("root", "mobile_a", "mobile_b")
@@ -2703,3 +2735,363 @@ def test_explicit_retreat_backs_away_straight_before_reclocking() -> None:
     assert finished.commands == {}
     assert finished.statuses[0].state is PrimitiveState.SUCCEEDED
     assert finished.statuses[0].code == "RETREAT_COMPLETE"
+
+
+def test_sealed_align_wave_groups_only_overlapping_full_align_goals() -> None:
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    ids = ("m1", "m5", "m7", "m8", "m6")
+    docking = _FakeDocking()
+    docking.module_ids = ids
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={module_id: f"/{module_id}" for module_id in ids},
+        states={module_id: _FakeStateReader() for module_id in ids},
+        docking=docking,  # type: ignore[arg-type]
+    )
+
+    goals = (
+        _goal(
+            "align-05-01",
+            PrimitiveName.ALIGN_FACES,
+            ("m5", "m1"),
+            {"face_a": "TOP", "face_b": "BOTTOM"},
+        ),
+        _goal(
+            "align-07-01",
+            PrimitiveName.ALIGN_FACES,
+            ("m7", "m1"),
+            {"face_a": "BOTTOM", "face_b": "TOP"},
+        ),
+        _goal(
+            "align-08-06",
+            PrimitiveName.ALIGN_FACES,
+            ("m8", "m6"),
+            {"face_a": "BOTTOM", "face_b": "TOP"},
+        ),
+    )
+
+    for goal in goals:
+        assert executor.submit(goal, 0.0).state is PrimitiveState.ACCEPTED
+
+    groups = executor.seal_active_align_wave()
+
+    assert groups == (("align-05-01", "align-07-01"),)
+    snapshot = executor.align_coordination_snapshot()
+    assert snapshot == (
+        ("reach", ("align-05-01", "align-07-01"), ()),
+    )
+
+
+def test_coordinated_align_wave_advances_only_when_every_member_reaches_barrier() -> None:
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    ids = ("m1", "m5", "m7")
+    docking = _FakeDocking()
+    docking.module_ids = ids
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={module_id: f"/{module_id}" for module_id in ids},
+        states={module_id: _FakeStateReader() for module_id in ids},
+        docking=docking,  # type: ignore[arg-type]
+    )
+
+    first = _goal(
+        "align-05-01",
+        PrimitiveName.ALIGN_FACES,
+        ("m5", "m1"),
+        {"face_a": "TOP", "face_b": "BOTTOM"},
+    )
+    second = _goal(
+        "align-07-01",
+        PrimitiveName.ALIGN_FACES,
+        ("m7", "m1"),
+        {"face_a": "BOTTOM", "face_b": "TOP"},
+    )
+    assert executor.submit(first, 0.0).state is PrimitiveState.ACCEPTED
+    assert executor.submit(second, 0.0).state is PrimitiveState.ACCEPTED
+    executor.seal_active_align_wave()
+
+    first_runtime = executor._active[first.goal_id]
+    second_runtime = executor._active[second.goal_id]
+
+    assert not executor._coordinated_align_mark_ready(first_runtime, "reach")
+    assert executor.align_coordination_snapshot() == (
+        ("reach", ("align-05-01", "align-07-01"), ("align-05-01",)),
+    )
+
+    assert executor._coordinated_align_mark_ready(second_runtime, "reach")
+    assert executor.align_coordination_snapshot() == (
+        ("align", ("align-05-01", "align-07-01"), ()),
+    )
+
+    assert not executor._coordinated_align_mark_ready(second_runtime, "align")
+    assert not executor._coordinated_align_mark_ready(first_runtime, "clocking")
+    assert executor.align_coordination_snapshot()[0][0] == "align"
+
+    assert executor._coordinated_align_mark_ready(first_runtime, "align")
+    assert executor.align_coordination_snapshot()[0][0] == "clocking"
+
+
+def test_coordinated_full_align_holds_fast_member_until_shared_approach() -> None:
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    ids = ("m1", "m5", "m7")
+    docking = _FakeDocking()
+    docking.module_ids = ids
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={module_id: f"/{module_id}" for module_id in ids},
+        states={module_id: _FakeStateReader() for module_id in ids},
+        docking=docking,  # type: ignore[arg-type]
+    )
+    target_pose = DockingFacePose(
+        DockingFace("m1", "TOP", "/m1/TOP", "/m1/body"),
+        (0.0, 0.0, 0.0),
+        (1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+    )
+    mobile_pose = DockingFacePose(
+        DockingFace("mobile", "BOTTOM", "/mobile/BOTTOM", "/mobile/body"),
+        (0.0005, 0.0, 0.0),
+        (-1.0, 0.0, 0.0),
+        (0.0, 1.0, 0.0),
+    )
+    executor._face_pose = lambda module_id, _face: (target_pose if module_id == "m1" else mobile_pose)  # type: ignore[method-assign]
+    executor._planar_pose = lambda _module_id: PlanarPose(0.0, 0.0, 0.0)  # type: ignore[method-assign]
+    executor._face_alignment_target = lambda *_args: PlanarPose(0.0, 0.0, 0.0)  # type: ignore[method-assign]
+    executor._face_alignment_staging_target = (  # type: ignore[method-assign]
+        lambda *_args, **_kwargs: PlanarPose(0.0, 0.0, 0.0)
+    )
+
+    first = _goal(
+        "align-05-01",
+        PrimitiveName.ALIGN_FACES,
+        ("m5", "m1"),
+        {"face_a": "TOP", "face_b": "BOTTOM"},
+    )
+    second = _goal(
+        "align-07-01",
+        PrimitiveName.ALIGN_FACES,
+        ("m7", "m1"),
+        {"face_a": "BOTTOM", "face_b": "TOP"},
+    )
+    assert executor.submit(first, 0.0).state is PrimitiveState.ACCEPTED
+    assert executor.submit(second, 0.0).state is PrimitiveState.ACCEPTED
+    executor.seal_active_align_wave()
+
+    # Skip the already-tested REACH barrier so this test isolates the root
+    # regression: one member may finish pose alignment before its peer.
+    executor._coordinated_align_mark_ready(executor._active[first.goal_id], "reach")
+    executor._coordinated_align_mark_ready(executor._active[second.goal_id], "reach")
+
+    aligned = {"m5": True, "m7": False}
+
+    def adjust(runtime, now_s, mobile_id, *_args, finish_on_ready=True, **_kwargs):
+        assert finish_on_ready is False
+        if aligned[mobile_id]:
+            return {}, executor._make_status(
+                runtime.goal,
+                PrimitiveState.RUNNING,
+                now_s,
+                phase="align_barrier",
+                progress=1.0,
+                code="FACES_ALIGNED",
+                message="ready",
+            )
+        return {mobile_id: SmoresCommand(linear_x_m_s=0.01)}, executor._make_status(
+            runtime.goal,
+            PrimitiveState.RUNNING,
+            now_s,
+            phase="axial_pose_adjustment",
+            progress=0.5,
+            code="ADJUSTING_FACE_POSE",
+            message="still aligning",
+        )
+
+    executor._adjust_face_pose = adjust  # type: ignore[method-assign]
+
+    first_tick = executor.step(0.1)
+    by_goal = {status.goal_id: status for status in first_tick.statuses}
+    assert by_goal[first.goal_id].code == "WAITING_ALIGN_WAVE_ALIGN"
+    assert by_goal[second.goal_id].code == "ADJUSTING_FACE_POSE"
+    assert "m5" not in first_tick.commands
+    assert first_tick.commands["m7"].linear_x_m_s != 0.0
+    assert not executor._active[first.goal_id].alignment_approach_started
+    assert executor.align_coordination_snapshot()[0][0] == "align"
+
+    aligned["m7"] = True
+    second_tick = executor.step(0.2)
+    assert all(status.code == "WAITING_ALIGN_WAVE_ALIGN" for status in second_tick.statuses)
+    assert executor.align_coordination_snapshot()[0][0] == "clocking"
+    assert not executor._active[first.goal_id].alignment_approach_started
+    assert not executor._active[second.goal_id].alignment_approach_started
+
+    executor._clocking_alignment_gate = lambda *_args, **_kwargs: None  # type: ignore[method-assign]
+    clocking_tick = executor.step(0.3)
+    assert all(status.code == "WAITING_ALIGN_WAVE_CLOCKING" for status in clocking_tick.statuses)
+    assert executor.align_coordination_snapshot()[0][0] == "approach"
+
+    approach_tick = executor.step(0.4)
+    assert all(status.code == "WAITING_ALIGN_WAVE_APPROACH" for status in approach_tick.statuses)
+    assert executor._active[first.goal_id].alignment_approach_started
+    assert executor._active[second.goal_id].alignment_approach_started
+    assert executor.align_coordination_snapshot()[0][0] == "complete"
+
+    completed = executor.step(0.5)
+    assert all(status.code == "FACES_IN_CONTACT" for status in completed.statuses)
+    assert len(executor.prepared_relation_snapshot()) == 2
+    assert executor.align_coordination_snapshot() == ()
+
+
+def test_coordinated_align_barrier_drops_stale_readiness_before_release() -> None:
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    ids = ("m1", "m5", "m7")
+    docking = _FakeDocking(); docking.module_ids = ids
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={module_id: f"/{module_id}" for module_id in ids},
+        states={module_id: _FakeStateReader() for module_id in ids},
+        docking=docking,  # type: ignore[arg-type]
+    )
+    first = _goal("a", PrimitiveName.ALIGN_FACES, ("m5", "m1"), {"face_a": "TOP", "face_b": "BOTTOM"})
+    second = _goal("b", PrimitiveName.ALIGN_FACES, ("m7", "m1"), {"face_a": "BOTTOM", "face_b": "TOP"})
+    executor.submit(first, 0.0); executor.submit(second, 0.0)
+    executor.seal_active_align_wave()
+    a=executor._active[first.goal_id]; b=executor._active[second.goal_id]
+
+    assert not executor._coordinated_align_mark_ready(a, "reach")
+    executor._coordinated_align_mark_not_ready(a, "reach")
+    assert not executor._coordinated_align_mark_ready(b, "reach")
+    assert executor.align_coordination_snapshot()[0][0] == "reach"
+    assert executor._coordinated_align_mark_ready(a, "reach")
+    assert executor.align_coordination_snapshot()[0][0] == "align"
+
+
+def test_sealed_align_wave_uses_existing_docking_topology_for_components() -> None:
+    """ALIGNs on the same rigid assembly must share one coordination wave."""
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    ids = ("m1", "m3", "m4", "m5", "m6", "m7")
+
+    class _ConnectedDocking(_FakeDocking):
+        module_ids = ids
+        connections = (
+            SimpleNamespace(
+                first_face=SimpleNamespace(module_id="m5"),
+                second_face=SimpleNamespace(module_id="m1"),
+            ),
+            SimpleNamespace(
+                first_face=SimpleNamespace(module_id="m7"),
+                second_face=SimpleNamespace(module_id="m1"),
+            ),
+        )
+
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={module_id: f"/{module_id}" for module_id in ids},
+        states={module_id: _FakeStateReader() for module_id in ids},
+        docking=_ConnectedDocking(),  # type: ignore[arg-type]
+    )
+
+    goals = (
+        _goal(
+            "align-04-05",
+            PrimitiveName.ALIGN_FACES,
+            ("m4", "m5"),
+            {"face_a": "BOTTOM", "face_b": "LEFT"},
+        ),
+        _goal(
+            "align-06-05",
+            PrimitiveName.ALIGN_FACES,
+            ("m6", "m5"),
+            {"face_a": "BOTTOM", "face_b": "RIGHT"},
+        ),
+        _goal(
+            "align-03-07",
+            PrimitiveName.ALIGN_FACES,
+            ("m3", "m7"),
+            {"face_a": "BOTTOM", "face_b": "TOP"},
+        ),
+    )
+    for goal in goals:
+        assert executor.submit(goal, 0.0).state is PrimitiveState.ACCEPTED
+
+    assert executor.seal_active_align_wave() == (
+        ("align-03-07", "align-04-05", "align-06-05"),
+    )
+
+
+def test_prepared_component_lifetime_follows_existing_docking_topology() -> None:
+    """A dock must not retire sibling prepared relations on the same assembly."""
+    from smores_ep.isaac.primitive_executor import IsaacPrimitiveExecutor
+
+    ids = ("m1", "m3", "m4", "m5", "m7")
+
+    class _ConnectedDocking(_FakeDocking):
+        module_ids = ids
+        connections = (
+            SimpleNamespace(
+                first_face=SimpleNamespace(module_id="m5"),
+                second_face=SimpleNamespace(module_id="m1"),
+            ),
+            SimpleNamespace(
+                first_face=SimpleNamespace(module_id="m7"),
+                second_face=SimpleNamespace(module_id="m1"),
+            ),
+        )
+
+    executor = IsaacPrimitiveExecutor(
+        stage=object(),
+        module_roots={module_id: f"/{module_id}" for module_id in ids},
+        states={module_id: _FakeStateReader() for module_id in ids},
+        docking=_ConnectedDocking(),  # type: ignore[arg-type]
+    )
+
+    def finish(goal: PrimitiveGoal, code: str) -> None:
+        assert executor.submit(goal, 0.0).state is PrimitiveState.ACCEPTED
+        executor._finish(
+            executor._active[goal.goal_id],
+            PrimitiveState.SUCCEEDED,
+            0.1,
+            code,
+            code,
+        )
+
+    align_04 = _goal(
+        "a04",
+        PrimitiveName.ALIGN_FACES,
+        ("m4", "m5"),
+        {"face_a": "BOTTOM", "face_b": "LEFT"},
+    )
+    align_03 = _goal(
+        "a03",
+        PrimitiveName.ALIGN_FACES,
+        ("m3", "m7"),
+        {"face_a": "BOTTOM", "face_b": "TOP"},
+    )
+    dock_04 = _goal(
+        "d04",
+        PrimitiveName.DOCK,
+        ("m4", "m5"),
+        {"face_a": "BOTTOM", "face_b": "LEFT"},
+    )
+    dock_03 = _goal(
+        "d03",
+        PrimitiveName.DOCK,
+        ("m3", "m7"),
+        {"face_a": "BOTTOM", "face_b": "TOP"},
+    )
+
+    finish(align_04, "FACES_IN_CONTACT")
+    finish(align_03, "FACES_IN_CONTACT")
+    assert len(executor.prepared_relation_snapshot()) == 2
+
+    finish(dock_04, "DOCKED")
+    rows = executor.prepared_relation_snapshot()
+    assert len(rows) == 2
+    assert sum(bool(row.docked) for row in rows) == 1
+
+    finish(dock_03, "DOCKED")
+    assert executor.prepared_relation_snapshot() == ()

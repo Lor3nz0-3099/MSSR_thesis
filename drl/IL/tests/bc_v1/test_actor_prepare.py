@@ -127,8 +127,8 @@ def test_preflight_and_manual_helper_are_safe_metadata_only(tmp_path):
         document.update(sidecar_output=str(Path(directory)/'sidecar'),
                         normalizer_output=str(Path(directory)/'normalizers'))
         # Test the current implementation, not the frozen historical rebuild receipt.
-        code='drl/IL/bc_v1/tensorization.py'
-        document['file_pins'][code]=a.file_sha(ROOT/code)
+        for code in ('drl/IL/bc_v1/tensorization.py','drl/IL/bc_v1/actor_prepare.py'):
+            document['file_pins'][code]=a.file_sha(ROOT/code)
         config=tmp_path/'actor-prepare.json';config.write_text(json.dumps(document))
         cfg=a.preflight(config);assert cfg['visibility'].document['radius_m']==1.
         assert not cfg['normalizer_output'].exists() and not cfg['sidecar_output'].exists()

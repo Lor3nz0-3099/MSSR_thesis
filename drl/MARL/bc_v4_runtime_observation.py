@@ -14,7 +14,7 @@ from drl.IL.bc_v1 import normalization as f2
 from drl.IL.bc_v1.actor_prepare import tensorize_actor_sample
 from drl.IL.bc_v1.actor_visibility import load_visibility_policy
 from drl.IL.bc_v1.batching import collate_policy_samples
-from drl.IL.bc_v1.candidates import enumerate_candidates
+from drl.IL.bc_v1.candidates import CandidateTables, enumerate_candidates
 from drl.IL.bc_v1.dataset import CachedInputs, CachedSample
 from drl.IL.bc_v1.feature_schema import load_feature_schema
 from drl.IL.bc_v1.smores_adapter import SMORESAdapter
@@ -23,18 +23,18 @@ from drl.IL.bc_v1.tensorization import load_tensor_layout, tensorize_policy_samp
 
 @dataclass(frozen=True)
 class BCV4RuntimeObservation:
-    """One complete BC-v4 actor input derived from current physical state."""
+    """Certified current views; privileged-only requests omit actor sidecars."""
 
     physical_state: Any
 
     # Collated tensor input consumed directly by H1/H2.
-    actor_graph: Mapping[str, Any]
+    actor_graph: Mapping[str, Any] | None
 
     # Single-sample routing used to bind H2 candidates to physical modules.
-    routing_snapshot: dict[str, Any]
+    routing_snapshot: dict[str, Any] | None
 
     # Full collated batch required later by the ActionSet decoder.
-    decoder_batch: Mapping[str, Any]
+    decoder_batch: Mapping[str, Any] | None
 
     # Centralized critic input from the same current physical sample, before
     # actor visibility projection. Never passed to H1/H2 by this bridge.
@@ -184,8 +184,17 @@ class BCV4RuntimeObservationBridge:
         task_context,
         observation=None,
         assigned_goal=None,
+        include_action_candidates=True,
+        include_privileged=True,
+        include_actor=True,
+        static_cache=None,
     ) -> BCV4RuntimeObservation:
-        """Derive one BC-v4 sample from one atomic current-state snapshot."""
+        """Derive actor/critic features from one atomic current-state snapshot.
+
+        Expert-only rows may omit candidates. Privileged-only requests retain
+        physical validation and critic normalization while omitting actor
+        projection, tensorization, collation and decoder sidecars.
+        """
 
         if observation is None:
             observation = c.ObservationBundle()
@@ -262,11 +271,12 @@ class BCV4RuntimeObservationBridge:
             self.feature_schema,
         )
 
-        candidates = enumerate_candidates(
+        candidate_builder = enumerate_candidates if static_cache is None else static_cache.enumerate
+        candidates = (candidate_builder(
             inputs.graph,
             self.spec,
             self.feature_schema,
-        )
+        ) if include_action_candidates else CandidateTables())
 
         current = CachedInputs(
             inputs,
@@ -289,21 +299,30 @@ class BCV4RuntimeObservationBridge:
         # Keep the centralized critic's true current environment measurements.
         # Ordinary G2 tensorization reuses the frozen F2 catalog and units. Do
         # not silently take its default scaler path for absent coverage.
-        scalers = dict(self.normalizers.scalers)
-        for _, row, index, key, _ in f2._feature_components(
-            features, self.spec, self.feature_schema, self.normalization_policy
-        ):
-            if key is not None and row.validity[index] and key not in scalers:
-                raise ValueError(f'Missing privileged normalizer coverage: {key}')
-        privileged_sample = tensorize_policy_sample(
-            sample,
-            spec=self.spec,
-            feature_schema=self.feature_schema,
-            normalization_policy=self.normalization_policy,
-            normalizers=self.normalizers,
-            tensor_layout=self.tensor_layout,
-        )
-        privileged_batch = collate_policy_samples([privileged_sample])
+        privileged_batch = None
+        if include_privileged:
+            scalers = dict(self.normalizers.scalers)
+            for _, row, index, key, _ in f2._feature_components(
+                features, self.spec, self.feature_schema, self.normalization_policy
+            ):
+                if key is not None and row.validity[index] and key not in scalers:
+                    raise ValueError(f'Missing privileged normalizer coverage: {key}')
+            privileged_sample = tensorize_policy_sample(
+                sample, spec=self.spec, feature_schema=self.feature_schema,
+                normalization_policy=self.normalization_policy, normalizers=self.normalizers,
+                tensor_layout=self.tensor_layout,
+                **({'static_cache':static_cache} if static_cache is not None else {}),
+            )
+            privileged_batch = collate_policy_samples([privileged_sample])
+
+        if not include_actor:
+            return BCV4RuntimeObservation(
+                physical_state=physical_state,
+                actor_graph=None,
+                routing_snapshot=None,
+                decoder_batch=None,
+                privileged_graph=None if privileged_batch is None else privileged_batch['inputs'],
+            )
 
         # IMPORTANT:
         # actor visibility projection happens HERE, before F2 tensorization.
@@ -316,17 +335,24 @@ class BCV4RuntimeObservationBridge:
             tensor_layout=self.tensor_layout,
             visibility=self.visibility,
             assigned_goal=assigned_goal,
+            **({'static_cache':static_cache} if static_cache is not None else {}),
         )
 
         # H1/H2 consume the collated tensor graph.
         decoder_batch = collate_policy_samples(
             [tensor_sample]
         )
+        if static_cache is not None:
+            decoder_batch['runtime_decoder_layout'] = static_cache.decoder_layout(tensor_sample)
 
         return BCV4RuntimeObservation(
             physical_state=physical_state,
             actor_graph=decoder_batch["inputs"],
             routing_snapshot=tensor_sample["routing"],
             decoder_batch=decoder_batch,
-            privileged_graph=privileged_batch['inputs'],
+            privileged_graph=None if privileged_batch is None else privileged_batch['inputs'],
         )
+
+    def prepare_privileged_snapshot(self, raw_snapshot, **kwargs) -> BCV4RuntimeObservation:
+        """Explicit capability for native sleeping and post-step critic rows."""
+        return self.prepare_snapshot(raw_snapshot, **kwargs, include_actor=False)

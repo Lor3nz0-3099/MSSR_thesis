@@ -112,9 +112,11 @@ def test_bc_v4_wrapper_rejects_wrong_checkpoint_hash(tmp_path):
 
 
 @pytest.mark.parametrize("n_agents", [1, 3, 8, 11])
+@pytest.mark.parametrize("category_key", ["categorical", "category"])
 def test_bc_v4_wrapper_forward_is_module_count_agnostic(
     monkeypatch,
     n_agents,
+    category_key,
 ):
     import drl.MARL.bc_v4_actor as wrapper_module
     from drl.MARL.bc_v4_actor import BCV4SharedActorWrapper
@@ -135,7 +137,7 @@ def test_bc_v4_wrapper_forward_is_module_count_agnostic(
 
     structural_arguments = {
         "numeric": {"n": 1},
-        "categorical": {"c": 2},
+        category_key: {"c": 2},
         "boolean": {"b": 3},
         "reference": {"r": 4},
         "reference_set": {"rs": 5},
@@ -181,7 +183,8 @@ def test_bc_v4_wrapper_forward_is_module_count_agnostic(
 
     calls = {}
 
-    def fake_bind_marl_candidates(*, routing, presence_logits):
+    def fake_bind_marl_candidates(*, routing, presence_logits, presence_threshold_logit):
+        calls['presence_threshold_logit'] = presence_threshold_logit
         calls["bind"] = (
             routing,
             presence_logits,
@@ -266,6 +269,7 @@ def test_bc_v4_wrapper_forward_is_module_count_agnostic(
     assert policy.calls == [graph]
 
     assert calls["bind"][0] is routing
+    assert calls['presence_threshold_logit']==wrapper.presence_threshold_logit
     assert torch.equal(
         calls["bind"][1],
         presence_logits,
@@ -276,7 +280,7 @@ def test_bc_v4_wrapper_forward_is_module_count_agnostic(
     assert calls["structural"] == {
         "binding_count": 1,
         "numeric": structural_arguments["numeric"],
-        "categorical": structural_arguments["categorical"],
+        "categorical": structural_arguments[category_key],
         "boolean": structural_arguments["boolean"],
         "reference": structural_arguments["reference"],
         "reference_set": structural_arguments[
@@ -745,6 +749,7 @@ def test_forward_all_owners_exposes_same_raw_actionset_prediction(monkeypatch):
         )
     )
 
+    wrapper.presence_threshold_logit = 0.0
     wrapper.structural_log_std = (
         torch.nn.Parameter(
             torch.tensor(

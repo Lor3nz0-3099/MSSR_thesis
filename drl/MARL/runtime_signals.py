@@ -199,6 +199,9 @@ def collect_runtime_signals(
         def field(name, default=None):
             return proposal_outcome.get(name, default) if isinstance(proposal_outcome, Mapping) else getattr(proposal_outcome, name, default)
         accepted, code = field("accepted"), field("code")
+        # Partial physical acceptance retains events from the RAW sampled set.
+        conflict = _known(field('conflict_owner_ids', ()), owners)
+        invalid = _known(field('invalid_owner_ids', ()), owners)
         if type(accepted) is not bool:
             raise ValueError("proposal outcome accepted must be a bool")
         attributed = _known(field("owner_ids", ()), owners)
@@ -211,12 +214,13 @@ def collect_runtime_signals(
             if not attributed:
                 raise ValueError("rejected policy proposal requires owner attribution")
             if code == "RESOURCE_BUSY":
-                conflict = attributed
+                conflict = conflict | attributed
             else:
-                invalid = attributed
+                invalid = invalid | attributed
         availability["conflict"] = _metadata(_measured(bool(conflict)), "event", proposal_source)
         availability["invalid"] = _metadata(_measured(bool(invalid)), "event", proposal_source)
-        diagnostics["proposal"] = dict(accepted=accepted, code=code, owner_ids=sorted(attributed))
+        diagnostics["proposal"] = dict(accepted=accepted, code=code, owner_ids=sorted(attributed),
+            conflict_owner_ids=sorted(conflict),invalid_owner_ids=sorted(invalid))
     if measured_collision_owner_ids is not None:
         collision = _known(measured_collision_owner_ids, owners)
         availability["collision"] = _metadata(_measured(bool(collision)), "event", collision_source)

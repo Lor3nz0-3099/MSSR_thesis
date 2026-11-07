@@ -13,12 +13,85 @@ def _shift(values, offset):
 
 
 def _ptr(values):
-    parts, offset = [torch.zeros(1,dtype=torch.int64)], 0
+    device = values[0].device if values else None
+    parts, offset = [torch.zeros(1,dtype=torch.int64,device=device)], 0
     for value in values:
         if value.dtype!=torch.int64 or value[0]!=0 or (value[1:]<value[:-1]).any():
             raise ValueError('Invalid local pointer')
         parts.append(value[1:]+offset); offset += int(value[-1])
     return _cat(parts)
+
+
+def collate_policy_inputs(xs):
+    """Collate already tensorized G2 input graphs without supervision/routing.
+
+    This is the runtime counterpart of the input portion of
+    ``collate_policy_samples``. It preserves the source device so already-GPU
+    graphs can be combined without a CPU round trip.
+    """
+    if not xs:
+        raise ValueError('Cannot collate an empty input batch')
+    result={}
+    offsets=[]
+    current={k:0 for k in ('module','connector','resource','coordinate','connection','relation','environment','object','resource_candidate','resource_outcome','structural','argument','domain','scope')}
+    for x in xs:
+        offsets.append(dict(current))
+        for family in FAMILIES: current[family]+=len(x[family+'_x'])
+        current['environment']+=int(x['environment_ptr'][-1]);current['object']+=int(x['object_ptr'][-1])
+        current['resource_candidate']+=len(x['resource_candidates']['resource'])
+        current['resource_outcome']+=len(x['resource_candidates'].get('outcome_resource',()))
+        current['structural']+=len(x['structural']['initiator'])
+        current['argument']+=len(x['structural']['argument_binding'])
+        current['domain']+=len(x['structural']['argument_domain_index'])
+        current['scope']+=len(x['structural']['scope_members'])
+    for family in FAMILIES:
+        result[family+'_x']=_cat([x[family+'_x'] for x in xs])
+        result[family+'_validity']=_cat([x[family+'_validity'] for x in xs])
+        result[family+'_ptr']=_ptr([torch.tensor([0,len(x[family+'_x'])],dtype=torch.int64,device=x[family+'_x'].device) for x in xs])
+    result['graph_ptr']=result.pop('module_ptr')
+    result['module_batch']=_cat([torch.full((len(x['module_x']),),i,dtype=torch.int64,device=x['module_x'].device) for i,x in enumerate(xs)])
+    for name,target in [('connector_to_module','module'),('resource_to_module','module'),
+                        ('coordinate_to_resource','resource'),('connection_connectors','connector'),('relation_to_module','module')]:
+        result[name]=_cat([_shift(x[name],o[target]) for x,o in zip(xs,offsets)])
+    result['coordinate_slot']=_cat([x['coordinate_slot'] for x in xs])
+    for name in ('task_one_hot','task_valid'): result[name]=_cat([x[name] for x in xs])
+    for family in ('environment','object'): result[family+'_ptr']=_ptr([x[family+'_ptr'] for x in xs])
+    result['relation_geometry_ptr']=_ptr([x['relation_geometry_ptr'] for x in xs])
+    result['relation_geometry_index']=_cat([x['relation_geometry_index']+o['environment'] for x,o in zip(xs,offsets)])
+    environment={}
+    for key in sorted({k for x in xs for k in x['environment']}):
+        records=[(i,x['environment'][key],offsets[i]) for i,x in enumerate(xs) if key in x['environment']]
+        environment[key]={name:_cat([row[name] for _,row,_ in records]) for name in ('x','validity')}
+        for name,target in [('token_index','environment'),('object_index','object')]:
+            environment[key][name]=_cat([row[name]+o[target] for _,row,o in records])
+        environment[key]['graph_index']=_cat([torch.full((len(row['x']),),i,dtype=torch.int64,device=row['x'].device) for i,row,_ in records])
+    result['environment']=environment
+    resources={}
+    if any(set(x['resource_candidates'])!=set(xs[0]['resource_candidates']) for x in xs):raise ValueError('Mixed resource action schemas')
+    for key in xs[0]['resource_candidates']:
+        values=[x['resource_candidates'][key] for x in xs]
+        resources[key]=_ptr(values) if key.endswith('_ptr') else _cat([
+            _shift(v,o[{'resource':'resource','outcome_resource':'resource','outcome_candidate':'resource_candidate'}[key]]) if key in ('resource','outcome_resource','outcome_candidate') else v for v,o in zip(values,offsets)])
+    result['resource_candidates']=resources
+    structural={}
+    for key in xs[0]['structural']:
+        values=[x['structural'][key] for x in xs]
+        if key.endswith('_ptr'): structural[key]=_ptr(values);continue
+        shifted=[]
+        for v,x,o in zip(values,xs,offsets):
+            target={'initiator':'module','peer':'module','connector_a':'connector','connector_b':'connector',
+                    'scope_members':'module','argument_binding':'structural'}.get(key)
+            if target: v=_shift(v,o[target])
+            elif key in ('argument_bound_ref','argument_domain_index'):
+                kind=x['structural']['argument_kind']
+                if key=='argument_domain_index':
+                    kind=torch.repeat_interleave(kind,x['structural']['argument_domain_ptr'][1:]-x['structural']['argument_domain_ptr'][:-1])
+                shift=torch.where((kind==5)|(kind==7),o['connector'],o['module'])
+                v=torch.where(v==-1,v,v+shift)
+            shifted.append(v)
+        structural[key]=_cat(shifted)
+    result['structural']=structural
+    return result
 
 
 def collate_policy_samples(samples):

@@ -49,6 +49,7 @@ def test_bulk_validator_scalar_reads_are_bounded_not_per_argument_row(device):
         if device == 'cuda':
             from drl.IL.bc_v1.training import move_batch_to_device
             x = move_batch_to_device({'inputs': x, 'supervision': {}}, device)['inputs']
+            heads = heads.to(device)
         assert hasattr(heads, '_validate_arguments_bulk'), 'Missing bulk H2 validator'
         with ScalarReads() as reads:
             heads._validate_arguments(x)

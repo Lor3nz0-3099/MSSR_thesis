@@ -59,7 +59,7 @@ def test_deterministic_bc_decoder_uses_frozen_runtime_threshold(
     assert seen["threshold"] == 4.5
 
 
-def test_runtime_threshold_is_not_a_mappo_sampling_parameter():
+def test_runtime_threshold_is_shared_boundary_not_a_ppo_hyperparameter():
     from drl.MARL.bc_v4_runtime_inference import (
         load_bc_v4_runtime_inference_config,
     )
@@ -72,3 +72,4 @@ def test_runtime_threshold_is_not_a_mappo_sampling_parameter():
         "mappo" not in
         " ".join(config.keys()).lower()
     )
+    assert 'calibrated stochastic MARL' in config['notes']

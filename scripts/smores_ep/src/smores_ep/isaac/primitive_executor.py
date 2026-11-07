@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 import math
 from typing import Any, Callable, Mapping
 
@@ -37,6 +37,32 @@ from smores_ep.primitives.pose_control import (
 
 
 @dataclass(frozen=True)
+class ActivePrimitiveClaims:
+    """Immutable native ownership evidence, independent of a goal's lifetime."""
+
+    goal_id: str
+    primitive: str
+    module_ids: tuple[str, ...]
+    faces: tuple[str, ...]
+    resource_modes: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True)
+class PreparedRelation:
+    """A connector relation physically prepared by ALIGN and awaiting DOCK."""
+
+    source_module: str
+    source_face: str
+    target_module: str
+    target_face: str
+    docked: bool = False
+
+    @property
+    def key(self) -> tuple[str, str, str, str]:
+        return (self.source_module, self.source_face, self.target_module, self.target_face)
+
+
+@dataclass(frozen=True)
 class PrimitiveExecutorStep:
     commands: Mapping[str, SmoresCommand]
     statuses: tuple[PrimitiveStatus, ...]
@@ -46,6 +72,16 @@ class PrimitiveExecutorStep:
         """Compatibility accessor for callers that expect one status."""
 
         return self.statuses[-1] if self.statuses else None
+
+
+@dataclass
+class _AlignCoordinationGroup:
+    """Executor-local phase barrier for one connected ALIGN wave."""
+
+    group_id: str
+    goal_ids: tuple[str, ...]
+    phase: str = "reach"
+    ready_goal_ids: set[str] = field(default_factory=set)
 
 
 @dataclass
@@ -266,7 +302,13 @@ class IsaacPrimitiveExecutor:
         # to this offset instead of a single global zero.
         self._pan_reference_offset_rad: dict[str, float] = {}
         self._active: dict[str, _ActiveGoal] = {}
+        self._align_coordination_groups: dict[str, _AlignCoordinationGroup] = {}
+        self._align_coordination_group_by_goal: dict[str, str] = {}
+        self._align_coordination_sequence = 0
+        self._prepared_relations: dict[tuple[str, str, str, str], PreparedRelation] = {}
         self._resource_owners: dict[str, dict[str, str]] = {}
+        self._active_claim_version = 0
+        self._active_claim_snapshot = None
         self._status: PrimitiveStatus | None = None
 
         # Cache repeated USD pose reads only while evaluating one primitive.
@@ -285,6 +327,254 @@ class IsaacPrimitiveExecutor:
     @property
     def active_goals(self) -> tuple[PrimitiveGoal, ...]:
         return tuple(runtime.goal for runtime in self._active.values())
+
+    def prepared_relation_snapshot(self) -> tuple[PreparedRelation, ...]:
+        """Immutable ALIGN→DOCK handoff state for the policy feasibility layer."""
+        return tuple(self._prepared_relations[key] for key in sorted(self._prepared_relations))
+
+    def align_coordination_snapshot(self) -> tuple[tuple[str, tuple[str, ...], tuple[str, ...]], ...]:
+        """Read-only phase state for sealed connected ALIGN waves."""
+
+        return tuple(
+            (group.phase, group.goal_ids, tuple(sorted(group.ready_goal_ids)))
+            for _, group in sorted(self._align_coordination_groups.items())
+        )
+
+    def seal_active_align_wave(self) -> tuple[tuple[str, ...], ...]:
+        """Seal currently active full ALIGN goals into connected components.
+
+        The policy can admit compatible ALIGN goals over consecutive control
+        frames.  Once that wave is saturated, the C1 runtime calls this method.
+        Only goals sharing at least one module are synchronized; independent
+        components retain full parallelism and never wait on each other.
+        """
+
+        candidates = [
+            runtime
+            for runtime in self._active.values()
+            if runtime.goal.primitive is PrimitiveName.ALIGN_FACES
+            and str(runtime.goal.parameters.get("execution_phase", "full")).lower() == "full"
+            and not runtime.alignment_approach_started
+            and runtime.goal.goal_id not in self._align_coordination_group_by_goal
+        ]
+        if len(candidates) < 2:
+            return ()
+
+        remaining = {
+            runtime.goal.goal_id: (
+                runtime,
+                set(self.connected_component_module_ids(runtime.goal.module_ids)),
+            )
+            for runtime in candidates
+        }
+        components: list[tuple[str, ...]] = []
+        while remaining:
+            first_id = min(remaining)
+            first_runtime, first_modules = remaining.pop(first_id)
+            component = [first_runtime]
+            modules = set(first_modules)
+            changed = True
+            while changed:
+                changed = False
+                for goal_id, (runtime, footprint) in tuple(remaining.items()):
+                    if modules.intersection(footprint):
+                        remaining.pop(goal_id)
+                        component.append(runtime)
+                        modules.update(footprint)
+                        changed = True
+            goal_ids = tuple(sorted(runtime.goal.goal_id for runtime in component))
+            if len(goal_ids) < 2:
+                continue
+            self._align_coordination_sequence += 1
+            group_id = f"align-wave-{self._align_coordination_sequence}"
+            group = _AlignCoordinationGroup(group_id=group_id, goal_ids=goal_ids)
+            self._align_coordination_groups[group_id] = group
+            for goal_id in goal_ids:
+                self._align_coordination_group_by_goal[goal_id] = group_id
+            components.append(goal_ids)
+        return tuple(components)
+
+    def _coordinated_align_group(self, runtime: _ActiveGoal) -> _AlignCoordinationGroup | None:
+        group_id = self._align_coordination_group_by_goal.get(runtime.goal.goal_id)
+        if group_id is None:
+            return None
+        return self._align_coordination_groups.get(group_id)
+
+    def _coordinated_align_mark_ready(self, runtime: _ActiveGoal, phase: str) -> bool:
+        """Mark one member at a phase barrier and release only collectively."""
+
+        group = self._coordinated_align_group(runtime)
+        if group is None:
+            return True
+        if group.phase != phase:
+            return False
+        group.ready_goal_ids.add(runtime.goal.goal_id)
+        active_members = tuple(goal_id for goal_id in group.goal_ids if goal_id in self._active)
+        if not active_members or not set(active_members).issubset(group.ready_goal_ids):
+            return False
+        next_phase = {
+            "reach": "align",
+            "align": "clocking",
+            "clocking": "approach",
+            "approach": "complete",
+        }.get(phase)
+        if next_phase is None:
+            return False
+        group.phase = next_phase
+        group.ready_goal_ids.clear()
+        return True
+
+    def _coordinated_align_mark_not_ready(
+        self, runtime: _ActiveGoal, phase: str
+    ) -> None:
+        group = self._coordinated_align_group(runtime)
+        if group is not None and group.phase == phase:
+            group.ready_goal_ids.discard(runtime.goal.goal_id)
+
+    def _coordinated_align_wait_status(
+        self, runtime: _ActiveGoal, now_s: float, phase: str
+    ) -> PrimitiveStatus:
+        return self._make_status(
+            runtime.goal,
+            PrimitiveState.RUNNING,
+            now_s,
+            phase=f"alignment_wave_{phase}_barrier",
+            progress=0.0,
+            code=f"WAITING_ALIGN_WAVE_{phase.upper()}",
+            message=f"waiting for connected ALIGN wave to complete {phase}",
+        )
+
+    def _drop_align_coordination_group(self, group_id: str) -> None:
+        group = self._align_coordination_groups.pop(group_id, None)
+        if group is None:
+            return
+        for goal_id in group.goal_ids:
+            self._align_coordination_group_by_goal.pop(goal_id, None)
+
+    @staticmethod
+    def _goal_relation_key(goal: PrimitiveGoal) -> tuple[str, str, str, str] | None:
+        if len(goal.module_ids) != 2:
+            return None
+        if 'face_a' not in goal.parameters or 'face_b' not in goal.parameters:
+            return None
+        return (str(goal.module_ids[0]), str(goal.parameters['face_a']),
+                str(goal.module_ids[1]), str(goal.parameters['face_b']))
+
+    def _record_prepared_relation(self, goal: PrimitiveGoal) -> None:
+        key = self._goal_relation_key(goal)
+        if key is None:
+            return
+        self._prepared_relations[key] = PreparedRelation(*key, docked=False)
+
+    def _prepared_topology_component(self, module_ids) -> set[str]:
+        """Close prepared-wave membership over already docked rigid topology."""
+
+        component = set(self.connected_component_module_ids(module_ids))
+        changed = True
+        while changed:
+            changed = False
+            for relation in self._prepared_relations.values():
+                endpoints = {relation.source_module, relation.target_module}
+                if not component.intersection(endpoints):
+                    continue
+                expanded = set(self.connected_component_module_ids(endpoints))
+                if not expanded.issubset(component):
+                    component.update(expanded)
+                    changed = True
+        return component
+
+    def _complete_prepared_relation(self, goal: PrimitiveGoal) -> None:
+        key = self._goal_relation_key(goal)
+        if key is None or key not in self._prepared_relations:
+            return
+        self._prepared_relations[key] = replace(self._prepared_relations[key], docked=True)
+        component = self._prepared_topology_component((key[0], key[2]))
+        rows = [relation for relation in self._prepared_relations.values()
+                if {relation.source_module, relation.target_module}.intersection(component)]
+        if rows and all(relation.docked for relation in rows):
+            for relation in rows:
+                self._prepared_relations.pop(relation.key, None)
+
+    def _discard_prepared_components_touching(self, module_ids) -> None:
+        touched = set(str(module_id) for module_id in module_ids)
+        if not touched or not self._prepared_relations:
+            return
+        component = self._prepared_topology_component(touched)
+        for key, relation in tuple(self._prepared_relations.items()):
+            if {relation.source_module, relation.target_module}.intersection(component):
+                self._prepared_relations.pop(key, None)
+
+    def active_resource_snapshot(self) -> tuple[ActivePrimitiveClaims, ...]:
+        """Read held claims; never reserve, step, cancel or expose mutable goals."""
+        if self._active_claim_snapshot is None:
+            self._active_claim_snapshot = tuple(ActivePrimitiveClaims(
+                runtime.goal.goal_id, runtime.goal.primitive.value,
+                tuple(runtime.goal.module_ids),
+                tuple(str(runtime.goal.parameters[k]) for k in ('face_a', 'face_b')
+                      if k in runtime.goal.parameters),
+                tuple(sorted(runtime.resource_modes.items())),
+            ) for _, runtime in sorted(self._active.items()))
+        return self._active_claim_snapshot
+
+    @property
+    def active_claim_version(self) -> int:
+        """Monotonic within this executor; reset replaces the executor epoch."""
+        return self._active_claim_version
+
+    def _claims_changed(self) -> None:
+        self._active_claim_version += 1
+        self._active_claim_snapshot = None
+
+    def resource_claims_for(self, goal: PrimitiveGoal) -> tuple[tuple[str, str], ...]:
+        """Use the same claim resolver as admission, with no state mutation."""
+        return tuple(sorted(self._resources_for(goal).items()))
+
+    def dock_readiness_for_pairs(self, pairs) -> tuple[bool, ...]:
+        """Evaluate whether fixed connector pairs are ready for local DOCK closure.
+
+        The policy may select ``dock`` once a pair is already aligned and inside
+        the same proximal contact region used by the executor's straight-contact
+        approach.  Final attachment remains governed by the stricter
+        ``DockingPairEvaluation.eligible`` gate.  This keeps far-away pairs out
+        of the stochastic support while allowing DOCK to close the residual gap
+        it was explicitly designed to close.
+        """
+        requested = tuple((str(a), str(fa), str(b), str(fb)) for a, fa, b, fb in pairs)
+        if not requested:
+            return ()
+        by_key = {}
+        for module_id in sorted({module for row in requested for module in (row[0], row[2])}):
+            for pose in self._docking.face_poses_for(module_id):
+                by_key[(module_id, pose.face.face_name)] = pose
+        verdicts = []
+        limits = self._docking_thresholds
+        for module_a, face_a, module_b, face_b in requested:
+            try:
+                first = by_key[(module_a, face_a)]
+                second = by_key[(module_b, face_b)]
+            except KeyError as error:
+                raise ValueError(
+                    f"Unknown docking endpoint in readiness query: {error.args[0]}"
+                ) from error
+            evaluation = evaluate_face_pair(first, second, limits)
+            face_names = frozenset((face_a, face_b))
+            top_bottom_pair = face_names == frozenset(("TOP", "BOTTOM"))
+            contact_gap = (
+                limits.top_bottom_contact_tolerance_m
+                if top_bottom_pair
+                else limits.normal_contact_tolerance_m
+            )
+            clocking_ready = (
+                not evaluation.clocking_constrained
+                or evaluation.clocking_error_rad <= limits.clocking_tolerance_rad
+            )
+            verdicts.append(bool(
+                evaluation.normal_separation_m <= max(0.012, 3.0 * contact_gap)
+                and evaluation.lateral_offset_m <= limits.lateral_offset_tolerance_m
+                and evaluation.normal_misalignment_rad <= limits.normal_alignment_tolerance_rad
+                and clocking_ready
+            ))
+        return tuple(verdicts)
 
     @property
     def status(self) -> PrimitiveStatus | None:
@@ -414,6 +704,13 @@ class IsaacPrimitiveExecutor:
             )
         return result
 
+    def connected_component_module_ids(self, seed_module_ids) -> tuple[str, ...]:
+        """Return the union of rigid docking components touching ``seed_module_ids``."""
+
+        return self._connected_component_module_ids(
+            {str(module_id): None for module_id in seed_module_ids}
+        )
+
     def _connected_component_module_ids(
         self,
         seed_module_ids: Mapping[str, Any],
@@ -438,7 +735,7 @@ class IsaacPrimitiveExecutor:
                     changed = True
         return tuple(sorted(connected))
 
-    def submit(self, goal: PrimitiveGoal, now_s: float) -> PrimitiveStatus:
+    def _prepare_admission(self, goal: PrimitiveGoal, now_s: float, *, preview=False):
         if (
             goal.primitive in {PrimitiveName.SET_TILT, PrimitiveName.SET_PAN,
                                PrimitiveName.ROTATE_PAN_BY}
@@ -576,7 +873,8 @@ class IsaacPrimitiveExecutor:
                 ),
             )
         try:
-            resolved_target = self._resolve_joint_target(goal)
+            resolved_target = (self._resolve_joint_target(goal, preview=True) if preview
+                               else self._resolve_joint_target(goal))
             resource_modes = self._resources_for(goal)
             resources = frozenset(resource_modes)
         except (KeyError, RuntimeError, ValueError) as error:
@@ -588,16 +886,7 @@ class IsaacPrimitiveExecutor:
                 code="INVALID_GOAL",
                 message=str(error),
             )
-        conflicts: dict[str, tuple[str, ...]] = {}
-        for resource, requested_mode in resource_modes.items():
-            owners = self._resource_owners.get(resource, {})
-            if not owners:
-                continue
-            has_exclusive_owner = any(
-                mode == "exclusive" for mode in owners.values()
-            )
-            if requested_mode == "exclusive" or has_exclusive_owner:
-                conflicts[resource] = tuple(sorted(owners))
+        conflicts = self.resource_claim_conflicts(resource_modes)
         if conflicts:
             detail = ", ".join(
                 f"{resource} owned by {', '.join(owners)}"
@@ -611,6 +900,32 @@ class IsaacPrimitiveExecutor:
                 code="RESOURCE_BUSY",
                 message=detail,
             )
+        return referenced_modules, resolved_target, resource_modes
+
+    def resource_claim_conflicts(self, resource_modes):
+        """Read current native exclusive/shared ownership without reserving it."""
+        conflicts = {}
+        for resource, requested_mode in resource_modes.items():
+            owners = self._resource_owners.get(resource, {})
+            if owners and (requested_mode == 'exclusive' or any(m == 'exclusive' for m in owners.values())):
+                conflicts[resource] = tuple(sorted(owners))
+        return conflicts
+
+    def check_admission(self, goal: PrimitiveGoal, now_s: float):
+        """Same admission rules as submit, without goals/claims/tracker mutation.
+
+        DOCK is a native approach/contact primitive: final geometric docking
+        checks run during execution, not as an align-before-dock policy rule.
+        """
+        prepared = self._prepare_admission(goal, now_s, preview=True)
+        return None if isinstance(prepared, tuple) else prepared
+
+    def submit(self, goal: PrimitiveGoal, now_s: float) -> PrimitiveStatus:
+        prepared = self._prepare_admission(goal, now_s)
+        if not isinstance(prepared, tuple):
+            return prepared
+        referenced_modules, resolved_target, resource_modes = prepared
+        resources = frozenset(resource_modes)
         runtime = _ActiveGoal(
             goal=goal,
             started_at_s=now_s,
@@ -632,6 +947,7 @@ class IsaacPrimitiveExecutor:
             self._resource_owners.setdefault(resource, {})[
                 goal.goal_id
             ] = mode
+        self._claims_changed()
         self._status = self._make_status(
             goal,
             PrimitiveState.ACCEPTED,
@@ -838,6 +1154,7 @@ class IsaacPrimitiveExecutor:
             raise ValueError("Reset requires ownership handoff from active coordination groups")
         # Runtime must invalidate old inputs and apply drive configuration before
         # returning. A publication/queue operation is not an acknowledgement.
+        self._discard_prepared_components_touching(module_ids)
         self.reset_free_modules_callback(module_ids)
         for module_id in module_ids:
             self._retained_internal_commands.pop(module_id, None)
@@ -942,8 +1259,14 @@ class IsaacPrimitiveExecutor:
             if face_b == "TOP"
             else None
         )
+        coordination_group = (
+            self._coordinated_align_group(runtime)
+            if execution_phase == "full"
+            else None
+        )
         if (
             execution_phase == "full"
+            and coordination_group is None
             and top_module_id is not None
             and evaluation.normal_misalignment_rad
             <= docking_thresholds.normal_alignment_tolerance_rad
@@ -997,6 +1320,73 @@ class IsaacPrimitiveExecutor:
             face_b,
             distance_m=self._staging_distance_for_goal(goal),
         )
+        if coordination_group is not None:
+            phase = coordination_group.phase
+            if phase == "complete":
+                return {}, self._finish(
+                    runtime,
+                    PrimitiveState.SUCCEEDED,
+                    now_s,
+                    code="FACES_IN_CONTACT",
+                    message=(
+                        f"{mobile_id}:{face_a} completed the coordinated "
+                        f"ALIGN wave with {target_id}:{face_b}"
+                    ),
+                )
+            if phase == "reach":
+                commands, status = self._reach_face_staging(
+                    runtime,
+                    now_s,
+                    mobile_id,
+                    current,
+                    staging_target,
+                    finish_on_ready=False,
+                )
+                if status.code == "STAGING_REACHED":
+                    self._coordinated_align_mark_ready(runtime, "reach")
+                    return {}, self._coordinated_align_wait_status(
+                        runtime, now_s, "reach"
+                    )
+                self._coordinated_align_mark_not_ready(runtime, "reach")
+                return commands, status
+            if phase == "align":
+                commands, status = self._adjust_face_pose(
+                    runtime,
+                    now_s,
+                    mobile_id,
+                    face_a,
+                    target_id,
+                    face_b,
+                    current,
+                    staging_target,
+                    finish_on_ready=False,
+                )
+                if status.code == "FACES_ALIGNED":
+                    self._coordinated_align_mark_ready(runtime, "align")
+                    return {}, self._coordinated_align_wait_status(
+                        runtime, now_s, "align"
+                    )
+                self._coordinated_align_mark_not_ready(runtime, "align")
+                return commands, status
+            if phase == "clocking":
+                clocking_gate = self._clocking_alignment_gate(
+                    runtime,
+                    now_s,
+                    mobile_id,
+                    face_a,
+                    target_id,
+                    face_b,
+                )
+                if clocking_gate is not None:
+                    self._coordinated_align_mark_not_ready(runtime, "clocking")
+                    return clocking_gate
+                self._coordinated_align_mark_ready(runtime, "clocking")
+                return {}, self._coordinated_align_wait_status(
+                    runtime, now_s, "clocking"
+                )
+            if phase == "approach":
+                runtime.alignment_approach_started = True
+
         if execution_phase == "reach":
             return self._reach_face_staging(
                 runtime,
@@ -1195,6 +1585,8 @@ class IsaacPrimitiveExecutor:
             runtime.contact_quality_recovery_active = False
 
         alignment_complete = self._face_alignment_complete(evaluation)
+        if coordination_group is not None and not alignment_complete:
+            self._coordinated_align_mark_not_ready(runtime, "approach")
         needs_better_parking = (
             quality_tolerance is not None
             and planar_lateral_error_m > float(quality_tolerance)
@@ -1241,6 +1633,11 @@ class IsaacPrimitiveExecutor:
                 runtime.contact_quality_recovery_active = True
                 quality_recovery_started = True
             elif alignment_complete:
+                if coordination_group is not None:
+                    self._coordinated_align_mark_ready(runtime, "approach")
+                    return {}, self._coordinated_align_wait_status(
+                        runtime, now_s, "approach"
+                    )
                 return {}, self._finish(
                     runtime,
                     PrimitiveState.SUCCEEDED,
@@ -1548,6 +1945,8 @@ class IsaacPrimitiveExecutor:
         mobile_id: str,
         current: PlanarPose,
         staging_target: PlanarPose,
+        *,
+        finish_on_ready: bool = True,
     ) -> tuple[dict[str, SmoresCommand], PrimitiveStatus]:
         """Execute only the paper's collision-free navigation phase."""
 
@@ -1697,6 +2096,16 @@ class IsaacPrimitiveExecutor:
         # stops outside that region so no participant can start approaching
         # while a peer is still navigating through free space.
         if not avoidance_active and remaining_m <= 0.025:
+            if not finish_on_ready:
+                return {}, self._make_status(
+                    runtime.goal,
+                    PrimitiveState.RUNNING,
+                    now_s,
+                    phase="reach_barrier",
+                    progress=1.0,
+                    code="STAGING_REACHED",
+                    message=f"{mobile_id} reached the local docking region",
+                )
             return {}, self._finish(
                 runtime,
                 PrimitiveState.SUCCEEDED,
@@ -1745,6 +2154,8 @@ class IsaacPrimitiveExecutor:
         target_face: str,
         current: PlanarPose,
         staging_target: PlanarPose,
+        *,
+        finish_on_ready: bool = True,
     ) -> tuple[dict[str, SmoresCommand], PrimitiveStatus]:
         """Execute only pose adjustment, without entering contact approach."""
 
@@ -1762,6 +2173,19 @@ class IsaacPrimitiveExecutor:
                 staging_target,
             )
         if ready:
+            if not finish_on_ready:
+                return {}, self._make_status(
+                    runtime.goal,
+                    PrimitiveState.RUNNING,
+                    now_s,
+                    phase="align_barrier",
+                    progress=1.0,
+                    code="FACES_ALIGNED",
+                    message=(
+                        f"{mobile_id}:{mobile_face} is aligned with "
+                        f"{target_id}:{target_face} and ready for clocking"
+                    ),
+                )
             return {}, self._finish(
                 runtime,
                 PrimitiveState.SUCCEEDED,
@@ -3769,7 +4193,7 @@ class IsaacPrimitiveExecutor:
             return current_tilt, True
         return commanded_target, False
 
-    def _resolve_joint_target(self, goal: PrimitiveGoal) -> float | None:
+    def _resolve_joint_target(self, goal: PrimitiveGoal, *, preview=False) -> float | None:
         if goal.primitive not in {
             PrimitiveName.SET_PAN,
             PrimitiveName.ROTATE_PAN_BY,
@@ -3777,7 +4201,8 @@ class IsaacPrimitiveExecutor:
             PrimitiveName.ROTATE_TILT_BY,
         }:
             return None
-        pan, tilt = self._joint_positions(goal.module_ids[0])
+        pan, tilt = (self._joint_positions(goal.module_ids[0], preview=True) if preview
+                     else self._joint_positions(goal.module_ids[0]))
         if goal.primitive is PrimitiveName.SET_PAN:
             # PAN is periodic. Resolve an absolute morphology target
             # to the nearest 2*pi-equivalent angle so a module that
@@ -3810,9 +4235,11 @@ class IsaacPrimitiveExecutor:
             )
         return target
 
-    def _joint_positions(self, module_id: str) -> tuple[float, float]:
+    def _joint_positions(self, module_id: str, *, preview=False) -> tuple[float, float]:
         state = self._states[module_id].read()
-        pan = self._pan_trackers[module_id].update(state.pan_joint_rad)
+        from copy import copy
+        tracker = copy(self._pan_trackers[module_id]) if preview else self._pan_trackers[module_id]
+        pan = tracker.update(state.pan_joint_rad)
         return pan, -state.tilt_joint_rad
 
     def _planar_pose(self, module_id: str) -> PlanarPose:
@@ -3823,9 +4250,7 @@ class IsaacPrimitiveExecutor:
         from pxr import Gf, Usd, UsdGeom
 
         body_path = f"{self._module_roots[module_id]}/body_link"
-        matrix = UsdGeom.Xformable(
-            self._stage.GetPrimAtPath(body_path)
-        ).ComputeLocalToWorldTransform(Usd.TimeCode.Default())
+        matrix = self._docking.world_transform(body_path)
         position = matrix.ExtractTranslation()
         forward = matrix.TransformDir(Gf.Vec3d(1.0, 0.0, 0.0))
 
@@ -4003,6 +4428,11 @@ class IsaacPrimitiveExecutor:
         message: str,
     ) -> PrimitiveStatus:
         goal = runtime.goal
+        if state is PrimitiveState.SUCCEEDED:
+            if goal.primitive is PrimitiveName.ALIGN_FACES and code == "FACES_IN_CONTACT":
+                self._record_prepared_relation(goal)
+            elif goal.primitive is PrimitiveName.DOCK and code == "DOCKED":
+                self._complete_prepared_relation(goal)
         if (
             goal.primitive in {PrimitiveName.SET_TILT, PrimitiveName.SET_PAN,
                                PrimitiveName.ROTATE_PAN_BY}
@@ -4035,14 +4465,31 @@ class IsaacPrimitiveExecutor:
             self._rc_posture_terminal_statuses[goal.goal_id] = status
             if state is PrimitiveState.SUCCEEDED:
                 self._rc_retained_posture_goal_ids[goal.module_ids[0]] = goal.goal_id
-        self._active.pop(goal.goal_id, None)
+        claims_changed = self._active.pop(goal.goal_id, None) is not None
+        align_group_id = self._align_coordination_group_by_goal.pop(
+            goal.goal_id, None
+        )
+        if align_group_id is not None:
+            group = self._align_coordination_groups.get(align_group_id)
+            if (
+                state is not PrimitiveState.SUCCEEDED
+                or code != "FACES_IN_CONTACT"
+            ):
+                self._drop_align_coordination_group(align_group_id)
+            elif group is not None and not any(
+                member_id in self._active for member_id in group.goal_ids
+            ):
+                self._align_coordination_groups.pop(align_group_id, None)
         for resource in runtime.resources:
             owners = self._resource_owners.get(resource)
             if owners is None:
                 continue
+            claims_changed = claims_changed or goal.goal_id in owners
             owners.pop(goal.goal_id, None)
             if not owners:
                 del self._resource_owners[resource]
+        if claims_changed:
+            self._claims_changed()
         return status
 
     def _resources_for(self, goal: PrimitiveGoal) -> dict[str, str]:
@@ -4085,6 +4532,9 @@ class IsaacPrimitiveExecutor:
             }
             face_a = str(goal.parameters["face_a"])
             face_b = str(goal.parameters["face_b"])
+            # Reserve this destination face for the alignment lifetime while
+            # allowing shared-root readers that target other connectors.
+            resources[f"connector:{second}:{face_b}"] = "exclusive"
             if face_a == "TOP":
                 resources[f"internal_motion:{first}"] = "exclusive"
             if face_b == "TOP":

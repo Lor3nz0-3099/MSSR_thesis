@@ -4,12 +4,12 @@ import pytest
 
 def test_profile_separates_nested_exclusive_from_inclusive_and_records_failures():
     from drl.MARL.benchmark_support import MonotonicProfile
-    ticks=iter([0.,1.,3.,5.,6.,9.])
+    ticks=iter([0.,1.,3.,5.,6.,9.,12.])
     profile=MonotonicProfile(clock=lambda:next(ticks))
     with profile.measure('outer'):
         with profile.measure('inner'):
             pass
-    with pytest.raises(RuntimeError):
+    with pytest.raises(RuntimeError, match='unit'):
         with profile.measure('failed'):
             raise RuntimeError('unit')
     assert profile.snapshot()['outer']==dict(calls=1,inclusive_s=5.,exclusive_s=3.)

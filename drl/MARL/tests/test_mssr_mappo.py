@@ -4008,6 +4008,10 @@ def test_altruistic_rollout_bridge_records_provider_payload():
             AltruisticRolloutSidecar()
         )
 
+        _build_altruistic_rollout_step = (
+            MSSRMAPPO._build_altruistic_rollout_step
+        )
+
     harness = Harness()
 
     MSSRMAPPO._record_altruistic_rollout_step(
@@ -4090,6 +4094,10 @@ def test_altruistic_rollout_uses_local_rewards_not_team_reward():
             AltruisticRolloutSidecar()
         )
 
+        _build_altruistic_rollout_step = (
+            MSSRMAPPO._build_altruistic_rollout_step
+        )
+
     harness = Harness()
 
     MSSRMAPPO._record_altruistic_rollout_step(
@@ -4149,6 +4157,10 @@ def test_altruistic_rollout_bridge_is_noop_when_provider_is_disabled():
         )
 
         _altruistic_rollout_provider = None
+
+        _build_altruistic_rollout_step = (
+            MSSRMAPPO._build_altruistic_rollout_step
+        )
 
     harness = Harness()
 
@@ -4232,6 +4244,10 @@ def test_altruistic_rollout_bridge_rejects_wrong_environment_count():
             AltruisticRolloutSidecar()
         )
 
+        _build_altruistic_rollout_step = (
+            MSSRMAPPO._build_altruistic_rollout_step
+        )
+
     with pytest.raises(
         ValueError,
         match="environment count",
@@ -4299,6 +4315,10 @@ def test_record_online_rollout_batch_invokes_altruistic_recording_bridge():
 
         _altruistic_rollout_sidecar = (
             AltruisticRolloutSidecar()
+        )
+
+        _build_altruistic_rollout_step = (
+            MSSRMAPPO._build_altruistic_rollout_step
         )
 
         # This test invokes record_online_rollout_batch as an unbound
@@ -5323,6 +5343,170 @@ def _make_structured_critic_rollout():
         )
         for graph in graphs
     )
+
+
+def test_altruistic_minibatch_reuses_one_encoder_forward_per_critic_and_graph():
+    import torch
+
+    from drl.MARL.mappo import MSSRMAPPO
+
+    class CountingCritic:
+        def __init__(self):
+            self.all_owner_calls = 0
+            self.single_owner_calls = 0
+
+        def forward_all_owners(self, graph):
+            self.all_owner_calls += 1
+            # One deterministic scalar per physical module row.
+            return graph["module_h"][:, :1]
+
+        def forward_owner(self, graph, *, owner_index):
+            del graph, owner_index
+            self.single_owner_calls += 1
+            raise AssertionError(
+                "production critics must not re-encode one graph per owner"
+            )
+
+    structured = _make_structured_critic_rollout()
+    altruistic = _make_two_step_altruistic_sidecar().flatten()
+    owner = CountingCritic()
+    mean_field = CountingCritic()
+
+    owner_values, mean_field_values = (
+        MSSRMAPPO.evaluate_altruistic_critic_minibatch(
+            structured_batch=structured,
+            altruistic_batch=altruistic,
+            possible_agents=("module_0", "module_1"),
+            owner_critic=owner,
+            mean_field_critic=mean_field,
+        )
+    )
+
+    assert owner.all_owner_calls == len(structured)
+    assert mean_field.all_owner_calls == len(structured)
+    assert owner.single_owner_calls == 0
+    assert mean_field.single_owner_calls == 0
+
+    # Sidecar mapping is module_0 -> physical_a -> row 1 and
+    # module_1 -> physical_b -> row 0. Preserve that exact semantics.
+    torch.testing.assert_close(
+        owner_values["module_0"],
+        torch.tensor([[0.0], [0.0]]),
+    )
+    torch.testing.assert_close(
+        owner_values["module_1"],
+        torch.tensor([[1.0], [3.0]]),
+    )
+    torch.testing.assert_close(
+        mean_field_values["module_0"],
+        torch.tensor([[0.0], [0.0]]),
+    )
+    torch.testing.assert_close(
+        mean_field_values["module_1"],
+        torch.tensor([[1.0], [3.0]]),
+    )
+
+
+def test_altruistic_rollout_targets_reuse_one_encoder_forward_per_critic_and_graph():
+    import torch
+
+    from drl.MARL.mappo import MSSRMAPPO
+
+    class CountingCritic:
+        def __init__(self):
+            self.all_owner_calls = 0
+            self.single_owner_calls = 0
+
+        def forward_all_owners(self, graph):
+            self.all_owner_calls += 1
+            return graph["module_h"][:, :1]
+
+        def forward_owner(self, graph, *, owner_index):
+            del graph, owner_index
+            self.single_owner_calls += 1
+            raise AssertionError(
+                "rollout target construction must not re-encode per owner"
+            )
+
+    structured = _make_structured_critic_rollout()
+    sidecar = _make_two_step_altruistic_sidecar()
+    owner = CountingCritic()
+    mean_field = CountingCritic()
+
+    owner_values, mean_field_values = (
+        MSSRMAPPO.evaluate_altruistic_rollout_values(
+            structured_samples=structured,
+            altruistic_sidecar=sidecar,
+            possible_agents=("module_0", "module_1"),
+            owner_critic=owner,
+            mean_field_critic=mean_field,
+        )
+    )
+
+    assert owner.all_owner_calls == len(structured)
+    assert mean_field.all_owner_calls == len(structured)
+    assert owner.single_owner_calls == 0
+    assert mean_field.single_owner_calls == 0
+    assert owner_values["module_0"].shape == (2, 1, 1)
+    assert mean_field_values["module_1"].shape == (2, 1, 1)
+
+
+def test_altruistic_bootstrap_reuses_one_encoder_forward_per_critic_and_graph():
+    from drl.MARL.mappo import MSSRMAPPO
+
+    class CountingCritic:
+        def __init__(self):
+            self.all_owner_calls = 0
+            self.single_owner_calls = 0
+
+        def forward_all_owners(self, graph):
+            self.all_owner_calls += 1
+            return graph["module_h"][:, :1]
+
+        def forward_owner(self, graph, *, owner_index):
+            del graph, owner_index
+            self.single_owner_calls += 1
+            raise AssertionError(
+                "bootstrap construction must not re-encode per owner"
+            )
+
+    structured = _make_structured_critic_rollout()
+    source_sidecar = _make_two_step_altruistic_sidecar()
+    final_sample = replace(
+        source_sidecar.flatten()[-1],
+        next_owner_row_index=source_sidecar.flatten()[-1].owner_row_index,
+    )
+
+    class FinalSidecar:
+        num_envs = 1
+
+        def __len__(self):
+            return 1
+
+        def flatten(self):
+            return [final_sample]
+
+    sidecar = FinalSidecar()
+    graph = structured[-1].critic_graph_snapshot
+    owner = CountingCritic()
+    mean_field = CountingCritic()
+
+    owner_values, mean_field_values = (
+        MSSRMAPPO.evaluate_altruistic_bootstrap_values(
+            next_critic_graphs=(graph,),
+            altruistic_sidecar=sidecar,
+            possible_agents=("module_0", "module_1"),
+            owner_critic=owner,
+            mean_field_critic=mean_field,
+        )
+    )
+
+    assert owner.all_owner_calls == 1
+    assert mean_field.all_owner_calls == 1
+    assert owner.single_owner_calls == 0
+    assert mean_field.single_owner_calls == 0
+    assert owner_values["module_0"].shape == (1, 1)
+    assert mean_field_values["module_1"].shape == (1, 1)
 
 
 def test_real_owner_conditioned_critics_evaluate_recorded_rollout_rows():

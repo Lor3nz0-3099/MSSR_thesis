@@ -1,15 +1,23 @@
 from dataclasses import dataclass, replace
 from copy import deepcopy
+from collections.abc import Mapping
 from typing import Any
+from time import perf_counter
 
 import torch
 
 from drl.MARL.altruistic_rollout import (
     AltruisticRolloutBatchPayload,
+    AltruisticRolloutSample,
     AltruisticRolloutSidecar,
     build_altruistic_rollout_batch,
 )
+from drl.MARL.c1_smdp import (
+    DiscountedOptionAccumulator,
+    actor_policy_lag_is_acceptable,
+)
 from skrl.multi_agents.torch.base import MultiAgent
+from skrl.memories.torch import RandomMemory
 from skrl.multi_agents.torch.mappo import MAPPO, MAPPO_CFG
 from skrl.multi_agents.torch.mappo.mappo import compute_gae
 from skrl.utils import ScopedTimer
@@ -19,6 +27,31 @@ from drl.MARL.policy import (
     compute_owner_action_log_probs,
     sample_marl_action_bundle,
 )
+
+
+class SMDPEventMemory(RandomMemory):
+    """Keep a physical frame's pre/post events in one PPO update.
+
+    The requested rollout size remains the update threshold. Two reserve slots
+    cover a frame that starts at that threshold and closes both pre and post.
+    Tensor consumers see only recorded rows, never unused reserve storage.
+    """
+
+    def __init__(self, *, memory_size, num_envs=1, device=None, **kwargs):
+        super().__init__(memory_size=memory_size + 2, num_envs=num_envs, device=device, **kwargs)
+
+    def add_samples(self, **tensors):
+        if self.filled:
+            raise BufferError("SMDP event memory requires post_interaction before more frames")
+        super().add_samples(**tensors)
+
+    def get_tensor_by_name(self, name):
+        valid_rows = len(self) // self.num_envs
+        return super().get_tensor_by_name(name)[:valid_rows]
+
+    def set_tensor_by_name(self, name, tensor):
+        with torch.no_grad():
+            self.get_tensor_by_name(name).copy_(tensor)
 
 
 @dataclass(frozen=True)
@@ -32,6 +65,11 @@ class StructuredRolloutSample:
     graph_snapshot: Any
     critic_graph_snapshot: Any = None
     next_critic_graph_snapshot: Any = None
+    rollout_active: bool = True
+    availability_snapshot: Any = None
+    # Number of 30 Hz control steps represented by this decision row.
+    # Zero denotes vector padding for an env with no closed option.
+    duration_steps: int = 1
 
 
 @dataclass(frozen=True)
@@ -42,6 +80,8 @@ class OnlineRolloutContext:
     critic_graph: Any
     routing_snapshot: Any
     hard_mask: Any
+    rollout_active: bool = True
+    availability_snapshot: Any = None
 
 
 @dataclass(frozen=True)
@@ -55,11 +95,22 @@ class OnlineRolloutDecision:
     action_set_prediction_template: Any = None
 
 
+@dataclass
+class _SMDPPendingTransition:
+    decision: OnlineRolloutDecision
+    observations: dict[str, torch.Tensor]
+    states: dict[str, torch.Tensor]
+    altruistic_sample: AltruisticRolloutSample
+    rewards: DiscountedOptionAccumulator
+    policy_version: int
+
+
 class StructuredRolloutSidecar:
     """Structured rollout storage aligned with skrl Memory.tensors_view indexes."""
 
     def __init__(self):
         self._samples = []
+        self._diagnostic_generation = 0
 
     def __len__(self) -> int:
         return len(self._samples)
@@ -94,6 +145,7 @@ class StructuredRolloutSidecar:
 
     def clear(self) -> None:
         self._samples.clear()
+        self._diagnostic_generation += 1
 
 
 def _detach_clone_tree(value):
@@ -136,6 +188,8 @@ class MSSRMAPPO(MAPPO):
         action_spaces=None,
         device=None,
         cfg={},
+        deterministic_update_mode: bool = False,
+        skip_expert_policy_inference: bool = False,
     ):
         """Initialize MAPPO without creating one optimizer per agent."""
         cfg = MAPPO_CFG(**cfg) if isinstance(cfg, dict) else cfg
@@ -153,7 +207,16 @@ class MSSRMAPPO(MAPPO):
         )
 
         self._structured_rollout_sidecar = StructuredRolloutSidecar()
+        self.deterministic_update_mode = deterministic_update_mode
+        self.skip_expert_policy_inference = skip_expert_policy_inference
         self._current_next_critic_graph = None
+        self._smdp_options_enabled = False
+        self._smdp_pending = None
+        self._smdp_transition_count = 0
+        self._smdp_event_step_count = 0
+        self._smdp_event_rows_last_interaction = 0
+        self._smdp_policy_version = 0
+        self._smdp_max_policy_lag = 0
 
         self.policies = {
             uid: self.models[uid].get("policy")
@@ -238,44 +301,69 @@ class MSSRMAPPO(MAPPO):
                 self._value_preprocessor[uid] = self._empty_preprocessor
 
     def post_interaction(self, *, timestep: int, timesteps: int) -> None:
-        """Trigger one coordinated update per completed rollout."""
+        """Trigger updates from physical rows or compact SMDP event rows."""
         if self.training:
-            self._rollout += 1
+            if bool(getattr(self, "_smdp_options_enabled", False)):
+                advance = int(self._smdp_event_rows_last_interaction)
+                self._smdp_event_rows_last_interaction = 0
+                self._rollout += advance
+                update_due = self._rollout >= self.cfg.rollouts
+            else:
+                self._rollout += 1
+                update_due = not self._rollout % self.cfg.rollouts
 
-            if (
-                not self._rollout % self.cfg.rollouts
-                and timestep >= self.cfg.learning_starts
-            ):
+            if update_due and timestep >= self.cfg.learning_starts:
                 with ScopedTimer() as timer:
                     self.enable_models_training_mode(True)
+                    if getattr(self, 'deterministic_update_mode', False):
+                        for name in ('shared_actor', 'shared_critic',
+                                     'altruistic_owner_critic', 'altruistic_mean_field_critic'):
+                            model = getattr(self, name, None)
+                            if model is not None:
+                                model.eval()
+                    self.coordinated_update(timestep=timestep, timesteps=timesteps)
 
-                    self.coordinated_update(
-                        timestep=timestep,
-                        timesteps=timesteps,
-                    )
+                    if bool(getattr(self, "_smdp_options_enabled", False)):
+                        metrics = getattr(
+                            self,
+                            "last_update_metrics",
+                            {},
+                        )
+                        if callable(metrics):
+                            metrics = metrics()
+
+                        if int(
+                            metrics.get(
+                                "actor_optimizer_steps",
+                                0,
+                            )
+                        ) > 0:
+                            self._smdp_policy_version = (
+                                int(
+                                    getattr(
+                                        self,
+                                        "_smdp_policy_version",
+                                        0,
+                                    )
+                                )
+                                + 1
+                            )
+
                     self._structured_rollout_sidecar.clear()
-
-                    altruistic_sidecar = getattr(
-                        self,
-                        "_altruistic_rollout_sidecar",
-                        None,
-                    )
-
+                    altruistic_sidecar = getattr(self, "_altruistic_rollout_sidecar", None)
                     if altruistic_sidecar is not None:
                         altruistic_sidecar.clear()
                     self._current_next_critic_graph = None
-
+                    if bool(getattr(self, "_smdp_options_enabled", False)):
+                        # Consume all events from this physical frame together:
+                        # deferring one past an actor update would increase lag.
+                        self._rollout = 0
+                        for memory in getattr(self, "memories", {}).values():
+                            memory.reset()
                     self.enable_models_training_mode(False)
-                    self.track_data(
-                        "Stats / Algorithm update time (ms)",
-                        timer.elapsed_time_ms,
-                    )
+                    self.track_data("Stats / Algorithm update time (ms)", timer.elapsed_time_ms)
 
-        MultiAgent.post_interaction(
-            self,
-            timestep=timestep,
-            timesteps=timesteps,
-        )
+        MultiAgent.post_interaction(self, timestep=timestep, timesteps=timesteps)
 
     def record_structured_rollout_step(self, samples) -> None:
         self._structured_rollout_sidecar.append_step(samples)
@@ -287,6 +375,8 @@ class MSSRMAPPO(MAPPO):
         critic_graph,
         routing_snapshot,
         hard_mask,
+        availability_snapshot=None,
+        actor_output=None,
     ) -> OnlineRolloutDecision:
         """Build one complete structured interaction decision.
 
@@ -295,12 +385,13 @@ class MSSRMAPPO(MAPPO):
         exact PPO reevaluation.
         """
         with torch.no_grad():
-            actor_output = self.forward_shared_actor(
-                actor=self.shared_actor,
-                graph=actor_graph,
-                possible_agents=self.possible_agents,
-                routing=routing_snapshot,
-            )
+            if actor_output is None:
+                actor_output = self.forward_shared_actor(
+                    actor=self.shared_actor,
+                    graph=actor_graph,
+                    possible_agents=self.possible_agents,
+                    routing=routing_snapshot,
+                )
 
             required_keys = (
                 "records",
@@ -324,6 +415,9 @@ class MSSRMAPPO(MAPPO):
 
             records = actor_output["records"]
 
+            from drl.MARL.c1_feasibility import apply_availability
+            actor_output = apply_availability(actor_output, availability_snapshot)
+
             if torch.is_tensor(hard_mask):
                 normalized_hard_mask = hard_mask.to(
                     dtype=torch.bool,
@@ -346,6 +440,12 @@ class MSSRMAPPO(MAPPO):
                     "hard_mask length must match candidate records"
                 )
 
+            if availability_snapshot is not None:
+                normalized_hard_mask = normalized_hard_mask | availability_snapshot.mask_tensor(
+                    device=normalized_hard_mask.device)
+            # The exact rollout support must survive later runtime changes.
+            normalized_hard_mask = normalized_hard_mask.detach().clone()
+
             action = sample_marl_action_bundle(
                 records=records,
                 resource_payloads=actor_output[
@@ -361,6 +461,7 @@ class MSSRMAPPO(MAPPO):
                 structural_log_std=actor_output[
                     "structural_log_std"
                 ],
+                deterministic=bool(getattr(self,'deterministic_policy_actions',False)),
             )
 
             owner_log_probs = compute_owner_action_log_probs(
@@ -432,6 +533,7 @@ class MSSRMAPPO(MAPPO):
             routing_snapshot=routing_snapshot,
             graph_snapshot=actor_graph,
             critic_graph_snapshot=critic_graph,
+            availability_snapshot=availability_snapshot,
         )
 
         return OnlineRolloutDecision(
@@ -465,6 +567,7 @@ class MSSRMAPPO(MAPPO):
         terminated,
         truncated,
         next_critic_graphs,
+        altruistic_samples=None,
     ) -> None:
         """Store one vectorized structured MARL transition.
 
@@ -662,11 +765,13 @@ class MSSRMAPPO(MAPPO):
             ]
         )
 
-        self._record_altruistic_rollout_step(
-            expected_num_envs=len(
-                decisions
-            ),
-        )
+        if altruistic_samples is None:
+            self._record_altruistic_rollout_step(expected_num_envs=len(decisions))
+        else:
+            samples = tuple(altruistic_samples)
+            if len(samples) != len(decisions):
+                raise ValueError("altruistic SMDP batch must match decision batch")
+            self._altruistic_rollout_sidecar.append_step(samples)
 
         self._current_next_observations = (
             next_observations
@@ -741,7 +846,7 @@ class MSSRMAPPO(MAPPO):
             AltruisticRolloutSidecar()
         )
 
-    def _record_altruistic_rollout_step(
+    def _build_altruistic_rollout_step(
         self,
         *,
         expected_num_envs: int,
@@ -806,21 +911,22 @@ class MSSRMAPPO(MAPPO):
             )
         )
 
-        sidecar = getattr(
-            self,
-            "_altruistic_rollout_sidecar",
-            None,
-        )
+        return samples
 
+    def _record_altruistic_rollout_step(
+        self,
+        *,
+        expected_num_envs: int,
+    ):
+        samples = self._build_altruistic_rollout_step(
+            expected_num_envs=expected_num_envs
+        )
+        if samples is None:
+            return None
+        sidecar = getattr(self, "_altruistic_rollout_sidecar", None)
         if sidecar is None:
-            raise RuntimeError(
-                "altruistic rollout sidecar is not initialized"
-            )
-
-        sidecar.append_step(
-            samples
-        )
-
+            raise RuntimeError("altruistic rollout sidecar is not initialized")
+        sidecar.append_step(samples)
         return samples
 
     def configure_fixed_alpha_appo(
@@ -954,6 +1060,49 @@ class MSSRMAPPO(MAPPO):
 
         self._training_advantage_mode = (
             "team"
+        )
+
+    def configure_smdp_options(self, *, enabled: bool = True) -> None:
+        """Enable compact SMDP collection for temporally extended C1 options."""
+        self._smdp_options_enabled = bool(enabled)
+        if enabled and any(not isinstance(memory, SMDPEventMemory)
+                           for memory in getattr(self, "memories", {}).values()):
+            raise ValueError("SMDP collection requires SMDPEventMemory frame reserve")
+        self._smdp_pending = None
+        self._smdp_event_rows_last_interaction = 0
+        self._smdp_policy_version = 0
+        self._smdp_max_policy_lag = 0
+        provider = getattr(self, '_rollout_context_provider', None)
+        configure_sleeping = getattr(provider, 'set_sleeping_actor_omission', None)
+        if callable(configure_sleeping):
+            configure_sleeping(bool(enabled and self.skip_expert_policy_inference))
+
+    @property
+    def smdp_transition_count(self) -> int:
+        return int(self._smdp_transition_count)
+
+    @property
+    def smdp_event_step_count(self) -> int:
+        return int(self._smdp_event_step_count)
+
+    @property
+    def smdp_policy_version(self) -> int:
+        return int(
+            getattr(
+                self,
+                "_smdp_policy_version",
+                0,
+            )
+        )
+
+    @property
+    def smdp_max_policy_lag(self) -> int:
+        return int(
+            getattr(
+                self,
+                "_smdp_max_policy_lag",
+                0,
+            )
         )
 
     def set_rollout_context_provider(
@@ -1091,14 +1240,67 @@ class MSSRMAPPO(MAPPO):
                     f"observations[{uid}]"
                 )
 
-        decisions = [
-            self.build_online_rollout_decision(
-                actor_graph=context.actor_graph,
-                critic_graph=context.critic_graph,
-                routing_snapshot=context.routing_snapshot,
-                hard_mask=context.hard_mask,
+        policy_indexes = [
+            index
+            for index, context in enumerate(contexts)
+            if not (
+                getattr(self, "skip_expert_policy_inference", False)
+                and not context.rollout_active
             )
-            for context in contexts
+        ]
+        with torch.no_grad():
+            policy_outputs = self.forward_shared_actor_batch(
+                actor=self.shared_actor,
+                graphs=[contexts[index].actor_graph for index in policy_indexes],
+                routings=[contexts[index].routing_snapshot for index in policy_indexes],
+                possible_agents=self.possible_agents,
+            )
+        actor_output_by_index = dict(zip(policy_indexes, policy_outputs, strict=True))
+
+        decisions = []
+        for index, context in enumerate(contexts):
+            if getattr(self, "skip_expert_policy_inference", False) and not context.rollout_active:
+                # This native row belongs to Expert control. Retain its real
+                # graph/state identity and neutral storage ABI without sampling
+                # a policy that cannot act or contribute an actor loss.
+                zero = torch.zeros(1, device=self.device)
+                sample = StructuredRolloutSample(
+                    action=None,
+                    hard_mask=torch.as_tensor(context.hard_mask, dtype=torch.bool,
+                                              device=self.device).detach(),
+                    owner_active_mask={uid: False for uid in self.possible_agents},
+                    routing_snapshot=context.routing_snapshot,
+                    graph_snapshot=context.actor_graph,
+                    critic_graph_snapshot=context.critic_graph,
+                    rollout_active=False,
+                )
+                decision = OnlineRolloutDecision(action=None,
+                    owner_log_probs={uid: zero.clone() for uid in self.possible_agents},
+                    global_value=zero.reshape(1, 1), structured_sample=sample)
+            else:
+                decision = self.build_online_rollout_decision(
+                    actor_graph=context.actor_graph,
+                    critic_graph=context.critic_graph,
+                    routing_snapshot=context.routing_snapshot,
+                    hard_mask=context.hard_mask,
+                    actor_output=actor_output_by_index[index],
+                    **({'availability_snapshot': context.availability_snapshot}
+                       if context.availability_snapshot is not None else {}),
+                )
+            decisions.append(decision)
+
+        # Assembly occupies native vector rows but contributes no policy
+        # training data. Keep its actual sample/value for storage alignment.
+        decisions = [
+            replace(decision, structured_sample=replace(
+                decision.structured_sample,
+                rollout_active=context.rollout_active,
+                owner_active_mask=(decision.structured_sample.owner_active_mask
+                    if context.rollout_active else {
+                        uid: False for uid in self.possible_agents
+                    }),
+            ))
+            for decision, context in zip(decisions, contexts)
         ]
 
         env_actions = (
@@ -1167,6 +1369,294 @@ class MSSRMAPPO(MAPPO):
         return (
             env_actions,
             outputs,
+        )
+
+    @staticmethod
+    def _smdp_owner_row(mapping, env_index: int):
+        return {
+            uid: value[env_index].detach().clone()
+            for uid, value in mapping.items()
+        }
+
+    def _smdp_start_pending(self, *, env_index, decision, observations, states,
+                            altruistic_sample, discount):
+        if self._smdp_pending is None:
+            self._smdp_pending = [None for _ in range(len(self._current_online_decisions))]
+        self._smdp_pending[env_index] = _SMDPPendingTransition(
+            decision=decision,
+            observations=self._smdp_owner_row(
+                observations,
+                env_index,
+            ),
+            states=self._smdp_owner_row(
+                states,
+                env_index,
+            ),
+            altruistic_sample=altruistic_sample,
+            rewards=DiscountedOptionAccumulator(
+                discount=discount
+            ),
+            policy_version=int(
+                getattr(
+                    self,
+                    "_smdp_policy_version",
+                    0,
+                )
+            ),
+        )
+
+    def _smdp_padding_row(self, *, env_index, decision, observations, states,
+                          next_observations, next_states, next_graph,
+                          altruistic_sample):
+        base = next(iter(observations.values()))
+        zero = torch.zeros((), dtype=base.dtype, device=base.device)
+        structured = replace(
+            decision.structured_sample,
+            action=None,
+            owner_active_mask={uid: False for uid in self.possible_agents},
+            rollout_active=False,
+            duration_steps=0,
+            # record_online_rollout_batch owns the one detached next-graph
+            # snapshot. This temporary event row is consumed synchronously.
+            next_critic_graph_snapshot=None,
+        )
+        padded_decision = replace(
+            decision,
+            action=None,
+            owner_log_probs={uid: zero.reshape(1) for uid in self.possible_agents},
+            global_value=zero.reshape(1, 1),
+            structured_sample=structured,
+        )
+        padded_altruistic = replace(
+            altruistic_sample,
+            owner_rewards={uid: torch.zeros_like(value)
+                           for uid, value in altruistic_sample.owner_rewards.items()},
+            mean_field_rewards={uid: torch.zeros_like(value)
+                                for uid, value in altruistic_sample.mean_field_rewards.items()},
+            next_owner_row_index=dict(altruistic_sample.owner_row_index),
+        )
+        return dict(
+            decision=padded_decision,
+            observations=self._smdp_owner_row(observations, env_index),
+            states=self._smdp_owner_row(states, env_index),
+            next_observations=self._smdp_owner_row(next_observations, env_index),
+            next_states=self._smdp_owner_row(next_states, env_index),
+            team_reward=zero,
+            terminated=False,
+            truncated=False,
+            next_graph=next_graph,
+            altruistic=padded_altruistic,
+        )
+
+    def _smdp_close_pending(self, *, env_index, next_observations, next_states,
+                            next_graph, next_owner_row_index, terminated, truncated):
+        pending = self._smdp_pending[env_index]
+        if pending is None or pending.rewards.duration_steps <= 0:
+            return None
+
+        current_version = int(
+            getattr(
+                self,
+                "_smdp_policy_version",
+                0,
+            )
+        )
+        policy_lag = (
+            current_version
+            - int(pending.policy_version)
+        )
+
+        if not actor_policy_lag_is_acceptable(
+            start_version=int(pending.policy_version),
+            current_version=current_version,
+            max_lag=1,
+        ):
+            # Preserve the physical option, but never train PPO
+            # on a structural decision sampled by a stale actor.
+            self._smdp_stale_option_drop_count = (
+                int(getattr(self, "_smdp_stale_option_drop_count", 0))
+                + 1
+            )
+            print(
+                "[C1 SMDP] drop stale option "
+                f"env={env_index} "
+                f"start_version={pending.policy_version} "
+                f"current_version={current_version} "
+                f"lag={policy_lag}",
+                flush=True,
+            )
+            return None
+
+        self._smdp_max_policy_lag = max(
+            int(
+                getattr(
+                    self,
+                    "_smdp_max_policy_lag",
+                    0,
+                )
+            ),
+            policy_lag,
+        )
+        structured = replace(
+            pending.decision.structured_sample,
+            duration_steps=int(pending.rewards.duration_steps),
+            next_critic_graph_snapshot=None,
+            rollout_active=True,
+        )
+        decision = replace(pending.decision, structured_sample=structured)
+        altruistic = replace(
+            pending.altruistic_sample,
+            owner_rewards={uid: value.detach().clone()
+                           for uid, value in pending.rewards.owner_rewards.items()},
+            mean_field_rewards={uid: value.detach().clone()
+                                for uid, value in pending.rewards.mean_field_rewards.items()},
+            next_owner_row_index=dict(next_owner_row_index),
+        )
+        return dict(
+            decision=decision,
+            observations=pending.observations,
+            states=pending.states,
+            next_observations=next_observations,
+            next_states=next_states,
+            team_reward=pending.rewards.team_reward.detach().clone(),
+            terminated=bool(terminated),
+            truncated=bool(truncated),
+            next_graph=next_graph,
+            altruistic=altruistic,
+        )
+
+    def _smdp_store_event_step(self, *, rows, decisions, observations, states,
+                               next_observations, next_states, next_graphs,
+                               altruistic_samples, env_actions):
+        if not any(row is not None for row in rows):
+            return False
+        materialized = []
+        for env_index, row in enumerate(rows):
+            if row is None:
+                row = self._smdp_padding_row(
+                    env_index=env_index, decision=decisions[env_index],
+                    observations=observations, states=states,
+                    next_observations=next_observations, next_states=next_states,
+                    next_graph=next_graphs[env_index],
+                    altruistic_sample=altruistic_samples[env_index],
+                )
+            materialized.append(row)
+
+        def stack_owner(field):
+            return {
+                uid: torch.stack([row[field][uid] for row in materialized], dim=0)
+                for uid in self.possible_agents
+            }
+
+        device = next(iter(observations.values())).device
+        batch = len(materialized)
+        self.record_online_rollout_batch(
+            decisions=[row["decision"] for row in materialized],
+            observations=stack_owner("observations"),
+            states=stack_owner("states"),
+            env_actions={uid: torch.zeros((batch, env_actions[uid].shape[1]),
+                                          dtype=env_actions[uid].dtype,
+                                          device=env_actions[uid].device)
+                         for uid in self.possible_agents},
+            team_rewards=torch.stack([row["team_reward"] for row in materialized]).reshape(batch, 1),
+            next_observations=stack_owner("next_observations"),
+            next_states=stack_owner("next_states"),
+            terminated=torch.tensor([row["terminated"] for row in materialized],
+                                    dtype=torch.bool, device=device).reshape(batch, 1),
+            truncated=torch.tensor([row["truncated"] for row in materialized],
+                                   dtype=torch.bool, device=device).reshape(batch, 1),
+            next_critic_graphs=[row["next_graph"] for row in materialized],
+            altruistic_samples=[row["altruistic"] for row in materialized],
+        )
+        active = sum(row["decision"].structured_sample.duration_steps > 0
+                     for row in materialized)
+        self._smdp_transition_count += int(active)
+        self._smdp_event_step_count += 1
+        self._smdp_event_rows_last_interaction += 1
+        return True
+
+    def _record_smdp_transition(self, *, observations, states, actions,
+                                next_observations, next_states, terminated, truncated,
+                                decisions, next_critic_graphs, team_rewards):
+        batch = len(decisions)
+        if self._smdp_pending is None or len(self._smdp_pending) != batch:
+            self._smdp_pending = [None for _ in range(batch)]
+
+        altruistic_samples = self._build_altruistic_rollout_step(expected_num_envs=batch)
+        if altruistic_samples is None:
+            raise RuntimeError("SMDP APPO collection requires altruistic rollout rewards")
+
+        first_uid = self.possible_agents[0]
+        discount_cfg = getattr(self.cfg, "discount_factor", {})
+        discount = float(discount_cfg[first_uid] if isinstance(discount_cfg, dict)
+                         else discount_cfg)
+
+        # A fresh decision epoch closes the previous option at the pre-step state.
+        pre_rows = [None for _ in range(batch)]
+        for env_index, decision in enumerate(decisions):
+            if decision.structured_sample.rollout_active and self._smdp_pending[env_index] is not None:
+                sample = altruistic_samples[env_index]
+                pre_rows[env_index] = self._smdp_close_pending(
+                    env_index=env_index,
+                    next_observations=self._smdp_owner_row(observations, env_index),
+                    next_states=self._smdp_owner_row(states, env_index),
+                    next_graph=decision.structured_sample.critic_graph_snapshot,
+                    next_owner_row_index=sample.owner_row_index,
+                    terminated=False, truncated=False,
+                )
+                self._smdp_pending[env_index] = None
+        self._smdp_store_event_step(
+            rows=pre_rows, decisions=decisions, observations=observations, states=states,
+            next_observations=observations, next_states=states,
+            next_graphs=[d.structured_sample.critic_graph_snapshot for d in decisions],
+            altruistic_samples=altruistic_samples, env_actions=actions,
+        )
+
+        # Start newly sampled decisions after the previous epoch is closed.
+        for env_index, decision in enumerate(decisions):
+            if decision.structured_sample.rollout_active:
+                self._smdp_start_pending(
+                    env_index=env_index, decision=decision, observations=observations,
+                    states=states, altruistic_sample=altruistic_samples[env_index],
+                    discount=discount,
+                )
+
+        # This physical frame belongs to the currently open decision epoch.
+        for env_index, pending in enumerate(self._smdp_pending):
+            if pending is None:
+                continue
+            sample = altruistic_samples[env_index]
+            pending.rewards.add(
+                team_reward=team_rewards[env_index, 0],
+                owner_rewards=sample.owner_rewards,
+                mean_field_rewards=sample.mean_field_rewards,
+            )
+
+        # Episode boundaries close on the captured post-step state.
+        post_rows = [None for _ in range(batch)]
+        for env_index, pending in enumerate(self._smdp_pending):
+            if pending is None:
+                continue
+            is_terminated = bool(terminated[env_index, 0].item())
+            is_truncated = bool(truncated[env_index, 0].item())
+            if not (is_terminated or is_truncated):
+                continue
+            sample = altruistic_samples[env_index]
+            next_rows = sample.next_owner_row_index or sample.owner_row_index
+            post_rows[env_index] = self._smdp_close_pending(
+                env_index=env_index,
+                next_observations=self._smdp_owner_row(next_observations, env_index),
+                next_states=self._smdp_owner_row(next_states, env_index),
+                next_graph=next_critic_graphs[env_index],
+                next_owner_row_index=next_rows,
+                terminated=is_terminated, truncated=is_truncated,
+            )
+            self._smdp_pending[env_index] = None
+        self._smdp_store_event_step(
+            rows=post_rows, decisions=decisions, observations=observations, states=states,
+            next_observations=next_observations, next_states=next_states,
+            next_graphs=next_critic_graphs, altruistic_samples=altruistic_samples,
+            env_actions=actions,
         )
 
     def record_transition(
@@ -1364,6 +1854,17 @@ class MSSRMAPPO(MAPPO):
                 * team_truncated
             )
 
+        if bool(getattr(self, "_smdp_options_enabled", False)):
+            self._record_smdp_transition(
+                observations=observations, states=states, actions=actions,
+                next_observations=next_observations, next_states=next_states,
+                terminated=team_terminated, truncated=team_truncated,
+                decisions=decisions, next_critic_graphs=next_critic_graphs,
+                team_rewards=team_rewards,
+            )
+            self._current_online_decisions = None
+            return
+
         self.record_online_rollout_batch(
             decisions=decisions,
             observations=observations,
@@ -1499,6 +2000,51 @@ class MSSRMAPPO(MAPPO):
                 graph=graph,
                 possible_agents=possible_agents,
             )
+
+    @staticmethod
+    def forward_shared_actor_batch(
+        *,
+        actor: Any,
+        graphs: list[Any],
+        routings: list[Any],
+        possible_agents: list[str],
+    ) -> list[dict[str, Any]]:
+        """Prefer one batched actor call, with a serial compatibility fallback."""
+        graphs = list(graphs)
+        routings = list(routings)
+        if len(graphs) != len(routings):
+            raise ValueError(
+                "graph and routing batches must have the same size"
+            )
+        if not graphs:
+            return []
+
+        batched = getattr(
+            actor,
+            "forward_all_owners_batch",
+            None,
+        )
+        if callable(batched):
+            kwargs = {
+                "graphs": graphs,
+                "routings": routings,
+                "possible_agents": possible_agents,
+            }
+            if getattr(actor, "prefer_lazy_payloads", False):
+                kwargs["lazy_payloads"] = True
+            return list(batched(**kwargs))
+
+        return [
+            MSSRMAPPO.forward_shared_actor(
+                actor=actor,
+                graph=graph,
+                routing=routing,
+                possible_agents=possible_agents,
+            )
+            for graph, routing in zip(
+                graphs, routings, strict=True
+            )
+        ]
 
     @staticmethod
     def build_shared_optimizers(
@@ -1707,8 +2253,16 @@ class MSSRMAPPO(MAPPO):
         possible_agents,
         owner_critic,
         mean_field_critic,
+        skip_inactive=False,
+        padding_reference=None,
+        diagnostics=None,
     ):
-        """Evaluate both trainable APPO critics on one PPO minibatch."""
+        """Evaluate critics, optionally omitting rows masked out of both losses.
+
+        Padding retains its physical row position and owner mapping. Its zero
+        placeholders are never values for GAE/bootstrap, only unused loss rows.
+        The public default retains full evaluation for other callers.
+        """
 
         agents = tuple(
             possible_agents
@@ -1774,22 +2328,62 @@ class MSSRMAPPO(MAPPO):
                     "owner-row mapping is invalid"
                 )
 
+            active = bool(getattr(structured_sample, "rollout_active", True))
+            if diagnostics is not None:
+                key = "valid_rows" if active else "padding_rows"
+                diagnostics[key] = diagnostics.get(key, 0) + 1
+            if skip_inactive and not active:
+                if diagnostics is not None:
+                    diagnostics["padding_rows_skipped"] = diagnostics.get("padding_rows_skipped", 0) + 1
+                for uid in agents:
+                    owner_values[uid].append(None)
+                    mean_field_values[uid].append(None)
+                continue
+
+            if diagnostics is not None:
+                diagnostics["owner_graph_forwards"] = diagnostics.get("owner_graph_forwards", 0) + 1
+                diagnostics["mean_field_graph_forwards"] = diagnostics.get("mean_field_graph_forwards", 0) + 1
+
+            owner_forward_all = getattr(
+                owner_critic,
+                "forward_all_owners",
+                None,
+            )
+            mean_field_forward_all = getattr(
+                mean_field_critic,
+                "forward_all_owners",
+                None,
+            )
+
+            owner_all_values = (
+                owner_forward_all(graph)
+                if callable(owner_forward_all)
+                else None
+            )
+            mean_field_all_values = (
+                mean_field_forward_all(graph)
+                if callable(mean_field_forward_all)
+                else None
+            )
+
             for uid in agents:
                 row = row_map[
                     uid
                 ]
 
                 owner_value = (
-                    owner_critic
-                    .forward_owner(
+                    owner_all_values[row]
+                    if owner_all_values is not None
+                    else owner_critic.forward_owner(
                         graph,
                         owner_index=row,
                     )
                 )
 
                 mf_value = (
-                    mean_field_critic
-                    .forward_owner(
+                    mean_field_all_values[row]
+                    if mean_field_all_values is not None
+                    else mean_field_critic.forward_owner(
                         graph,
                         owner_index=row,
                     )
@@ -1821,6 +2415,14 @@ class MSSRMAPPO(MAPPO):
                     )
                 )
 
+        for value_map in (owner_values, mean_field_values):
+            for uid, values in value_map.items():
+                if any(value is None for value in values):
+                    reference = next((value for value in values if value is not None), padding_reference)
+                    if reference is None:
+                        raise ValueError("all-padding critic minibatch requires padding_reference")
+                    value_map[uid] = [reference.new_zeros(1) if value is None else value for value in values]
+
         return (
             {
                 uid: torch.stack(
@@ -1848,6 +2450,7 @@ class MSSRMAPPO(MAPPO):
         possible_agents,
         owner_critic,
         mean_field_critic,
+        structured_samples=None,
     ):
         """Evaluate V_i(s_T+1) and V_i^MF(s_T+1).
 
@@ -1915,9 +2518,22 @@ class MSSRMAPPO(MAPPO):
                 "altruistic rollout alignment is invalid"
             )
 
-        final_samples = flat[
+        final_samples = list(flat[
             -num_envs:
-        ]
+        ])
+
+        if structured_samples is not None:
+            if len(structured_samples) != len(flat) or len(flat) % num_envs:
+                raise ValueError("structured/bootstrap rollout alignment is invalid")
+            graphs = list(graphs)
+            for env_index in range(num_envs):
+                final_samples[env_index] = None
+                for index in range(len(flat) - num_envs + env_index, -1, -num_envs):
+                    transition = structured_samples[index]
+                    if transition.rollout_active and transition.duration_steps > 0:
+                        graphs[env_index] = transition.next_critic_graph_snapshot
+                        final_samples[env_index] = flat[index]
+                        break
 
         owner_values = {
             uid: []
@@ -1938,6 +2554,14 @@ class MSSRMAPPO(MAPPO):
                 final_samples,
                 strict=True,
             ):
+                if sample is None:
+                    # This env contributes only padding, hence no bootstrap
+                    # target. Do not evaluate its still-open physical option.
+                    for uid in agents:
+                        zero = torch.zeros_like(flat[0].owner_rewards[uid]).reshape(1)
+                        owner_values[uid].append(zero)
+                        mean_field_values[uid].append(zero.clone())
+                    continue
                 if graph is None:
                     raise ValueError(
                         "next critic graph must not be None"
@@ -1965,6 +2589,27 @@ class MSSRMAPPO(MAPPO):
                         "next-state owner-row mapping is missing or invalid"
                     )
 
+                owner_forward_all = getattr(
+                    owner_critic,
+                    "forward_all_owners",
+                    None,
+                )
+                mean_field_forward_all = getattr(
+                    mean_field_critic,
+                    "forward_all_owners",
+                    None,
+                )
+                owner_all_values = (
+                    owner_forward_all(graph)
+                    if callable(owner_forward_all)
+                    else None
+                )
+                mean_field_all_values = (
+                    mean_field_forward_all(graph)
+                    if callable(mean_field_forward_all)
+                    else None
+                )
+
                 for uid in agents:
                     owner_index = (
                         row_map[
@@ -1973,8 +2618,9 @@ class MSSRMAPPO(MAPPO):
                     )
 
                     owner_value = (
-                        owner_critic
-                        .forward_owner(
+                        owner_all_values[owner_index]
+                        if owner_all_values is not None
+                        else owner_critic.forward_owner(
                             graph,
                             owner_index=(
                                 owner_index
@@ -1983,8 +2629,9 @@ class MSSRMAPPO(MAPPO):
                     )
 
                     mean_field_value = (
-                        mean_field_critic
-                        .forward_owner(
+                        mean_field_all_values[owner_index]
+                        if mean_field_all_values is not None
+                        else mean_field_critic.forward_owner(
                             graph,
                             owner_index=(
                                 owner_index
@@ -2201,14 +2848,36 @@ class MSSRMAPPO(MAPPO):
                         "altruistic owner-row mapping is invalid"
                     )
 
+                owner_forward_all = getattr(
+                    owner_critic,
+                    "forward_all_owners",
+                    None,
+                )
+                mean_field_forward_all = getattr(
+                    mean_field_critic,
+                    "forward_all_owners",
+                    None,
+                )
+                owner_all_values = (
+                    owner_forward_all(graph)
+                    if callable(owner_forward_all)
+                    else None
+                )
+                mean_field_all_values = (
+                    mean_field_forward_all(graph)
+                    if callable(mean_field_forward_all)
+                    else None
+                )
+
                 for uid in agents:
                     owner_index = row_map[
                         uid
                     ]
 
                     owner_value = (
-                        owner_critic
-                        .forward_owner(
+                        owner_all_values[owner_index]
+                        if owner_all_values is not None
+                        else owner_critic.forward_owner(
                             graph,
                             owner_index=(
                                 owner_index
@@ -2217,8 +2886,9 @@ class MSSRMAPPO(MAPPO):
                     )
 
                     mean_field_value = (
-                        mean_field_critic
-                        .forward_owner(
+                        mean_field_all_values[owner_index]
+                        if mean_field_all_values is not None
+                        else mean_field_critic.forward_owner(
                             graph,
                             owner_index=(
                                 owner_index
@@ -2319,6 +2989,7 @@ class MSSRMAPPO(MAPPO):
         discount_factor: float,
         lambda_coefficient: float,
         alpha,
+        duration_steps=None,
         terminated=None,
         owner_next_values=None,
         mean_field_next_values=None,
@@ -2396,6 +3067,15 @@ class MSSRMAPPO(MAPPO):
             num_envs,
             1,
         )
+
+        if duration_steps is None:
+            duration_steps = torch.ones(expected_shape, dtype=torch.long, device=dones.device)
+        elif (
+            not torch.is_tensor(duration_steps)
+            or tuple(duration_steps.shape) != expected_shape
+            or duration_steps.device != dones.device
+        ):
+            raise ValueError(f"duration_steps must have shape {expected_shape} on dones.device")
 
         if (
             not torch.is_tensor(
@@ -2549,6 +3229,7 @@ class MSSRMAPPO(MAPPO):
                 gae_lambda=(
                     lambda_coefficient
                 ),
+                duration_steps=duration_steps,
             )
 
             mean_field_result = (
@@ -2577,6 +3258,7 @@ class MSSRMAPPO(MAPPO):
                     gae_lambda=(
                         lambda_coefficient
                     ),
+                    duration_steps=duration_steps,
                 )
             )
 
@@ -2836,13 +3518,29 @@ class MSSRMAPPO(MAPPO):
             for uid in possible_agents
         }
 
-        for sample in structured_batch:
-            actor_output = self.forward_shared_actor(
-                actor=self.shared_actor,
-                graph=sample.graph_snapshot,
-                routing=sample.routing_snapshot,
-                possible_agents=list(possible_agents),
+        policy_indexes = [
+            index
+            for index, sample in enumerate(structured_batch)
+            if not (
+                getattr(self, "skip_expert_policy_inference", False)
+                and not sample.rollout_active
             )
+        ]
+        policy_outputs = self.forward_shared_actor_batch(
+            actor=self.shared_actor,
+            graphs=[structured_batch[index].graph_snapshot for index in policy_indexes],
+            routings=[structured_batch[index].routing_snapshot for index in policy_indexes],
+            possible_agents=list(possible_agents),
+        )
+        actor_output_by_index = dict(zip(policy_indexes, policy_outputs, strict=True))
+
+        for index, sample in enumerate(structured_batch):
+            if getattr(self, "skip_expert_policy_inference", False) and not sample.rollout_active:
+                for uid in possible_agents:
+                    owner_log_prob_samples[uid].append(torch.zeros(1, device=self.device))
+                    owner_entropy_samples[uid].append(torch.zeros(1, device=self.device))
+                continue
+            actor_output = actor_output_by_index[index]
 
             required_keys = (
                 "records",
@@ -2879,6 +3577,9 @@ class MSSRMAPPO(MAPPO):
                     dtype=torch.bool,
                     device=device,
                 )
+
+            from drl.MARL.c1_feasibility import apply_availability
+            actor_output = apply_availability(actor_output, sample.availability_snapshot)
 
             owner_log_probs = compute_owner_action_log_probs(
                 records=records,
@@ -3034,6 +3735,12 @@ class MSSRMAPPO(MAPPO):
                 "altruistic sidecar and skrl Memory are not aligned"
             )
 
+        # Expert assembly contributes no learner rows. Preserve alignment checks
+        # and post_interaction's normal clearing, but avoid evaluating critics
+        # and GAE for a rollout that cannot produce an optimizer step.
+        if not any(sample.rollout_active for sample in structured_all):
+            return
+
         (
             owner_values,
             mean_field_values,
@@ -3086,6 +3793,7 @@ class MSSRMAPPO(MAPPO):
                     self
                     .altruistic_mean_field_critic
                 ),
+                structured_samples=(structured_all if getattr(self, "_smdp_options_enabled", False) else None),
             )
         )
 
@@ -3169,6 +3877,30 @@ class MSSRMAPPO(MAPPO):
                     self
                     .altruistic_alpha
                 ),
+                duration_steps=torch.tensor(
+                    [int(getattr(sample, "duration_steps", 1)) for sample in structured_all],
+                    dtype=torch.long,
+                    device=dones.device,
+                ).reshape(dones.shape),
+            )
+        )
+
+        self._last_update_metrics.update(self.altruistic_target_diagnostics(
+            targets=targets, structured_samples=structured_all,
+            possible_agents=self.possible_agents, alpha=self.altruistic_alpha))
+
+        # Passive pre-update value-fit diagnostics on active SMDP rows.
+        # These metrics do not change PPO, GAE or the actor.
+        from drl.MARL.c1_critic_quality import critic_fit_diagnostics
+
+        self._last_update_metrics.update(
+            critic_fit_diagnostics(
+                owner_values=owner_values,
+                mean_field_values=mean_field_values,
+                owner_returns=targets.owner_returns,
+                mean_field_returns=targets.mean_field_returns,
+                structured_samples=structured_all,
+                possible_agents=self.possible_agents,
             )
         )
 
@@ -3447,6 +4179,11 @@ class MSSRMAPPO(MAPPO):
                             self
                             .altruistic_mean_field_critic
                         ),
+                        # Generic train-mode encoders may consume dropout RNG
+                        # even on padding. Native C1 keeps its models in eval.
+                        skip_inactive=bool(getattr(self, "deterministic_update_mode", False)),
+                        padding_reference=next(iter(advantages.values())),
+                        diagnostics=self._critic_evaluation_metrics,
                     )
                 )
 
@@ -3480,6 +4217,9 @@ class MSSRMAPPO(MAPPO):
                                 first_uid
                             ]
                         ),
+                        sample_mask=torch.tensor([
+                            sample.rollout_active for sample in structured_batch
+                        ], device=advantage_device, dtype=torch.bool),
                     )
                 )
 
@@ -3513,6 +4253,9 @@ class MSSRMAPPO(MAPPO):
                                 first_uid
                             ]
                         ),
+                        sample_mask=torch.tensor([
+                            sample.rollout_active for sample in structured_batch
+                        ], device=advantage_device, dtype=torch.bool),
                     )
                 )
 
@@ -3520,6 +4263,9 @@ class MSSRMAPPO(MAPPO):
                     new_log_probs=new_log_probs, old_log_probs=old_log_probs,
                     owner_entropies=owner_entropies, owner_active_masks=owner_active_masks,
                     ratio_clip=self.cfg.ratio_clip[first_uid])
+                grad_norm_clip = getattr(self.cfg, "grad_norm_clip", 0.0)
+                if isinstance(grad_norm_clip, Mapping):
+                    grad_norm_clip = grad_norm_clip[first_uid]
                 step_metrics = self.coordinated_altruistic_optimizer_step(
                     owner_policy_losses=(
                         owner_policy_losses
@@ -3545,6 +4291,8 @@ class MSSRMAPPO(MAPPO):
                     active_owners=(
                         active_owners
                     ),
+                    actor_updates_enabled=bool(getattr(self, "c1_actor_updates_enabled", True)),
+                    grad_norm_clip=float(grad_norm_clip),
                 )
                 self._record_update_metrics(step_metrics, policy_metrics)
 
@@ -3676,9 +4424,50 @@ class MSSRMAPPO(MAPPO):
     @property
     def last_update_metrics(self):
         """JSON-safe means across the most recent update's actual minibatches."""
-        return dict(getattr(self, "_last_update_metrics", {}))
+        return {**getattr(self, "_last_update_metrics", {}),
+                **{"critic_" + key: value for key, value in
+                   getattr(self, "_critic_evaluation_metrics", {}).items()}}
+
+    @staticmethod
+    def altruistic_target_diagnostics(*, targets, structured_samples, possible_agents, alpha):
+        """Summarize actual pre-normalization rollout targets on actor-active rows.
+
+        Flattening follows the sidecar/Memory time-major order. Each active owner
+        contributes one sample; inactive Expert rows never enter these statistics.
+        This detached observer neither changes targets nor consumes random state.
+        """
+        channels = {
+            "owner_advantage": targets.owner_advantages,
+            "mean_field_advantage": targets.mean_field_advantages,
+            "scaled_mean_field_advantage": {
+                uid: (alpha[uid] if isinstance(alpha, Mapping) else alpha) * tensor
+                for uid, tensor in targets.mean_field_advantages.items()},
+            "combined_advantage": targets.altruistic_advantages,
+        }
+        metrics = {}
+        for name, tensors in channels.items():
+            selected = []
+            for uid in possible_agents:
+                values = tensors[uid].detach().reshape(-1)
+                mask = torch.tensor([bool(sample.owner_active_mask.get(uid, False))
+                    for sample in structured_samples], device=values.device, dtype=torch.bool)
+                if mask.numel() != values.numel():
+                    raise ValueError("target diagnostics and structured rollout are not aligned")
+                selected.append(values[mask])
+            values = torch.cat(selected).to(dtype=torch.float64)
+            if not bool(torch.isfinite(values).all().item()):
+                raise ValueError(f"nonfinite active {name}")
+            metrics[name + "_count"] = values.numel()
+            for stat in ("mean", "std", "min", "max"):
+                value = 0.
+                if values.numel():
+                    value = (values.std(unbiased=False) if stat == "std"
+                             else getattr(values, stat)()).item()
+                metrics[name + "_" + stat] = value
+        return metrics
 
     def _reset_update_metrics(self):
+        self._critic_evaluation_metrics = {}
         self._last_update_metrics = {key: 0 for key in (
             "actor_optimizer_steps", "global_critic_optimizer_steps",
             "owner_critic_optimizer_steps", "mean_field_critic_optimizer_steps", "minibatches")}
@@ -3806,6 +4595,7 @@ class MSSRMAPPO(MAPPO):
         sampled_returns,
         value_clip: float,
         value_loss_scale: float,
+        sample_mask: torch.Tensor | None = None,
     ) -> torch.Tensor:
         """Shared value loss for one owner-conditioned critic."""
 
@@ -3854,6 +4644,17 @@ class MSSRMAPPO(MAPPO):
                 ]
             )
 
+            if sample_mask is not None:
+                mask = sample_mask.to(device=predicted.device, dtype=torch.bool).reshape(-1)
+                if predicted.shape[0] != mask.numel():
+                    raise ValueError('critic sample mask must match minibatch rows')
+                predicted = predicted[mask]
+                old_value = old_value[mask]
+                target = target[mask]
+                if not mask.any():
+                    losses.append(predicted.sum())
+                    continue
+
             if value_clip > 0:
                 predicted = (
                     old_value
@@ -3889,8 +4690,11 @@ class MSSRMAPPO(MAPPO):
         owner_critic_optimizer,
         mean_field_critic_optimizer,
         active_owners=None,
+        profile_sink=None,
+        actor_updates_enabled=True,
+        grad_norm_clip: float = 0.0,
     ):
-        """One actor step plus one step for each APPO critic."""
+        """One actor step plus two critic steps (optional actor freeze)."""
 
         owners = (
             tuple(
@@ -3922,35 +4726,53 @@ class MSSRMAPPO(MAPPO):
 
         if any(not bool(torch.isfinite(loss).all().item()) for loss in (policy_loss, owner_value_loss, mean_field_value_loss)):
             raise ValueError("nonfinite APPO optimizer loss")
+        profile_start = perf_counter() if profile_sink is not None else None
         actor_optimizer.zero_grad(
             set_to_none=True
         )
 
-        policy_loss.backward()
-        actor_grad_norm = MSSRMAPPO._optimizer_gradient_norm(actor_optimizer)
-        actor_optimizer.step()
+        actor_grad_norm = 0.0
+        actor_grad_norm_post_clip = 0.0
+        if actor_updates_enabled:
+            policy_loss.backward()
+            actor_grad_norm = MSSRMAPPO._optimizer_gradient_norm(actor_optimizer)
+            actor_grad_norm_post_clip = MSSRMAPPO._clip_optimizer_gradients(actor_optimizer, grad_norm_clip)
+            actor_optimizer.step()
 
+        if profile_sink is not None:
+            profile_sink('update.actor_backward_optimizer', perf_counter() - profile_start)
+        profile_start = perf_counter() if profile_sink is not None else None
         owner_critic_optimizer.zero_grad(
             set_to_none=True
         )
 
         owner_value_loss.backward()
         owner_grad_norm = MSSRMAPPO._optimizer_gradient_norm(owner_critic_optimizer)
+        owner_grad_norm_post_clip = MSSRMAPPO._clip_optimizer_gradients(owner_critic_optimizer, grad_norm_clip)
         owner_critic_optimizer.step()
 
+        if profile_sink is not None:
+            profile_sink('update.owner_backward_optimizer', perf_counter() - profile_start)
+        profile_start = perf_counter() if profile_sink is not None else None
         mean_field_critic_optimizer.zero_grad(
             set_to_none=True
         )
 
         mean_field_value_loss.backward()
         mf_grad_norm = MSSRMAPPO._optimizer_gradient_norm(mean_field_critic_optimizer)
+        mf_grad_norm_post_clip = MSSRMAPPO._clip_optimizer_gradients(mean_field_critic_optimizer, grad_norm_clip)
         mean_field_critic_optimizer.step()
 
+        if profile_sink is not None:
+            profile_sink('update.mean_field_backward_optimizer', perf_counter() - profile_start)
         return {
             "actor_grad_norm": actor_grad_norm,
+            "actor_grad_norm_post_clip": actor_grad_norm_post_clip,
             "owner_critic_grad_norm": owner_grad_norm,
+            "owner_critic_grad_norm_post_clip": owner_grad_norm_post_clip,
             "mean_field_critic_grad_norm": mf_grad_norm,
-            "actor_optimizer_steps": 1,
+            "mean_field_critic_grad_norm_post_clip": mf_grad_norm_post_clip,
+            "actor_optimizer_steps": int(bool(actor_updates_enabled)),
             "owner_critic_optimizer_steps": 1,
             "mean_field_critic_optimizer_steps": 1,
             "policy_loss":
@@ -3960,6 +4782,15 @@ class MSSRMAPPO(MAPPO):
             "mean_field_value_loss":
                 mean_field_value_loss,
         }
+
+    @staticmethod
+    def _clip_optimizer_gradients(optimizer, limit: float) -> float:
+        """Clip the whole optimizer's gradient norm and measure what step uses."""
+        if limit > 0:
+            parameters = [parameter for group in optimizer.param_groups
+                          for parameter in group["params"] if parameter.grad is not None]
+            torch.nn.utils.clip_grad_norm_(parameters, limit, error_if_nonfinite=True)
+        return MSSRMAPPO._optimizer_gradient_norm(optimizer)
 
     @staticmethod
     def coordinated_optimizer_step(
