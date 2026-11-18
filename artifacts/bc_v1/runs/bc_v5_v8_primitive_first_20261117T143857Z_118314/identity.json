@@ -1,0 +1,56 @@
+{
+  "audit_fingerprint": "351e79a75973abc1ea2e129a7de023a10f1e0404512ce43204902d69eb01834f",
+  "excluded_counts": {
+    "train": 0,
+    "validation": 0
+  },
+  "model_source": {
+    "action_set_fingerprint": "9d4825f23380cce49ba5fd620334ecb3fc167e1963fe66a11cc4a538e644a4df",
+    "action_set_version": "mssr.bc_v1.action_set.v1",
+    "catalog_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "decode_config": {
+      "configured_arguments": {},
+      "threshold_logit": 0.0
+    },
+    "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+    "h1_config_fingerprint": "81154912d4eed35d00bf97433e8964c10b6fc0b261abe34e2124d15695d490bf",
+    "head_config": {
+      "activation": "silu",
+      "dropout": 0.1,
+      "hidden_dim": 128,
+      "schema_version": "mssr.bc_v1.action_set_head.v1"
+    },
+    "head_config_fingerprint": "3e3e5c930388f20283c0c6bb9c360ae0cb3a118279757035f74e90d37282d778",
+    "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+    "model_contract": "action_set_v1",
+    "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+    "source_identity": {
+      "canonical_sha": "8a5d43b262407ef31f3a05fee160f1c3b6871dfc3093cf6ce708100b3d638143",
+      "f1_sha": "e8a1c8244d5173317349b44ecf443ce2ce85c864d7dd561e5fd993357aede62e",
+      "f2_fingerprint": "04bec0c04f091f0a4dc9b55c0fb606abe56f27258cf2acaa2afa96d4efab97e8",
+      "feature_schema_fingerprint": "43ab1b93c21b2645176e614ab1af7437f37163ec2b6047c0671d18a354b67d57",
+      "g1_fingerprint": "f32c8f4d56e88d774dc3b8a56cc9f38a91ef83f8e822ad0c75043c3d2c774128",
+      "layout_fingerprint": "e5b6a313062746a68bc5c1ba43cd200479af15f1b9d1e3cee24a1675a90deb49",
+      "normalizer_sha": "c8e4089aa37eaeceac32a4186713985b99ea185d1c92eb6cc9889acd3631bf5d",
+      "resource_contract_fingerprint": "7a77f9118c81a7ca7a9b80f8f1df78011c92492be9c53a17d3fc00188268d194",
+      "robot_spec_fingerprint": "c6e1c78d3fe5f8ede3c1d7e8ab5957799d0952580a171437db7ffcddc092ae19",
+      "split_fingerprint": "ecab5c6e9ae58e7a3dd5b55673a990f9aea8e3dfb34c0d4910302242dfb207b4",
+      "storage_fingerprint": "cfdad3c4bc94c073783699d5d4df403b2e2009d95c984a06f6bdd21257869b1c",
+      "tensorizer_fingerprint": "6d58cba605f53ecf8290d8cc55e9591c28a96bf426d6c13241659a2b3290cf63"
+    },
+    "source_manifest_fingerprint": "75f604a8d33f81ce18736006e1c3be6545c21cfdd57d18e44d3be41bd1e6f0b3",
+    "source_schema_version": "mssr.bc_v1.g2_sidecar.v1",
+    "training_config_fingerprint": "495d9dfc7478fa5c1f61d13cbae0b01647413875f7197abbafd1ae8787f4c044"
+  },
+  "sample_counts": {
+    "train": 82518,
+    "validation": 23749
+  },
+  "sampling": {
+    "balanced_quota": 16,
+    "frequency_exponent": 0.5
+  },
+  "schema_version": "mssr.bc_v5.training_identity.v1",
+  "stage678_readiness_fingerprint": "5e21171a02959e55197bbdf34a8e7ef6b1bd2638458872f116cb2a877fc4d4d4",
+  "train_sampler_index_fingerprint": "d9da84effc9f500720bc7df1987e661bad5aff12ecebb16d564fc02f437fc6b4"
+}

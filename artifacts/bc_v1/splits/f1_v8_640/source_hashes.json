@@ -1,0 +1,17 @@
+[
+  {
+    "collection": "new_assembly",
+    "manifest_sha256": "c978c98477358c3c1b8f80b16c9522dd6eedcd9eb8c19b02f3e914707cd2caf5",
+    "path": "datasets/expert_assembly_canonical_v8"
+  },
+  {
+    "collection": "new_reconfiguration",
+    "manifest_sha256": "f9fb37ea6039c9c9a24ed98d594086af2cb836c20bf573bf5667042ffa5b9c71",
+    "path": "datasets/expert_reconfiguration_canonical_v8"
+  },
+  {
+    "collection": "historical",
+    "manifest_sha256": "b7eeffaee3abbd69aac2ee0ec2afb000429f0aeb3005fed6f9ebaf4d3fd7494c",
+    "path": "datasets/expert_v1_canonical_v8"
+  }
+]

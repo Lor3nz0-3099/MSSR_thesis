@@ -1,0 +1,155 @@
+{
+  "test": {
+    "bc_valid_transitions": 19523,
+    "episode_support": {},
+    "episodes": 102,
+    "kind_counts": {
+      "expert": 99,
+      "teleop": 3
+    },
+    "largest_episodes": [
+      {
+        "bc_valid_transitions": 10384,
+        "episode_id": "teleop-ce8293656bb444ac999f87c0520672fc"
+      },
+      {
+        "bc_valid_transitions": 5273,
+        "episode_id": "teleop-3aa4f69128774d5eba1f8d851c02cf53"
+      },
+      {
+        "bc_valid_transitions": 544,
+        "episode_id": "teleop-b1456ab292aa4a319c9d4bcc17e7e57f"
+      }
+    ],
+    "smallest_episodes": [
+      {
+        "bc_valid_transitions": 7,
+        "episode_id": "expert:assembly:seed-51027100"
+      },
+      {
+        "bc_valid_transitions": 7,
+        "episode_id": "expert:assembly:seed-51027106"
+      },
+      {
+        "bc_valid_transitions": 7,
+        "episode_id": "expert:assembly:seed-51027109"
+      }
+    ],
+    "stratum_counts": {
+      "expert_assembly": 1,
+      "expert_gap": 3,
+      "expert_navigation": 2,
+      "expert_stairs": 3,
+      "teleop_button": 1,
+      "teleop_mission": 2,
+      "zz_assembly_mobile_manipulator8_button": 20,
+      "zz_assembly_rc_car8_navigation": 20,
+      "zz_assembly_snake8_gap": 20,
+      "zz_assembly_snake8_stairs": 20,
+      "zz_reconfiguration": 10
+    },
+    "supervised_instances": {}
+  },
+  "train": {
+    "bc_valid_transitions": 82528,
+    "episode_support": {},
+    "episodes": 429,
+    "kind_counts": {
+      "expert": 414,
+      "teleop": 15
+    },
+    "largest_episodes": [
+      {
+        "bc_valid_transitions": 9725,
+        "episode_id": "teleop-5e0c4d97db80492bbb561b16ef132949"
+      },
+      {
+        "bc_valid_transitions": 7770,
+        "episode_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8"
+      },
+      {
+        "bc_valid_transitions": 7751,
+        "episode_id": "teleop-952c36750c624fb19de8421019325d13"
+      }
+    ],
+    "smallest_episodes": [
+      {
+        "bc_valid_transitions": 6,
+        "episode_id": "expert:reconfiguration:seed-1000011"
+      },
+      {
+        "bc_valid_transitions": 7,
+        "episode_id": "expert:assembly:seed-51017103"
+      },
+      {
+        "bc_valid_transitions": 7,
+        "episode_id": "expert:assembly:seed-51037100"
+      }
+    ],
+    "stratum_counts": {
+      "expert_assembly": 1,
+      "expert_gap": 12,
+      "expert_navigation": 9,
+      "expert_stairs": 12,
+      "teleop_button": 6,
+      "teleop_mission": 9,
+      "zz_assembly_mobile_manipulator8_button": 80,
+      "zz_assembly_rc_car8_navigation": 80,
+      "zz_assembly_snake8_gap": 80,
+      "zz_assembly_snake8_stairs": 80,
+      "zz_reconfiguration": 60
+    },
+    "supervised_instances": {}
+  },
+  "validation": {
+    "bc_valid_transitions": 23751,
+    "episode_support": {},
+    "episodes": 102,
+    "kind_counts": {
+      "expert": 99,
+      "teleop": 3
+    },
+    "largest_episodes": [
+      {
+        "bc_valid_transitions": 12350,
+        "episode_id": "teleop-fb69637be28d49ccbff572e721cfae24"
+      },
+      {
+        "bc_valid_transitions": 7015,
+        "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c"
+      },
+      {
+        "bc_valid_transitions": 1017,
+        "episode_id": "teleop-170338d489a64eb397a10cf9910392a1"
+      }
+    ],
+    "smallest_episodes": [
+      {
+        "bc_valid_transitions": 7,
+        "episode_id": "expert:assembly:seed-51007100"
+      },
+      {
+        "bc_valid_transitions": 7,
+        "episode_id": "expert:assembly:seed-51007109"
+      },
+      {
+        "bc_valid_transitions": 7,
+        "episode_id": "expert:reconfiguration:seed-1000001"
+      }
+    ],
+    "stratum_counts": {
+      "expert_assembly": 1,
+      "expert_gap": 3,
+      "expert_navigation": 2,
+      "expert_stairs": 3,
+      "teleop_button": 1,
+      "teleop_mission": 2,
+      "zz_assembly_mobile_manipulator8_button": 20,
+      "zz_assembly_rc_car8_navigation": 20,
+      "zz_assembly_snake8_gap": 20,
+      "zz_assembly_snake8_stairs": 20,
+      "zz_reconfiguration": 10
+    },
+    "supervised_instances": {}
+  }
+}

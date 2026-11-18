@@ -1,0 +1,147 @@
+{
+  "complete": true,
+  "deep_verification": {
+    "duplicates": 0,
+    "episodes": 531,
+    "missing": 0,
+    "operations": {
+      "align_faces": 3383,
+      "dock": 3376,
+      "gravity_settle": 81,
+      "undock": 266
+    },
+    "routing_failures": 0,
+    "samples": 106279,
+    "splits": {
+      "test": 0,
+      "train": 82528,
+      "validation": 23751
+    },
+    "structural_samples": 4748
+  },
+  "fingerprint": "e6e746aecfd976fb37ff83d50b4e3ac50839d895e1af46e43d845e10d487a49a",
+  "h1_features_unchanged": true,
+  "legacy_align_restoration": false,
+  "masked_align_eligible_candidate_instances": {
+    "train": 0,
+    "validation": 0
+  },
+  "masked_align_positive_instances": {
+    "train": 13,
+    "validation": 4
+  },
+  "new_candidate_counts": {
+    "train": {
+      "resource:pan_delta": {
+        "masked": 6,
+        "negative": 660218
+      },
+      "resource:pan_target": {
+        "masked": 6,
+        "negative": 659691,
+        "positive": 527
+      },
+      "resource:pan_velocity": {
+        "masked": 6,
+        "negative": 539202,
+        "positive": 121016
+      },
+      "resource:tilt_delta": {
+        "masked": 6,
+        "negative": 660218
+      },
+      "resource:tilt_target": {
+        "masked": 6,
+        "negative": 600463,
+        "positive": 59755
+      },
+      "resource:tilt_velocity": {
+        "masked": 6,
+        "negative": 660218
+      },
+      "resource:wheel_velocity": {
+        "negative": 407118,
+        "positive": 253106
+      },
+      "structural:align_faces": {
+        "negative": 1697669,
+        "positive": 2715
+      },
+      "structural:dock": {
+        "negative": 1828716,
+        "positive": 2708
+      },
+      "structural:gravity_settle": {
+        "negative": 644975,
+        "positive": 67
+      },
+      "structural:undock": {
+        "negative": 1126560,
+        "positive": 216
+      }
+    },
+    "validation": {
+      "resource:pan_delta": {
+        "negative": 190008
+      },
+      "resource:pan_target": {
+        "negative": 189961,
+        "positive": 47
+      },
+      "resource:pan_velocity": {
+        "negative": 151296,
+        "positive": 38712
+      },
+      "resource:tilt_delta": {
+        "negative": 190008
+      },
+      "resource:tilt_target": {
+        "negative": 173927,
+        "positive": 16081
+      },
+      "resource:tilt_velocity": {
+        "negative": 190008
+      },
+      "resource:wheel_velocity": {
+        "negative": 122780,
+        "positive": 67228
+      },
+      "structural:align_faces": {
+        "negative": 410820,
+        "positive": 668
+      },
+      "structural:dock": {
+        "negative": 443108,
+        "positive": 668
+      },
+      "structural:gravity_settle": {
+        "negative": 186320,
+        "positive": 14
+      },
+      "structural:undock": {
+        "negative": 325530,
+        "positive": 50
+      }
+    }
+  },
+  "new_g2": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/sidecar/g2_v8_bc_v5_stage11_full",
+  "new_g2_fingerprint": "75f604a8d33f81ce18736006e1c3be6545c21cfdd57d18e44d3be41bd1e6f0b3",
+  "old_g2_fingerprint": "5b0deb04b26c19ce0f5e0290d984335e91b2ecb7ccafb32bdea4c2aea84ec275",
+  "pending": [
+    "Step 6 candidate/mask/offline-live audit",
+    "Step 7 binary validity + balanced batching"
+  ],
+  "positive_retention_except_mask_pass": true,
+  "ready_for_training": false,
+  "schema_version": "mssr.bc_v5.topology_rebuild.actor_v8.masked_labels.v1",
+  "source_diagnostic_sha256": "20e859e86599e5f7dc0088c09c4efc095b62facb83069c4003bc6bb888b8f531",
+  "source_rows": {
+    "train": 82528,
+    "validation": 23751
+  },
+  "test_payload_access": 0,
+  "zero_positive_graphs_after_mask": {
+    "train": 10,
+    "validation": 2
+  }
+}

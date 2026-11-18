@@ -1,0 +1,33 @@
+{
+  "new_source_sha256": {
+    "drl/IL/bc_v1/bc_v5_binary.py": "86fc02fbd3dc08144d92b15f29ecc8e4b32a1dd75df0d617a8e05659c2989948",
+    "drl/IL/bc_v1/bc_v5_candidate_census.py": "7ccfb2e24fca2d3b3dbedc3af3312f89088af01f0d231d3a7717046a7ffd90d8",
+    "drl/IL/bc_v1/bc_v5_integrity.py": "9a14ffb6b7cf337c44ddfc32b997c64c83cae6fa9db077d07ff0c9be39ed9c7b",
+    "drl/IL/bc_v1/bc_v5_stage11.py": "a57bed93aca02ca57725849d1b4395ba87564e97aa9ba5fac77f38c66a24658f",
+    "drl/IL/bc_v1/bc_v5_train.py": "fe1eb80c3d0e80890920622796a6a923cf99972e1826e754ecbb8bb7e51c519c",
+    "drl/IL/tests/bc_v1/test_bc_v5_binary_integrity.py": "270b6b0b8cd4c7dbc979f8d441044155dc94e193dbc72f52294a3dec39afc0f7",
+    "drl/IL/tests/bc_v1/test_bc_v5_candidate_census.py": "a50569e5599cde8867ba1673dde86cfb354cf4c19259eab8dd7b61db942dc746",
+    "drl/IL/tests/bc_v1/test_bc_v5_temporal_optional_v8.py": "08b38f0ec01c3e7292ed8752415e088291b72e3cf99a6bc008a78671d75fe29e"
+  },
+  "old_source_sha256": {
+    "bc_v5_binary.py": "f3f83941b581bcb378fad5b9e248af6d14e31381fbfa2383577fe0f9c308d938",
+    "bc_v5_binary_integrity.py": "07e89e8e70dfdf6bfece3efcc662052360afe51b153100d9e9f7185822c5ba20",
+    "bc_v5_candidate_census.py": "62a89aa75c925172662d27b73c20eb31cf1465688fde506c02a4c8da0c850c5b",
+    "bc_v5_candidate_census.py::tests": "969758852ae5aa01487757eeb0191ad6006cd61ccbab4ade3562ad5f909160dd",
+    "bc_v5_integrity.py": "9be975d3eaa3b57abc6e54bc36d70640e868c51fca84a17286ef8b3d34ccd4be",
+    "bc_v5_stage11.py": "60d1d1c1f5bc041a7ebab0e2032dd49691dc9c70fc7f07963ab79276cfc48191",
+    "bc_v5_train.py": "3b000c0cf827cd24e8bc51759abfbe82cc2a5c445b78f6bab4964f4939bfd319"
+  },
+  "previous_stage2_config_sha256": "bdb6b1d318e5dc7da6e15c5d16e30852062e96f41b30fa41e537db03193d6686",
+  "reason": "Explicit user-approved removal of independent temporal audit prerequisite",
+  "safety": {
+    "canonical_g1_f1_f2_g2_unchanged": true,
+    "canonical_internal_temporal_conflicts_excluded": true,
+    "external_temporal_audit_required": false,
+    "localized_resource_conflict_masks_preserved": true,
+    "stage11_candidate_generation_completed": false,
+    "test_payload_access": 0
+  },
+  "schema_version": "mssr.bc_v5.temporal_gate_amendment.v1",
+  "updated_stage2_config_sha256": "6518d894698847889db5855fef1854b8b75e5c3aba9e8c2a0115247b2f8b25b3"
+}

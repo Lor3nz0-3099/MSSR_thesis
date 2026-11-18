@@ -1,0 +1,31 @@
+{
+  "checkpoint": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/runs/bc_v5_v8_primitive_first_20261117T143857Z_118314/last.pt",
+  "checkpoint_epoch": 20,
+  "checkpoint_sha256": "38b98fd70ca104e248bd507a59d19973fcf40c64c07f46ed2471f36b8d6d2205",
+  "decoder_rule": "presence_logits >= threshold_logit",
+  "elapsed_seconds": 117.145,
+  "f2_fingerprint": "04bec0c04f091f0a4dc9b55c0fb606abe56f27258cf2acaa2afa96d4efab97e8",
+  "g2_manifest_fingerprint": "75f604a8d33f81ce18736006e1c3be6545c21cfdd57d18e44d3be41bd1e6f0b3",
+  "mask_policy": "VALID candidate slots ONLY; no masked supervision counted",
+  "masked_candidates": 0,
+  "schema_version": "mssr.bc_v5.decoder_validation_calibration.v1",
+  "source_code_sha256": "a3e30ca2c34b896f2af74f7808d251afa8b2bcf95d2c16f413ff35e02f8eb211",
+  "test_payload_access": 0,
+  "thresholds_logit": [
+    -1.0,
+    -0.5,
+    0.0,
+    0.25,
+    0.5,
+    0.75,
+    1.0,
+    1.25,
+    1.5,
+    2.0,
+    2.5,
+    3.0,
+    4.0,
+    5.0
+  ],
+  "validation_rows": 23749
+}

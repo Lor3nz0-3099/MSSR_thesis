@@ -1,0 +1,137 @@
+{
+  "approved_amendment": {
+    "policy": "canonical_v8_native_temporal_flags_external_audit_optional",
+    "previous_stage2_config_sha256": "bdb6b1d318e5dc7da6e15c5d16e30852062e96f41b30fa41e537db03193d6686",
+    "rationale": "Independent temporal audit no longer mandatory, without altering Canonical R16/unresolved exclusions or conflict masks",
+    "source_pins_updated": [
+      "5_integrity",
+      "6_candidate_census"
+    ]
+  },
+  "expected": {
+    "actor_g2": {
+      "test": 0,
+      "train": 82528,
+      "validation": 23751
+    },
+    "excluded_legacy_button_episodes": 7,
+    "g2_physical": {
+      "test": {
+        "episodes": 102,
+        "samples": 19523
+      },
+      "train": {
+        "episodes": 429,
+        "samples": 82528
+      },
+      "validation": {
+        "episodes": 102,
+        "samples": 23751
+      }
+    }
+  },
+  "paths": {
+    "actor_visibility": "configs/bc_v1/actor_visibility_r1m.json",
+    "canonical": "datasets/expert_canonical_v8_unified",
+    "f1": "artifacts/bc_v1/splits/f1_v8_640/split.json",
+    "f2": "artifacts/bc_v1/normalization/f2_v8_640",
+    "g1": "artifacts/bc_v1/cache/g1_v8_640",
+    "g2_physical": "artifacts/bc_v1/sidecar/g2_v8_640"
+  },
+  "pins": {
+    "actor_visibility_policy_sha256": "2ce167bd300ea251908cf2f63d1eef9cb57190c42d98fe15d2969d02392da6ef",
+    "canonical_manifest_sha256": "8a5d43b262407ef31f3a05fee160f1c3b6871dfc3093cf6ce708100b3d638143",
+    "f1_fingerprint": "ecab5c6e9ae58e7a3dd5b55673a990f9aea8e3dfb34c0d4910302242dfb207b4",
+    "f1_split_sha256": "e8a1c8244d5173317349b44ecf443ce2ce85c864d7dd561e5fd993357aede62e",
+    "f2_normalizer_fingerprint": "5a9e2984d534aa0590ca7dab378bda818400f306aba90342925824fade6b063a",
+    "f2_normalizer_sha256": "6f5d386d5bdeb97500ac76bbbd02159e92b28d34fbaf7f3c5cfdfe235d2a88a4",
+    "g1_cache_fingerprint": "f32c8f4d56e88d774dc3b8a56cc9f38a91ef83f8e822ad0c75043c3d2c774128",
+    "g1_manifest_sha256": "94d140e0ab1edec302414d184315ed860c3ac2bdeee815be0fc45af542a3d790",
+    "g2_physical_manifest_fingerprint": "5027836e49b3a3341bc6e867dedd5731d9f759976d4c671e139400f851bdf6cc",
+    "g2_physical_manifest_sha256": "44b88f3bb45d8117ca3f073e080784858c1157533c7100b791a86bfcedc56c1f",
+    "module_sha256": {
+      "10_legacy_reference": "86d36b0d7046950379822f78b7a2a23d6371456b7343c61aaed11f9094791c3c",
+      "5_integrity": "9a14ffb6b7cf337c44ddfc32b997c64c83cae6fa9db077d07ff0c9be39ed9c7b",
+      "6_candidate_census": "7ccfb2e24fca2d3b3dbedc3af3312f89088af01f0d231d3a7717046a7ffd90d8",
+      "6_primitive_census": "ef45b9a38785cb78aa13977a74f77f80031e061b046162b092a88a0f9445b02f",
+      "7_topology_preflight": "e1880feec9c1fb25b0c7889976985da49ad79af89476ee5c20da18252ad2412b",
+      "8_joint_history": "0d31fb3d3a1a1571f9ff818faed1aa70e202187dfad5c29c084308a9f9dcb48e",
+      "9_runtime_guard": "de9cda1820449d9d7ff798b41acf25e45cce78f9b6b0b0c89bfad0702d96879d"
+    },
+    "stage10_v8_code_sha256": "5bdb83d07f3f9b5396acee66631938271ce345e6ed9e54024f4995238db633be"
+  },
+  "purpose": "Versioned BC-v5 Stage 5-10 setup; preparation only; not training or Stage11",
+  "safety": {
+    "dataset_cache_or_sidecar_mutations": false,
+    "legacy_configs_changed": false,
+    "stage11_permitted": false,
+    "test_payload_access": 0,
+    "training_permitted": false
+  },
+  "schema_version": "mssr.bc_v5.stage2_v8_config.v1",
+  "stage10": {
+    "expected_missing_align": {
+      "train": 13,
+      "validation": 4
+    },
+    "legacy_offline_restore": false,
+    "policy": "mask_unrepresentable_align_positive",
+    "requires_stage7_8_exact_certification": true,
+    "stage11_must_implement_mask_and_audit": true
+  },
+  "stage3": {
+    "actor_f2": "artifacts/bc_v1/normalization/f2_v8_actor_visible_r1m",
+    "actor_g2": "artifacts/bc_v1/sidecar/g2_v8_actor_visible_r1m",
+    "actor_g2_expected_manifest_fingerprint": null,
+    "note": "Stage 3 creates TEST-free actor-visible G2; actual fingerprint is checked from manifest+SUCCESS without editing this frozen config.",
+    "pin_strategy": "Use Stage-3 manifest + SUCCESS.json and verify exact v8 lineage in Stage-10; never rewrite this config",
+    "stage3_intermediates_required": true
+  },
+  "stages": {
+    "10": {
+      "config": "configs/bc_v1/bc_v5_stages_5_10_v8.json",
+      "module": "drl.IL.bc_v1.bc_v5_stage10_mask_v8",
+      "output": "artifacts/bc_v1/audits/bc_v5_v8/stage10_mask_disposition.json",
+      "stage7": "artifacts/bc_v1/audits/bc_v5_v8/stage7_topology_positive.json",
+      "stage8": "artifacts/bc_v1/audits/bc_v5_v8/stage8_joint_history.json"
+    },
+    "5": {
+      "canonical": "datasets/expert_canonical_v8_unified",
+      "g2": "stage3.actor_g2",
+      "module": "drl.IL.bc_v1.bc_v5_integrity",
+      "output": "artifacts/bc_v1/audits/bc_v5_v8/stage5_integrity.json",
+      "temporal_audit": null
+    },
+    "6_candidates": {
+      "g2": "stage3.actor_g2",
+      "module": "drl.IL.bc_v1.bc_v5_candidate_census",
+      "output": "artifacts/bc_v1/audits/bc_v5_v8/stage6_candidate_census.json",
+      "overlay": "artifacts/bc_v1/audits/bc_v5_v8/stage5_integrity.json"
+    },
+    "6_primitive": {
+      "g2": "stage3.actor_g2",
+      "module": "drl.IL.bc_v1.bc_v5_census",
+      "output": "artifacts/bc_v1/audits/bc_v5_v8/stage6_primitive_census.json"
+    },
+    "7": {
+      "canonical": "datasets/expert_canonical_v8_unified",
+      "g2": "stage3.actor_g2",
+      "module": "drl.IL.bc_v1.bc_v5_topology_positive_audit",
+      "output": "artifacts/bc_v1/audits/bc_v5_v8/stage7_topology_positive.json",
+      "overlay": "artifacts/bc_v1/audits/bc_v5_v8/stage5_integrity.json"
+    },
+    "8": {
+      "canonical": "datasets/expert_canonical_v8_unified",
+      "g2": "stage3.actor_g2",
+      "module": "drl.IL.bc_v1.bc_v5_align_joint_history",
+      "output": "artifacts/bc_v1/audits/bc_v5_v8/stage8_joint_history.json",
+      "overlay": "artifacts/bc_v1/audits/bc_v5_v8/stage5_integrity.json",
+      "preflight": "artifacts/bc_v1/audits/bc_v5_v8/stage7_topology_positive.json"
+    },
+    "9": {
+      "action": "runtime safety contract audit, no dataset writes",
+      "module": "drl.IL.bc_v1.bc_v5_live",
+      "runtime_align_exception": false
+    }
+  }
+}

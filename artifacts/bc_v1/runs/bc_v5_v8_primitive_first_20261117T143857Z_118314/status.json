@@ -1,0 +1,1 @@
+{"bad_epochs": 8, "best_epoch": 12, "best_validation_loss": 0.1263360841252254, "elapsed_seconds": 11664.4, "global_step": 25800, "max_epochs": 30, "patience": 8, "phase": "COMPLETE", "test_payload_access": 0}

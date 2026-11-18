@@ -1,0 +1,76 @@
+{
+  "align_exception_diagnostic_sha256": "20e859e86599e5f7dc0088c09c4efc095b62facb83069c4003bc6bb888b8f531",
+  "complete": true,
+  "fingerprint": "5e21171a02959e55197bbdf34a8e7ef6b1bd2638458872f116cb2a877fc4d4d4",
+  "h1_h2": "metadata preflight PASS; GPU forward/backward still pending",
+  "masked_align_positive_instances": {
+    "train": 13,
+    "validation": 4
+  },
+  "note": "Stage11 G2 remains unchanged; 12 zero-positive rows excluded from supervised batches only.",
+  "sampler_policy": "TRAIN-only adaptive exact-positive primitive pools; metadata+sample bootstrap",
+  "schema_version": "mssr.bc_v5.v8.stage678_readiness.v1",
+  "source_actor_g2_fingerprint": "5b0deb04b26c19ce0f5e0290d984335e91b2ecb7ccafb32bdea4c2aea84ec275",
+  "stage11_g2": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/sidecar/g2_v8_bc_v5_stage11_full",
+  "stage11_g2_manifest_fingerprint": "75f604a8d33f81ce18736006e1c3be6545c21cfdd57d18e44d3be41bd1e6f0b3",
+  "stage11_report_fingerprint": "e6e746aecfd976fb37ff83d50b4e3ac50839d895e1af46e43d845e10d487a49a",
+  "stage5_overlay_fingerprint": "351e79a75973abc1ea2e129a7de023a10f1e0404512ce43204902d69eb01834f",
+  "supervision_policy": "closed_world + per-resource conflicts + masked align initiators",
+  "test_payload_access": 0,
+  "train_ready_contract": true,
+  "validation_sampler": "sequential unmodified",
+  "zero_positive_graphs": {
+    "train": [
+      {
+        "episode_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+        "transition_index": 1796
+      },
+      {
+        "episode_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+        "transition_index": 2319
+      },
+      {
+        "episode_id": "teleop-0e4e34fe3a5f4ed1b6a86642acf4fac8",
+        "transition_index": 7298
+      },
+      {
+        "episode_id": "teleop-39e2f4b4cd684e9ea72734cc21baca94",
+        "transition_index": 5595
+      },
+      {
+        "episode_id": "teleop-5e0c4d97db80492bbb561b16ef132949",
+        "transition_index": 1606
+      },
+      {
+        "episode_id": "teleop-5e0c4d97db80492bbb561b16ef132949",
+        "transition_index": 2139
+      },
+      {
+        "episode_id": "teleop-952c36750c624fb19de8421019325d13",
+        "transition_index": 2574
+      },
+      {
+        "episode_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+        "transition_index": 3395
+      },
+      {
+        "episode_id": "teleop-a7d7e08f5fd14a59bd3af6afb53ccde1",
+        "transition_index": 3946
+      },
+      {
+        "episode_id": "teleop-adcf33433f954669838220b9f617d952",
+        "transition_index": 5645
+      }
+    ],
+    "validation": [
+      {
+        "episode_id": "teleop-1bea8f28c1c04323a4c3ec7e2829d07c",
+        "transition_index": 4213
+      },
+      {
+        "episode_id": "teleop-fb69637be28d49ccbff572e721cfae24",
+        "transition_index": 1050
+      }
+    ]
+  }
+}

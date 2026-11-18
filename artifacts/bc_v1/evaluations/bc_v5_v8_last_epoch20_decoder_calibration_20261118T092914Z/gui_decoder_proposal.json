@@ -1,0 +1,7 @@
+{
+  "apply_automatically": false,
+  "checkpoint": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/runs/bc_v5_v8_primitive_first_20261117T143857Z_118314/last.pt",
+  "note": "Review primitive_by_threshold.csv and GUI runs before applying this proposal.",
+  "original_threshold_logit": 0.0,
+  "threshold_logit": 1.0
+}

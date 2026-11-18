@@ -1,0 +1,19 @@
+{
+  "TEST_payload_access": 0,
+  "actor_f2_fingerprint": "04bec0c04f091f0a4dc9b55c0fb606abe56f27258cf2acaa2afa96d4efab97e8",
+  "actor_g2_manifest_fingerprint": "5b0deb04b26c19ce0f5e0290d984335e91b2ecb7ccafb32bdea4c2aea84ec275",
+  "actor_visibility_fingerprint": "e6b819c2e23e1713f70649d83b547d7701d78ef8c0ec7a21668c803c7c8f6234",
+  "complete": true,
+  "g2_resource_manifest_fingerprint": "ff4e8279765e09dd89665b78897cb88635bc10d37ec004182044f4707a1bf1c1",
+  "g2_structural_manifest_fingerprint": "f790f8b81f02f4c0bde4003e3f536b818409d23249d6a325f64d41e212b412ca",
+  "note": "Step 3 only; Stage 5-11 audits and 17 align_faces masks are not certified.",
+  "ready_for_training": false,
+  "resource_authority": "only verified v8 complete Nav2 snapshots may certify inactive",
+  "sample_counts": {
+    "test": 0,
+    "train": 82528,
+    "validation": 23751
+  },
+  "schema_version": "mssr.bc_v5.stage3_v8_report.v1",
+  "source_g2_manifest_fingerprint": "5027836e49b3a3341bc6e867dedd5731d9f759976d4c671e139400f851bdf6cc"
+}

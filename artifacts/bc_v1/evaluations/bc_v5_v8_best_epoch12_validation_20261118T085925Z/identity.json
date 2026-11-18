@@ -1,0 +1,21 @@
+{
+  "audit_fingerprint": "351e79a75973abc1ea2e129a7de023a10f1e0404512ce43204902d69eb01834f",
+  "batch_size": 32,
+  "checkpoint": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/runs/bc_v5_v8_primitive_first_20261117T143857Z_118314/best.pt",
+  "checkpoint_epoch": 12,
+  "checkpoint_sha256": "24e3542b49352739e527ea6d3290f5d4d3953d82aa2383825a36e68a6b5305d3",
+  "elapsed_seconds": 138.93,
+  "expected_rows": 23749,
+  "f2_fingerprint": "04bec0c04f091f0a4dc9b55c0fb606abe56f27258cf2acaa2afa96d4efab97e8",
+  "g2_manifest_fingerprint": "75f604a8d33f81ce18736006e1c3be6545c21cfdd57d18e44d3be41bd1e6f0b3",
+  "mask_policy": "exact-set over valid candidate slots only",
+  "regression_policy": "oracle positives and correctly selected positives; masked candidates excluded; physical original expert targets",
+  "rows": 23749,
+  "schema_version": "mssr.bc_v5.validation_evaluation.v1",
+  "source_code_sha256": "f89cf13e0764c487ad403cd9beb61113e7a1a742189a69b2dbd65ba3e432f8f3",
+  "split": "validation",
+  "stage678_fingerprint": "5e21171a02959e55197bbdf34a8e7ef6b1bd2638458872f116cb2a877fc4d4d4",
+  "status": "COMPLETE",
+  "test_payload_access": 0,
+  "threshold_logit": 0.0
+}

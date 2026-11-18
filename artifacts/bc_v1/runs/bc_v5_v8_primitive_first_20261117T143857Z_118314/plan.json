@@ -1,0 +1,64 @@
+{
+  "audit_fingerprint": "351e79a75973abc1ea2e129a7de023a10f1e0404512ce43204902d69eb01834f",
+  "excluded": {
+    "train": 0,
+    "validation": 0
+  },
+  "label_contract": "binary_presence + explicit partial-resource validity mask",
+  "manifest_fingerprint": "75f604a8d33f81ce18736006e1c3be6545c21cfdd57d18e44d3be41bd1e6f0b3",
+  "mode": "RUN_REQUESTED",
+  "samples": {
+    "train": 82518,
+    "validation": 23749
+  },
+  "sampling": {
+    "balanced_quota": 16,
+    "frequency_exponent": 0.5
+  },
+  "schema_version": "mssr.bc_v5.training_plan.v1",
+  "scratch": true,
+  "source_g2": "/home/lorenzo/MSSR_thesis/artifacts/bc_v1/sidecar/g2_v8_bc_v5_stage11_full",
+  "stage678_readiness_fingerprint": "5e21171a02959e55197bbdf34a8e7ef6b1bd2638458872f116cb2a877fc4d4d4",
+  "temporal_exclusion": "Canonical R16/unresolved sequence/unlocalizable conflict (no external classification)",
+  "test_payload_access": 0,
+  "v8_sampler_bootstrap": {
+    "balanced_quota": 16,
+    "batch_size": 64,
+    "bootstrap_exact_rows": 1023,
+    "bootstrap_signature": "d9da84effc9f500720bc7df1987e661bad5aff12ecebb16d564fc02f437fc6b4",
+    "frequency_exponent": 0.5,
+    "known_primitives": [
+      "resource:pan_target",
+      "resource:pan_velocity",
+      "resource:tilt_target",
+      "resource:wheel_velocity",
+      "structural:align_faces",
+      "structural:dock",
+      "structural:gravity_settle",
+      "structural:undock"
+    ],
+    "last_epoch_balanced_draws": {},
+    "last_epoch_balanced_slots": 0,
+    "last_epoch_uniform_slots": 0,
+    "note": "Primitive-first; one rare priority slot per batch if prior and rare pools known; all choices are real TRAIN rows.",
+    "observed_exact_rows": 1023,
+    "positive_primitive_pool_sizes": {
+      "resource:pan_target": 1,
+      "resource:pan_velocity": 206,
+      "resource:tilt_target": 107,
+      "resource:wheel_velocity": 216,
+      "structural:align_faces": 251,
+      "structural:dock": 259,
+      "structural:gravity_settle": 10,
+      "structural:undock": 15
+    },
+    "schema_version": "mssr.bc_v5.v8.primitive_first_sampler.v2",
+    "structural_positive_rows_sqlite": 3823,
+    "test_payload_access": 0,
+    "train_rows": 82518
+  },
+  "zero_positive_excluded": {
+    "train": 10,
+    "validation": 2
+  }
+}
