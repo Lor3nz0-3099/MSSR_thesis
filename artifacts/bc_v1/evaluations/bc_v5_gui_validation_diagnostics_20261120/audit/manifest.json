@@ -1,0 +1,610 @@
+{
+  "schema": "mssr.bc_v5.gui_validation_diagnostics.audited.v1",
+  "label": "GUI diagnostics sul VALIDATION set",
+  "scope": "actor-only BC-v5 online GUI, S0 loose-modules initial conditions",
+  "created_from": "good_datas_GUI.zip",
+  "raw_zip_sha256": "2a8f0da056b5ae24852a1ecca111034dfc044a7375f6e920f2206a5d8badacb2",
+  "checkpoint_epoch": 20,
+  "checkpoint_sha256": "38b98fd70ca104e248bd507a59d19973fcf40c64c07f46ed2471f36b8d6d2205",
+  "threshold_logit": 1.0,
+  "episode_count": 8,
+  "seven_dock_episodes": 6,
+  "face_topology_verified": 5,
+  "summary_present": 2,
+  "summary_missing": 6,
+  "runner_errors": 1,
+  "runtime_source_manifest_digests": {
+    "S0_validation_gap_last_ep20_t1_20261120T101308Z": "d8d512854ba9e347ba97ee8529035222cfce4a54ced39a0c8a25be6392f9c6cc",
+    "S0_validation_gap_last_ep20_t1_20261120T102025Z": "d8d512854ba9e347ba97ee8529035222cfce4a54ced39a0c8a25be6392f9c6cc",
+    "S0_validation_manipulation_last_ep20_t1_20261120T131123Z": "c38c217f6f68655e3ebbafab97e4a401de2c605f066fa77ea6f34b013ebc697a",
+    "S0_validation_manipulation_last_ep20_t1_20261120T135020Z": "c38c217f6f68655e3ebbafab97e4a401de2c605f066fa77ea6f34b013ebc697a",
+    "S0_validation_navigation_last_ep20_t1_20261120T122732Z": "c38c217f6f68655e3ebbafab97e4a401de2c605f066fa77ea6f34b013ebc697a",
+    "S0_validation_navigation_last_ep20_t1_20261120T124058Z": "c38c217f6f68655e3ebbafab97e4a401de2c605f066fa77ea6f34b013ebc697a",
+    "S0_validation_stairs_last_ep20_t1_20261120T102607Z": "d8d512854ba9e347ba97ee8529035222cfce4a54ced39a0c8a25be6392f9c6cc",
+    "S0_validation_stairs_last_ep20_t1_20261120T103531Z": "d8d512854ba9e347ba97ee8529035222cfce4a54ced39a0c8a25be6392f9c6cc"
+  },
+  "episodes": [
+    {
+      "run_id": "S0_validation_gap_last_ep20_t1_20261120T101308Z",
+      "file_names": [
+        "RUN_STARTED.json",
+        "bc_v5_policy_logits.jsonl",
+        "events.jsonl",
+        "initial_state.json",
+        "launcher_settings.json",
+        "run_config.json",
+        "runtime.log",
+        "source_sha256.json",
+        "target_topology.json",
+        "viewer_settings.json"
+      ],
+      "files": [
+        {
+          "name": "RUN_STARTED.json",
+          "sha256": "79c83ba120441909a0226a0c7e4793f591fc3a3285ba6d59f42a8d8df4b79add",
+          "bytes": 39
+        },
+        {
+          "name": "bc_v5_policy_logits.jsonl",
+          "sha256": "167e210f79de34c40da205964a227d0e5f5fbb5f7535a438bfbeead875ff8700",
+          "bytes": 3094950
+        },
+        {
+          "name": "events.jsonl",
+          "sha256": "178aa4eddfc53a4e71f94a9b845a9e63d486ac2562b2d76e5c15ce2f6b1f3382",
+          "bytes": 234963
+        },
+        {
+          "name": "initial_state.json",
+          "sha256": "bbad8558752161d51cf9b7e4bff19427f7a743d10223a8189bbc22f2823b9dc6",
+          "bytes": 5884
+        },
+        {
+          "name": "launcher_settings.json",
+          "sha256": "fe237b001a15191614955a5addb63198a3cd5b0b927ae7c9ee5a217a5dbcc5cf",
+          "bytes": 158
+        },
+        {
+          "name": "run_config.json",
+          "sha256": "ff9b0c0fb20429ae4abcc7334886da0dd890759aceee4fc3e5ba25493c9a86ac",
+          "bytes": 5560
+        },
+        {
+          "name": "runtime.log",
+          "sha256": "1b5b54c613858745ea813e947da97765156bab9a846c8e64c8f12fbc9d76b0b4",
+          "bytes": 28562
+        },
+        {
+          "name": "source_sha256.json",
+          "sha256": "3b62986f46d743774940e1358f10e482b958d6887d70e31cdb562cc79f5acd3f",
+          "bytes": 21047
+        },
+        {
+          "name": "target_topology.json",
+          "sha256": "8635b294e702ee91426c7f7ce024fc32ca1d263572babfb88237b31b80686612",
+          "bytes": 4843
+        },
+        {
+          "name": "viewer_settings.json",
+          "sha256": "49ead846dcd507127d201a207ce92c74e74b09d0ca6b7d8f2c418faae71ce822",
+          "bytes": 2196
+        }
+      ],
+      "initial_state_sha256": "a5531f4fc7bbfa1ba1e0706dc8bf5e0c642e183f95ad314e4fe9987b6562a598"
+    },
+    {
+      "run_id": "S0_validation_gap_last_ep20_t1_20261120T102025Z",
+      "file_names": [
+        "RUN_STARTED.json",
+        "bc_v5_policy_logits.jsonl",
+        "events.jsonl",
+        "initial_state.json",
+        "launcher_settings.json",
+        "run_config.json",
+        "runtime.log",
+        "source_sha256.json",
+        "target_topology.json",
+        "viewer_settings.json"
+      ],
+      "files": [
+        {
+          "name": "RUN_STARTED.json",
+          "sha256": "c855a39030348be13581d1f3f8e74408603e1388b0a38e00eaac1eab078c1af0",
+          "bytes": 39
+        },
+        {
+          "name": "bc_v5_policy_logits.jsonl",
+          "sha256": "14d76bf17329ff5207b01a50a930ada158a92433d5e3c1cd5610266483a2acc2",
+          "bytes": 3436999
+        },
+        {
+          "name": "events.jsonl",
+          "sha256": "0b7901a1b61b60586366db730e5383e6a6171a0830a9003a638b9e8094448a40",
+          "bytes": 304408
+        },
+        {
+          "name": "initial_state.json",
+          "sha256": "7245f1a3ce0c89a64f0d15b22122e1540049dd4879a6f3666987883b43aa5aed",
+          "bytes": 5934
+        },
+        {
+          "name": "launcher_settings.json",
+          "sha256": "fe237b001a15191614955a5addb63198a3cd5b0b927ae7c9ee5a217a5dbcc5cf",
+          "bytes": 158
+        },
+        {
+          "name": "run_config.json",
+          "sha256": "723bc702ebf90905438281c0d29f64344e8ed9a62dd01115969c03ffc25f2d4c",
+          "bytes": 5574
+        },
+        {
+          "name": "runtime.log",
+          "sha256": "87b9692aaf6425c96be3bc9359ea0680784c069c8921362c4e1c219aa15329ab",
+          "bytes": 28208
+        },
+        {
+          "name": "source_sha256.json",
+          "sha256": "3b62986f46d743774940e1358f10e482b958d6887d70e31cdb562cc79f5acd3f",
+          "bytes": 21047
+        },
+        {
+          "name": "target_topology.json",
+          "sha256": "8635b294e702ee91426c7f7ce024fc32ca1d263572babfb88237b31b80686612",
+          "bytes": 4843
+        },
+        {
+          "name": "viewer_settings.json",
+          "sha256": "985dfba9903f7ad88ee3f77e163b5cfc04d6c1d047518193a7ee6d4de9c03794",
+          "bytes": 2217
+        }
+      ],
+      "initial_state_sha256": "a382d488b8b5b48d2838b5e882aa3a781dda80b923aeca766cc9fea72dac9a42"
+    },
+    {
+      "run_id": "S0_validation_manipulation_last_ep20_t1_20261120T131123Z",
+      "file_names": [
+        "RUN_STARTED.json",
+        "bc_v5_policy_logits.jsonl",
+        "events.jsonl",
+        "initial_state.json",
+        "launcher_settings.json",
+        "reset_records.json",
+        "run_config.json",
+        "runtime.log",
+        "source_sha256.json",
+        "summary.json",
+        "target_topology.json",
+        "viewer_settings.json"
+      ],
+      "files": [
+        {
+          "name": "RUN_STARTED.json",
+          "sha256": "8eddb682286ec8351c2022b5c31c6cfd0eadcbdb59ae38ac9e7734280f6db188",
+          "bytes": 39
+        },
+        {
+          "name": "bc_v5_policy_logits.jsonl",
+          "sha256": "d1df0625a1681b95c0db9aadde8151ba18db7d996e2edaabe368cbbfa6e7b3f3",
+          "bytes": 4830245
+        },
+        {
+          "name": "events.jsonl",
+          "sha256": "263a243a24aba87777c3425a5723229d8238e6bee9625cc96d40af725c529bbb",
+          "bytes": 340700
+        },
+        {
+          "name": "initial_state.json",
+          "sha256": "6dec66f86b3885eb196d95fc0cda6b42695ff40d4c97922330bc7527dfb1418f",
+          "bytes": 7410
+        },
+        {
+          "name": "launcher_settings.json",
+          "sha256": "fe237b001a15191614955a5addb63198a3cd5b0b927ae7c9ee5a217a5dbcc5cf",
+          "bytes": 158
+        },
+        {
+          "name": "reset_records.json",
+          "sha256": "1cce8c80323c6ff1a775d5fe2d963616bf02745555ff62de6cba61f91d228c15",
+          "bytes": 231
+        },
+        {
+          "name": "run_config.json",
+          "sha256": "96711218a185a007a92b97bc6f14b496593c0ef3e8536a6e410a7e3dda245d8a",
+          "bytes": 5613
+        },
+        {
+          "name": "runtime.log",
+          "sha256": "7af5b8de6d0055323b0ae64f3ae86ef484ba5217edea8c65404e76bf5dcc44be",
+          "bytes": 28761
+        },
+        {
+          "name": "source_sha256.json",
+          "sha256": "fa16904b7e378bff4b6285efe552c326bc9ff370d924f1bfcf931d074670a773",
+          "bytes": 21047
+        },
+        {
+          "name": "summary.json",
+          "sha256": "f1cde81399665e859f6caf01981b17a12838f153a6c48e4caa6315d0aa9cc74a",
+          "bytes": 4162
+        },
+        {
+          "name": "target_topology.json",
+          "sha256": "a7c07ec1777f67bbae6409e195c33a0753d0ede5e6623ba9556352c7a9f389a8",
+          "bytes": 6766
+        },
+        {
+          "name": "viewer_settings.json",
+          "sha256": "f3acc73f8c36fbc183049aada09c0c6316e75aaf32a184663c7ca91ddd70254e",
+          "bytes": 2212
+        }
+      ],
+      "initial_state_sha256": "aaad5fe4241134d92119aef693bb62a13c14fd576bf422e27269ffdf51f6d62d"
+    },
+    {
+      "run_id": "S0_validation_manipulation_last_ep20_t1_20261120T135020Z",
+      "file_names": [
+        "RUN_STARTED.json",
+        "bc_v5_policy_logits.jsonl",
+        "events.jsonl",
+        "initial_state.json",
+        "launcher_settings.json",
+        "reset_records.json",
+        "run_config.json",
+        "runtime.log",
+        "source_sha256.json",
+        "summary.json",
+        "target_topology.json",
+        "viewer_settings.json"
+      ],
+      "files": [
+        {
+          "name": "RUN_STARTED.json",
+          "sha256": "bf7d3f1b7dc40bbb5fb3245b802d2df52bb6385ef77cbbb74e0dc6485c4f4c3f",
+          "bytes": 39
+        },
+        {
+          "name": "bc_v5_policy_logits.jsonl",
+          "sha256": "e8413f6336510ad29bdd20c77aab372c9f72fea8694c636f8aadc59b21546efb",
+          "bytes": 4347589
+        },
+        {
+          "name": "events.jsonl",
+          "sha256": "01d15687e96e9d1b611503ca4f2e9d97b7733c16eef44326794f0db4d5c957bc",
+          "bytes": 437679
+        },
+        {
+          "name": "initial_state.json",
+          "sha256": "42700040736bdd05a4f9b36ada16a0b44fe4ceadfb088edfb1d17900e85b44bc",
+          "bytes": 7450
+        },
+        {
+          "name": "launcher_settings.json",
+          "sha256": "fe237b001a15191614955a5addb63198a3cd5b0b927ae7c9ee5a217a5dbcc5cf",
+          "bytes": 158
+        },
+        {
+          "name": "reset_records.json",
+          "sha256": "4088fa2001139990ba8aad53aad5a0f238c8866c8543cf1119d056a5e4af49b1",
+          "bytes": 231
+        },
+        {
+          "name": "run_config.json",
+          "sha256": "078d09a48be6d3213da95b649754aa68ad02ac19931ca29647e25a48ce2fe2c3",
+          "bytes": 5627
+        },
+        {
+          "name": "runtime.log",
+          "sha256": "0ca0667d581c8ea3ce0c4b164c11dbbc138b9f03395951274bc4e30ad68dbc6b",
+          "bytes": 27814
+        },
+        {
+          "name": "source_sha256.json",
+          "sha256": "fa16904b7e378bff4b6285efe552c326bc9ff370d924f1bfcf931d074670a773",
+          "bytes": 21047
+        },
+        {
+          "name": "summary.json",
+          "sha256": "8d3a1c53747449c077da2d5356337e77a47f9fa8dcc281d5be5c854fcb977b13",
+          "bytes": 2598
+        },
+        {
+          "name": "target_topology.json",
+          "sha256": "a7c07ec1777f67bbae6409e195c33a0753d0ede5e6623ba9556352c7a9f389a8",
+          "bytes": 6766
+        },
+        {
+          "name": "viewer_settings.json",
+          "sha256": "45a674a8b28be0dc2e970620a80e969f044d4e5fb86d513d4be8499720063129",
+          "bytes": 2211
+        }
+      ],
+      "initial_state_sha256": "51512df208718019e9347b32c783660740630ce6338b00702670f75bcca980eb"
+    },
+    {
+      "run_id": "S0_validation_navigation_last_ep20_t1_20261120T122732Z",
+      "file_names": [
+        "RUN_STARTED.json",
+        "bc_v5_policy_logits.jsonl",
+        "events.jsonl",
+        "initial_state.json",
+        "launcher_settings.json",
+        "run_config.json",
+        "runtime.log",
+        "source_sha256.json",
+        "target_topology.json",
+        "viewer_settings.json"
+      ],
+      "files": [
+        {
+          "name": "RUN_STARTED.json",
+          "sha256": "a5561f5cba868b1b9f6e8b94b0182b2ad500640d914b7812d4a6fc729bb57c88",
+          "bytes": 39
+        },
+        {
+          "name": "bc_v5_policy_logits.jsonl",
+          "sha256": "a1b426d681c478cc03a54e6a2c9c2ed7d420dac7455491b95ea98b59db5501dc",
+          "bytes": 3295855
+        },
+        {
+          "name": "events.jsonl",
+          "sha256": "b166b468048d1a0335f7aeb74176302f21d3e4087c20d46927cddf21c843ff47",
+          "bytes": 218119
+        },
+        {
+          "name": "initial_state.json",
+          "sha256": "ab8faf8407e1e6412d843f74ada85e3d23c5d3bcf528a8f76043dc8e974a3af5",
+          "bytes": 6689
+        },
+        {
+          "name": "launcher_settings.json",
+          "sha256": "fe237b001a15191614955a5addb63198a3cd5b0b927ae7c9ee5a217a5dbcc5cf",
+          "bytes": 158
+        },
+        {
+          "name": "run_config.json",
+          "sha256": "1b81a8c2dfc85e6923d587f4a33a08f50c1f2c647ebeb4d8513bc9b116e0b6d0",
+          "bytes": 5581
+        },
+        {
+          "name": "runtime.log",
+          "sha256": "28a23f603b5440b987ba7901efaac9d789f063ec9bf5164c6ab373b12bc119ce",
+          "bytes": 26830
+        },
+        {
+          "name": "source_sha256.json",
+          "sha256": "fa16904b7e378bff4b6285efe552c326bc9ff370d924f1bfcf931d074670a773",
+          "bytes": 21047
+        },
+        {
+          "name": "target_topology.json",
+          "sha256": "84b7eaaafac37038184405d4c2447ae9f419d42dc86b94b8523882b356d4b685",
+          "bytes": 5667
+        },
+        {
+          "name": "viewer_settings.json",
+          "sha256": "49ead846dcd507127d201a207ce92c74e74b09d0ca6b7d8f2c418faae71ce822",
+          "bytes": 2196
+        }
+      ],
+      "initial_state_sha256": "a891bea41447981be8975cb6666e3476cec829947e4e624fb7f9c546da1c810d"
+    },
+    {
+      "run_id": "S0_validation_navigation_last_ep20_t1_20261120T124058Z",
+      "file_names": [
+        "RUN_STARTED.json",
+        "bc_v5_policy_logits.jsonl",
+        "events.jsonl",
+        "initial_state.json",
+        "launcher_settings.json",
+        "run_config.json",
+        "runtime.log",
+        "source_sha256.json",
+        "target_topology.json",
+        "viewer_settings.json"
+      ],
+      "files": [
+        {
+          "name": "RUN_STARTED.json",
+          "sha256": "0ac3d4f1035219b03070a1f3b34e9a0a7fce24f6532d561b32dc2ca6e7e44f3d",
+          "bytes": 39
+        },
+        {
+          "name": "bc_v5_policy_logits.jsonl",
+          "sha256": "7bd8ee04ad6f07922d18c66332d2113d25d3fa5c4f29ed2176be93e034918913",
+          "bytes": 9405311
+        },
+        {
+          "name": "events.jsonl",
+          "sha256": "b70459c3b086b1dc77e4ec688ab463a00c08df752d0c178dd242b41822ccd56c",
+          "bytes": 252019
+        },
+        {
+          "name": "initial_state.json",
+          "sha256": "892866f6efebb869bb6a755989bb8289d8fabe9507e43e28ee06f539e0d51e8d",
+          "bytes": 7222
+        },
+        {
+          "name": "launcher_settings.json",
+          "sha256": "fe237b001a15191614955a5addb63198a3cd5b0b927ae7c9ee5a217a5dbcc5cf",
+          "bytes": 158
+        },
+        {
+          "name": "run_config.json",
+          "sha256": "55f8682c2a90865353ea2919a4841b676431bc4c91c6e87e83fefc04b0e42061",
+          "bytes": 5595
+        },
+        {
+          "name": "runtime.log",
+          "sha256": "76e85fa3e4706d0ba9062d39e04c78606fc462e5b0990b139f0cf9756e1504f4",
+          "bytes": 26898
+        },
+        {
+          "name": "source_sha256.json",
+          "sha256": "fa16904b7e378bff4b6285efe552c326bc9ff370d924f1bfcf931d074670a773",
+          "bytes": 21047
+        },
+        {
+          "name": "target_topology.json",
+          "sha256": "84b7eaaafac37038184405d4c2447ae9f419d42dc86b94b8523882b356d4b685",
+          "bytes": 5667
+        },
+        {
+          "name": "viewer_settings.json",
+          "sha256": "985dfba9903f7ad88ee3f77e163b5cfc04d6c1d047518193a7ee6d4de9c03794",
+          "bytes": 2217
+        }
+      ],
+      "initial_state_sha256": "c4b6bfd0276c5ed3cc018b9c4eb727bbaa442bc4d3cb58e3a4e02ae143900507"
+    },
+    {
+      "run_id": "S0_validation_stairs_last_ep20_t1_20261120T102607Z",
+      "file_names": [
+        "RUN_STARTED.json",
+        "bc_v5_policy_logits.jsonl",
+        "events.jsonl",
+        "initial_state.json",
+        "launcher_settings.json",
+        "run_config.json",
+        "runtime.log",
+        "source_sha256.json",
+        "target_topology.json",
+        "viewer_settings.json"
+      ],
+      "files": [
+        {
+          "name": "RUN_STARTED.json",
+          "sha256": "34e1dc8985c663557f94e8fcb829b7ff91507f7c768d726041d16e54b016c602",
+          "bytes": 39
+        },
+        {
+          "name": "bc_v5_policy_logits.jsonl",
+          "sha256": "84bb9d2bec296e6875ca548a8efae330142a8c7645ccbabf51e40806bf6e0266",
+          "bytes": 3259288
+        },
+        {
+          "name": "events.jsonl",
+          "sha256": "c66729e862bcb7bfadbce49d140b2b395f859adb2b4f16a81cc3356c8a36d29f",
+          "bytes": 363211
+        },
+        {
+          "name": "initial_state.json",
+          "sha256": "aa0aef174ac674defc50d7215011bbca32d0c4312aa1dad280814e18d0124708",
+          "bytes": 7526
+        },
+        {
+          "name": "launcher_settings.json",
+          "sha256": "fe237b001a15191614955a5addb63198a3cd5b0b927ae7c9ee5a217a5dbcc5cf",
+          "bytes": 158
+        },
+        {
+          "name": "run_config.json",
+          "sha256": "9c39cf201ffbeb5b56621885ab26aec14d8a09e806629f0e4766e7b929d70b72",
+          "bytes": 5569
+        },
+        {
+          "name": "runtime.log",
+          "sha256": "465f71988300710731ffd03f427d71823e9fe6c88a7982fabf9a27948daeefc6",
+          "bytes": 29324
+        },
+        {
+          "name": "source_sha256.json",
+          "sha256": "3b62986f46d743774940e1358f10e482b958d6887d70e31cdb562cc79f5acd3f",
+          "bytes": 21047
+        },
+        {
+          "name": "target_topology.json",
+          "sha256": "8635b294e702ee91426c7f7ce024fc32ca1d263572babfb88237b31b80686612",
+          "bytes": 4843
+        },
+        {
+          "name": "viewer_settings.json",
+          "sha256": "49ead846dcd507127d201a207ce92c74e74b09d0ca6b7d8f2c418faae71ce822",
+          "bytes": 2196
+        }
+      ],
+      "initial_state_sha256": "f3f7d9439563332742c556f3c8f98be98c602fece87458cb8ee88a2931758636"
+    },
+    {
+      "run_id": "S0_validation_stairs_last_ep20_t1_20261120T103531Z",
+      "file_names": [
+        "RUN_STARTED.json",
+        "bc_v5_policy_logits.jsonl",
+        "events.jsonl",
+        "initial_state.json",
+        "launcher_settings.json",
+        "run_config.json",
+        "runtime.log",
+        "source_sha256.json",
+        "target_topology.json",
+        "viewer_settings.json"
+      ],
+      "files": [
+        {
+          "name": "RUN_STARTED.json",
+          "sha256": "3ef62de7a88e1936103daf84f2da46c42102cc677fac65e938ed341b9bb09d5a",
+          "bytes": 39
+        },
+        {
+          "name": "bc_v5_policy_logits.jsonl",
+          "sha256": "0dc7531bca33fb5b335203fd1722416dba450d14a0133a9661cf78b910ae3125",
+          "bytes": 3394559
+        },
+        {
+          "name": "events.jsonl",
+          "sha256": "7e7b3957e523dd61e2ddd4cc32d70595c3129879b64bb5ccd74c5d05c813971a",
+          "bytes": 424636
+        },
+        {
+          "name": "initial_state.json",
+          "sha256": "6d6ca9abdd27a0ac119124b465482a753385a868b825e622833f47cf054e92d0",
+          "bytes": 7576
+        },
+        {
+          "name": "launcher_settings.json",
+          "sha256": "fe237b001a15191614955a5addb63198a3cd5b0b927ae7c9ee5a217a5dbcc5cf",
+          "bytes": 158
+        },
+        {
+          "name": "run_config.json",
+          "sha256": "ac24b0b725702e4ceb9a680f1bdd3430f7bcc6b15e4155585081931c578da903",
+          "bytes": 5583
+        },
+        {
+          "name": "runtime.log",
+          "sha256": "adc568feb7c010f65545302a07ac61627cee3802be201013f3f74f935d574475",
+          "bytes": 27341
+        },
+        {
+          "name": "source_sha256.json",
+          "sha256": "3b62986f46d743774940e1358f10e482b958d6887d70e31cdb562cc79f5acd3f",
+          "bytes": 21047
+        },
+        {
+          "name": "target_topology.json",
+          "sha256": "8635b294e702ee91426c7f7ce024fc32ca1d263572babfb88237b31b80686612",
+          "bytes": 4843
+        },
+        {
+          "name": "viewer_settings.json",
+          "sha256": "985dfba9903f7ad88ee3f77e163b5cfc04d6c1d047518193a7ee6d4de9c03794",
+          "bytes": 2217
+        }
+      ],
+      "initial_state_sha256": "59b94f1e5c30ed53fdd07d117817a3307ce6e7ce8e38fbe71067af650a1d35ba"
+    }
+  ],
+  "notes": [
+    "Event-based face-labeled target-graph isomorphism is an audit of recorded DOCK COMPLETE edges, not an independent post-run measured physical snapshot.",
+    "A runner status completed denotes horizon reached; it does not certify completion of target morphology.",
+    "When summary.json is absent the user reports manual early termination. Exact cutoff and success flags are not independently recorded.",
+    "MM8 seed 21005 has all seven target-compatible DOCK COMPLETE, 16 SET_TILT COMPLETE; final joint-angle tolerance not independently checked.",
+    "MM8 seed 21005 summary status error refers to FileNotFoundError for policy probe logfile at simulated 92.4 s, not an observed physical assembly failure.",
+    "Offline metrics are not inferred from online viewer runs; no TEST data accessed."
+  ],
+  "test_readiness": {
+    "f1_v8_test_episodes_reserved": 102,
+    "g2_stage11_test_episodes_in_current_inventory": 0,
+    "current_evaluator": "VALIDATION only; not compatible with TEST",
+    "next_required": "separate one-shot test sidecar/evaluator with frozen F2 and decoder 1.0"
+  }
+}
